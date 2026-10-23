@@ -1,156 +1,184 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:math';
 
-import 'package:audioplayers/audioplayers.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
-import 'package:web_socket_channel/io.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
-import 'diagnostics.dart';
+class AmbientStateEvent {
+  const AmbientStateEvent({required this.mode, required this.sub, this.reason});
+  final String mode;
+  final String sub;
+  final String? reason;
+}
 
 class AmbientVoice {
-  AmbientVoice({
-    required this.baseUrl,
-    required this.token,
-    required this.device,
-    required this.onSpeaking,
-  });
-
+  AmbientVoice({required this.baseUrl, required this.token, required this.device});
   final String baseUrl;
   final String token;
   final String device;
-  final void Function(bool speaking) onSpeaking;
-
-  final AudioPlayer _player = AudioPlayer();
-  final List<Map<String, dynamic>> _queue = [];
-  final Set<int> _seen = {};
+  final ValueNotifier<bool> speaking = ValueNotifier(false);
+  final ValueNotifier<AmbientStateEvent?> state = ValueNotifier(null);
+  static const MethodChannel _sink = MethodChannel('snippet/ambient_audio');
+  final Map<int, Map<int, Map<String, dynamic>>> _chunks = {};
+  final Map<int, Set<int>> _received = {};
+  final Set<int> _ended = {};
+  final Set<int> _barged = {};
   WebSocketChannel? _channel;
   StreamSubscription<dynamic>? _sub;
   Timer? _retry;
-  bool _closed = false;
-  bool _playing = false;
-  int _failures = 0;
-  int _last = 0;
-  DateTime? _connectedAt;
-
-  Future<void> start() async {
-    _connect();
-  }
-
-  Uri _uri(String path, [Map<String, String>? query]) => Uri.parse(baseUrl)
-      .replace(path: path, queryParameters: {'token': token, ...?query});
-
+  bool _closed = false, _running = false;
+  int _failures = 0, _last = 0;
+  Uri _uri(String path, [Map<String, String>? query]) => Uri.parse(baseUrl).replace(path: path, queryParameters: {'token': token, ...?query});
+  Future<void> start() async => _connect();
   void _connect() {
     if (_closed) return;
     final base = Uri.parse(baseUrl);
-    final uri = base.replace(
-        scheme: base.scheme == 'https' ? 'wss' : 'ws',
-        path: '/events',
-        queryParameters: {'token': token});
+    final u = base.replace(scheme: base.scheme == 'https' ? 'wss' : 'ws', path: '/events', queryParameters: {'token': token});
     try {
-      final channel = IOWebSocketChannel.connect(uri,
-          connectTimeout: const Duration(seconds: 10),
-          pingInterval: const Duration(seconds: 45));
-      _channel = channel;
-      _sub = channel.stream.listen(_onFrame, onError: (_) => _reconnect(), onDone: _reconnect);
-      _connectedAt = DateTime.now();
-      unawaited(_catchUp());
-    } catch (_) {
-      _reconnect();
-    }
+      final c = WebSocketChannel.connect(u);
+      _channel = c;
+      _sub = c.stream.listen(_frame, onError: (_) => _reconnect(), onDone: _reconnect);
+      _failures = 0;
+      _catchUp();
+    } catch (_) { _reconnect(); }
   }
-
   void _reconnect() {
-    if (_closed) return;
+    if (_closed || _retry?.isActive == true) return;
     _sub?.cancel();
-    _channel = null;
-    final alive = _connectedAt == null ? Duration.zero : DateTime.now().difference(_connectedAt!);
-    _connectedAt = null;
-    _failures = alive > const Duration(seconds: 30) ? 1 : _failures + 1;
-    _retry?.cancel();
-    final base = (2 << (_failures.clamp(0, 5))).clamp(2, 60);
-    _retry = Timer(Duration(milliseconds: base * 1000 + Random().nextInt(1000)), _connect);
+    _retry = Timer(Duration(milliseconds: (500 * (1 << _failures.clamp(0, 5))).clamp(500, 15000)), () { _failures++; _connect(); });
   }
-
+  void _frame(dynamic raw) {
+    try {
+      final f = jsonDecode(raw as String) as Map<String, dynamic>;
+      if (f['device'] != device) return;
+      final turn = f['turn'] as int?;
+      switch (f['kind']) {
+        case 'ambient_state': state.value = AmbientStateEvent(mode: f['mode'] as String? ?? '', sub: f['sub'] as String? ?? '', reason: f['reason'] as String?); break;
+        case 'ambient_speech_start': if (turn != null) { _chunks.putIfAbsent(turn, () => {}); _received.putIfAbsent(turn, () => {}); _play(); } break;
+        case 'ambient_speech_chunk': if (turn != null && !_barged.contains(turn)) { final seq = f['seq'] as int; _received.putIfAbsent(turn, () => {}).add(seq); _chunks.putIfAbsent(turn, () => {})[seq] = f; _play(); } break;
+        case 'ambient_speech_end': if (turn != null) { _ended.add(turn); _play(); } break;
+        case 'ambient_speech_cancel': if (turn != null) _cancel(turn, f['after_seq'] as int? ?? -1); break;
+      }
+    } catch (_) {}
+  }
   Future<void> _catchUp() async {
     try {
-      final response = await http.get(_uri('/ambient/turns', {'after': '$_last', 'device': device}));
-      if (response.statusCode != 200) return;
-      final turns = (jsonDecode(response.body) as Map<String, dynamic>)['turns'] as List? ?? [];
-      for (final t in turns) {
-        _accept((t as Map).cast<String, dynamic>());
+      final r = await http.get(_uri('/ambient/turns', {'after': '$_last', 'device': device}));
+      if (r.statusCode != 200) return;
+      for (final t in (jsonDecode(r.body)['turns'] as List)) {
+        final id = t['id'] as int;
+        _last = id > _last ? id : _last;
+        _chunks.putIfAbsent(id, () => {});
+        _received.putIfAbsent(id, () => {});
+        for (final c in (t['chunks'] as List? ?? [])) { final m = Map<String, dynamic>.from(c as Map); final seq = m['seq'] as int; _chunks[id]![seq] = m; _received[id]!.add(seq); }
+        if (t['ended'] == true) _ended.add(id);
       }
+      _play();
     } catch (_) {}
   }
-
-  void _onFrame(dynamic raw) {
-    try {
-      final frame = jsonDecode(raw as String);
-      if (frame is Map && frame['kind'] == 'ambient_speech' && frame['device'] == device) {
-        _accept(frame.cast<String, dynamic>());
-      }
-    } catch (_) {}
-  }
-
-  void _accept(Map<String, dynamic> turn) {
-    final id = (turn['id'] as num?)?.toInt() ?? 0;
-    if (id == 0 || !_seen.add(id)) return;
-    if (id > _last) _last = id;
-    _queue.add(turn);
-    unawaited(_play());
-  }
-
-  Future<bool> _playServerAudio(int id) async {
-    try {
-      final response = await http
-          .get(_uri('/ambient/turns/$id/audio'))
-          .timeout(const Duration(seconds: 10));
-      if (response.statusCode != 200 || response.bodyBytes.isEmpty) return false;
-      final finished = _player.onPlayerComplete.first;
-      await _player.play(BytesSource(response.bodyBytes, mimeType: 'audio/wav'));
-      await finished.timeout(const Duration(seconds: 90));
-      return true;
-    } catch (e) {
-      await AmbientDiagnostics.log('server audio failed: $e');
-      try {
-        await _player.stop();
-      } catch (_) {}
-      return false;
-    }
-  }
-
   Future<void> _play() async {
-    if (_playing) return;
-    _playing = true;
-    onSpeaking(true);
+    if (_running || _closed) return;
+    _running = true;
+    speaking.value = _chunks.isNotEmpty;
     try {
-      while (_queue.isNotEmpty && !_closed) {
-        final turn = _queue.removeAt(0);
-        if (turn['audio'] == true) {
-          await _playServerAudio((turn['id'] as num).toInt());
+      while (!_closed && _chunks.isNotEmpty) {
+        final turn = _chunks.keys.reduce((a, b) => a < b ? a : b);
+        if (_barged.contains(turn)) { _chunks.remove(turn); continue; }
+        final map = _chunks[turn]!;
+        final keys = map.keys.toList()..sort();
+        if (keys.isEmpty) {
+          if (_ended.contains(turn)) {
+            final pos = await _position();
+            if ((pos['seq'] as int? ?? -1) >= 0) await _played(turn, pos['seq'] as int, pos['played_ms'] as int? ?? 0, true);
+            _chunks.remove(turn);
+            continue;
+          }
+          await Future<void>.delayed(const Duration(milliseconds: 20));
+          continue;
         }
-        unawaited(http
-            .post(_uri('/ambient/turns/played'),
-                headers: {'content-type': 'application/json'},
-                body: jsonEncode({'id': turn['id']}))
-            .catchError((Object _) => http.Response('', 500)));
+        final seq = keys.first;
+        final pcm = await _fetch(turn, seq);
+        map.remove(seq);
+        if (pcm == null) continue;
+        try {
+          await _sink.invokeMethod('enqueue', {'turn': turn, 'seq': seq, 'pcm': pcm, 'silenceMs': 80});
+          final next = map.keys.toList()..sort();
+          if (next.isNotEmpty) unawaited(_pumpAhead(turn));
+          final target = seq;
+          Map<String, dynamic> pos = const {};
+          while (!_closed) {
+            await Future<void>.delayed(const Duration(milliseconds: 20));
+            pos = await _position();
+            if ((pos['seq'] as int? ?? -1) >= target) break;
+          }
+          final playedSeq = pos['seq'] as int? ?? -1;
+          if (playedSeq >= seq) await _played(turn, seq, _duration(pcm), false);
+        } catch (_) {}
+        if (map.isEmpty && _ended.contains(turn)) {
+          Map<String, dynamic> pos;
+          do { await Future<void>.delayed(const Duration(milliseconds: 20)); pos = await _position(); }
+          while (!_closed && (pos['seq'] as int? ?? -1) < seq);
+          await _played(turn, seq, pos['played_ms'] as int? ?? _duration(pcm), true);
+          _chunks.remove(turn);
+        }
       }
-      await Future<void>.delayed(const Duration(milliseconds: 450));
     } finally {
-      _playing = false;
-      onSpeaking(false);
+      _running = false;
+      if (_chunks.isEmpty) {
+        speaking.value = false;
+      } else if (!_closed) {
+        unawaited(_play());
+      }
     }
   }
-
-  Future<void> dispose() async {
-    _closed = true;
-    _retry?.cancel();
-    await _sub?.cancel();
-    await _channel?.sink.close();
-    _queue.clear();
+  int _duration(Uint8List pcm) => pcm.length * 1000 ~/ 48000;
+  Future<Map<String, dynamic>> _position() async => await _sink.invokeMapMethod<String, dynamic>('position') ?? const {};
+  Future<Uint8List?> _fetch(int turn, int seq) async {
+    for (var attempt = 0; attempt < 30; attempt++) {
+      try { final r = await http.get(_uri('/ambient/turns/$turn/chunks/$seq')); if (r.statusCode == 200) return r.bodyBytes; } catch (_) {}
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    }
+    return null;
+  }
+  Future<void> _pumpAhead(int turn) async {
+    final map = _chunks[turn];
+    if (map == null || map.isEmpty) return;
+    final seq = (map.keys.toList()..sort()).first;
     try {
-      await _player.dispose();
+      final r = await http.get(_uri('/ambient/turns/$turn/chunks/$seq'));
+      if (r.statusCode != 200) return;
+      map.remove(seq);
+      await _sink.invokeMethod('enqueue', {'turn': turn, 'seq': seq, 'pcm': r.bodyBytes, 'silenceMs': 80});
     } catch (_) {}
   }
+  Future<void> _played(int id, int seq, int ms, bool complete) async { try { await http.post(_uri('/ambient/turns/played'), headers: {'content-type':'application/json'}, body: jsonEncode({'id':id,'seq':seq,'played_ms':ms,'complete':complete})); } catch (_) {} }
+  Future<void> _cancel(int turn, int after) async {
+    final m = _chunks[turn];
+    m?.removeWhere((seq, _) => seq > after);
+    try {
+      final pos = await _position();
+      final seq = pos['seq'] as int? ?? -1;
+      final ms = pos['played_ms'] as int? ?? 0;
+      if (seq >= 0 && seq > after) {
+        await http.post(_uri('/ambient/barge'), headers: {'content-type': 'application/json'}, body: jsonEncode({'turn': turn, 'seq': seq, 'played_ms': ms}));
+      }
+      await _sink.invokeMethod('cancelAfter', {'turn': turn, 'seq': after, 'fadeMs': 50});
+    } catch (_) {}
+  }
+  Future<void> duck(bool on) async { try { await _sink.invokeMethod('volume', {'volume': on ? 0.3 : 1.0}); } catch (_) {} }
+  Future<void> stopNow() async {
+    final turn = _chunks.isEmpty ? null : _chunks.keys.reduce((a,b) => a < b ? a : b);
+    final pos = await _sink.invokeMapMethod<String, dynamic>('stop');
+    if (turn != null) {
+      final seq = pos?['seq'] as int? ?? -1;
+      final ms = pos?['played_ms'] as int? ?? 0;
+      _barged.add(turn);
+      _chunks.remove(turn);
+      try { await http.post(_uri('/ambient/barge'), headers: {'content-type':'application/json'}, body: jsonEncode({'turn':turn,'seq':seq,'played_ms':ms})); } catch (_) {}
+    }
+    speaking.value = false;
+  }
+  Future<void> dispose() async { _closed = true; _retry?.cancel(); await _sub?.cancel(); await _channel?.sink.close(); await _sink.invokeMethod('stop').catchError((_) {}); speaking.dispose(); state.dispose(); }
 }

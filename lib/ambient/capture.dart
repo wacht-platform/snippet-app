@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:record/record.dart';
 import 'package:silero_vad/silero_vad.dart';
 
@@ -67,8 +68,11 @@ class AmbientCapture {
   StreamSubscription<Uint8List>? _sub;
   Timer? _ticker;
   bool _running = false;
-  bool _muted = false;
+  bool _duringPlayback = false;
+  bool _ducked = false;
+  DateTime? _speechSince;
   AmbientVoice? _voice;
+  final ValueNotifier<AmbientVoice?> voiceListenable = ValueNotifier(null);
   double _probability = 0;
   int _segments = 0;
   String? _error;
@@ -84,7 +88,7 @@ class AmbientCapture {
         pending: uploader.pending.value,
         error: uploader.displaced.value ? null : (_error ?? uploader.lastError.value),
         displaced: uploader.displaced.value,
-        assistantSpeaking: _muted,
+        assistantSpeaking: _voice?.speaking.value ?? false,
       );
 
   Future<void> start() async {
@@ -100,16 +104,24 @@ class AmbientCapture {
     _segmenter = SpeechSegmenter(
       threshold: threshold,
       offThreshold: threshold - 0.15,
+      onSpeechStart: (startedAt) {
+        final seq = uploader.reserveSequence();
+        unawaited(seq.then((value) => uploader.activity(startedAt, value)));
+        return seq;
+      },
       onSegment: (segment) {
         _segments++;
-        unawaited(uploader.enqueue(segment));
+        unawaited(uploader.enqueue(segment.copyWith(duringPlayback: _duringPlayback)));
       },
     );
-    final stream = await _recorder.startStream(const RecordConfig(
+    final stream = await _recorder.startStream(RecordConfig(
         encoder: AudioEncoder.pcm16bits,
         sampleRate: 16000,
         numChannels: 1,
-        audioInterruption: AudioInterruptionMode.none));
+        audioInterruption: AudioInterruptionMode.none,
+        echoCancel: true,
+        noiseSuppress: true,
+        androidConfig: const AndroidRecordConfig(audioSource: AndroidAudioSource.voiceCommunication)));
     _running = true;
     _error = null;
     _sub = stream.listen(_onAudio, onError: (Object e) {
@@ -122,28 +134,13 @@ class AmbientCapture {
       baseUrl: uploader.baseUrl,
       token: uploader.token,
       device: uploader.device,
-      onSpeaking: _setMuted,
     );
+    voiceListenable.value = _voice;
     unawaited(_voice!.start());
     _status.add(current);
   }
 
-  Timer? _muteGuard;
-
-  void _setMuted(bool muted) {
-    if (_muted == muted) return;
-    _muted = muted;
-    _muteGuard?.cancel();
-    if (muted) _muteGuard = Timer(const Duration(seconds: 90), () => _setMuted(false));
-    if (muted) {
-      _segmenter?.flush();
-      _pending.clear();
-    }
-    if (!_status.isClosed) _status.add(current);
-  }
-
   void _onAudio(Uint8List bytes) {
-    if (_muted) return;
     final vad = _vad;
     final segmenter = _segmenter;
     if (vad == null || segmenter == null) return;
@@ -160,11 +157,33 @@ class AmbientCapture {
       }
       _probability = vad.process(samples);
       segmenter.addFrame(frame, _probability);
+      _handleBargeIn(segmenter.speaking);
       offset += chunkBytes;
     }
     if (offset < buffer.length) {
       _pending.add(Uint8List.sublistView(buffer, offset));
     }
+  }
+
+  void _handleBargeIn(bool voiceActive) {
+    final voice = _voice;
+    if (voice == null || !voice.speaking.value) {
+      _speechSince = null;
+      _duringPlayback = false;
+      if (_ducked && voice != null) { _ducked = false; unawaited(voice.duck(false)); }
+      return;
+    }
+    if (!voiceActive) {
+      _speechSince = null;
+      if (_ducked) { _ducked = false; unawaited(voice.duck(false)); }
+      _duringPlayback = false;
+      return;
+    }
+    _duringPlayback = true;
+    final since = _speechSince ??= DateTime.now();
+    final elapsed = DateTime.now().difference(since);
+    if (elapsed >= const Duration(milliseconds: 250) && !_ducked) { _ducked = true; unawaited(voice.duck(true)); }
+    if (elapsed >= const Duration(milliseconds: 400)) { _speechSince = null; unawaited(voice.stopNow()); }
   }
 
   Future<void> stop() async {
@@ -180,9 +199,10 @@ class AmbientCapture {
   }
 
   Future<void> dispose() async {
-    _muteGuard?.cancel();
     await _voice?.dispose();
     _voice = null;
+    voiceListenable.value = null;
+    voiceListenable.dispose();
     await stop();
     uploader.close();
     await _recorder.dispose();

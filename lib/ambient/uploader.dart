@@ -6,6 +6,9 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import 'diagnostics.dart';
 
 import 'segmenter.dart';
 import 'wav.dart';
@@ -67,7 +70,7 @@ class AmbientUploader {
   Directory? _dir;
   final Set<String> _inFlight = {};
   int _workers = 0;
-  static const _maxWorkers = 3;
+  static const _maxWorkers = 2;
   bool _closed = false;
   int _failures = 0;
 
@@ -83,7 +86,25 @@ class AmbientUploader {
   Future<void> start() async {
     await _refreshCount();
     _heartbeat = Timer.periodic(const Duration(seconds: 15), (_) => _beat());
-    unawaited(_drain());
+    unawaited(_drain(backlog: displaced.value));
+  }
+
+  Future<int> _nextSeq() async {
+    final prefs = await SharedPreferences.getInstance();
+    final key = 'ambient_seq_$device';
+    final current = prefs.getInt(key) ?? 0;
+    final next = max(current, DateTime.now().millisecondsSinceEpoch ~/ 1000) + 1;
+    await prefs.setInt(key, next);
+    return next;
+  }
+
+  Future<int> reserveSequence() => _nextSeq();
+
+  Future<void> activity(DateTime startedAt, int seq) async {
+    try {
+      final uri = Uri.parse(baseUrl).replace(path: '/ambient/activity', queryParameters: {'token': token});
+      await http.post(uri, headers: {'content-type': 'application/json'}, body: jsonEncode({'device': device, 'seq': seq, 'started_at': startedAt.toIso8601String()})).timeout(const Duration(seconds: 10));
+    } catch (_) {}
   }
 
   Future<void> _beat() async {
@@ -99,24 +120,17 @@ class AmbientUploader {
           (jsonDecode(response.body) as Map<String, dynamic>)['held'] == false) {
         await _giveUp();
       }
-    } catch (_) {}
+    } catch (e) {
+      await AmbientDiagnostics.log('heartbeat failed: $e');
+    }
   }
 
   Future<void> _giveUp() async {
     if (displaced.value) return;
     displaced.value = true;
     _heartbeat?.cancel();
-    final dir = await _queueDir();
-    await for (final f in dir.list()) {
-      if (f is File) {
-        try {
-          await f.delete();
-        } on FileSystemException {
-          continue;
-        }
-      }
-    }
-    pending.value = 0;
+    pending.value = await _refreshCount();
+    unawaited(_drain(backlog: true));
     lastError.value = 'Another device took over listening';
   }
 
@@ -133,15 +147,19 @@ class AmbientUploader {
   Future<void> _write(AmbientSegment segment) async {
     final dir = await _queueDir();
     final id = newSegmentId();
+    final seq = await (segment.seq ?? _nextSeq());
     await File('${dir.path}/$id.wav').writeAsBytes(pcm16ToWav(segment.pcm), flush: true);
     await File('${dir.path}/$id.json').writeAsString(jsonEncode({
       'id': id,
       'started_at': segment.startedAt.toUtc().toIso8601String(),
       'duration_ms': segment.duration.inMilliseconds,
+      'continued': segment.continued,
+      'during_playback': segment.duringPlayback,
+      'seq': seq,
     }), flush: true);
     await _trim(dir);
     await _refreshCount();
-    unawaited(_drain());
+    unawaited(_drain(backlog: displaced.value));
   }
 
   Future<void> _trim(Directory dir) async {
@@ -183,19 +201,21 @@ class AmbientUploader {
     return metas;
   }
 
-  Future<void> _refreshCount() async {
-    pending.value = (await _metas()).length;
+  Future<int> _refreshCount() async {
+    final count = (await _metas()).length;
+    pending.value = count;
+    return count;
   }
 
-  Future<void> _drain() async {
+  Future<void> _drain({bool backlog = false}) async {
     if (_closed) return;
     while (_workers < _maxWorkers) {
       _workers++;
-      unawaited(_worker());
+      unawaited(_worker(backlog: backlog));
     }
   }
 
-  Future<void> _worker() async {
+  Future<void> _worker({bool backlog = false}) async {
     try {
       while (!_closed) {
         final metas = await _metas();
@@ -208,7 +228,7 @@ class AmbientUploader {
         _inFlight.add(next.path);
         bool ok;
         try {
-          ok = await _upload(next);
+          ok = await _upload(next, backlog: backlog || displaced.value);
         } finally {
           _inFlight.remove(next.path);
         }
@@ -226,7 +246,7 @@ class AmbientUploader {
     }
   }
 
-  Future<bool> _upload(File meta) async {
+  Future<bool> _upload(File meta, {bool backlog = false}) async {
     final stem = meta.path.substring(0, meta.path.length - 5);
     final audio = File('$stem.wav');
     try {
@@ -241,6 +261,10 @@ class AmbientUploader {
         'device': device,
         'started_at': info['started_at'] as String,
         'duration_ms': '${info['duration_ms']}',
+        'seq': '${info['seq']}',
+        'continued': '${info['continued'] == true}',
+        'during_playback': '${info['during_playback'] == true}',
+        if (backlog) 'backlog': '1',
       });
       final response = await http
           .post(uri, headers: {'content-type': 'audio/wav'}, body: await audio.readAsBytes())
@@ -250,8 +274,10 @@ class AmbientUploader {
         return true;
       }
       if (response.statusCode == 409) {
+        if (backlog) { await _remove(stem); return true; }
         await _giveUp();
-        return true;
+        final retry = await _upload(meta, backlog: true);
+        return retry;
       }
       if (response.statusCode == 400 || response.statusCode == 413) {
         lastError.value = 'Server rejected a segment (${response.statusCode}); dropped it';

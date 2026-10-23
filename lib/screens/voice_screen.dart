@@ -254,32 +254,32 @@ class _VoiceScreenState extends State<VoiceScreen> {
     return [
       SettingsGroup(
         header: 'Ambient listening',
-        footer: 'Each line of speech is sent to TypeSafe (Jev) to tell real '
+        footer: 'Each line of speech is sent to the voice classifier (a TypeSafe model) to tell real '
             'conversation from TV and background, and to notice when you are '
             'talking to the assistant. With chat context on, a short, redacted '
-            'tail of your Mission Control chat goes too. Without Jev, only a '
+            'tail of your Mission Control chat goes too. Without the voice classifier, only a '
             'wake phrase works.',
         children: [
           SettingsRow(
-            label: 'Filter with Jev',
+            label: 'Voice classifier',
             trailing: SettingsSwitch(
-              value: a.watcher == 'jev',
-              onChanged: _busy ? null : (on) => _saveAmbient(watcher: on ? 'jev' : 'off'),
+              value: a.watcher == 'classifier',
+              onChanged: _busy ? null : (on) => _saveAmbient(watcher: on ? 'classifier' : 'off'),
             ),
           ),
           SettingsRow(
             label: 'Share chat context',
-            sub: 'Send recent Mission Control chat and its open question to Jev',
+            sub: 'Send recent Mission Control chat and its open question to the voice classifier',
             trailing: SettingsSwitch(
               value: a.watcherChatContext,
-              onChanged: _busy || a.watcher != 'jev'
+              onChanged: _busy || a.watcher != 'classifier'
                   ? null
                   : (on) => _saveAmbient(chatContext: on),
             ),
           ),
           SettingsRow(
             label: 'TypeSafe key',
-            sub: a.watcherKeySet ? 'Saved on this machine' : 'Needed for Jev',
+            sub: a.watcherKeySet ? 'Saved on this machine' : 'Needed for the voice classifier',
             chevron: true,
             onTap: () => _editWatcherKey(a),
           ),

@@ -6,10 +6,13 @@ import 'package:flutter/services.dart';
 
 import '../../../ambient/capture.dart';
 import '../../../ambient/controller.dart';
+import '../../../ambient/voice.dart';
 import '../../../api.dart';
 import '../../../models.dart';
 import '../../../theme.dart';
 import '../../../widgets.dart';
+
+final ValueNotifier<AmbientStateEvent?> _emptyAmbientState = ValueNotifier(null);
 
 Color _modeColor(String mode) =>
     mode == 'active' ? AppColors.accent : AppColors.ok;
@@ -345,7 +348,15 @@ class _AmbientStageState extends State<AmbientStage> {
     super.dispose();
   }
 
-  String _caption(String mode, bool selected) {
+  String _caption(String mode, bool selected, [AmbientStateEvent? event]) {
+    if (selected && event != null) {
+      if (event.mode == 'passive') return 'Listening quietly';
+      if (event.mode == 'pinned') return 'Ready to talk';
+      if (event.mode == 'active') return 'In conversation';
+      if (event.sub == 'speaking') return 'Speaking';
+      if (event.sub == 'thinking') return 'Thinking';
+      if (event.sub == 'listening') return 'Listening';
+    }
     if (selected && _m.elsewhere) {
       return 'Listening on ${_m.settings?.listeningDevice ?? 'another device'}';
     }
@@ -405,12 +416,15 @@ class _AmbientStageState extends State<AmbientStage> {
                       weight: W.strong,
                       color: selected ? AppColors.fg1 : AppColors.fg3)),
               const SizedBox(height: 3),
-              AnimatedSwitcher(
-                duration: const Duration(milliseconds: 200),
-                child: Text(_caption(mode, selected),
-                    key: ValueKey(_caption(mode, selected)),
-                    textAlign: TextAlign.center,
-                    style: sans(13, color: AppColors.fg4)),
+              ValueListenableBuilder<AmbientVoice?>(
+                valueListenable: AmbientController.instance.voice,
+                builder: (context, voice, _) => ValueListenableBuilder<AmbientStateEvent?>(
+                  valueListenable: voice?.state ?? _emptyAmbientState,
+                  builder: (context, event, _) => Column(mainAxisSize: MainAxisSize.min, children: [
+                    AnimatedSwitcher(duration: const Duration(milliseconds: 200), child: Text(_caption(mode, selected, event), key: ValueKey(_caption(mode, selected, event)), textAlign: TextAlign.center, style: sans(13, color: AppColors.fg4))),
+                    if (event?.reason?.startsWith('mission_control:') == true) Text(event!.reason!.substring('mission_control:'.length).trim(), maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(12, color: AppColors.fg4)),
+                  ]),
+                ),
               ),
             ]),
           ),

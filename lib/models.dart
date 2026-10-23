@@ -1722,7 +1722,7 @@ class AmbientSettings {
       this.effectiveMode = '',
       this.watcherChatContext = false,
       this.modelsReady = false,
-      this.watcher = 'jev',
+      this.watcher = 'classifier',
       this.watcherKeySet = false,
       this.conversationTimeoutSecs = 90,
       this.wakePhrases = const []});
@@ -1755,7 +1755,7 @@ class AmbientSettings {
         effectiveMode = j['effective_mode'] as String? ?? '',
         watcherChatContext = j['watcher_chat_context'] == true,
         modelsReady = j['models_ready'] == true,
-        watcher = j['watcher'] as String? ?? 'jev',
+        watcher = (j['watcher'] as String? ?? 'classifier') == 'jev' ? 'classifier' : (j['watcher'] as String? ?? 'classifier'),
         watcherKeySet = j['watcher_key_set'] == true,
         conversationTimeoutSecs = (j['conversation_timeout_secs'] as num?)?.toInt() ?? 90,
         wakePhrases = [for (final p in (j['wake_phrases'] as List? ?? const [])) p as String],

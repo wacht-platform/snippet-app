@@ -2,9 +2,13 @@ import 'dart:collection';
 import 'dart:typed_data';
 
 class AmbientSegment {
-  AmbientSegment(this.startedAt, this.pcm);
+  AmbientSegment(this.startedAt, this.pcm, {this.continued = false, this.duringPlayback = false, this.seq});
   final DateTime startedAt;
   final Uint8List pcm;
+  final bool continued;
+  final bool duringPlayback;
+  final Future<int>? seq;
+  AmbientSegment copyWith({bool? duringPlayback, Future<int>? seq}) => AmbientSegment(startedAt, pcm, continued: continued, duringPlayback: duringPlayback ?? this.duringPlayback, seq: seq ?? this.seq);
 
   Duration get duration => Duration(milliseconds: pcm.length ~/ 2 * 1000 ~/ 16000);
 }
@@ -12,17 +16,19 @@ class AmbientSegment {
 class SpeechSegmenter {
   SpeechSegmenter({
     required this.onSegment,
+    required this.onSpeechStart,
     this.threshold = 0.5,
     this.offThreshold = 0.35,
     this.preRollFrames = 10,
     this.minSpeechFrames = 8,
-    this.endSilenceFrames = 16,
+    this.endSilenceFrames = 25,
     this.maxFrames = 1875,
   });
 
   static const frameMs = 32;
 
   final void Function(AmbientSegment segment) onSegment;
+  final Future<int> Function(DateTime startedAt) onSpeechStart;
   final double threshold;
   final double offThreshold;
   final int preRollFrames;
@@ -37,12 +43,29 @@ class SpeechSegmenter {
   int _speechFrames = 0;
   int _silentFrames = 0;
   DateTime _startedAt = DateTime.now();
+  bool _continued = false;
+  Future<int>? _seq;
+  Uint8List? _pendingTail;
+  DateTime? _pendingTailStartedAt;
 
   bool get speaking => _active;
 
   void addFrame(Uint8List frame, double probability) {
     if (!_active) {
-      if (probability >= threshold) {
+      if (_pendingTail != null) {
+        if (probability >= offThreshold) {
+          _beginContinued(frame);
+        } else {
+          _preRoll.addLast(_pendingTail!);
+          _preRoll.addLast(frame);
+          while (_preRoll.length > preRollFrames) {
+            _preRoll.removeFirst();
+          }
+          _pendingTail = null;
+          _pendingTailStartedAt = null;
+          if (probability >= threshold) _begin(frame);
+        }
+      } else if (probability >= threshold) {
         _begin(frame);
       } else {
         _preRoll.addLast(frame);
@@ -63,9 +86,16 @@ class SpeechSegmenter {
     if (_silentFrames >= endSilenceFrames) {
       _finish();
     } else if (_frames >= maxFrames) {
-      final keepGoing = probability >= offThreshold;
-      _finish();
-      if (keepGoing) _beginEmpty();
+      final frames = _buffer.takeBytes();
+      const tailBytes = 10 * 512 * 2;
+      final first = Uint8List.fromList(frames.sublist(0, frames.length - tailBytes));
+      final tail = Uint8List.fromList(frames.sublist(frames.length - tailBytes));
+      final wasContinued = _continued;
+      _active = false;
+      _continued = true;
+      if (_speechFrames >= minSpeechFrames) onSegment(AmbientSegment(_startedAt, first, continued: wasContinued));
+      _pendingTail = tail;
+      _pendingTailStartedAt = _startedAt.add(Duration(milliseconds: first.length ~/ 2 * 1000 ~/ 16000));
     }
   }
 
@@ -86,14 +116,21 @@ class SpeechSegmenter {
     _speechFrames = 1;
     _silentFrames = 0;
     _active = true;
+    _continued = false;
+    _seq = onSpeechStart(_startedAt);
   }
 
-  void _beginEmpty() {
-    _startedAt = DateTime.now();
-    _frames = 0;
+  void _beginContinued(Uint8List frame) {
+    _startedAt = _pendingTailStartedAt ?? DateTime.now();
+    _buffer.add(_pendingTail!);
+    _buffer.add(frame);
+    _pendingTail = null;
+    _pendingTailStartedAt = null;
+    _frames = 11;
     _speechFrames = 1;
     _silentFrames = 0;
     _active = true;
+    _continued = true;
   }
 
   void _finish() {
@@ -104,7 +141,7 @@ class SpeechSegmenter {
     _speechFrames = 0;
     _silentFrames = 0;
     if (enough && bytes.isNotEmpty) {
-      onSegment(AmbientSegment(_startedAt, bytes));
+      onSegment(AmbientSegment(_startedAt, bytes, continued: _continued, seq: _seq));
     }
   }
 }

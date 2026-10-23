@@ -9,6 +9,7 @@ import '../api.dart';
 import '../models.dart';
 import '../platform.dart';
 import 'capture.dart';
+import 'voice.dart';
 import 'diagnostics.dart';
 import 'uploader.dart';
 
@@ -84,8 +85,11 @@ class AmbientController extends ChangeNotifier {
   StreamSubscription<AmbientStatus>? _localSub;
   bool _bound = false;
   bool _initialised = false;
+  static final ValueNotifier<AmbientVoice?> _emptyVoice = ValueNotifier(null);
 
   bool get running => status.running;
+
+  ValueListenable<AmbientVoice?> get voice => _local?.voiceListenable ?? _emptyVoice;
 
   Future<String> get deviceId async => (await _identity).$1;
 
