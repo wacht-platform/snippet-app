@@ -1676,7 +1676,6 @@ class AmbientSettings {
   final bool conversationOpen;
   final String effectiveMode;
   final bool watcherChatContext;
-  final String voice;
   final bool modelsReady;
   final String watcher;
   final bool watcherKeySet;
@@ -1693,7 +1692,6 @@ class AmbientSettings {
       this.conversationOpen = false,
       this.effectiveMode = '',
       this.watcherChatContext = false,
-      this.voice = '',
       this.modelsReady = false,
       this.watcher = 'jev',
       this.watcherKeySet = false,
@@ -1712,7 +1710,6 @@ class AmbientSettings {
       conversationOpen: conversationOpen,
       effectiveMode: effectiveMode,
       watcherChatContext: watcherChatContext,
-      voice: voice,
       modelsReady: modelsReady,
       watcher: watcher,
       watcherKeySet: watcherKeySet,
@@ -1728,7 +1725,6 @@ class AmbientSettings {
         conversationOpen = j['conversation'] != null,
         effectiveMode = j['effective_mode'] as String? ?? '',
         watcherChatContext = j['watcher_chat_context'] == true,
-        voice = j['voice'] as String? ?? '',
         modelsReady = j['models_ready'] == true,
         watcher = j['watcher'] as String? ?? 'jev',
         watcherKeySet = j['watcher_key_set'] == true,

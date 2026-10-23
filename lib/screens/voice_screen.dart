@@ -159,7 +159,6 @@ class _VoiceScreenState extends State<VoiceScreen> {
   Future<void> _saveAmbient({
     String? watcher,
     bool? chatContext,
-    String? voice,
     String? typesafeKey,
     int? timeout,
     List<String>? phrases,
@@ -171,7 +170,6 @@ class _VoiceScreenState extends State<VoiceScreen> {
       final next = await widget.client.setAmbientSettings(
           watcher: watcher,
           watcherChatContext: chatContext,
-          voice: voice,
           typesafeKey: typesafeKey,
           conversationTimeoutSecs: timeout,
           wakePhrases: phrases);
@@ -252,7 +250,7 @@ class _VoiceScreenState extends State<VoiceScreen> {
       SettingsGroup(
         header: 'Reply voice',
         footer: 'Mission Control\'s spoken replies are made on this machine and played on the listening device.',
-        children: [for (final m in _models.where((m) => m.kind == 'tts')) _modelRow(m, a.voice == m.id, (id) => _saveAmbient(voice: id))],
+        children: [for (final m in _models.where((m) => m.kind == 'tts')) _modelRow(m, false, (_) async {})],
       ),
       SettingsGroup(
         header: 'Conversation',
