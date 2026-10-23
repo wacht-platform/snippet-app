@@ -128,9 +128,13 @@ class AmbientCapture {
     _status.add(current);
   }
 
+  Timer? _muteGuard;
+
   void _setMuted(bool muted) {
     if (_muted == muted) return;
     _muted = muted;
+    _muteGuard?.cancel();
+    if (muted) _muteGuard = Timer(const Duration(seconds: 90), () => _setMuted(false));
     if (muted) {
       _segmenter?.flush();
       _pending.clear();
@@ -176,6 +180,7 @@ class AmbientCapture {
   }
 
   Future<void> dispose() async {
+    _muteGuard?.cancel();
     await _voice?.dispose();
     _voice = null;
     await stop();

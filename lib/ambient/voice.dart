@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:http/http.dart' as http;
@@ -31,6 +32,7 @@ class AmbientVoice {
   bool _playing = false;
   int _failures = 0;
   int _last = 0;
+  DateTime? _connectedAt;
 
   Future<void> start() async {
     try {
@@ -58,7 +60,7 @@ class AmbientVoice {
           pingInterval: const Duration(seconds: 45));
       _channel = channel;
       _sub = channel.stream.listen(_onFrame, onError: (_) => _reconnect(), onDone: _reconnect);
-      _failures = 0;
+      _connectedAt = DateTime.now();
       unawaited(_catchUp());
     } catch (_) {
       _reconnect();
@@ -69,9 +71,12 @@ class AmbientVoice {
     if (_closed) return;
     _sub?.cancel();
     _channel = null;
-    _failures++;
+    final alive = _connectedAt == null ? Duration.zero : DateTime.now().difference(_connectedAt!);
+    _connectedAt = null;
+    _failures = alive > const Duration(seconds: 30) ? 1 : _failures + 1;
     _retry?.cancel();
-    _retry = Timer(Duration(seconds: (2 << (_failures.clamp(0, 5))).clamp(2, 60)), _connect);
+    final base = (2 << (_failures.clamp(0, 5))).clamp(2, 60);
+    _retry = Timer(Duration(milliseconds: base * 1000 + Random().nextInt(1000)), _connect);
   }
 
   Future<void> _catchUp() async {
@@ -112,7 +117,12 @@ class AmbientVoice {
         final text = (turn['text'] as String?) ?? '';
         if (text.isNotEmpty) {
           try {
-            await _tts.speak(text);
+            await _tts.speak(text).timeout(Duration(milliseconds: text.length * 90 + 6000));
+          } on TimeoutException {
+            await AmbientDiagnostics.log('tts timed out');
+            try {
+              await _tts.stop();
+            } catch (_) {}
           } catch (e) {
             await AmbientDiagnostics.log('tts failed: $e');
           }
