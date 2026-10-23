@@ -1663,6 +1663,8 @@ class AmbientSettings {
   final bool conversationOpen;
   final String effectiveMode;
   final bool watcherChatContext;
+  final String voice;
+  final List<(String, String)> voices;
   final String watcher;
   final bool watcherKeySet;
   final int conversationTimeoutSecs;
@@ -1678,6 +1680,8 @@ class AmbientSettings {
       this.conversationOpen = false,
       this.effectiveMode = '',
       this.watcherChatContext = false,
+      this.voice = 'system',
+      this.voices = const [],
       this.watcher = 'jev',
       this.watcherKeySet = false,
       this.conversationTimeoutSecs = 90,
@@ -1695,6 +1699,8 @@ class AmbientSettings {
       conversationOpen: conversationOpen,
       effectiveMode: effectiveMode,
       watcherChatContext: watcherChatContext,
+      voice: voice,
+      voices: voices,
       watcher: watcher,
       watcherKeySet: watcherKeySet,
       conversationTimeoutSecs: conversationTimeoutSecs,
@@ -1709,6 +1715,11 @@ class AmbientSettings {
         conversationOpen = j['conversation'] != null,
         effectiveMode = j['effective_mode'] as String? ?? '',
         watcherChatContext = j['watcher_chat_context'] == true,
+        voice = j['voice'] as String? ?? 'system',
+        voices = [
+          for (final v in (j['voices'] as List? ?? const []))
+            ((v as Map)['id'] as String, v['name'] as String)
+        ],
         watcher = j['watcher'] as String? ?? 'jev',
         watcherKeySet = j['watcher_key_set'] == true,
         conversationTimeoutSecs = (j['conversation_timeout_secs'] as num?)?.toInt() ?? 90,

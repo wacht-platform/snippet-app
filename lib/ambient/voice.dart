@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:http/http.dart' as http;
 import 'package:web_socket_channel/io.dart';
@@ -23,6 +24,7 @@ class AmbientVoice {
   final void Function(bool speaking) onSpeaking;
 
   final FlutterTts _tts = FlutterTts();
+  final AudioPlayer _player = AudioPlayer();
   final List<Map<String, dynamic>> _queue = [];
   final Set<int> _seen = {};
   WebSocketChannel? _channel;
@@ -107,6 +109,25 @@ class AmbientVoice {
     unawaited(_play());
   }
 
+  Future<bool> _playServerAudio(int id) async {
+    try {
+      final response = await http
+          .get(_uri('/ambient/turns/$id/audio'))
+          .timeout(const Duration(seconds: 10));
+      if (response.statusCode != 200 || response.bodyBytes.isEmpty) return false;
+      final finished = _player.onPlayerComplete.first;
+      await _player.play(BytesSource(response.bodyBytes, mimeType: 'audio/wav'));
+      await finished.timeout(const Duration(seconds: 90));
+      return true;
+    } catch (e) {
+      await AmbientDiagnostics.log('server audio failed: $e');
+      try {
+        await _player.stop();
+      } catch (_) {}
+      return false;
+    }
+  }
+
   Future<void> _play() async {
     if (_playing) return;
     _playing = true;
@@ -115,7 +136,9 @@ class AmbientVoice {
       while (_queue.isNotEmpty && !_closed) {
         final turn = _queue.removeAt(0);
         final text = (turn['text'] as String?) ?? '';
-        if (text.isNotEmpty) {
+        final spoken = turn['audio'] == true &&
+            await _playServerAudio((turn['id'] as num).toInt());
+        if (!spoken && text.isNotEmpty) {
           try {
             await _tts.speak(text).timeout(Duration(milliseconds: text.length * 90 + 6000));
           } on TimeoutException {
@@ -148,6 +171,7 @@ class AmbientVoice {
     _queue.clear();
     try {
       await _tts.stop();
+      await _player.dispose();
     } catch (_) {}
   }
 }

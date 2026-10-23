@@ -299,6 +299,7 @@ class _VoiceScreenState extends State<VoiceScreen> {
   Future<void> _saveAmbient({
     String? watcher,
     bool? chatContext,
+    String? voice,
     String? typesafeKey,
     int? timeout,
     List<String>? phrases,
@@ -310,6 +311,7 @@ class _VoiceScreenState extends State<VoiceScreen> {
       final next = await widget.client.setAmbientSettings(
           watcher: watcher,
           watcherChatContext: chatContext,
+          voice: voice,
           typesafeKey: typesafeKey,
           conversationTimeoutSecs: timeout,
           wakePhrases: phrases);
@@ -379,6 +381,29 @@ class _VoiceScreenState extends State<VoiceScreen> {
             sub: a.watcherKeySet ? 'Saved on this machine' : 'Needed for Jev',
             chevron: true,
             onTap: () => _editWatcherKey(a),
+          ),
+        ],
+      ),
+      SettingsGroup(
+        header: 'Replies',
+        footer: 'Mission Control\'s spoken replies are made on this machine and '
+            'played on the listening device. The voice downloads the first time '
+            'it is used. The system voice uses the phone\'s own speech engine.',
+        children: [
+          SettingsRow(
+            label: 'Reply voice',
+            trailing: SettingsPopup<String>(
+              label: a.voice == 'system'
+                  ? 'System voice'
+                  : a.voices.firstWhere((v) => v.$1 == a.voice,
+                      orElse: () => (a.voice, a.voice)).$2,
+              selected: a.voice,
+              items: [
+                for (final v in a.voices) (v.$1, v.$2),
+                ('system', 'System voice'),
+              ],
+              onSelected: (v) => _saveAmbient(voice: v),
+            ),
           ),
         ],
       ),
