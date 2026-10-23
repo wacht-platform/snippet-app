@@ -461,10 +461,10 @@ class _AmbientStageState extends State<AmbientStage> {
                         itemBuilder: (_, i) => _globe(i, globe),
                       ),
               ),
-              if (_m.on && _m.settings?.keySet == false)
+              if (!_m.on && _m.settings != null && !_m.settings!.modelsReady)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(32, 10, 32, 0),
-                  child: Text('Add an AssemblyAI key in Voice settings or nothing will be transcribed.',
+                  child: Text('Download a speech model and a reply voice in Settings, Voice, to start listening.',
                       textAlign: TextAlign.center,
                       style: sans(13, color: AppColors.fg3)),
                 ),

@@ -498,6 +498,7 @@ class DaemonClient {
     String? watcher,
     bool? watcherChatContext,
     String? voice,
+    String? sttModel,
     String? typesafeKey,
     int? conversationTimeoutSecs,
     List<String>? wakePhrases,
@@ -510,14 +511,40 @@ class DaemonClient {
           if (watcher != null) 'watcher': watcher,
           if (watcherChatContext != null) 'watcher_chat_context': watcherChatContext,
           if (voice != null) 'voice': voice,
+          if (sttModel != null) 'stt_model': sttModel,
           if (typesafeKey != null) 'typesafe_api_key': typesafeKey,
           if (conversationTimeoutSecs != null)
             'conversation_timeout_secs': conversationTimeoutSecs,
           if (wakePhrases != null) 'wake_phrases': wakePhrases,
         }));
-    if (r.statusCode != 200) throw _err('save ambient settings', r);
+    if (r.statusCode != 200) {
+      throw r.statusCode == 400 ? r.body : _err('save ambient settings', r);
+    }
     return AmbientSettings.fromJson(jsonDecode(r.body) as Map<String, dynamic>);
   }
+
+  Future<List<ModelInfo>> listModels() async {
+    final r = await http.get(_uri('/models'));
+    if (r.statusCode != 200) throw _err('load models', r);
+    return _models(r.body);
+  }
+
+  Future<List<ModelInfo>> downloadModel(String id) async {
+    final r = await http.post(_uri('/models/download'), headers: _json, body: jsonEncode({'id': id}));
+    if (r.statusCode != 200) throw r.statusCode == 400 ? r.body : _err('download model', r);
+    return _models(r.body);
+  }
+
+  Future<List<ModelInfo>> deleteModel(String id) async {
+    final r = await http.post(_uri('/models/delete'), headers: _json, body: jsonEncode({'id': id}));
+    if (r.statusCode != 200) throw r.statusCode == 409 ? r.body : _err('remove model', r);
+    return _models(r.body);
+  }
+
+  List<ModelInfo> _models(String body) => [
+        for (final m in ((jsonDecode(body) as Map<String, dynamic>)['models'] as List? ?? const []))
+          ModelInfo.fromJson((m as Map).cast<String, dynamic>())
+      ];
 
   Future<bool> claimAmbientLease(String device, String label) async {
     final r = await http.post(_uri('/ambient/lease'),

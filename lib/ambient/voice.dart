@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:audioplayers/audioplayers.dart';
-import 'package:flutter_tts/flutter_tts.dart';
 import 'package:http/http.dart' as http;
 import 'package:web_socket_channel/io.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
@@ -23,7 +22,6 @@ class AmbientVoice {
   final String device;
   final void Function(bool speaking) onSpeaking;
 
-  final FlutterTts _tts = FlutterTts();
   final AudioPlayer _player = AudioPlayer();
   final List<Map<String, dynamic>> _queue = [];
   final Set<int> _seen = {};
@@ -37,12 +35,6 @@ class AmbientVoice {
   DateTime? _connectedAt;
 
   Future<void> start() async {
-    try {
-      await _tts.awaitSpeakCompletion(true);
-      await _tts.setSpeechRate(0.5);
-    } catch (e) {
-      await AmbientDiagnostics.log('tts setup failed: $e');
-    }
     _connect();
   }
 
@@ -135,20 +127,8 @@ class AmbientVoice {
     try {
       while (_queue.isNotEmpty && !_closed) {
         final turn = _queue.removeAt(0);
-        final text = (turn['text'] as String?) ?? '';
-        final spoken = turn['audio'] == true &&
-            await _playServerAudio((turn['id'] as num).toInt());
-        if (!spoken && text.isNotEmpty) {
-          try {
-            await _tts.speak(text).timeout(Duration(milliseconds: text.length * 90 + 6000));
-          } on TimeoutException {
-            await AmbientDiagnostics.log('tts timed out');
-            try {
-              await _tts.stop();
-            } catch (_) {}
-          } catch (e) {
-            await AmbientDiagnostics.log('tts failed: $e');
-          }
+        if (turn['audio'] == true) {
+          await _playServerAudio((turn['id'] as num).toInt());
         }
         unawaited(http
             .post(_uri('/ambient/turns/played'),
@@ -170,7 +150,6 @@ class AmbientVoice {
     await _channel?.sink.close();
     _queue.clear();
     try {
-      await _tts.stop();
       await _player.dispose();
     } catch (_) {}
   }

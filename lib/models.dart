@@ -1653,6 +1653,33 @@ class AmbientDevice {
             ((j['last_seen'] as num?)?.toInt() ?? 0) * 1000);
 }
 
+class ModelInfo {
+  final String id;
+  final String kind;
+  final String name;
+  final String detail;
+  final int sizeMb;
+  final String status;
+  final int done;
+  final int total;
+  final String? error;
+
+  ModelInfo.fromJson(Map<String, dynamic> j)
+      : id = j['id'] as String? ?? '',
+        kind = j['kind'] as String? ?? '',
+        name = j['name'] as String? ?? '',
+        detail = j['detail'] as String? ?? '',
+        sizeMb = (j['size_mb'] as num?)?.toInt() ?? 0,
+        status = j['status'] as String? ?? 'missing',
+        done = (j['done'] as num?)?.toInt() ?? 0,
+        total = (j['total'] as num?)?.toInt() ?? 0,
+        error = j['error'] as String?;
+
+  bool get ready => status == 'ready';
+  bool get downloading => status == 'downloading';
+  int get percent => total <= 0 ? 0 : (done * 100 ~/ total).clamp(0, 100);
+}
+
 class AmbientSettings {
   final bool enabled;
   final String mode;
@@ -1664,7 +1691,8 @@ class AmbientSettings {
   final String effectiveMode;
   final bool watcherChatContext;
   final String voice;
-  final List<(String, String)> voices;
+  final String sttModel;
+  final bool modelsReady;
   final String watcher;
   final bool watcherKeySet;
   final int conversationTimeoutSecs;
@@ -1680,8 +1708,9 @@ class AmbientSettings {
       this.conversationOpen = false,
       this.effectiveMode = '',
       this.watcherChatContext = false,
-      this.voice = 'system',
-      this.voices = const [],
+      this.voice = '',
+      this.sttModel = '',
+      this.modelsReady = false,
       this.watcher = 'jev',
       this.watcherKeySet = false,
       this.conversationTimeoutSecs = 90,
@@ -1700,7 +1729,8 @@ class AmbientSettings {
       effectiveMode: effectiveMode,
       watcherChatContext: watcherChatContext,
       voice: voice,
-      voices: voices,
+      sttModel: sttModel,
+      modelsReady: modelsReady,
       watcher: watcher,
       watcherKeySet: watcherKeySet,
       conversationTimeoutSecs: conversationTimeoutSecs,
@@ -1715,11 +1745,9 @@ class AmbientSettings {
         conversationOpen = j['conversation'] != null,
         effectiveMode = j['effective_mode'] as String? ?? '',
         watcherChatContext = j['watcher_chat_context'] == true,
-        voice = j['voice'] as String? ?? 'system',
-        voices = [
-          for (final v in (j['voices'] as List? ?? const []))
-            ((v as Map)['id'] as String, v['name'] as String)
-        ],
+        voice = j['voice'] as String? ?? '',
+        sttModel = j['stt_model'] as String? ?? '',
+        modelsReady = j['models_ready'] == true,
         watcher = j['watcher'] as String? ?? 'jev',
         watcherKeySet = j['watcher_key_set'] == true,
         conversationTimeoutSecs = (j['conversation_timeout_secs'] as num?)?.toInt() ?? 90,

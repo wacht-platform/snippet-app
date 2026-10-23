@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import '../api.dart';
 import '../models.dart';
@@ -58,6 +60,7 @@ class _VoiceScreenState extends State<VoiceScreen> {
 
   @override
   void dispose() {
+    _modelTimer?.cancel();
     _keyField.dispose();
     _langField.dispose();
     _termField.dispose();
@@ -70,6 +73,7 @@ class _VoiceScreenState extends State<VoiceScreen> {
     super.initState();
     _load();
     _loadAmbient();
+    _loadModels();
   }
 
   Future<void> _load() async {
@@ -288,6 +292,70 @@ class _VoiceScreenState extends State<VoiceScreen> {
   }
 
   AmbientSettings? _ambient;
+  List<ModelInfo> _models = const [];
+  Timer? _modelTimer;
+
+  Future<void> _loadModels() async {
+    try {
+      final list = await widget.client.listModels();
+      if (!mounted) return;
+      setState(() => _models = list);
+      _modelTimer?.cancel();
+      if (list.any((m) => m.downloading)) {
+        _modelTimer = Timer(const Duration(seconds: 2), _loadModels);
+      } else {
+        _loadAmbient();
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _modelAction(Future<List<ModelInfo>> Function() run) async {
+    try {
+      final list = await run();
+      if (!mounted) return;
+      setState(() => _models = list);
+      _modelTimer?.cancel();
+      _modelTimer = Timer(const Duration(seconds: 1), _loadModels);
+    } catch (e) {
+      if (mounted) toast(context, '$e', danger: true);
+    }
+  }
+
+  Widget _modelRow(ModelInfo m, bool selected, Future<void> Function(String id) use) {
+    Widget trailing;
+    if (m.downloading) {
+      trailing = Text('${m.percent}%', style: sans(kMobile ? 15 : 12.5, color: AppColors.fg3));
+    } else if (m.ready) {
+      trailing = Row(mainAxisSize: MainAxisSize.min, children: [
+        if (selected)
+          AppIcon('check', size: 16, color: AppColors.accent)
+        else
+          Text('Use', style: sans(kMobile ? 15 : 12.5, color: AppColors.accent)),
+        const SizedBox(width: 10),
+        IconBtn('trash',
+            size: 32,
+            iconSize: 15,
+            tooltip: 'Remove',
+            onTap: () => _modelAction(() => widget.client.deleteModel(m.id))),
+      ]);
+    } else {
+      trailing = Text(m.status == 'failed' ? 'Retry' : 'Download',
+          style: sans(kMobile ? 15 : 12.5, color: AppColors.accent));
+    }
+    final sub = m.status == 'failed'
+        ? (m.error ?? 'Download failed')
+        : '${m.detail} ${m.sizeMb} MB';
+    return SettingsRow(
+      label: m.name,
+      sub: sub,
+      trailing: trailing,
+      onTap: m.downloading
+          ? null
+          : m.ready
+              ? (selected ? null : () => use(m.id))
+              : () => _modelAction(() => widget.client.downloadModel(m.id)),
+    );
+  }
 
   Future<void> _loadAmbient() async {
     try {
@@ -300,6 +368,7 @@ class _VoiceScreenState extends State<VoiceScreen> {
     String? watcher,
     bool? chatContext,
     String? voice,
+    String? sttModel,
     String? typesafeKey,
     int? timeout,
     List<String>? phrases,
@@ -312,6 +381,7 @@ class _VoiceScreenState extends State<VoiceScreen> {
           watcher: watcher,
           watcherChatContext: chatContext,
           voice: voice,
+          sttModel: sttModel,
           typesafeKey: typesafeKey,
           conversationTimeoutSecs: timeout,
           wakePhrases: phrases);
@@ -385,27 +455,14 @@ class _VoiceScreenState extends State<VoiceScreen> {
         ],
       ),
       SettingsGroup(
-        header: 'Replies',
-        footer: 'Mission Control\'s spoken replies are made on this machine and '
-            'played on the listening device. The voice downloads the first time '
-            'it is used. The system voice uses the phone\'s own speech engine.',
-        children: [
-          SettingsRow(
-            label: 'Reply voice',
-            trailing: SettingsPopup<String>(
-              label: a.voice == 'system'
-                  ? 'System voice'
-                  : a.voices.firstWhere((v) => v.$1 == a.voice,
-                      orElse: () => (a.voice, a.voice)).$2,
-              selected: a.voice,
-              items: [
-                for (final v in a.voices) (v.$1, v.$2),
-                ('system', 'System voice'),
-              ],
-              onSelected: (v) => _saveAmbient(voice: v),
-            ),
-          ),
-        ],
+        header: 'Speech recognition',
+        footer: 'Runs on this machine, so your audio never leaves it. Ambient listening needs one downloaded.',
+        children: [for (final m in _models.where((m) => m.kind == 'stt')) _modelRow(m, a.sttModel == m.id, (id) => _saveAmbient(sttModel: id))],
+      ),
+      SettingsGroup(
+        header: 'Reply voice',
+        footer: 'Mission Control\'s spoken replies are made on this machine and played on the listening device.',
+        children: [for (final m in _models.where((m) => m.kind == 'tts')) _modelRow(m, a.voice == m.id, (id) => _saveAmbient(voice: id))],
       ),
       SettingsGroup(
         header: 'Conversation',
