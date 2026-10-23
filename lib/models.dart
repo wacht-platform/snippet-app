@@ -1666,6 +1666,35 @@ class ModelInfo {
   int get percent => total <= 0 ? 0 : (done * 100 ~/ total).clamp(0, 100);
 }
 
+class AmbientSpeaker {
+  final int id;
+  final String label;
+  final bool isUser;
+  final int lines;
+  final int lastSeen;
+
+  AmbientSpeaker.fromJson(Map<String, dynamic> j)
+      : id = (j['id'] as num).toInt(),
+        label = j['label'] as String? ?? '',
+        isUser = j['is_user'] as bool? ?? false,
+        lines = (j['lines'] as num?)?.toInt() ?? 0,
+        lastSeen = (j['last_seen'] as num?)?.toInt() ?? 0;
+}
+
+class AmbientSpeakers {
+  final bool modelsReady;
+  final bool enrolled;
+  final List<AmbientSpeaker> speakers;
+
+  AmbientSpeakers.fromJson(Map<String, dynamic> j)
+      : modelsReady = j['models_ready'] as bool? ?? false,
+        enrolled = j['enrolled'] as bool? ?? false,
+        speakers = [
+          for (final speaker in j['speakers'] as List? ?? const [])
+            AmbientSpeaker.fromJson((speaker as Map).cast<String, dynamic>())
+        ];
+}
+
 class AmbientSettings {
   final bool enabled;
   final String mode;

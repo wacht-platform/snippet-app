@@ -1,6 +1,10 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:record/record.dart';
+import 'package:permission_handler/permission_handler.dart';
+import '../ambient/wav.dart';
 import '../api.dart';
 import '../models.dart';
 import '../platform.dart';
@@ -45,6 +49,7 @@ class _VoiceScreenState extends State<VoiceScreen> {
     _load();
     _loadAmbient();
     _loadModels();
+    _loadSpeakers();
   }
 
   Future<void> _load() async {
@@ -86,6 +91,44 @@ class _VoiceScreenState extends State<VoiceScreen> {
   AmbientSettings? _ambient;
   List<ModelInfo> _models = const [];
   Timer? _modelTimer;
+  AmbientSpeakers? _speakers;
+
+  Future<void> _loadSpeakers() async {
+    try {
+      final value = await widget.client.getAmbientSpeakers();
+      if (mounted) setState(() => _speakers = value);
+    } catch (_) {}
+  }
+
+  Future<void> _editSpeaker(AmbientSpeaker speaker) async {
+    final label = await promptText(context, title: 'Rename speaker', initial: speaker.label,
+        hint: 'Name', saveLabel: 'Save');
+    if (label == null || label.trim().isEmpty) return;
+    try {
+      await widget.client.labelAmbientSpeaker(speaker.id, label.trim());
+      await _loadSpeakers();
+    } catch (e) {
+      if (mounted) toast(context, '$e', danger: true);
+    }
+  }
+
+  Future<void> _forgetSpeakers() async {
+    final yes = await confirmAction(context, title: 'Forget other speakers?',
+        body: 'Learned speakers will be removed. Your voice enrolment stays.', confirmLabel: 'Forget', danger: false);
+    if (yes != true) return;
+    try {
+      await widget.client.clearAmbientSpeakers();
+      await _loadSpeakers();
+    } catch (e) {
+      if (mounted) toast(context, '$e', danger: true);
+    }
+  }
+
+  Future<void> _enrollSheet() async {
+    await showModalBottomSheet<void>(context: context, isScrollControlled: true,
+        builder: (context) => _SpeakerEnrollmentSheet(client: widget.client,
+            onComplete: _loadSpeakers));
+  }
 
   Future<void> _loadModels() async {
     try {
@@ -248,6 +291,32 @@ class _VoiceScreenState extends State<VoiceScreen> {
         children: [for (final m in _models.where((m) => m.kind == 'stt')) _modelRow(m, false, (_) async {})],
       ),
       SettingsGroup(
+        header: 'Speaker recognition',
+        footer: _speakers?.modelsReady == true
+            ? 'Recognises your voice and keeps track of other speakers.'
+            : 'Download both speaker models to set up voice recognition.',
+        children: [
+          for (final m in _models.where((m) => m.kind == 'speaker')) _modelRow(m, false, (_) async {}),
+          SettingsRow(
+            label: 'My voice',
+            sub: _speakers?.modelsReady == true
+                ? (_speakers?.enrolled == true ? 'Enrolled' : 'Not set up')
+                : 'Download speaker models first',
+            chevron: _speakers?.modelsReady == true,
+            onTap: _speakers?.modelsReady == true ? _enrollSheet : null,
+          ),
+          for (final s in _speakers?.speakers ?? const <AmbientSpeaker>[])
+            SettingsRow(
+              label: s.isUser ? 'You' : (s.label.isNotEmpty ? s.label : 'Speaker ${s.id}'),
+              sub: '${s.lines} ${s.lines == 1 ? 'line' : 'lines'}',
+              chevron: !s.isUser,
+              onTap: s.isUser ? null : () => _editSpeaker(s),
+            ),
+          if ((_speakers?.speakers.any((s) => !s.isUser) ?? false))
+            SettingsRow(label: 'Forget other speakers', onTap: _forgetSpeakers),
+        ],
+      ),
+      SettingsGroup(
         header: 'Reply voice',
         footer: 'Mission Control\'s spoken replies are made on this machine and played on the listening device.',
         children: [for (final m in _models.where((m) => m.kind == 'tts')) _modelRow(m, false, (_) async {})],
@@ -345,4 +414,106 @@ class _VoiceScreenState extends State<VoiceScreen> {
     }
     return body;
   }
+}
+
+class _SpeakerEnrollmentSheet extends StatefulWidget {
+  const _SpeakerEnrollmentSheet({required this.client, required this.onComplete});
+  final DaemonClient client;
+  final Future<void> Function() onComplete;
+
+  @override
+  State<_SpeakerEnrollmentSheet> createState() => _SpeakerEnrollmentSheetState();
+}
+
+class _SpeakerEnrollmentSheetState extends State<_SpeakerEnrollmentSheet> {
+  final AudioRecorder _recorder = AudioRecorder();
+  final BytesBuilder _pcm = BytesBuilder(copy: false);
+  StreamSubscription<Uint8List>? _subscription;
+  Timer? _timer;
+  int _seconds = 0;
+  bool _recording = false;
+  bool _saving = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _subscription?.cancel();
+    if (_recording) unawaited(_recorder.cancel());
+    unawaited(_recorder.dispose());
+    super.dispose();
+  }
+
+  Future<void> _start() async {
+    if (!(await Permission.microphone.request()).isGranted) {
+      setState(() => _error = 'Microphone permission is required.');
+      return;
+    }
+    try {
+      _pcm.clear();
+      final stream = await _recorder.startStream(const RecordConfig(
+          encoder: AudioEncoder.pcm16bits, sampleRate: 16000, numChannels: 1));
+      _subscription = stream.listen(_pcm.add, onError: (Object e) {
+        if (mounted) setState(() { _recording = false; _error = '$e'; });
+      });
+      setState(() { _seconds = 0; _recording = true; _error = null; });
+      _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+        if (!mounted) return;
+        setState(() => _seconds++);
+        if (_seconds >= 60) _stop();
+      });
+    } catch (e) {
+      setState(() => _error = '$e');
+    }
+  }
+
+  Future<void> _stop() async {
+    _timer?.cancel();
+    _timer = null;
+    await _recorder.stop();
+    await _subscription?.cancel();
+    _subscription = null;
+    if (mounted) setState(() => _recording = false);
+  }
+
+  Future<void> _save() async {
+    if (_seconds < 20 || _recording || _saving) return;
+    setState(() { _saving = true; _error = null; });
+    try {
+      await widget.client.enrollAmbientSpeaker(pcm16ToWav(_pcm.takeBytes()));
+      await widget.onComplete();
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      if (mounted) setState(() => _error = '$e');
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => SafeArea(
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + MediaQuery.viewInsetsOf(context).bottom),
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Text('Set up my voice', style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 12),
+            const Text('Read this aloud in a natural voice: “The morning light fell across the quiet garden. I made a cup of tea and watched the birds gather near the window.”'),
+            const SizedBox(height: 16),
+            Text('${_seconds ~/ 60}:${(_seconds % 60).toString().padLeft(2, '0')}', textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.headlineMedium),
+            const SizedBox(height: 12),
+            Row(children: [
+              Expanded(child: OutlinedButton(onPressed: _saving ? null : (_recording ? _stop : _start),
+                  child: Text(_recording ? 'Stop' : 'Record'))),
+              const SizedBox(width: 12),
+              Expanded(child: FilledButton(onPressed: _seconds >= 20 && !_recording && !_saving ? _save : null,
+                  child: Text(_saving ? 'Saving…' : 'Save'))),
+            ]),
+            if (_seconds < 20 && !_recording) const Padding(padding: EdgeInsets.only(top: 8),
+                child: Text('Record at least 20 seconds to save.')),
+            if (_error != null) Padding(padding: const EdgeInsets.only(top: 8),
+                child: Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error))),
+          ]),
+        ),
+      );
 }
