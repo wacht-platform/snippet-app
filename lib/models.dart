@@ -1661,6 +1661,10 @@ class AmbientSettings {
   final String? listeningId;
   final String? listeningDevice;
   final bool conversationOpen;
+  final String watcher;
+  final bool watcherKeySet;
+  final int conversationTimeoutSecs;
+  final List<String> wakePhrases;
 
   const AmbientSettings(
       {this.enabled = false,
@@ -1669,7 +1673,24 @@ class AmbientSettings {
       this.devices = const [],
       this.listeningId,
       this.listeningDevice,
-      this.conversationOpen = false});
+      this.conversationOpen = false,
+      this.watcher = 'jev',
+      this.watcherKeySet = false,
+      this.conversationTimeoutSecs = 90,
+      this.wakePhrases = const []});
+
+  AmbientSettings withMode(String next) => AmbientSettings(
+      enabled: enabled,
+      mode: next,
+      keySet: keySet,
+      devices: devices,
+      listeningId: listeningId,
+      listeningDevice: listeningDevice,
+      conversationOpen: conversationOpen,
+      watcher: watcher,
+      watcherKeySet: watcherKeySet,
+      conversationTimeoutSecs: conversationTimeoutSecs,
+      wakePhrases: wakePhrases);
 
   AmbientSettings.fromJson(Map<String, dynamic> j)
       : enabled = j['enabled'] == true,
@@ -1678,6 +1699,10 @@ class AmbientSettings {
         listeningId = j['listening_id'] as String?,
         listeningDevice = j['listening_device'] as String?,
         conversationOpen = j['conversation'] != null,
+        watcher = j['watcher'] as String? ?? 'jev',
+        watcherKeySet = j['watcher_key_set'] == true,
+        conversationTimeoutSecs = (j['conversation_timeout_secs'] as num?)?.toInt() ?? 90,
+        wakePhrases = [for (final p in (j['wake_phrases'] as List? ?? const [])) p as String],
         devices = [
           for (final d in (j['devices'] as List? ?? const []))
             AmbientDevice.fromJson((d as Map).cast<String, dynamic>())

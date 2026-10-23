@@ -69,6 +69,7 @@ class _VoiceScreenState extends State<VoiceScreen> {
   void initState() {
     super.initState();
     _load();
+    _loadAmbient();
   }
 
   Future<void> _load() async {
@@ -286,6 +287,112 @@ class _VoiceScreenState extends State<VoiceScreen> {
     await _save(keyterms: terms);
   }
 
+  AmbientSettings? _ambient;
+
+  Future<void> _loadAmbient() async {
+    try {
+      final a = await widget.client.getAmbientSettings();
+      if (mounted) setState(() => _ambient = a);
+    } catch (_) {}
+  }
+
+  Future<void> _saveAmbient({
+    String? watcher,
+    String? typesafeKey,
+    int? timeout,
+    List<String>? phrases,
+    String? done,
+  }) async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      final next = await widget.client.setAmbientSettings(
+          watcher: watcher,
+          typesafeKey: typesafeKey,
+          conversationTimeoutSecs: timeout,
+          wakePhrases: phrases);
+      if (!mounted) return;
+      setState(() => _ambient = next);
+      if (done != null) toast(context, done);
+    } catch (e) {
+      if (mounted) toast(context, "Couldn't save: $e", danger: true);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _editWatcherKey(AmbientSettings a) async {
+    final key = await promptText(context,
+        title: a.watcherKeySet ? 'Replace TypeSafe key' : 'TypeSafe API key',
+        hint: 'Paste the key from typesafe.ai',
+        saveLabel: 'Save key');
+    if (key == null || key.trim().isEmpty || !mounted) return;
+    await _saveAmbient(typesafeKey: key.trim(), done: 'Key saved');
+  }
+
+  Future<void> _editPhrases(AmbientSettings a) async {
+    final text = await promptText(context,
+        title: 'Wake phrases',
+        hint: 'One per line, e.g. snippet',
+        initial: a.wakePhrases.join('\n'),
+        saveLabel: 'Save',
+        maxLines: 6);
+    if (text == null || !mounted) return;
+    await _saveAmbient(phrases: [
+      for (final t in text.split(RegExp(r'[\n,]')))
+        if (t.trim().isNotEmpty) t.trim()
+    ]);
+  }
+
+  List<Widget> _ambientGroups(AmbientSettings a) {
+    final timeouts = <int>{30, 60, 90, 180, 300, a.conversationTimeoutSecs}.toList()..sort();
+    return [
+      SettingsGroup(
+        header: 'Ambient listening',
+        footer: 'Each line of speech is sent to TypeSafe (Jev) to tell real '
+            'conversation from TV and background, and to notice when you are '
+            'talking to the assistant. Without it, only a wake phrase works.',
+        children: [
+          SettingsRow(
+            label: 'Filter with Jev',
+            trailing: SettingsSwitch(
+              value: a.watcher == 'jev',
+              onChanged: _busy ? null : (on) => _saveAmbient(watcher: on ? 'jev' : 'off'),
+            ),
+          ),
+          SettingsRow(
+            label: 'TypeSafe key',
+            sub: a.watcherKeySet ? 'Saved on this machine' : 'Needed for Jev',
+            chevron: true,
+            onTap: () => _editWatcherKey(a),
+          ),
+        ],
+      ),
+      SettingsGroup(
+        header: 'Conversation',
+        footer: 'Saying a wake phrase at the start of a sentence opens a spoken '
+            'conversation with Mission Control, even in Passive mode.',
+        children: [
+          SettingsRow(
+            label: 'Wake phrases',
+            sub: a.wakePhrases.isEmpty ? 'None' : a.wakePhrases.join(', '),
+            chevron: true,
+            onTap: () => _editPhrases(a),
+          ),
+          SettingsRow(
+            label: 'Ends after silence',
+            trailing: SettingsPopup<int>(
+              label: _lengthLabel(a.conversationTimeoutSecs),
+              selected: a.conversationTimeoutSecs,
+              items: [for (final s in timeouts) (s, _lengthLabel(s))],
+              onSelected: (s) => _saveAmbient(timeout: s),
+            ),
+          ),
+        ],
+      ),
+    ];
+  }
+
   Future<void> _editKey(VoiceSettings v) async {
     final key = await promptText(context,
         title: v.keySet ? 'Replace AssemblyAI key' : 'AssemblyAI API key',
@@ -395,6 +502,7 @@ class _VoiceScreenState extends State<VoiceScreen> {
           ),
         ],
       ),
+      if (_ambient != null) ..._ambientGroups(_ambient!),
     ];
   }
 

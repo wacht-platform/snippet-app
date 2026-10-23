@@ -492,12 +492,24 @@ class DaemonClient {
     return AmbientSettings.fromJson(jsonDecode(r.body) as Map<String, dynamic>);
   }
 
-  Future<AmbientSettings> setAmbientSettings({bool? enabled, String? mode}) async {
+  Future<AmbientSettings> setAmbientSettings({
+    bool? enabled,
+    String? mode,
+    String? watcher,
+    String? typesafeKey,
+    int? conversationTimeoutSecs,
+    List<String>? wakePhrases,
+  }) async {
     final r = await http.post(_uri('/ambient/settings'),
         headers: _json,
         body: jsonEncode({
           if (enabled != null) 'enabled': enabled,
           if (mode != null) 'mode': mode,
+          if (watcher != null) 'watcher': watcher,
+          if (typesafeKey != null) 'typesafe_api_key': typesafeKey,
+          if (conversationTimeoutSecs != null)
+            'conversation_timeout_secs': conversationTimeoutSecs,
+          if (wakePhrases != null) 'wake_phrases': wakePhrases,
         }));
     if (r.statusCode != 200) throw _err('save ambient settings', r);
     return AmbientSettings.fromJson(jsonDecode(r.body) as Map<String, dynamic>);

@@ -90,11 +90,7 @@ class _AmbientModel extends ChangeNotifier {
   Future<void> setMode(String mode) async {
     final before = settings;
     if (before == null || before.mode == mode) return;
-    settings = AmbientSettings(
-        enabled: before.enabled,
-        mode: mode,
-        keySet: before.keySet,
-        devices: before.devices);
+    settings = before.withMode(mode);
     notifyListeners();
     try {
       settings = await client.setAmbientSettings(mode: mode);
