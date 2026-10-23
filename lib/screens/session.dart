@@ -67,7 +67,8 @@ import 'mission_control/mission_control_state.dart'
         parseDirectMessage,
         parseCoordinationReply,
         parseParentMessage,
-        parseAssignmentEnvelope;
+        parseAssignmentEnvelope,
+        parseAmbientTurn;
 
 part 'session_socket.dart';
 part 'session_appbar.dart';

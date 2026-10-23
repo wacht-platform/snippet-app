@@ -643,6 +643,24 @@ AssignmentEnvelope? parseAssignmentEnvelope(String text) {
   );
 }
 
+class AmbientTurn {
+  const AmbientTurn({required this.device, required this.at, required this.text});
+  final String device;
+  final DateTime? at;
+  final String text;
+}
+
+AmbientTurn? parseAmbientTurn(String text) {
+  final match = RegExp(r'^\s*<ambient_turn device="([^"]*)" at="([^"]*)">([\s\S]*?)</ambient_turn>\s*$')
+      .firstMatch(text);
+  if (match == null) return null;
+  return AmbientTurn(
+    device: match.group(1) ?? '',
+    at: DateTime.tryParse(match.group(2) ?? '')?.toLocal(),
+    text: (match.group(3) ?? '').trim(),
+  );
+}
+
 /// Project harness events into the Mission Control chat feed.
 List<FeedItem> feedItemsFromEvents(List<Map<String, dynamic>> events) {
   final out = <FeedItem>[];

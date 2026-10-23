@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import '../../../theme.dart';
 import '../../../widgets.dart';
 import '../mission_control_state.dart';
+import '../../session_coordination_cards.dart' show AmbientTurnCard;
 import '../../../platform.dart';
 import '../../../pull_refresh.dart';
 
@@ -74,7 +75,9 @@ class _FeedRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return switch (item) {
-      UserMessageItem m => Bubble(mine: true, text: m.text),
+      UserMessageItem m => parseAmbientTurn(m.text) != null
+          ? AmbientTurnCard(turn: parseAmbientTurn(m.text)!)
+          : Bubble(mine: true, text: m.text),
       BoardMessageItem b => _BoardMessageRow(message: b.message),
       AutonomousRoundItem r => _EnvelopeRow(
           color: r.round.due.isNotEmpty ? AppColors.run : AppColors.fg4,

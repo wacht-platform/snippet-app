@@ -226,6 +226,15 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
             addEvent(key, ParentMessageCard(body: parent));
             break;
           }
+          final ambient = parseAmbientTurn(text);
+          if (ambient != null) {
+            addEvent(
+                key,
+                Padding(
+                    padding: const EdgeInsets.only(top: 4, bottom: 20),
+                    child: AmbientTurnCard(turn: ambient)));
+            break;
+          }
           final assignment = parseAssignmentEnvelope(text);
           if (assignment != null) {
             addEvent(key, AssignmentCard(assignment: assignment));

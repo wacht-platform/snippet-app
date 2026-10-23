@@ -9,6 +9,7 @@ import '../theme.dart';
 import '../widgets.dart';
 import 'mission_control/mission_control_state.dart'
     show
+        AmbientTurn,
         AssignmentEnvelope,
         AutonomousRound,
         BoardMessage,
@@ -516,6 +517,56 @@ class AssignmentCard extends StatelessWidget {
       status: 'Assigned',
       body: assignment.scope,
       footer: done.isEmpty ? null : 'Done when: $done',
+    );
+  }
+}
+
+class AmbientTurnCard extends StatelessWidget {
+  const AmbientTurnCard({super.key, required this.turn});
+  final AmbientTurn turn;
+
+  String get _where {
+    final os = turn.device.split('-').first;
+    return switch (os) {
+      'android' => 'Android',
+      'ios' => 'iPhone',
+      'macos' => 'Mac',
+      'linux' => 'Linux',
+      'windows' => 'Windows',
+      _ => turn.device,
+    };
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final at = turn.at;
+    final time = at == null
+        ? ''
+        : '${at.hour.toString().padLeft(2, '0')}:${at.minute.toString().padLeft(2, '0')}';
+    return Align(
+      alignment: Alignment.centerRight,
+      child: ConstrainedBox(
+        constraints:
+            BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * 0.82),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
+          decoration: BoxDecoration(
+            color: AppColors.surface2,
+            borderRadius: BorderRadius.circular(18),
+          ),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(mainAxisSize: MainAxisSize.min, children: [
+              AppIcon('mic', size: 12, color: AppColors.accent),
+              const SizedBox(width: 6),
+              Text(time.isEmpty ? 'Spoken on $_where' : 'Spoken on $_where, $time',
+                  style: TS.meta()),
+            ]),
+            const SizedBox(height: 6),
+            SelectableText(turn.text,
+                style: sans(kMobile ? 16 : 14, height: 1.4, color: AppColors.fg1)),
+          ]),
+        ),
+      ),
     );
   }
 }
