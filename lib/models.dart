@@ -121,27 +121,13 @@ class ServerConfig {
 
 class VoiceSettings {
   final bool enabled;
-  final String speechModel;
-  final String language;
-  final List<String> keyterms;
   final int maxSeconds;
-  final bool keySet;
-  final List<String> speechModels;
   final int minSeconds;
   final int maxSecondsLimit;
 
   VoiceSettings.fromJson(Map<String, dynamic> j)
       : enabled = j['enabled'] != false,
-        speechModel = j['speech_model'] as String? ?? '',
-        language = j['language'] as String? ?? '',
-        keyterms = [for (final t in (j['keyterms'] as List? ?? const [])) t as String],
         maxSeconds = (j['max_seconds'] as num?)?.toInt() ?? 180,
-        keySet = j['key_set'] == true,
-        speechModels = [
-          for (final m in (j['speech_models'] as List? ??
-              const ['universal-3-5-pro', 'universal-2']))
-            m as String
-        ],
         minSeconds = (j['min_seconds'] as num?)?.toInt() ?? 30,
         maxSecondsLimit = (j['max_seconds_limit'] as num?)?.toInt() ?? 600;
 }
@@ -1691,7 +1677,6 @@ class AmbientSettings {
   final String effectiveMode;
   final bool watcherChatContext;
   final String voice;
-  final String sttModel;
   final bool modelsReady;
   final String watcher;
   final bool watcherKeySet;
@@ -1709,7 +1694,6 @@ class AmbientSettings {
       this.effectiveMode = '',
       this.watcherChatContext = false,
       this.voice = '',
-      this.sttModel = '',
       this.modelsReady = false,
       this.watcher = 'jev',
       this.watcherKeySet = false,
@@ -1729,7 +1713,6 @@ class AmbientSettings {
       effectiveMode: effectiveMode,
       watcherChatContext: watcherChatContext,
       voice: voice,
-      sttModel: sttModel,
       modelsReady: modelsReady,
       watcher: watcher,
       watcherKeySet: watcherKeySet,
@@ -1746,7 +1729,6 @@ class AmbientSettings {
         effectiveMode = j['effective_mode'] as String? ?? '',
         watcherChatContext = j['watcher_chat_context'] == true,
         voice = j['voice'] as String? ?? '',
-        sttModel = j['stt_model'] as String? ?? '',
         modelsReady = j['models_ready'] == true,
         watcher = j['watcher'] as String? ?? 'jev',
         watcherKeySet = j['watcher_key_set'] == true,

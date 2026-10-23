@@ -965,7 +965,7 @@ class _DesktopShellState extends State<DesktopShell>
         (SettingsPage.vault, 'lock-key', 'Settings: Vault',
             ['secrets', 'keys', 'credentials']),
         (SettingsPage.voice, 'mic', 'Settings: Voice',
-            ['voice notes', 'transcription', 'assemblyai', 'microphone']),
+            ['voice notes', 'transcription', 'speech model', 'microphone']),
         (SettingsPage.webSearch, 'globe', 'Settings: Web search',
             ['exa', 'search', 'internet', 'browse']),
         (SettingsPage.accounts, 'users', 'Settings: Accounts',

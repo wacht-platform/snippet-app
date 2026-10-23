@@ -451,21 +451,13 @@ class DaemonClient {
 
   Future<VoiceSettings> setVoice({
     bool? enabled,
-    String? speechModel,
-    String? language,
-    List<String>? keyterms,
     int? maxSeconds,
-    String? apiKey,
   }) async {
     final r = await http.post(_uri('/config/voice'),
         headers: _json,
         body: jsonEncode({
           if (enabled != null) 'enabled': enabled,
-          if (speechModel != null) 'speech_model': speechModel,
-          if (language != null) 'language': language,
-          if (keyterms != null) 'keyterms': keyterms,
           if (maxSeconds != null) 'max_seconds': maxSeconds,
-          if (apiKey != null) 'api_key': apiKey,
         }));
     if (r.statusCode != 200) {
       throw r.statusCode == 400 ? r.body : _err('save voice settings', r);
@@ -498,7 +490,6 @@ class DaemonClient {
     String? watcher,
     bool? watcherChatContext,
     String? voice,
-    String? sttModel,
     String? typesafeKey,
     int? conversationTimeoutSecs,
     List<String>? wakePhrases,
@@ -511,7 +502,6 @@ class DaemonClient {
           if (watcher != null) 'watcher': watcher,
           if (watcherChatContext != null) 'watcher_chat_context': watcherChatContext,
           if (voice != null) 'voice': voice,
-          if (sttModel != null) 'stt_model': sttModel,
           if (typesafeKey != null) 'typesafe_api_key': typesafeKey,
           if (conversationTimeoutSecs != null)
             'conversation_timeout_secs': conversationTimeoutSecs,
