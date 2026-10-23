@@ -65,7 +65,9 @@ class AmbientUploader {
   final ValueNotifier<bool> displaced = ValueNotifier(false);
   Timer? _heartbeat;
   Directory? _dir;
-  bool _draining = false;
+  final Set<String> _inFlight = {};
+  int _workers = 0;
+  static const _maxWorkers = 3;
   bool _closed = false;
   int _failures = 0;
 
@@ -186,17 +188,30 @@ class AmbientUploader {
   }
 
   Future<void> _drain() async {
-    if (_draining || _closed) return;
-    _draining = true;
+    if (_closed) return;
+    while (_workers < _maxWorkers) {
+      _workers++;
+      unawaited(_worker());
+    }
+  }
+
+  Future<void> _worker() async {
     try {
       while (!_closed) {
         final metas = await _metas();
         pending.value = metas.length;
-        if (metas.isEmpty) {
-          _failures = 0;
+        final next = metas.where((m) => !_inFlight.contains(m.path)).firstOrNull;
+        if (next == null) {
+          if (metas.isEmpty) _failures = 0;
           break;
         }
-        final ok = await _upload(metas.first);
+        _inFlight.add(next.path);
+        bool ok;
+        try {
+          ok = await _upload(next);
+        } finally {
+          _inFlight.remove(next.path);
+        }
         if (ok) {
           _failures = 0;
           lastError.value = null;
@@ -207,7 +222,7 @@ class AmbientUploader {
         await Future<void>.delayed(Duration(seconds: wait));
       }
     } finally {
-      _draining = false;
+      _workers--;
     }
   }
 
