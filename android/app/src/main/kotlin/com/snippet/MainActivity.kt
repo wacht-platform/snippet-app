@@ -52,11 +52,12 @@ class MainActivity : FlutterActivity() {
     private val written = mutableListOf<AudioBoundary>()
     @Volatile private var audioTrack: AudioTrack? = null
     @Volatile private var stopping = false
+    @Volatile private var framesWritten = 0L
     private var audioThread: Thread? = null
     private fun ensureTrack(): AudioTrack {
         audioTrack?.let { return it }
         val min = AudioTrack.getMinBufferSize(24000, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT)
-        val track = AudioTrack.Builder().setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION).setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build()).setAudioFormat(AudioFormat.Builder().setSampleRate(24000).setChannelMask(AudioFormat.CHANNEL_OUT_MONO).setEncoding(AudioFormat.ENCODING_PCM_16BIT).build()).setBufferSizeInBytes(maxOf(min, 9600)).setTransferMode(AudioTrack.MODE_STREAM).build()
+        val track = AudioTrack.Builder().setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA).setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build()).setAudioFormat(AudioFormat.Builder().setSampleRate(24000).setChannelMask(AudioFormat.CHANNEL_OUT_MONO).setEncoding(AudioFormat.ENCODING_PCM_16BIT).build()).setBufferSizeInBytes(maxOf(min, 9600)).setTransferMode(AudioTrack.MODE_STREAM).build()
         audioTrack = track
         stopping = false
         track.play()
@@ -71,12 +72,13 @@ class MainActivity : FlutterActivity() {
         while (!stopping) {
             val item = try { audioQueue.take() } catch (_: InterruptedException) { break }
             val track = audioTrack ?: break
-            val start = track.playbackHeadPosition.toLong() and 0xffffffffL
+            val start = framesWritten
             val totalFrames = item.pcm.size / 2
             synchronized(written) { written.add(AudioBoundary(item.turn, item.seq, start, start + totalFrames, start + totalFrames + item.silenceFrames)) }
             var off = 0
             while (off < item.pcm.size && !stopping) { val n = track.write(item.pcm, off, item.pcm.size - off, AudioTrack.WRITE_BLOCKING); if (n <= 0) break; off += n }
-            if (item.silenceFrames > 0 && !stopping) { val silence = ByteArray(item.silenceFrames * 2); var p = 0; while (p < silence.size && !stopping) { val n = track.write(silence, p, silence.size - p, AudioTrack.WRITE_BLOCKING); if (n <= 0) break; p += n } }
+            framesWritten += totalFrames
+            if (item.silenceFrames > 0 && !stopping) { val silence = ByteArray(item.silenceFrames * 2); var p = 0; while (p < silence.size && !stopping) { val n = track.write(silence, p, silence.size - p, AudioTrack.WRITE_BLOCKING); if (n <= 0) break; p += n }; framesWritten += item.silenceFrames }
         }
     }
     private fun position(): Map<String, Int> {
@@ -122,6 +124,7 @@ class MainActivity : FlutterActivity() {
         audioThread?.interrupt()
         audioTrack?.let { try { it.pause(); it.flush(); it.stop(); it.release() } catch (_: Exception) {} }
         audioTrack = null
+        framesWritten = 0L
         synchronized(written) { written.clear() }
         return pos
     }
