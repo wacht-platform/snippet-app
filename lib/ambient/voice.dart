@@ -84,6 +84,7 @@ class AmbientVoice {
           state.value = AmbientStateEvent(mode: f['mode'] as String? ?? '', sub: f['sub'] as String? ?? '', reason: f['reason'] as String?);
         case 'ambient_speech_start':
           if (turn != null && !_dead(turn)) {
+            unawaited(_sink.invokeMethod('warm').catchError((_) {}));
             _chunks.putIfAbsent(turn, () => {});
             _play();
           }

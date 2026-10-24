@@ -56,6 +56,10 @@ class AmbientAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
                     enqueue(call.argument<Int>("turn") ?: 0, call.argument<Int>("seq") ?: 0, pcm, call.argument<Int>("silenceMs") ?: 80)
                     result.success(null)
                 }
+                "warm" -> {
+                    synchronized(lock) { if (sink == null) createSink() }
+                    result.success(null)
+                }
                 "mediaActive" -> result.success(audioManager()?.isMusicActive ?: false)
                 "position" -> result.success(position())
                 "volume" -> {
