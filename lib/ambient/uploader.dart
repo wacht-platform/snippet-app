@@ -126,7 +126,7 @@ class AmbientUploader {
     _live[seq] = live;
     live.chain = () async {
       final value = await seq;
-      final ok = await _stream.start(live.h, live.id, value, startedAt, continued: continued);
+      final ok = await _stream.start(live.h, live.id, value, startedAt, continued: continued, live: true);
       if (!ok) {
         live.failed = true;
         live.buffer.clear();

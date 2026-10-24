@@ -84,7 +84,7 @@ class AmbientStream {
     } catch (_) {}
   }
 
-  Future<bool> start(int h, String id, int seq, DateTime startedAt, {bool continued = false, bool backlog = false}) async {
+  Future<bool> start(int h, String id, int seq, DateTime startedAt, {bool continued = false, bool backlog = false, bool live = false}) async {
     final ws = await _socket();
     if (ws == null) return false;
     _send(ws, jsonEncode({
@@ -95,6 +95,7 @@ class AmbientStream {
       'started_at': startedAt.toUtc().toIso8601String(),
       'continued': continued,
       if (backlog) 'backlog': true,
+      if (live) 'live': true,
     }));
     return true;
   }
