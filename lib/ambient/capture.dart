@@ -157,6 +157,7 @@ class AmbientCapture {
       device: uploader.device,
     );
     voiceListenable.value = _voice;
+    _voice!.state.addListener(_onAmbientState);
     _mediaTimer?.cancel();
     _mediaTimer = Timer.periodic(const Duration(milliseconds: 500), (_) async {
       if (_voice?.speaking.value == true) return;
@@ -203,6 +204,11 @@ class AmbientCapture {
     if (offset < buffer.length) {
       _pending.add(Uint8List.sublistView(buffer, offset));
     }
+  }
+
+  void _onAmbientState() {
+    final inConversation = _voice?.state.value?.mode == 'active';
+    _segmenter?.endSilenceFrames = inConversation ? 12 : 20;
   }
 
   void _handleBargeIn(bool voiceActive) {

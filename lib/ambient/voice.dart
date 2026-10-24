@@ -31,6 +31,8 @@ class AmbientVoice {
   final Set<int> _finished = {};
   final Map<int, Set<int>> _consumed = {};
   final Map<int, int> _cancelAfter = {};
+  final Map<(int, int), Future<Uint8List?>> _inflight = {};
+  final Map<int, Completer<void>> _wake = {};
   final http.Client _client = http.Client();
   WebSocketChannel? _channel;
   StreamSubscription<dynamic>? _sub;
@@ -86,21 +88,27 @@ class AmbientVoice {
           if (turn != null && !_dead(turn)) {
             unawaited(_sink.invokeMethod('warm').catchError((_) {}));
             _chunks.putIfAbsent(turn, () => {});
+            _prefetch(turn, 0);
             _play();
           }
         case 'ambient_speech_chunk':
           if (turn != null && !_dead(turn)) {
             final seq = f['seq'] as int;
             if (_consumed[turn]?.contains(seq) != true) _chunks.putIfAbsent(turn, () => {})[seq] = f;
+            _wakeTurn(turn);
             _play();
           }
         case 'ambient_speech_end':
           if (turn != null && !_dead(turn)) {
             _ended.add(turn);
+            _wakeTurn(turn);
             _play();
           }
         case 'ambient_speech_cancel':
-          if (turn != null) _cancel(turn, f['after_seq'] as int? ?? -1);
+          if (turn != null) {
+            _wakeTurn(turn);
+            _cancel(turn, f['after_seq'] as int? ?? -1);
+          }
       }
     } catch (e) {
       AmbientDiagnostics.log('voice: bad frame $e');
@@ -124,6 +132,7 @@ class AmbientVoice {
           map[seq] = m;
         }
         if (t['ended'] == true) _ended.add(id);
+        _wakeTurn(id);
       }
       _play();
     } catch (_) {}
@@ -198,6 +207,7 @@ class AmbientVoice {
           queuedMax = seq;
           enqueuedMax = seq;
           queuedMs[seq] = _duration(pcm);
+          _prefetch(turn, seq + 1);
           lastProgress = DateTime.now();
           AmbientDiagnostics.log('voice: enqueued $turn/$seq ${pcm.length}B');
           continue;
@@ -237,11 +247,13 @@ class AmbientVoice {
         _finish(turn);
         return;
       }
-      await Future<void>.delayed(const Duration(milliseconds: 30));
+      await _wait(turn);
     }
   }
 
   void _finish(int turn) {
+    _wake.remove(turn)?.complete();
+    _inflight.removeWhere((k, _) => k.$1 == turn);
     _chunks.remove(turn);
     _finished.add(turn);
     final old = turn - 100;
@@ -261,9 +273,31 @@ class AmbientVoice {
     }
   }
 
+  Future<void> _wait(int turn) =>
+      _wake.putIfAbsent(turn, () => Completer<void>()).future.timeout(const Duration(milliseconds: 30), onTimeout: () {});
+
+  void _wakeTurn(int turn) => _wake.remove(turn)?.complete();
+
+  void _prefetch(int turn, int seq) {
+    if (_dead(turn)) return;
+    final cutoff = _cancelAfter[turn];
+    if (cutoff != null && seq > cutoff) return;
+    _inflight.putIfAbsent((turn, seq), () => _fetchLoop(turn, seq));
+  }
+
   Future<Uint8List?> _fetch(int turn, int seq) async {
+    final pending = _inflight.remove((turn, seq));
+    if (pending != null) {
+      final bytes = await pending;
+      if (bytes != null) return bytes;
+    }
+    return _fetchLoop(turn, seq);
+  }
+
+  Future<Uint8List?> _fetchLoop(int turn, int seq) async {
     for (var attempt = 0; attempt < 30; attempt++) {
       if (_closed || _dead(turn)) return null;
+      if (_ended.contains(turn) && _chunks[turn]?.containsKey(seq) != true) return null;
       try {
         final r = await _client.get(_uri('/ambient/turns/$turn/chunks/$seq'));
         if (r.statusCode == 200) return r.bodyBytes;

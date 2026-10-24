@@ -40,7 +40,7 @@ class SpeechSegmenter {
   final double offThreshold;
   final int preRollFrames;
   final int minSpeechFrames;
-  final int endSilenceFrames;
+  int endSilenceFrames;
   final int maxFrames;
 
   final Queue<Uint8List> _preRoll = Queue();
