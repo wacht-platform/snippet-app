@@ -148,7 +148,7 @@ class AmbientCapture {
     });
     _statTimer?.cancel();
     _statTimer = Timer.periodic(const Duration(seconds: 30), (_) {
-      uploader.stat({'frames': _frames, 'speech': _speechFrames, 'loud_low_vad': _loudQuiet, 'segments': _segments, 'threshold': threshold});
+      uploader.stat({'frames': _frames, 'speech': _speechFrames, 'loud_low_vad': _loudQuiet, 'held_ms': _heldBytes ~/ 32, 'build': 9, 'segments': _segments, 'threshold': threshold});
       _frames = 0;
       _speechFrames = 0;
       _loudQuiet = 0;
@@ -175,12 +175,14 @@ class AmbientCapture {
   int _frames = 0;
   int _speechFrames = 0;
   int _loudQuiet = 0;
+  int _heldBytes = 0;
 
   void _onAudio(Uint8List bytes) {
     final vad = _vad;
     final segmenter = _segmenter;
     if (vad == null || segmenter == null) return;
     if (AmbientHold.active) {
+      _heldBytes += bytes.length;
       segmenter.abandon();
       _pending.takeBytes();
       return;
