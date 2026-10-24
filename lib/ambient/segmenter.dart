@@ -18,6 +18,7 @@ class SpeechSegmenter {
   SpeechSegmenter({
     required this.onSegment,
     required this.onSpeechStart,
+    this.onDiscard,
     this.threshold = 0.5,
     this.offThreshold = 0.35,
     this.preRollFrames = 10,
@@ -30,6 +31,7 @@ class SpeechSegmenter {
 
   final void Function(AmbientSegment segment) onSegment;
   final Future<int> Function(DateTime startedAt) onSpeechStart;
+  final void Function(Future<int> seq)? onDiscard;
   final double threshold;
   final double offThreshold;
   final int preRollFrames;
@@ -94,7 +96,7 @@ class SpeechSegmenter {
       final wasContinued = _continued;
       _active = false;
       _continued = true;
-      if (_speechFrames >= minSpeechFrames) onSegment(AmbientSegment(_startedAt, first, continued: wasContinued));
+      if (_speechFrames >= minSpeechFrames) onSegment(AmbientSegment(_startedAt, first, continued: wasContinued, seq: _seq));
       _pendingTail = tail;
       _pendingTailStartedAt = _startedAt.add(Duration(milliseconds: first.length ~/ 2 * 1000 ~/ 16000));
     }
@@ -132,6 +134,7 @@ class SpeechSegmenter {
     _silentFrames = 0;
     _active = true;
     _continued = true;
+    _seq = onSpeechStart(_startedAt);
   }
 
   void _finish() {
@@ -143,6 +146,8 @@ class SpeechSegmenter {
     _silentFrames = 0;
     if (enough && bytes.isNotEmpty) {
       onSegment(AmbientSegment(_startedAt, bytes, continued: _continued, seq: _seq));
+    } else if (_seq != null) {
+      onDiscard?.call(_seq!);
     }
   }
 }

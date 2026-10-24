@@ -114,6 +114,7 @@ class AmbientCapture {
         unawaited(seq.then((value) => uploader.activity(startedAt, value)));
         return seq;
       },
+      onDiscard: (seq) => unawaited(seq.then(uploader.skip)),
       onSegment: (segment) {
         _segments++;
         final seen = _mediaAt;

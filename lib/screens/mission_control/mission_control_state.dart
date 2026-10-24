@@ -656,7 +656,7 @@ String _unescapeXml(String s) =>
     s.replaceAll('&lt;', '<').replaceAll('&gt;', '>').replaceAll('&quot;', '"').replaceAll('&amp;', '&');
 
 String? voiceClassifierNote(String agentId, String body) {
-  if (agentId != 'voice classifier') return null;
+  if (agentId != 'voice classifier' && agentId != 'ambient mode') return null;
   final text = body.trim();
   final mode = RegExp(r'^Ambient mode is now (\w+) \((.*)\)\.?$').firstMatch(text);
   if (mode != null) {

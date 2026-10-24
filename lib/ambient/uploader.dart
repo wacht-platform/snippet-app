@@ -101,6 +101,13 @@ class AmbientUploader {
 
   Future<int> reserveSequence() => _nextSeq();
 
+  Future<void> skip(int seq) async {
+    try {
+      final uri = Uri.parse(baseUrl).replace(path: '/ambient/activity', queryParameters: {'token': token});
+      await _client.post(uri, headers: {'content-type': 'application/json'}, body: jsonEncode({'device': device, 'seq': seq, 'skip': true})).timeout(const Duration(seconds: 10));
+    } catch (_) {}
+  }
+
   Future<void> activity(DateTime startedAt, int seq) async {
     try {
       final uri = Uri.parse(baseUrl).replace(path: '/ambient/activity', queryParameters: {'token': token});

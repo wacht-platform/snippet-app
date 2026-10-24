@@ -1,8 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math';
 
-import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:web_socket_channel/web_socket_channel.dart';
 
@@ -23,26 +24,32 @@ class AmbientVoice {
   final ValueNotifier<bool> speaking = ValueNotifier(false);
   final ValueNotifier<AmbientStateEvent?> state = ValueNotifier(null);
   static const MethodChannel _sink = MethodChannel('snippet/ambient_audio');
+
   final Map<int, Map<int, Map<String, dynamic>>> _chunks = {};
-  final Map<int, Set<int>> _received = {};
   final Set<int> _ended = {};
   final Set<int> _barged = {};
+  final Set<int> _finished = {};
+  final Map<int, Set<int>> _consumed = {};
+  final Map<int, int> _cancelAfter = {};
+  final http.Client _client = http.Client();
   WebSocketChannel? _channel;
   StreamSubscription<dynamic>? _sub;
   Timer? _retry;
-  bool _closed = false, _running = false;
-  final http.Client _client = http.Client();
-  final Set<int> _finished = {};
-  final Map<int, Set<int>> _consumed = {};
-  final Map<int, DateTime> _idleSince = {};
   Timer? _poll;
-  int _gen = 0;
-  int _failures = 0, _last = 0;
-  Uri _uri(String path, [Map<String, String>? query]) => Uri.parse(baseUrl).replace(path: path, queryParameters: {'token': token, ...?query});
+  bool _closed = false, _running = false;
+  int _gen = 0, _failures = 0, _last = 0;
+  int? _playingTurn;
+
+  Uri _uri(String path, [Map<String, String>? query]) =>
+      Uri.parse(baseUrl).replace(path: path, queryParameters: {'token': token, ...?query});
+  bool _dead(int turn) => _finished.contains(turn) || _barged.contains(turn);
+  int _duration(Uint8List pcm) => pcm.length * 1000 ~/ 48000;
+
   Future<void> start() async {
     _poll = Timer.periodic(const Duration(milliseconds: 2000), (_) => _catchUp());
     _connect();
   }
+
   void _connect() {
     if (_closed) return;
     final base = Uri.parse(baseUrl);
@@ -53,166 +60,291 @@ class AmbientVoice {
       _sub = c.stream.listen(_frame, onError: (_) => _reconnect(), onDone: _reconnect);
       _failures = 0;
       _catchUp();
-    } catch (_) { _reconnect(); }
+    } catch (_) {
+      _reconnect();
+    }
   }
+
   void _reconnect() {
     if (_closed || _retry?.isActive == true) return;
     _sub?.cancel();
-    _retry = Timer(Duration(milliseconds: (500 * (1 << _failures.clamp(0, 5))).clamp(500, 15000)), () { _failures++; _connect(); });
+    _retry = Timer(Duration(milliseconds: (500 * (1 << _failures.clamp(0, 5))).clamp(500, 15000)), () {
+      _failures++;
+      _connect();
+    });
   }
+
   void _frame(dynamic raw) {
     try {
       final f = jsonDecode(raw as String) as Map<String, dynamic>;
       if (f['device'] != device) return;
       final turn = f['turn'] as int?;
       switch (f['kind']) {
-        case 'ambient_state': state.value = AmbientStateEvent(mode: f['mode'] as String? ?? '', sub: f['sub'] as String? ?? '', reason: f['reason'] as String?); break;
-        case 'ambient_speech_start': if (turn != null) { _chunks.putIfAbsent(turn, () => {}); _received.putIfAbsent(turn, () => {}); _play(); } break;
-        case 'ambient_speech_chunk': if (turn != null && !_barged.contains(turn)) { final seq = f['seq'] as int; _received.putIfAbsent(turn, () => {}).add(seq); _chunks.putIfAbsent(turn, () => {})[seq] = f; _play(); } break;
-        case 'ambient_speech_end': if (turn != null) { _ended.add(turn); _play(); } break;
-        case 'ambient_speech_cancel': if (turn != null) _cancel(turn, f['after_seq'] as int? ?? -1); break;
+        case 'ambient_state':
+          state.value = AmbientStateEvent(mode: f['mode'] as String? ?? '', sub: f['sub'] as String? ?? '', reason: f['reason'] as String?);
+        case 'ambient_speech_start':
+          if (turn != null && !_dead(turn)) {
+            _chunks.putIfAbsent(turn, () => {});
+            _play();
+          }
+        case 'ambient_speech_chunk':
+          if (turn != null && !_dead(turn)) {
+            final seq = f['seq'] as int;
+            if (_consumed[turn]?.contains(seq) != true) _chunks.putIfAbsent(turn, () => {})[seq] = f;
+            _play();
+          }
+        case 'ambient_speech_end':
+          if (turn != null && !_dead(turn)) {
+            _ended.add(turn);
+            _play();
+          }
+        case 'ambient_speech_cancel':
+          if (turn != null) _cancel(turn, f['after_seq'] as int? ?? -1);
       }
-    } catch (_) {}
+    } catch (e) {
+      AmbientDiagnostics.log('voice: bad frame $e');
+    }
   }
+
   Future<void> _catchUp() async {
     try {
-      final floor = _chunks.isEmpty ? _last : (_chunks.keys.reduce((a, b) => a < b ? a : b) - 1);
+      final floor = _chunks.isEmpty ? _last : (_chunks.keys.reduce(min) - 1);
       final r = await _client.get(_uri('/ambient/turns', {'after': '$floor', 'device': device}));
       if (r.statusCode != 200) return;
       for (final t in (jsonDecode(r.body)['turns'] as List)) {
         final id = t['id'] as int;
-        _last = id > _last ? id : _last;
-        if (_finished.contains(id) || _barged.contains(id)) continue;
-        _chunks.putIfAbsent(id, () => {});
-        _received.putIfAbsent(id, () => {});
-        for (final c in (t['chunks'] as List? ?? [])) { final m = Map<String, dynamic>.from(c as Map); final seq = m['seq'] as int; if (_consumed[id]?.contains(seq) == true) continue; _chunks[id]![seq] = m; _received[id]!.add(seq); }
+        _last = max(_last, id);
+        if (_dead(id)) continue;
+        final map = _chunks.putIfAbsent(id, () => {});
+        for (final c in (t['chunks'] as List? ?? [])) {
+          final m = Map<String, dynamic>.from(c as Map);
+          final seq = m['seq'] as int;
+          if (_consumed[id]?.contains(seq) == true) continue;
+          map[seq] = m;
+        }
         if (t['ended'] == true) _ended.add(id);
       }
       _play();
     } catch (_) {}
   }
+
   Future<void> _play() async {
     if (_running || _closed) return;
     _running = true;
     speaking.value = _chunks.isNotEmpty;
     try {
       while (!_closed && _chunks.isNotEmpty) {
-        final turn = _chunks.keys.reduce((a, b) => a < b ? a : b);
-        if (_barged.contains(turn)) { _finish(turn); continue; }
-        final map = _chunks[turn]!;
-        final keys = map.keys.toList()..sort();
-        if (keys.isEmpty) {
-          if (_ended.contains(turn)) {
-            final pos = await _position();
-            if ((pos['seq'] as int? ?? -1) >= 0) await _played(turn, pos['seq'] as int, pos['played_ms'] as int? ?? 0, true);
-            _finish(turn);
-            continue;
-          }
-          final since = _idleSince.putIfAbsent(turn, () => DateTime.now());
-          final newer = _chunks.keys.any((k) => k > turn);
-          if (newer || DateTime.now().difference(since) > const Duration(seconds: 8)) {
-            AmbientDiagnostics.log('voice: dropping stalled turn $turn');
-            _finish(turn);
-            continue;
-          }
-          await Future<void>.delayed(const Duration(milliseconds: 20));
+        final turn = _chunks.keys.reduce(min);
+        if (_dead(turn)) {
+          _finish(turn);
           continue;
         }
-        _idleSince.remove(turn);
-        final seq = keys.first;
-        final pcm = await _fetch(turn, seq);
-        map.remove(seq);
-        _consumed.putIfAbsent(turn, () => {}).add(seq);
-        if (pcm == null) AmbientDiagnostics.log('voice: chunk $turn/$seq unavailable');
-        if (pcm == null) continue;
+        _playingTurn = turn;
         try {
-          await _sink.invokeMethod('enqueue', {'turn': turn, 'seq': seq, 'pcm': pcm, 'silenceMs': 80});
-          AmbientDiagnostics.log('voice: enqueued $turn/$seq ${pcm.length}B');
-          final next = map.keys.toList()..sort();
-          if (next.isNotEmpty) unawaited(_pumpAhead(turn));
-          final target = seq;
-          final gen = _gen;
-          final deadline = DateTime.now().add(Duration(milliseconds: _duration(pcm) + 6000));
-          Map<String, dynamic> pos = const {};
-          while (!_closed && gen == _gen && DateTime.now().isBefore(deadline)) {
-            await Future<void>.delayed(const Duration(milliseconds: 20));
-            pos = await _position();
-            if ((pos['seq'] as int? ?? -1) >= target) break;
-          }
-          if (gen != _gen) continue;
-          final playedSeq = pos['seq'] as int? ?? -1;
-          if (playedSeq >= seq) await _played(turn, seq, _duration(pcm), false);
-        } catch (e) { AmbientDiagnostics.log('voice: playback error $e'); }
-        if (map.isEmpty && _ended.contains(turn)) {
-          Map<String, dynamic> pos;
-          final gen = _gen;
-          final deadline = DateTime.now().add(const Duration(seconds: 8));
-          do { await Future<void>.delayed(const Duration(milliseconds: 20)); pos = await _position(); }
-          while (!_closed && gen == _gen && DateTime.now().isBefore(deadline) && (pos['seq'] as int? ?? -1) < seq);
-          if (gen != _gen) { _finish(turn); continue; }
-          await _played(turn, seq, pos['played_ms'] as int? ?? _duration(pcm), true);
+          await _playTurn(turn);
+        } catch (e) {
+          AmbientDiagnostics.log('voice: turn $turn failed: $e');
           _finish(turn);
         }
+        _playingTurn = null;
+        if (_chunks.containsKey(turn) && !_dead(turn)) await Future<void>.delayed(const Duration(milliseconds: 20));
       }
     } finally {
       _running = false;
-      if (_chunks.isEmpty) {
-        speaking.value = false;
-      } else if (!_closed) {
-        unawaited(_play());
-      }
+      _playingTurn = null;
+      speaking.value = _chunks.isNotEmpty;
     }
   }
-  void _finish(int turn) { _chunks.remove(turn); _finished.add(turn); _idleSince.remove(turn); }
-  int _duration(Uint8List pcm) => pcm.length * 1000 ~/ 48000;
-  Future<Map<String, dynamic>> _position() async => await _sink.invokeMapMethod<String, dynamic>('position') ?? const {};
+
+  Future<void> _playTurn(int turn) async {
+    final gen = _gen;
+    var queuedMax = -1;
+    var enqueuedMax = -1;
+    var ackedMax = -1;
+    final queuedMs = <int, int>{};
+    var lastProgress = DateTime.now();
+    DateTime? gapSince;
+    bool stale() => _closed || gen != _gen || _dead(turn);
+
+    while (!stale()) {
+      final map = _chunks[turn];
+      if (map == null) return;
+      final cutoff = _cancelAfter[turn];
+      if (cutoff != null) {
+        map.removeWhere((s, _) => s > cutoff);
+        if (queuedMax > cutoff) queuedMax = cutoff;
+        if (enqueuedMax > cutoff) enqueuedMax = cutoff;
+        queuedMs.removeWhere((sq, _) => sq > cutoff);
+        _ended.add(turn);
+      }
+      final next = map.keys.where((s) => s > queuedMax).toList()..sort();
+      if (next.isNotEmpty) {
+        final seq = next.first;
+        final gapExpired = gapSince != null && DateTime.now().difference(gapSince) > const Duration(seconds: 2);
+        if (seq == queuedMax + 1 || gapExpired) {
+          gapSince = null;
+          final pcm = await _fetch(turn, seq);
+          if (stale()) return;
+          map.remove(seq);
+          _consumed.putIfAbsent(turn, () => {}).add(seq);
+          if (pcm == null) {
+            AmbientDiagnostics.log('voice: chunk $turn/$seq unavailable');
+            queuedMax = seq;
+            continue;
+          }
+          if (seq > (_cancelAfter[turn] ?? 1 << 30)) continue;
+          await _sink.invokeMethod('enqueue', {'turn': turn, 'seq': seq, 'pcm': pcm, 'silenceMs': 80});
+          queuedMax = seq;
+          enqueuedMax = seq;
+          queuedMs[seq] = _duration(pcm);
+          lastProgress = DateTime.now();
+          AmbientDiagnostics.log('voice: enqueued $turn/$seq ${pcm.length}B');
+          continue;
+        }
+        gapSince ??= DateTime.now();
+      }
+
+      final pos = await _position();
+      if (stale()) return;
+      final posTurn = pos['turn'] as int? ?? -1;
+      final playedSeq = posTurn == turn ? (pos['seq'] as int? ?? -1) : (posTurn > turn ? enqueuedMax : -1);
+      final idle = posTurn == turn && pos['active'] == 0;
+      while (ackedMax < playedSeq && ackedMax < enqueuedMax) {
+        ackedMax++;
+        final ms = queuedMs[ackedMax];
+        if (ms != null) await _played(turn, ackedMax, ms, false);
+        lastProgress = DateTime.now();
+      }
+      final done = map.isEmpty && _ended.contains(turn);
+      if (done && (enqueuedMax < 0 || playedSeq >= enqueuedMax || idle)) {
+        if (enqueuedMax >= 0) await _played(turn, max(ackedMax, min(playedSeq, enqueuedMax)), pos['played_ms'] as int? ?? queuedMs[enqueuedMax] ?? 0, true);
+        _finish(turn);
+        return;
+      }
+      if (map.isEmpty && !_ended.contains(turn) && playedSeq >= enqueuedMax && _chunks.entries.any((e) => e.key > turn && e.value.isNotEmpty)) {
+        AmbientDiagnostics.log('voice: dropping unfinished turn $turn');
+        _finish(turn);
+        return;
+      }
+      var remaining = 0;
+      queuedMs.forEach((s, ms) {
+        if (s > playedSeq) remaining += ms;
+      });
+      if (DateTime.now().difference(lastProgress) > Duration(milliseconds: remaining + 6000)) {
+        AmbientDiagnostics.log('voice: turn $turn stalled');
+        await _played(turn, max(ackedMax, -1), 0, true);
+        _finish(turn);
+        return;
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 30));
+    }
+  }
+
+  void _finish(int turn) {
+    _chunks.remove(turn);
+    _finished.add(turn);
+    final old = turn - 100;
+    _finished.removeWhere((t) => t < old);
+    _ended.removeWhere((t) => t < old);
+    _barged.removeWhere((t) => t < old);
+    _consumed.removeWhere((t, _) => t < old);
+    _cancelAfter.removeWhere((t, _) => t < old);
+  }
+
+  Future<Map<String, dynamic>> _position() async {
+    try {
+      return await _sink.invokeMapMethod<String, dynamic>('position') ?? const {};
+    } catch (e) {
+      AmbientDiagnostics.log('voice: position failed $e');
+      return const {};
+    }
+  }
+
   Future<Uint8List?> _fetch(int turn, int seq) async {
     for (var attempt = 0; attempt < 30; attempt++) {
-      try { final r = await _client.get(_uri('/ambient/turns/$turn/chunks/$seq')); if (r.statusCode == 200) return r.bodyBytes; } catch (_) {}
+      if (_closed || _dead(turn)) return null;
+      try {
+        final r = await _client.get(_uri('/ambient/turns/$turn/chunks/$seq'));
+        if (r.statusCode == 200) return r.bodyBytes;
+      } catch (_) {}
       await Future<void>.delayed(const Duration(milliseconds: 100));
     }
     return null;
   }
-  Future<void> _pumpAhead(int turn) async {
-    final map = _chunks[turn];
-    if (map == null || map.isEmpty) return;
-    final seq = (map.keys.toList()..sort()).first;
+
+  Future<void> _played(int id, int seq, int ms, bool complete) async {
     try {
-      final r = await _client.get(_uri('/ambient/turns/$turn/chunks/$seq'));
-      if (r.statusCode != 200) return;
-      map.remove(seq);
-      _consumed.putIfAbsent(turn, () => {}).add(seq);
-      await _sink.invokeMethod('enqueue', {'turn': turn, 'seq': seq, 'pcm': r.bodyBytes, 'silenceMs': 80});
-    } catch (_) {}
+      await _client.post(_uri('/ambient/turns/played'),
+          headers: {'content-type': 'application/json'},
+          body: jsonEncode({'id': id, 'seq': seq, 'played_ms': ms, 'complete': complete}));
+    } catch (e) {
+      AmbientDiagnostics.log('voice: played ack failed $e');
+    }
   }
-  Future<void> _played(int id, int seq, int ms, bool complete) async { try { await _client.post(_uri('/ambient/turns/played'), headers: {'content-type':'application/json'}, body: jsonEncode({'id':id,'seq':seq,'played_ms':ms,'complete':complete})); } catch (_) {} }
+
+  Future<void> _postBarge(int turn, int seq, int ms) async {
+    try {
+      await _client.post(_uri('/ambient/barge'),
+          headers: {'content-type': 'application/json'}, body: jsonEncode({'turn': turn, 'seq': seq, 'played_ms': ms}));
+    } catch (e) {
+      AmbientDiagnostics.log('voice: barge post failed $e');
+    }
+  }
+
   Future<void> _cancel(int turn, int after) async {
-    _gen++;
-    final m = _chunks[turn];
-    m?.removeWhere((seq, _) => seq > after);
+    if (_dead(turn)) return;
+    if (!_chunks.containsKey(turn)) {
+      _finished.add(turn);
+      return;
+    }
+    _cancelAfter[turn] = after;
+    _chunks[turn]?.removeWhere((seq, _) => seq > after);
+    _ended.add(turn);
     try {
       final pos = await _position();
-      final seq = pos['seq'] as int? ?? -1;
-      final ms = pos['played_ms'] as int? ?? 0;
-      if (seq >= 0 && seq > after) {
-        await _client.post(_uri('/ambient/barge'), headers: {'content-type': 'application/json'}, body: jsonEncode({'turn': turn, 'seq': seq, 'played_ms': ms}));
+      if ((pos['turn'] as int? ?? -1) == turn && (pos['seq'] as int? ?? -1) > after) {
+        await _postBarge(turn, pos['seq'] as int, pos['played_ms'] as int? ?? 0);
       }
       await _sink.invokeMethod('cancelAfter', {'turn': turn, 'seq': after, 'fadeMs': 50});
+    } catch (e) {
+      AmbientDiagnostics.log('voice: cancel failed $e');
+    }
+    _play();
+  }
+
+  Future<void> duck(bool on) async {
+    try {
+      await _sink.invokeMethod('volume', {'volume': on ? 0.3 : 1.0});
     } catch (_) {}
   }
-  Future<void> duck(bool on) async { try { await _sink.invokeMethod('volume', {'volume': on ? 0.3 : 1.0}); } catch (_) {} }
+
   Future<void> stopNow() async {
+    final turn = _playingTurn ?? (_chunks.isEmpty ? null : _chunks.keys.reduce(min));
     _gen++;
-    final turn = _chunks.isEmpty ? null : _chunks.keys.reduce((a,b) => a < b ? a : b);
-    final pos = await _sink.invokeMapMethod<String, dynamic>('stop');
-    if (turn != null) {
-      final seq = pos?['seq'] as int? ?? -1;
-      final ms = pos?['played_ms'] as int? ?? 0;
-      _barged.add(turn);
-      _finish(turn);
-      try { await _client.post(_uri('/ambient/barge'), headers: {'content-type':'application/json'}, body: jsonEncode({'turn':turn,'seq':seq,'played_ms':ms})); } catch (_) {}
+    if (turn != null) _barged.add(turn);
+    Map<String, dynamic>? pos;
+    try {
+      pos = await _sink.invokeMapMethod<String, dynamic>('stop');
+    } catch (e) {
+      AmbientDiagnostics.log('voice: stop failed $e');
     }
-    speaking.value = false;
+    if (turn != null) {
+      final same = (pos?['turn'] as int? ?? -1) == turn;
+      _finish(turn);
+      await _postBarge(turn, same ? (pos?['seq'] as int? ?? -1) : -1, same ? (pos?['played_ms'] as int? ?? 0) : 0);
+    }
+    speaking.value = _chunks.isNotEmpty;
   }
-  Future<void> dispose() async { _closed = true; _retry?.cancel(); _poll?.cancel(); _client.close(); await _sub?.cancel(); await _channel?.sink.close(); await _sink.invokeMethod('stop').catchError((_) {}); speaking.dispose(); state.dispose(); }
+
+  Future<void> dispose() async {
+    _closed = true;
+    _retry?.cancel();
+    _poll?.cancel();
+    _client.close();
+    await _sub?.cancel();
+    await _channel?.sink.close();
+    await _sink.invokeMethod('stop').catchError((_) {});
+    speaking.dispose();
+    state.dispose();
+  }
 }
