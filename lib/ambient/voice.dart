@@ -195,6 +195,7 @@ class AmbientVoice {
           gapSince = null;
           final pcm = await _fetch(turn, seq);
           if (stale()) return;
+          final tail = ((map[seq]?['text'] as String?) ?? '').trimRight();
           map.remove(seq);
           _consumed.putIfAbsent(turn, () => {}).add(seq);
           if (pcm == null) {
@@ -203,7 +204,7 @@ class AmbientVoice {
             continue;
           }
           if (seq > (_cancelAfter[turn] ?? 1 << 30)) continue;
-          await _sink.invokeMethod('enqueue', {'turn': turn, 'seq': seq, 'pcm': pcm, 'silenceMs': 80});
+          await _sink.invokeMethod('enqueue', {'turn': turn, 'seq': seq, 'pcm': pcm, 'silenceMs': tail.isEmpty ? 80 : (RegExp(r'[.!?]["\x27)]*$').hasMatch(tail) ? 80 : RegExp(r'[,;:\u2014]$').hasMatch(tail) ? 40 : 0)});
           queuedMax = seq;
           enqueuedMax = seq;
           queuedMs[seq] = _duration(pcm);
