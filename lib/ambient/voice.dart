@@ -36,6 +36,7 @@ class AmbientVoice {
   final Map<int, Set<int>> _consumed = {};
   final Map<int, DateTime> _idleSince = {};
   Timer? _poll;
+  int _gen = 0;
   int _failures = 0, _last = 0;
   Uri _uri(String path, [Map<String, String>? query]) => Uri.parse(baseUrl).replace(path: path, queryParameters: {'token': token, ...?query});
   Future<void> start() async {
@@ -130,19 +131,25 @@ class AmbientVoice {
           final next = map.keys.toList()..sort();
           if (next.isNotEmpty) unawaited(_pumpAhead(turn));
           final target = seq;
+          final gen = _gen;
+          final deadline = DateTime.now().add(Duration(milliseconds: _duration(pcm) + 6000));
           Map<String, dynamic> pos = const {};
-          while (!_closed) {
+          while (!_closed && gen == _gen && DateTime.now().isBefore(deadline)) {
             await Future<void>.delayed(const Duration(milliseconds: 20));
             pos = await _position();
             if ((pos['seq'] as int? ?? -1) >= target) break;
           }
+          if (gen != _gen) continue;
           final playedSeq = pos['seq'] as int? ?? -1;
           if (playedSeq >= seq) await _played(turn, seq, _duration(pcm), false);
         } catch (e) { AmbientDiagnostics.log('voice: playback error $e'); }
         if (map.isEmpty && _ended.contains(turn)) {
           Map<String, dynamic> pos;
+          final gen = _gen;
+          final deadline = DateTime.now().add(const Duration(seconds: 8));
           do { await Future<void>.delayed(const Duration(milliseconds: 20)); pos = await _position(); }
-          while (!_closed && (pos['seq'] as int? ?? -1) < seq);
+          while (!_closed && gen == _gen && DateTime.now().isBefore(deadline) && (pos['seq'] as int? ?? -1) < seq);
+          if (gen != _gen) { _finish(turn); continue; }
           await _played(turn, seq, pos['played_ms'] as int? ?? _duration(pcm), true);
           _finish(turn);
         }
@@ -180,6 +187,7 @@ class AmbientVoice {
   }
   Future<void> _played(int id, int seq, int ms, bool complete) async { try { await _client.post(_uri('/ambient/turns/played'), headers: {'content-type':'application/json'}, body: jsonEncode({'id':id,'seq':seq,'played_ms':ms,'complete':complete})); } catch (_) {} }
   Future<void> _cancel(int turn, int after) async {
+    _gen++;
     final m = _chunks[turn];
     m?.removeWhere((seq, _) => seq > after);
     try {
@@ -194,6 +202,7 @@ class AmbientVoice {
   }
   Future<void> duck(bool on) async { try { await _sink.invokeMethod('volume', {'volume': on ? 0.3 : 1.0}); } catch (_) {} }
   Future<void> stopNow() async {
+    _gen++;
     final turn = _chunks.isEmpty ? null : _chunks.keys.reduce((a,b) => a < b ? a : b);
     final pos = await _sink.invokeMapMethod<String, dynamic>('stop');
     if (turn != null) {

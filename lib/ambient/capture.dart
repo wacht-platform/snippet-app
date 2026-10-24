@@ -71,6 +71,7 @@ class AmbientCapture {
   bool _running = false;
   bool _duringPlayback = false;
   DateTime? _mediaAt;
+  DateTime? _playbackAt;
   Timer? _mediaTimer;
   static const MethodChannel _audio = MethodChannel('snippet/ambient_audio');
   bool _ducked = false;
@@ -117,7 +118,9 @@ class AmbientCapture {
         _segments++;
         final seen = _mediaAt;
         final media = seen != null && seen.isAfter(segment.startedAt.subtract(const Duration(seconds: 1)));
-        unawaited(uploader.enqueue(segment.copyWith(duringPlayback: _duringPlayback, media: media)));
+        final heard = _playbackAt;
+        final overlap = heard != null && heard.isAfter(segment.startedAt.subtract(const Duration(milliseconds: 1500)));
+        unawaited(uploader.enqueue(segment.copyWith(duringPlayback: _duringPlayback || overlap, media: media)));
       },
     );
     final stream = await _recorder.startStream(RecordConfig(
@@ -180,6 +183,7 @@ class AmbientCapture {
 
   void _handleBargeIn(bool voiceActive) {
     final voice = _voice;
+    if (voice != null && voice.speaking.value) _playbackAt = DateTime.now();
     if (voice == null || !voice.speaking.value) {
       _speechSince = null;
       _duringPlayback = false;
@@ -193,10 +197,14 @@ class AmbientCapture {
       return;
     }
     _duringPlayback = true;
+    if (_probability < 0.85) {
+      _speechSince = null;
+      return;
+    }
     final since = _speechSince ??= DateTime.now();
     final elapsed = DateTime.now().difference(since);
     if (elapsed >= const Duration(milliseconds: 250) && !_ducked) { _ducked = true; unawaited(voice.duck(true)); }
-    if (elapsed >= const Duration(milliseconds: 400)) { _speechSince = null; unawaited(voice.stopNow()); }
+    if (elapsed >= const Duration(milliseconds: 550)) { _speechSince = null; unawaited(voice.stopNow()); }
   }
 
   Future<void> stop() async {
