@@ -227,8 +227,12 @@ class AmbientCapture {
     }
     final since = _speechSince ??= DateTime.now();
     final elapsed = DateTime.now().difference(since);
-    if (elapsed >= const Duration(milliseconds: 450) && !_ducked) { _ducked = true; unawaited(voice.duck(true)); }
-    if (elapsed >= const Duration(milliseconds: 900)) { _speechSince = null; unawaited(voice.stopNow()); }
+    if (elapsed >= const Duration(milliseconds: 150) && !_ducked) { _ducked = true; unawaited(voice.duck(true)); }
+    if (elapsed >= const Duration(milliseconds: 350)) {
+      _speechSince = null;
+      uploader.stat({'barge_stop': 1, 'prob': _probability});
+      unawaited(voice.stopNow());
+    }
   }
 
   Future<void> stop() async {
