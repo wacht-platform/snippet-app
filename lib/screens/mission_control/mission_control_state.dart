@@ -644,12 +644,32 @@ AssignmentEnvelope? parseAssignmentEnvelope(String text) {
 }
 
 class AmbientTurn {
-  const AmbientTurn({required this.device, required this.at, required this.text, this.mode = '', this.wake = false});
+  const AmbientTurn({
+    required this.device,
+    required this.at,
+    required this.text,
+    this.mode = '',
+    this.wake = false,
+    this.continuation = false,
+    this.interruptedReply = '',
+    this.context = const [],
+    this.judged = '',
+    this.addressed,
+    this.speaker = '',
+    this.expects = '',
+  });
   final String device;
   final DateTime? at;
   final String text;
   final String mode;
   final bool wake;
+  final bool continuation;
+  final String interruptedReply;
+  final List<String> context;
+  final String judged;
+  final double? addressed;
+  final String speaker;
+  final String expects;
 }
 
 String _unescapeXml(String s) =>
@@ -673,14 +693,26 @@ AmbientTurn? parseAmbientTurn(String text) {
   final attrs = <String, String>{
     for (final m in RegExp(r'(\w+)="([^"]*)"').allMatches(match.group(1) ?? '')) m.group(1)!: _unescapeXml(m.group(2) ?? ''),
   };
-  final body = _unescapeXml((match.group(2) ?? '')
-      .replaceAll(RegExp(r'<(recent_speech|context)>[\s\S]*?</\1>'), ''));
+  final raw = match.group(2) ?? '';
+  final contextBlock = RegExp(r'<context>([\s\S]*?)</context>').firstMatch(raw)?.group(1) ?? '';
+  final context = [
+    for (final line in _unescapeXml(contextBlock).split('\n'))
+      if (line.trim().isNotEmpty) line.replaceFirst(RegExp(r'^\[earlier, not sent\]\s*'), '').trim(),
+  ];
+  final body = _unescapeXml(raw.replaceAll(RegExp(r'<(recent_speech|context)>[\s\S]*?</\1>'), ''));
   return AmbientTurn(
     device: attrs['device'] ?? '',
     at: DateTime.tryParse(attrs['at'] ?? '')?.toLocal(),
     text: body.trim(),
     mode: attrs['mode'] ?? '',
     wake: attrs['wake'] == 'true',
+    continuation: (attrs['continuation_of'] ?? '').isNotEmpty,
+    interruptedReply: attrs['interrupted_reply'] ?? '',
+    context: context,
+    judged: attrs['judged'] ?? '',
+    addressed: double.tryParse(attrs['addressed'] ?? ''),
+    speaker: attrs['speaker'] ?? '',
+    expects: attrs['expects'] ?? '',
   );
 }
 

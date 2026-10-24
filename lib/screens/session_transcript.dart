@@ -154,6 +154,15 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
           // Meta-tools render via their own events (note → note, ask_user →
           // user_question, delegate_task → lane_spawned). Skip their generic tool
           // lines so they don't double up.
+          if (_isSpeakTool(_s(e['tool_name']))) {
+            endTools(key);
+            final args = e['arguments'];
+            final spoken = args is Map ? _s(args['text']).trim() : '';
+            if (spoken.isNotEmpty) {
+              addEvent(key, SpeakCard(text: spoken, expecting: args is Map ? _s(args['expecting']) : ''));
+            }
+            break;
+          }
           if (_isMetaTool(_s(e['tool_name']))) break;
           pending = e;
           pendingKey = abs;
@@ -174,7 +183,7 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
               pendingKey = null;
             } else {
               final name = _s(e['tool_name']);
-              if (_isMetaTool(name)) break;
+              if (_isMetaTool(name) || _isSpeakTool(name)) break;
               addToolRow(
                   toolRow(abs,
                       tool: name,
@@ -476,6 +485,8 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
   }
 
   // Meta-tools have dedicated event rendering, so their generic tool lines are skipped.
+  bool _isSpeakTool(String n) => n == 'speak' || n.endsWith('__speak');
+
   bool _isMetaTool(String n) =>
       n == 'update_plan' ||
       n == 'ask_user' ||

@@ -521,9 +521,18 @@ class AssignmentCard extends StatelessWidget {
   }
 }
 
-class AmbientTurnCard extends StatelessWidget {
+class AmbientTurnCard extends StatefulWidget {
   const AmbientTurnCard({super.key, required this.turn});
   final AmbientTurn turn;
+
+  @override
+  State<AmbientTurnCard> createState() => _AmbientTurnCardState();
+}
+
+class _AmbientTurnCardState extends State<AmbientTurnCard> {
+  bool _open = false;
+
+  AmbientTurn get turn => widget.turn;
 
   String get _where {
     final os = turn.device.split('-').first;
@@ -537,40 +546,128 @@ class AmbientTurnCard extends StatelessWidget {
     };
   }
 
+  List<String> get _chips => [
+        if (turn.wake) 'wake word',
+        if (turn.continuation) 'continuation',
+        if (turn.interruptedReply.isNotEmpty) 'interrupted a reply',
+        if (turn.context.isNotEmpty)
+          '${turn.context.length} earlier ${turn.context.length == 1 ? 'line' : 'lines'} attached',
+      ];
+
+  bool get _hasDetail =>
+      turn.context.isNotEmpty ||
+      turn.interruptedReply.isNotEmpty ||
+      turn.judged.isNotEmpty ||
+      turn.addressed != null;
+
   @override
   Widget build(BuildContext context) {
     final at = turn.at;
     final time = at == null
         ? ''
         : '${at.hour.toString().padLeft(2, '0')}:${at.minute.toString().padLeft(2, '0')}';
+    final chips = _chips;
     return Align(
       alignment: Alignment.centerRight,
       child: ConstrainedBox(
         constraints:
             BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * 0.82),
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: _hasDetail ? () => setState(() => _open = !_open) : null,
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
+            decoration: BoxDecoration(
+              color: AppColors.surface2,
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(mainAxisSize: MainAxisSize.min, children: [
+                AppIcon('mic', size: 12, color: AppColors.accent),
+                const SizedBox(width: 6),
+                Flexible(
+                  child: Text(
+                      [
+                        time.isEmpty ? 'Spoken on $_where' : 'Spoken on $_where, $time',
+                        if (turn.mode == 'passive') 'passive' else if (turn.mode == 'active') 'conversation',
+                      ].join(' · '),
+                      style: TS.meta()),
+                ),
+              ]),
+              const SizedBox(height: 6),
+              SelectableText(turn.text,
+                  style: sans(kMobile ? 16 : 14, height: 1.4, color: AppColors.fg1)),
+              if (chips.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Wrap(spacing: 6, runSpacing: 6, children: [
+                  for (final c in chips)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: AppColors.surface1,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(c, style: TS.meta()),
+                    ),
+                ]),
+              ],
+              if (_open) ...[
+                const SizedBox(height: 10),
+                if (turn.judged.isNotEmpty || turn.addressed != null)
+                  Text(
+                      [
+                        if (turn.judged.isNotEmpty) 'Judged ${turn.judged}',
+                        if (turn.addressed != null) 'reply expected ${(turn.addressed! * 100).round()}%',
+                        if (turn.speaker.isNotEmpty) 'speaker ${turn.speaker}',
+                        if (turn.expects.isNotEmpty) 'answering a ${turn.expects} question',
+                      ].join(' · '),
+                      style: TS.meta()),
+                if (turn.interruptedReply.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Text('Heard of its last reply: ${turn.interruptedReply}', style: TS.meta()),
+                ],
+                for (final line in turn.context) ...[
+                  const SizedBox(height: 6),
+                  Text('Earlier, not sent: $line', style: TS.meta()),
+                ],
+              ],
+            ]),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class SpeakCard extends StatelessWidget {
+  const SpeakCard({super.key, required this.text, this.expecting = ''});
+  final String text;
+  final String expecting;
+
+  @override
+  Widget build(BuildContext context) {
+    final asking = expecting.isNotEmpty && expecting != 'none';
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: ConstrainedBox(
+        constraints:
+            BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * 0.86),
         child: Container(
+          margin: const EdgeInsets.symmetric(vertical: 6),
           padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
           decoration: BoxDecoration(
-            color: AppColors.surface2,
-            borderRadius: BorderRadius.circular(18),
+            color: AppColors.surface1,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppColors.fg1.withValues(alpha: 0.08)),
           ),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(mainAxisSize: MainAxisSize.min, children: [
-              AppIcon('mic', size: 12, color: AppColors.accent),
+              AppIcon('volume', size: 12, color: AppColors.accent),
               const SizedBox(width: 6),
-              Flexible(
-                child: Text(
-                    [
-                      time.isEmpty ? 'Spoken on $_where' : 'Spoken on $_where, $time',
-                      if (turn.wake) 'wake word',
-                      if (turn.mode == 'passive') 'passive' else if (turn.mode == 'active') 'conversation',
-                    ].join(' · '),
-                    style: TS.meta()),
-              ),
+              Text(asking ? 'Said aloud · waiting for your answer' : 'Said aloud', style: TS.meta()),
             ]),
             const SizedBox(height: 6),
-            SelectableText(turn.text,
-                style: sans(kMobile ? 16 : 14, height: 1.4, color: AppColors.fg1)),
+            SelectableText(text, style: sans(kMobile ? 15 : 14, height: 1.4, color: AppColors.fg1)),
           ]),
         ),
       ),

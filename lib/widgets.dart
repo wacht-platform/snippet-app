@@ -1951,6 +1951,7 @@ const _lucide = <String, IconData>{
   'user': LucideIcons.user,
   'sparkles': LucideIcons.sparkles,
   'mic': LucideIcons.mic,
+  'volume': LucideIcons.volume2,
   'mic-off': LucideIcons.micOff,
   'shield': LucideIcons.shield,
   'goal': LucideIcons.goal,
