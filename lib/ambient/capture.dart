@@ -6,6 +6,8 @@ import 'package:flutter/services.dart';
 import 'package:record/record.dart';
 import 'package:silero_vad/silero_vad.dart';
 
+import 'hold.dart';
+
 import 'diagnostics.dart';
 import 'segmenter.dart';
 import 'uploader.dart';
@@ -178,6 +180,11 @@ class AmbientCapture {
     final vad = _vad;
     final segmenter = _segmenter;
     if (vad == null || segmenter == null) return;
+    if (AmbientHold.active) {
+      segmenter.abandon();
+      _pending.takeBytes();
+      return;
+    }
     _pending.add(bytes);
     const chunkBytes = SileroVad.chunkSamples * 2;
     final buffer = _pending.takeBytes();

@@ -1,3 +1,4 @@
+import 'package:snippet/ambient/hold.dart';
 import 'dart:async';
 import 'dart:typed_data';
 
@@ -439,7 +440,7 @@ class _SpeakerEnrollmentSheet extends StatefulWidget {
 }
 
 class _SpeakerEnrollmentSheetState extends State<_SpeakerEnrollmentSheet> {
-  final AudioRecorder _recorder = AudioRecorder();
+  final AudioRecorder _recorder = HeldRecorder();
   final BytesBuilder _pcm = BytesBuilder(copy: false);
   StreamSubscription<Uint8List>? _subscription;
   Timer? _timer;

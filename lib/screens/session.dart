@@ -1,3 +1,4 @@
+import 'package:snippet/ambient/hold.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -315,7 +316,7 @@ class _SessionScreenState extends State<SessionScreen>
   final _scaffoldKey = GlobalKey<ScaffoldState>();
   final _composerCardKey = GlobalKey();
   final _modelChipKey = GlobalKey();
-  final AudioRecorder _recorder = AudioRecorder();
+  final AudioRecorder _recorder = HeldRecorder();
   final AudioPlayer _audioPlayer = AudioPlayer();
   StreamSubscription<Amplitude>? _amplitudeSub;
   StreamSubscription<PlayerState>? _playerStateSub;

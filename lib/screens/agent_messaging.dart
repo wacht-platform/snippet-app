@@ -1,3 +1,4 @@
+import 'package:snippet/ambient/hold.dart';
 import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
@@ -352,7 +353,7 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
   final List<_AgentAttachment> _attachments = [];
   int _attachmentGeneration = 0;
 
-  final AudioRecorder _recorder = AudioRecorder();
+  final AudioRecorder _recorder = HeldRecorder();
   AudioPlayer? _player;
 
   AudioPlayer get _audioPlayer {

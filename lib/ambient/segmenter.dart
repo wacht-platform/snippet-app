@@ -152,6 +152,18 @@ class SpeechSegmenter {
     onLiveStart?.call(seq, _startedAt, true, initial);
   }
 
+  void abandon() {
+    if (_active && _seq != null) onDiscard?.call(_seq!);
+    _buffer.takeBytes();
+    _preRoll.clear();
+    _pendingTail = null;
+    _pendingTailStartedAt = null;
+    _active = false;
+    _frames = 0;
+    _speechFrames = 0;
+    _silentFrames = 0;
+  }
+
   void _finish() {
     final bytes = _buffer.takeBytes();
     final enough = _speechFrames >= minSpeechFrames;
