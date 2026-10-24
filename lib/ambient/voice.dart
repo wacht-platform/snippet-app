@@ -104,6 +104,8 @@ class AmbientVoice {
             _wakeTurn(turn);
             _play();
           }
+        case 'ambient_speech_interrupt':
+          unawaited(_interruptAll());
         case 'ambient_speech_cancel':
           if (turn != null) {
             _wakeTurn(turn);
@@ -352,6 +354,28 @@ class AmbientVoice {
     try {
       await _sink.invokeMethod('volume', {'volume': on ? 0.0 : 1.0});
     } catch (_) {}
+  }
+
+  Future<void> _interruptAll() async {
+    final turns = <int>{..._chunks.keys};
+    final current = _playingTurn;
+    if (current != null) turns.add(current);
+    _gen++;
+    _barged.addAll(turns);
+    Map<String, dynamic>? pos;
+    try {
+      pos = await _sink.invokeMapMethod<String, dynamic>('stop');
+    } catch (e) {
+      AmbientDiagnostics.log('voice: interrupt stop failed $e');
+    }
+    final playing = pos?['turn'] as int?;
+    for (final t in turns) {
+      _finish(t);
+    }
+    if (playing != null && playing >= 0 && turns.contains(playing)) {
+      await _postBarge(playing, pos?['seq'] as int? ?? -1, pos?['played_ms'] as int? ?? 0);
+    }
+    speaking.value = _chunks.isNotEmpty;
   }
 
   Future<void> stopNow() async {
