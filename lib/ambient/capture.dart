@@ -197,14 +197,14 @@ class AmbientCapture {
       return;
     }
     _duringPlayback = true;
-    if (_probability < 0.85) {
+    if (_probability < 0.9) {
       _speechSince = null;
       return;
     }
     final since = _speechSince ??= DateTime.now();
     final elapsed = DateTime.now().difference(since);
-    if (elapsed >= const Duration(milliseconds: 250) && !_ducked) { _ducked = true; unawaited(voice.duck(true)); }
-    if (elapsed >= const Duration(milliseconds: 550)) { _speechSince = null; unawaited(voice.stopNow()); }
+    if (elapsed >= const Duration(milliseconds: 450) && !_ducked) { _ducked = true; unawaited(voice.duck(true)); }
+    if (elapsed >= const Duration(milliseconds: 900)) { _speechSince = null; unawaited(voice.stopNow()); }
   }
 
   Future<void> stop() async {
