@@ -21,6 +21,14 @@ class AmbientStream {
   final Map<int, Completer<StreamDone>> _waiting = {};
   int _handle = 0;
   bool _closed = false;
+  bool _keep = false;
+  int _failures = 0;
+  Timer? _retry;
+  void Function(int turn, Uint8List pcm)? onTtsFrame;
+  void Function(Map<String, dynamic> msg)? onTts;
+  void Function(bool open)? onConnection;
+
+  bool get open => _ws?.readyState == WebSocket.open;
 
   int nextHandle() => ++_handle;
 
@@ -28,6 +36,19 @@ class AmbientStream {
     final ws = _ws;
     if (ws != null && ws.readyState == WebSocket.open) return Future.value(ws);
     return _connecting ??= _connect().whenComplete(() => _connecting = null);
+  }
+
+  void keepAlive() {
+    _keep = true;
+    unawaited(_socket());
+  }
+
+  void _scheduleRetry() {
+    if (!_keep || _closed || _retry?.isActive == true) return;
+    _retry = Timer(Duration(milliseconds: (500 * (1 << _failures.clamp(0, 5))).clamp(500, 15000)), () {
+      _failures++;
+      unawaited(_socket());
+    });
   }
 
   Future<WebSocket?> _connect() async {
@@ -48,13 +69,24 @@ class AmbientStream {
         cancelOnError: true,
       );
       _ws = ws;
+      _failures = 0;
+      _send(ws, jsonEncode({'t': 'caps', 'tts_stream': 1}));
+      onConnection?.call(true);
       return ws;
     } catch (_) {
+      _scheduleRetry();
       return null;
     }
   }
 
   void _onMessage(dynamic data) {
+    if (data is List<int>) {
+      if (data.length < 6) return;
+      final bytes = data is Uint8List ? data : Uint8List.fromList(data);
+      final turn = ByteData.sublistView(bytes, 0, 4).getUint32(0, Endian.little);
+      onTtsFrame?.call(turn, Uint8List.sublistView(bytes, 4));
+      return;
+    }
     if (data is! String) return;
     final Map<String, dynamic> msg;
     try {
@@ -66,6 +98,8 @@ class AmbientStream {
     if (t == 'done' || t == 'err') {
       final h = (msg['h'] as num?)?.toInt() ?? 0;
       _waiting.remove(h)?.complete(StreamDone((msg['code'] as num?)?.toInt() ?? 0, '${msg['status'] ?? ''}'));
+    } else if (t == 'tts_start' || t == 'tts_end' || t == 'tts_stop') {
+      onTts?.call(msg);
     }
   }
 
@@ -75,6 +109,10 @@ class AmbientStream {
     _waiting.clear();
     for (final c in pending) {
       c.complete(StreamDone(0, 'connection lost'));
+    }
+    if (_ws == null) {
+      onConnection?.call(false);
+      _scheduleRetry();
     }
   }
 
@@ -139,6 +177,11 @@ class AmbientStream {
     if (ws != null && ws.readyState == WebSocket.open) _send(ws, jsonEncode({'t': 'stat', ...values}));
   }
 
+  void ttsPos(int turn, int ms, bool done) {
+    final ws = _ws;
+    if (ws != null && ws.readyState == WebSocket.open) _send(ws, jsonEncode({'t': 'tts_pos', 'turn': turn, 'ms': ms, 'done': done}));
+  }
+
   void skip(int seq) {
     final ws = _ws;
     if (ws != null && ws.readyState == WebSocket.open) _send(ws, jsonEncode({'t': 'skip', 'seq': seq}));
@@ -146,6 +189,7 @@ class AmbientStream {
 
   void close() {
     _closed = true;
+    _retry?.cancel();
     final ws = _ws;
     _ws = null;
     try {

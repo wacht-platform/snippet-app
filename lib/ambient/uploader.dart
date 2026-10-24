@@ -62,6 +62,8 @@ class AmbientUploader {
   final http.Client _client = http.Client();
   late final AmbientStream _stream = AmbientStream(baseUrl: baseUrl, token: token, device: device);
   final Map<Future<int>, _Live> _live = {};
+
+  AmbientStream get stream => _stream;
   AmbientUploader({
     required this.baseUrl,
     required this.token,
@@ -100,6 +102,7 @@ class AmbientUploader {
   Future<void> start() async {
     await _refreshCount();
     _heartbeat = Timer.periodic(const Duration(seconds: 15), (_) => _beat());
+    _stream.keepAlive();
     unawaited(_drain(backlog: displaced.value));
   }
 

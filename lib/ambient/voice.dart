@@ -8,12 +8,22 @@ import 'package:http/http.dart' as http;
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 import 'diagnostics.dart';
+import 'stream.dart';
 
 class AmbientStateEvent {
   const AmbientStateEvent({required this.mode, required this.sub, this.reason});
   final String mode;
   final String sub;
   final String? reason;
+}
+
+class _StreamTurn {
+  int bytes = 0;
+  bool ended = false;
+  int? carry;
+  int lastPlayed = -1;
+  DateTime lastFrame = DateTime.now();
+  DateTime lastProgress = DateTime.now();
 }
 
 class AmbientVoice {
@@ -41,6 +51,14 @@ class AmbientVoice {
   bool _closed = false, _running = false;
   int _gen = 0, _failures = 0, _last = 0;
   int? _playingTurn;
+  AmbientStream? _duplex;
+  final Map<int, _StreamTurn> _streams = {};
+  final Set<int> _streamIds = {};
+  final Set<int> _streamDead = {};
+  Timer? _streamTick;
+  bool _ticking = false;
+
+  bool get _busy => _chunks.isNotEmpty || _streams.isNotEmpty;
 
   Uri _uri(String path, [Map<String, String>? query]) =>
       Uri.parse(baseUrl).replace(path: path, queryParameters: {'token': token, ...?query});
@@ -84,6 +102,11 @@ class AmbientVoice {
       switch (f['kind']) {
         case 'ambient_state':
           state.value = AmbientStateEvent(mode: f['mode'] as String? ?? '', sub: f['sub'] as String? ?? '', reason: f['reason'] as String?);
+        case 'ambient_speech_start' || 'ambient_speech_chunk' || 'ambient_speech_end' when turn != null && (f['stream'] == true || _streamIds.contains(turn)):
+          _streamIds.add(turn);
+          _chunks.remove(turn);
+        case 'ambient_speech_cancel' when turn != null && _streamIds.contains(turn):
+          unawaited(stopStream(turn));
         case 'ambient_speech_start':
           if (turn != null && !_dead(turn)) {
             unawaited(_sink.invokeMethod('warm').catchError((_) {}));
@@ -125,7 +148,7 @@ class AmbientVoice {
       for (final t in (jsonDecode(r.body)['turns'] as List)) {
         final id = t['id'] as int;
         _last = max(_last, id);
-        if (_dead(id)) continue;
+        if (_dead(id) || t['stream'] == true || _streamIds.contains(id)) continue;
         final map = _chunks.putIfAbsent(id, () => {});
         for (final c in (t['chunks'] as List? ?? [])) {
           final m = Map<String, dynamic>.from(c as Map);
@@ -143,7 +166,7 @@ class AmbientVoice {
   Future<void> _play() async {
     if (_running || _closed) return;
     _running = true;
-    speaking.value = _chunks.isNotEmpty;
+    speaking.value = _busy;
     try {
       while (!_closed && _chunks.isNotEmpty) {
         final turn = _chunks.keys.reduce(min);
@@ -164,7 +187,7 @@ class AmbientVoice {
     } finally {
       _running = false;
       _playingTurn = null;
-      speaking.value = _chunks.isNotEmpty;
+      speaking.value = _busy;
     }
   }
 
@@ -350,6 +373,145 @@ class AmbientVoice {
     _play();
   }
 
+  void attach(AmbientStream duplex) {
+    _duplex = duplex;
+    duplex.onTtsFrame = _onStreamFrame;
+    duplex.onTts = _onStreamMessage;
+    duplex.onConnection = (_) => _streamChanged();
+  }
+
+  void _onStreamMessage(Map<String, dynamic> msg) {
+    final turn = (msg['turn'] as num?)?.toInt() ?? 0;
+    switch (msg['t']) {
+      case 'tts_start':
+        if (turn <= 0 || _streamDead.contains(turn)) return;
+        _adoptStream(turn);
+        unawaited(_sink.invokeMethod('warm').catchError((_) {}));
+        _streamChanged();
+      case 'tts_end':
+        if (turn <= 0 || _streamDead.contains(turn)) return;
+        _adoptStream(turn).ended = true;
+        _streamChanged();
+      case 'tts_stop':
+        unawaited(stopStream(turn));
+    }
+  }
+
+  _StreamTurn _adoptStream(int turn) {
+    _streamIds.add(turn);
+    if (_chunks.remove(turn) != null) _finished.add(turn);
+    return _streams.putIfAbsent(turn, _StreamTurn.new);
+  }
+
+  void _onStreamFrame(int turn, Uint8List pcm) {
+    if (_closed || turn <= 0 || _streamDead.contains(turn)) return;
+    final fresh = !_streams.containsKey(turn);
+    final st = _adoptStream(turn);
+    if (fresh) _streamChanged();
+    var data = pcm;
+    final carry = st.carry;
+    if (carry != null) {
+      data = Uint8List(pcm.length + 1)
+        ..[0] = carry
+        ..setRange(1, pcm.length + 1, pcm);
+      st.carry = null;
+    }
+    if (data.length.isOdd) {
+      st.carry = data.last;
+      data = Uint8List.sublistView(data, 0, data.length - 1);
+    }
+    if (data.isEmpty) return;
+    st.bytes += data.length;
+    st.lastFrame = DateTime.now();
+    unawaited(_sink.invokeMethod('enqueueFrame', {'turn': turn, 'pcm': data}).catchError((Object e) {
+      AmbientDiagnostics.log('voice: stream frame failed $e');
+    }));
+  }
+
+  void _streamChanged() {
+    speaking.value = _busy;
+    if (_streams.isEmpty) {
+      _streamTick?.cancel();
+      _streamTick = null;
+    } else {
+      _streamTick ??= Timer.periodic(const Duration(milliseconds: 200), (_) => _tickStream());
+    }
+  }
+
+  Map<int, int> _playedMap(Map<String, dynamic> pos) => {
+        for (final e in ((pos['turns'] as Map?) ?? const {}).entries) (e.key as num).toInt(): (e.value as num).toInt(),
+      };
+
+  Future<void> _tickStream() async {
+    if (_ticking || _closed) return;
+    _ticking = true;
+    try {
+      Map<String, dynamic> pos = const {};
+      try {
+        pos = await _sink.invokeMapMethod<String, dynamic>('streamPosition') ?? const {};
+      } catch (e) {
+        AmbientDiagnostics.log('voice: stream position failed $e');
+      }
+      final played = _playedMap(pos);
+      final heard = pos['turn'] as int? ?? -1;
+      final active = pos['active'] == 1;
+      final now = DateTime.now();
+      final quietLimit = (_duplex?.open ?? false) ? const Duration(seconds: 8) : const Duration(seconds: 3);
+      for (final e in _streams.entries.toList()) {
+        final turn = e.key, st = e.value;
+        if (!identical(_streams[turn], st)) continue;
+        final ms = played[turn] ?? 0;
+        if (ms != st.lastPlayed) {
+          st.lastPlayed = ms;
+          st.lastProgress = now;
+        }
+        final total = st.bytes ~/ 48;
+        final caughtUp = ms >= total - 5;
+        if (st.ended && (caughtUp || (!active && now.difference(st.lastProgress) > const Duration(milliseconds: 1500)))) {
+          _duplex?.ttsPos(turn, caughtUp ? total : ms, true);
+          _endStream(turn);
+          continue;
+        }
+        if (!st.ended && caughtUp && !(active && heard == turn) && now.difference(st.lastFrame) > quietLimit) {
+          AmbientDiagnostics.log('voice: stream turn $turn stalled at ${ms}ms');
+          _duplex?.ttsPos(turn, ms, false);
+          _endStream(turn);
+          continue;
+        }
+        if (turn == heard && active) _duplex?.ttsPos(turn, ms, false);
+      }
+    } finally {
+      _ticking = false;
+    }
+    _streamChanged();
+  }
+
+  void _endStream(int turn) {
+    _streams.remove(turn);
+    _streamDead.add(turn);
+    _streamDead.removeWhere((t) => t < turn - 100);
+    _streamIds.removeWhere((t) => t < turn - 100);
+  }
+
+  Future<void> stopStream([int turn = 0]) async {
+    final stopped = turn == 0 ? _streams.keys.toList() : [turn];
+    for (final t in stopped) {
+      _streamIds.add(t);
+      _endStream(t);
+    }
+    _streamChanged();
+    Map<String, dynamic> pos = const {};
+    try {
+      pos = await _sink.invokeMapMethod<String, dynamic>('stopStream', {'turn': turn, 'fadeMs': 25}) ?? const {};
+    } catch (e) {
+      AmbientDiagnostics.log('voice: stream stop failed $e');
+    }
+    final played = _playedMap(pos);
+    for (final t in stopped) {
+      _duplex?.ttsPos(t, played[t] ?? 0, false);
+    }
+  }
+
   Future<void> duck(bool on) async {
     try {
       await _sink.invokeMethod('volume', {'volume': on ? 0.0 : 1.0});
@@ -357,6 +519,7 @@ class AmbientVoice {
   }
 
   Future<void> _interruptAll() async {
+    if (_streams.isNotEmpty) await stopStream();
     final turns = <int>{..._chunks.keys};
     final current = _playingTurn;
     if (current != null) turns.add(current);
@@ -375,10 +538,11 @@ class AmbientVoice {
     if (playing != null && playing >= 0 && turns.contains(playing)) {
       await _postBarge(playing, pos?['seq'] as int? ?? -1, pos?['played_ms'] as int? ?? 0);
     }
-    speaking.value = _chunks.isNotEmpty;
+    speaking.value = _busy;
   }
 
   Future<void> stopNow() async {
+    if (_streams.isNotEmpty) await stopStream();
     final turn = _playingTurn ?? (_chunks.isEmpty ? null : _chunks.keys.reduce(min));
     _gen++;
     if (turn != null) _barged.add(turn);
@@ -393,13 +557,20 @@ class AmbientVoice {
       _finish(turn);
       await _postBarge(turn, same ? (pos?['seq'] as int? ?? -1) : -1, same ? (pos?['played_ms'] as int? ?? 0) : 0);
     }
-    speaking.value = _chunks.isNotEmpty;
+    speaking.value = _busy;
   }
 
   Future<void> dispose() async {
     _closed = true;
     _retry?.cancel();
     _poll?.cancel();
+    _streamTick?.cancel();
+    final duplex = _duplex;
+    if (duplex != null) {
+      duplex.onTtsFrame = null;
+      duplex.onTts = null;
+      duplex.onConnection = null;
+    }
     _client.close();
     await _sub?.cancel();
     await _channel?.sink.close();

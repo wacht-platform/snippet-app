@@ -7,6 +7,8 @@ import android.media.AudioFormat
 import android.media.AudioManager
 import android.media.AudioTrack
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
@@ -15,8 +17,8 @@ import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 
 class AmbientAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
-    private class Chunk(val turn: Int, val seq: Int, val pcm: ByteArray, val silenceFrames: Int)
-    private class Boundary(val turn: Int, val seq: Int, val start: Long, val audioEnd: Long)
+    private class Chunk(val turn: Int, val seq: Int, val pcm: ByteArray, val silenceFrames: Int, val stream: Boolean = false)
+    private class Boundary(val turn: Int, val seq: Int, val start: Long, val audioEnd: Long, val stream: Boolean = false)
     private class Sink(val track: AudioTrack) {
         val queue = LinkedBlockingQueue<Chunk>()
         val written = CopyOnWriteArrayList<Boundary>()
@@ -36,6 +38,10 @@ class AmbientAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
     private var savedMode = AudioManager.MODE_NORMAL
     private var savedCallVolume = -1
     private var raisedCallVolume = -1
+    private val streamBase = HashMap<Int, Long>()
+    private val streamStopped = HashSet<Int>()
+    @Volatile private var lastStream: Map<String, Any> = idleStream()
+    private val main = Handler(Looper.getMainLooper())
 
     override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         context = binding.applicationContext
@@ -68,6 +74,12 @@ class AmbientAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
                     result.success(null)
                 }
                 "stop" -> result.success(stopTrack())
+                "enqueueFrame" -> {
+                    enqueueFrame(call.argument<Int>("turn") ?: 0, call.argument<ByteArray>("pcm") ?: byteArrayOf())
+                    result.success(null)
+                }
+                "streamPosition" -> result.success(streamPosition())
+                "stopStream" -> stopStream(call.argument<Int>("turn") ?: 0, call.argument<Int>("fadeMs") ?: 25) { main.post { result.success(it) } }
                 "cancelAfter" -> {
                     cancelAfter(call.argument<Int>("turn") ?: 0, call.argument<Int>("seq") ?: -1, call.argument<Int>("fadeMs") ?: 50)
                     result.success(null)
@@ -80,6 +92,8 @@ class AmbientAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
     }
 
     private fun idlePos(): Map<String, Int> = mapOf("seq" to -1, "played_ms" to 0, "turn" to -1, "active" to 0)
+
+    private fun idleStream(): Map<String, Any> = mapOf("turn" to -1, "played_ms" to 0, "active" to 0, "turns" to HashMap<Int, Int>())
 
     private fun audioManager(): AudioManager? = context?.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
 
@@ -185,7 +199,12 @@ class AmbientAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
     }
 
     private fun releaseSink(s: Sink) {
-        if (sink === s) sink = null
+        if (sink === s) {
+            lastStream = streamStats(s) + ("active" to 0)
+            for ((turn, frames) in streamPlayed(s)) streamBase[turn] = (streamBase[turn] ?: 0L) + frames
+            trimStreamState()
+            sink = null
+        }
         s.stopping = true
         s.queue.clear()
         try {
@@ -207,6 +226,87 @@ class AmbientAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
             val s = sink ?: createSink()
             s.queue.put(Chunk(turn, seq, pcm, 24000 * silenceMs / 1000))
         }
+    }
+
+    private fun enqueueFrame(turn: Int, pcm: ByteArray) {
+        if (pcm.size < 2) return
+        synchronized(lock) {
+            if (turn in streamStopped) return
+            val s = sink ?: createSink()
+            s.queue.put(Chunk(turn, -1, pcm, 0, true))
+        }
+    }
+
+    private fun streamPlayed(s: Sink): Map<Int, Long> {
+        val head = try { s.track.playbackHeadPosition.toLong() and 0xffffffffL } catch (_: Exception) { 0L }
+        val out = LinkedHashMap<Int, Long>()
+        for (b in s.written) {
+            if (!b.stream) continue
+            out[b.turn] = (out[b.turn] ?: 0L) + (head - b.start).coerceIn(0L, b.audioEnd - b.start)
+        }
+        return out
+    }
+
+    private fun streamStats(s: Sink): Map<String, Any> {
+        val head = try { s.track.playbackHeadPosition.toLong() and 0xffffffffL } catch (_: Exception) { 0L }
+        var heard = -1
+        var pendingStream = s.queue.any { it.stream }
+        for (b in s.written) {
+            if (!b.stream) continue
+            if (head >= b.start) heard = b.turn
+            if (head < b.audioEnd) pendingStream = true
+        }
+        val turns = HashMap<Int, Int>()
+        for ((turn, frames) in streamBase) turns[turn] = (frames * 1000 / 24000).toInt()
+        for ((turn, frames) in streamPlayed(s)) turns[turn] = (((streamBase[turn] ?: 0L) + frames) * 1000 / 24000).toInt()
+        if (heard < 0) heard = (lastStream["turn"] as? Int) ?: -1
+        return mapOf("turn" to heard, "played_ms" to (turns[heard] ?: 0), "active" to if (pendingStream) 1 else 0, "turns" to turns)
+    }
+
+    private fun streamPosition(): Map<String, Any> = synchronized(lock) { sink?.let { streamStats(it) } ?: lastStream }
+
+    private fun trimStreamState() {
+        val newest = (streamBase.keys + streamStopped).maxOrNull() ?: return
+        streamBase.keys.removeAll { it < newest - 50 }
+        streamStopped.removeAll { it < newest - 50 }
+    }
+
+    private fun stopStream(turn: Int, fadeMs: Int, done: (Map<String, Any>) -> Unit) {
+        val s: Sink
+        synchronized(lock) {
+            if (turn != 0) streamStopped.add(turn)
+            else {
+                streamStopped.addAll(streamBase.keys)
+                sink?.let { cur ->
+                    cur.written.forEach { if (it.stream) streamStopped.add(it.turn) }
+                    cur.queue.forEach { if (it.stream) streamStopped.add(it.turn) }
+                }
+            }
+            val cur = sink
+            if (cur == null) {
+                done(lastStream)
+                return
+            }
+            s = cur
+            s.queue.clear()
+        }
+        Thread {
+            val steps = 5
+            val start = currentVolume
+            for (i in 1..steps) {
+                try { Thread.sleep((fadeMs / steps).coerceAtLeast(1).toLong()) } catch (_: InterruptedException) { break }
+                try { s.track.setVolume(start * (1f - i.toFloat() / steps)) } catch (_: Exception) { break }
+            }
+            val pos = synchronized(lock) {
+                if (sink === s) {
+                    val p = streamStats(s)
+                    lastPos = positionOf(s) + ("active" to 0)
+                    releaseSink(s)
+                    p + ("active" to 0)
+                } else lastStream
+            }
+            done(pos)
+        }.start()
     }
 
     private fun writeAll(s: Sink, data: ByteArray): Boolean {
@@ -235,9 +335,20 @@ class AmbientAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
                 }
                 continue
             }
-            val frames = (item.pcm.size / 2).toLong()
-            synchronized(lock) { s.written.add(Boundary(item.turn, item.seq, s.framesWritten, s.framesWritten + frames)) }
-            if (!writeAll(s, item.pcm)) return
+            val pcm = if (item.pcm.size % 2 == 0) item.pcm else item.pcm.copyOf(item.pcm.size - 1)
+            val frames = (pcm.size / 2).toLong()
+            val skip = synchronized(lock) {
+                if (item.stream && item.turn in streamStopped) return@synchronized true
+                val last = s.written.lastOrNull()
+                if (item.stream && last != null && last.stream && last.turn == item.turn && last.audioEnd == s.framesWritten) {
+                    s.written[s.written.size - 1] = Boundary(item.turn, -1, last.start, s.framesWritten + frames, true)
+                } else {
+                    s.written.add(Boundary(item.turn, item.seq, s.framesWritten, s.framesWritten + frames, item.stream))
+                }
+                false
+            }
+            if (skip) continue
+            if (!writeAll(s, pcm)) return
             s.framesWritten += frames
             if (item.silenceFrames > 0) {
                 if (!writeAll(s, ByteArray(item.silenceFrames * 2))) return
@@ -252,6 +363,7 @@ class AmbientAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
         var lastTurn = -1
         var ms = 0
         for (b in s.written) {
+            if (b.stream) continue
             if (head < b.start) break
             lastTurn = b.turn
             if (head >= b.audioEnd) {

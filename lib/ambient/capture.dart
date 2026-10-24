@@ -158,6 +158,7 @@ class AmbientCapture {
       token: uploader.token,
       device: uploader.device,
     );
+    _voice!.attach(uploader.stream);
     voiceListenable.value = _voice;
     _voice!.state.addListener(_onAmbientState);
     _mediaTimer?.cancel();
