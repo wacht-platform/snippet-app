@@ -133,6 +133,11 @@ class AmbientStream {
     if (ws != null && ws.readyState == WebSocket.open) _send(ws, jsonEncode({'t': 'abort', 'h': h}));
   }
 
+  void stat(Map<String, Object> values) {
+    final ws = _ws;
+    if (ws != null && ws.readyState == WebSocket.open) _send(ws, jsonEncode({'t': 'stat', ...values}));
+  }
+
   void skip(int seq) {
     final ws = _ws;
     if (ws != null && ws.readyState == WebSocket.open) _send(ws, jsonEncode({'t': 'skip', 'seq': seq}));

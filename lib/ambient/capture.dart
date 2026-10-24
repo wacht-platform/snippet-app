@@ -144,6 +144,13 @@ class AmbientCapture {
     _ticker = Timer.periodic(const Duration(milliseconds: 500), (_) {
       if (!_status.isClosed) _status.add(current);
     });
+    _statTimer?.cancel();
+    _statTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      uploader.stat({'frames': _frames, 'speech': _speechFrames, 'loud_low_vad': _loudQuiet, 'segments': _segments, 'threshold': threshold});
+      _frames = 0;
+      _speechFrames = 0;
+      _loudQuiet = 0;
+    });
     _voice = AmbientVoice(
       baseUrl: uploader.baseUrl,
       token: uploader.token,
@@ -161,6 +168,11 @@ class AmbientCapture {
     _status.add(current);
   }
 
+  Timer? _statTimer;
+  int _frames = 0;
+  int _speechFrames = 0;
+  int _loudQuiet = 0;
+
   void _onAudio(Uint8List bytes) {
     final vad = _vad;
     final segmenter = _segmenter;
@@ -177,6 +189,13 @@ class AmbientCapture {
         samples[i] = view.getInt16(i * 2, Endian.little) / 32768.0;
       }
       _probability = vad.process(samples);
+      _frames++;
+      if (_probability >= threshold) _speechFrames++;
+      var energy = 0.0;
+      for (final x in samples) {
+        energy += x * x;
+      }
+      if (energy / samples.length > 0.0004 && _probability < 0.3) _loudQuiet++;
       segmenter.addFrame(frame, _probability);
       _handleBargeIn(segmenter.speaking);
       offset += chunkBytes;
@@ -217,6 +236,7 @@ class AmbientCapture {
     _running = false;
     _ticker?.cancel();
     _mediaTimer?.cancel();
+    _statTimer?.cancel();
     await _sub?.cancel();
     await _recorder.stop();
     _segmenter?.flush();

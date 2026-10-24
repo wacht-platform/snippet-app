@@ -118,6 +118,8 @@ class AmbientUploader {
     _stream.skip(seq);
   }
 
+  void stat(Map<String, Object> values) => _stream.stat(values);
+
   void liveStart(Future<int> seq, DateTime startedAt, bool continued, Uint8List initial) {
     final live = _Live(_stream.nextHandle(), newSegmentId());
     live.buffer.add(initial);
