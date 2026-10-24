@@ -11,6 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'diagnostics.dart';
 
 import 'segmenter.dart';
+import 'stream.dart';
 import 'wav.dart';
 
 String newSegmentId() {
@@ -47,8 +48,20 @@ Future<(String, String)> ambientDeviceIdentity() async {
   return ('$os-$id', '$name ${id.substring(0, 4)}');
 }
 
+class _Live {
+  _Live(this.h, this.id);
+  final int h;
+  final String id;
+  final List<Uint8List> buffer = [];
+  bool started = false;
+  bool failed = false;
+  Future<void> chain = Future.value();
+}
+
 class AmbientUploader {
   final http.Client _client = http.Client();
+  late final AmbientStream _stream = AmbientStream(baseUrl: baseUrl, token: token, device: device);
+  final Map<Future<int>, _Live> _live = {};
   AmbientUploader({
     required this.baseUrl,
     required this.token,
@@ -102,17 +115,45 @@ class AmbientUploader {
   Future<int> reserveSequence() => _nextSeq();
 
   Future<void> skip(int seq) async {
-    try {
-      final uri = Uri.parse(baseUrl).replace(path: '/ambient/activity', queryParameters: {'token': token});
-      await _client.post(uri, headers: {'content-type': 'application/json'}, body: jsonEncode({'device': device, 'seq': seq, 'skip': true})).timeout(const Duration(seconds: 10));
-    } catch (_) {}
+    _stream.skip(seq);
   }
 
-  Future<void> activity(DateTime startedAt, int seq) async {
-    try {
-      final uri = Uri.parse(baseUrl).replace(path: '/ambient/activity', queryParameters: {'token': token});
-      await _client.post(uri, headers: {'content-type': 'application/json'}, body: jsonEncode({'device': device, 'seq': seq, 'started_at': startedAt.toIso8601String()})).timeout(const Duration(seconds: 10));
-    } catch (_) {}
+  void liveStart(Future<int> seq, DateTime startedAt, bool continued, Uint8List initial) {
+    final live = _Live(_stream.nextHandle(), newSegmentId());
+    live.buffer.add(initial);
+    _live[seq] = live;
+    live.chain = () async {
+      final value = await seq;
+      final ok = await _stream.start(live.h, live.id, value, startedAt, continued: continued);
+      if (!ok) {
+        live.failed = true;
+        live.buffer.clear();
+        return;
+      }
+      for (final part in live.buffer) {
+        _stream.chunk(live.h, part);
+      }
+      live.buffer.clear();
+      live.started = true;
+    }();
+  }
+
+  void liveChunk(Future<int> seq, Uint8List frame) {
+    final live = _live[seq];
+    if (live == null || live.failed) return;
+    if (live.started) {
+      _stream.chunk(live.h, frame);
+    } else {
+      live.buffer.add(frame);
+    }
+  }
+
+  void liveAbort(Future<int> seq) {
+    final live = _live.remove(seq);
+    if (live == null) return;
+    unawaited(live.chain.then((_) {
+      if (!live.failed) _stream.abort(live.h);
+    }));
   }
 
   Future<void> _beat() async {
@@ -154,7 +195,10 @@ class AmbientUploader {
 
   Future<void> _write(AmbientSegment segment) async {
     final dir = await _queueDir();
-    final id = newSegmentId();
+    final seqKey = segment.seq;
+    final live = seqKey == null ? null : _live.remove(seqKey);
+    final streaming = live != null && !live.failed;
+    final id = streaming ? live.id : newSegmentId();
     final seq = await (segment.seq ?? _nextSeq());
     await File('${dir.path}/$id.wav').writeAsBytes(pcm16ToWav(segment.pcm), flush: true);
     await File('${dir.path}/$id.json').writeAsString(jsonEncode({
@@ -168,7 +212,38 @@ class AmbientUploader {
     }), flush: true);
     await _trim(dir);
     await _refreshCount();
-    unawaited(_drain(backlog: displaced.value));
+    if (streaming) {
+      final path = '${dir.path}/$id.json';
+      _inFlight.add(path);
+      unawaited(_finishLive(live, path, segment));
+    } else {
+      unawaited(_drain(backlog: displaced.value));
+    }
+  }
+
+  Future<void> _finishLive(_Live live, String metaPath, AmbientSegment segment) async {
+    var done = StreamDone(0, 'connection lost');
+    try {
+      await live.chain;
+      if (!live.failed) {
+        done = await _stream.end(
+          live.h,
+          live.id,
+          durationMs: segment.duration.inMilliseconds,
+          bytes: segment.pcm.length,
+          media: segment.media,
+          duringPlayback: segment.duringPlayback,
+        );
+      }
+    } finally {
+      _inFlight.remove(metaPath);
+    }
+    if (done.code == 200) {
+      await _remove(metaPath.substring(0, metaPath.length - 5));
+      await _refreshCount();
+    } else {
+      unawaited(_drain(backlog: displaced.value));
+    }
   }
 
   Future<void> _trim(Directory dir) async {
@@ -264,39 +339,43 @@ class AmbientUploader {
         return true;
       }
       final info = jsonDecode(await meta.readAsString()) as Map<String, dynamic>;
-      final uri = Uri.parse(baseUrl).replace(path: '/ambient/events', queryParameters: {
-        'token': token,
-        'id': info['id'] as String,
-        'device': device,
-        'started_at': info['started_at'] as String,
-        'duration_ms': '${info['duration_ms']}',
-        'seq': '${info['seq']}',
-        'continued': '${info['continued'] == true}',
-        'during_playback': '${info['during_playback'] == true}',
-        'media': '${info['media'] == true}',
-        if (backlog) 'backlog': '1',
-      });
-      final response = await http
-          .post(uri, headers: {'content-type': 'audio/wav'}, body: await audio.readAsBytes())
-          .timeout(const Duration(seconds: 60));
-      if (response.statusCode == 200) {
+      final wav = await audio.readAsBytes();
+      final pcm = wav.length > 44 ? Uint8List.sublistView(wav, 44) : Uint8List(0);
+      final h = _stream.nextHandle();
+      final id = info['id'] as String;
+      final started = DateTime.tryParse(info['started_at'] as String) ?? DateTime.now();
+      final opened = await _stream.start(h, id, (info['seq'] as num).toInt(), started,
+          continued: info['continued'] == true, backlog: backlog);
+      if (!opened) {
+        lastError.value = 'Upload failed: no connection';
+        return false;
+      }
+      for (var i = 0; i < pcm.length; i += 16384) {
+        _stream.chunk(h, Uint8List.sublistView(pcm, i, min(i + 16384, pcm.length)));
+      }
+      final response = await _stream.end(h, id,
+          durationMs: (info['duration_ms'] as num).toInt(),
+          bytes: pcm.length,
+          media: info['media'] == true,
+          duringPlayback: info['during_playback'] == true);
+      if (response.code == 200) {
         await _remove(stem);
         return true;
       }
-      if (response.statusCode == 409) {
+      if (response.code == 409) {
         if (backlog) { await _remove(stem); return true; }
         await _giveUp();
         final retry = await _upload(meta, backlog: true);
         return retry;
       }
-      if (response.statusCode == 400 || response.statusCode == 413) {
-        lastError.value = 'Server rejected a segment (${response.statusCode}); dropped it';
+      if (response.code == 400 || response.code == 413) {
+        lastError.value = 'Server rejected a segment (${response.code}); dropped it';
         await _remove(stem);
         return true;
       }
-      lastError.value = response.statusCode == 403
+      lastError.value = response.code == 403
           ? 'Ambient listening is turned off on the server'
-          : 'Upload failed (${response.statusCode})';
+          : 'Upload failed (${response.code})';
       return false;
     } catch (e) {
       lastError.value = 'Upload failed: $e';
@@ -307,5 +386,6 @@ class AmbientUploader {
   void close() {
     _closed = true;
     _heartbeat?.cancel();
+    _stream.close();
   }
 }

@@ -111,10 +111,14 @@ class AmbientCapture {
       offThreshold: threshold - 0.15,
       onSpeechStart: (startedAt) {
         final seq = uploader.reserveSequence();
-        unawaited(seq.then((value) => uploader.activity(startedAt, value)));
         return seq;
       },
-      onDiscard: (seq) => unawaited(seq.then(uploader.skip)),
+      onDiscard: (seq) {
+        uploader.liveAbort(seq);
+        unawaited(seq.then(uploader.skip));
+      },
+      onLiveStart: uploader.liveStart,
+      onLiveChunk: uploader.liveChunk,
       onSegment: (segment) {
         _segments++;
         final seen = _mediaAt;

@@ -19,6 +19,8 @@ class SpeechSegmenter {
     required this.onSegment,
     required this.onSpeechStart,
     this.onDiscard,
+    this.onLiveStart,
+    this.onLiveChunk,
     this.threshold = 0.5,
     this.offThreshold = 0.35,
     this.preRollFrames = 10,
@@ -32,6 +34,8 @@ class SpeechSegmenter {
   final void Function(AmbientSegment segment) onSegment;
   final Future<int> Function(DateTime startedAt) onSpeechStart;
   final void Function(Future<int> seq)? onDiscard;
+  final void Function(Future<int> seq, DateTime startedAt, bool continued, Uint8List initial)? onLiveStart;
+  final void Function(Future<int> seq, Uint8List frame)? onLiveChunk;
   final double threshold;
   final double offThreshold;
   final int preRollFrames;
@@ -79,6 +83,7 @@ class SpeechSegmenter {
       return;
     }
     _buffer.add(frame);
+    onLiveChunk?.call(_seq!, frame);
     _frames++;
     if (probability >= threshold) _speechFrames++;
     if (probability >= offThreshold) {
@@ -96,7 +101,11 @@ class SpeechSegmenter {
       final wasContinued = _continued;
       _active = false;
       _continued = true;
-      if (_speechFrames >= minSpeechFrames) onSegment(AmbientSegment(_startedAt, first, continued: wasContinued, seq: _seq));
+      if (_speechFrames >= minSpeechFrames) {
+        onSegment(AmbientSegment(_startedAt, first, continued: wasContinued, seq: _seq));
+      } else if (_seq != null) {
+        onDiscard?.call(_seq!);
+      }
       _pendingTail = tail;
       _pendingTailStartedAt = _startedAt.add(Duration(milliseconds: first.length ~/ 2 * 1000 ~/ 16000));
     }
@@ -110,9 +119,12 @@ class SpeechSegmenter {
   void _begin(Uint8List frame) {
     _startedAt = DateTime.now()
         .subtract(Duration(milliseconds: (_preRoll.length + 1) * frameMs));
+    final initial = BytesBuilder(copy: false);
     for (final past in _preRoll) {
       _buffer.add(past);
+      initial.add(past);
     }
+    initial.add(frame);
     _frames = _preRoll.length + 1;
     _preRoll.clear();
     _buffer.add(frame);
@@ -120,13 +132,15 @@ class SpeechSegmenter {
     _silentFrames = 0;
     _active = true;
     _continued = false;
-    _seq = onSpeechStart(_startedAt);
+    final seq = _seq = onSpeechStart(_startedAt);
+    onLiveStart?.call(seq, _startedAt, false, initial.takeBytes());
   }
 
   void _beginContinued(Uint8List frame) {
     _startedAt = _pendingTailStartedAt ?? DateTime.now();
     _buffer.add(_pendingTail!);
     _buffer.add(frame);
+    final initial = Uint8List.fromList([..._pendingTail!, ...frame]);
     _pendingTail = null;
     _pendingTailStartedAt = null;
     _frames = 11;
@@ -134,7 +148,8 @@ class SpeechSegmenter {
     _silentFrames = 0;
     _active = true;
     _continued = true;
-    _seq = onSpeechStart(_startedAt);
+    final seq = _seq = onSpeechStart(_startedAt);
+    onLiveStart?.call(seq, _startedAt, true, initial);
   }
 
   void _finish() {
