@@ -534,6 +534,11 @@ class DaemonClient {
     if (r.statusCode != 200) throw _err('forget speakers', r);
   }
 
+  Future<void> claimAmbientSpeaker(int id) async {
+    final r = await http.post(_uri('/ambient/speakers/claim'), headers: _json, body: jsonEncode({'id': id}));
+    if (r.statusCode != 200) throw _err('claim speaker', r);
+  }
+
   Future<void> labelAmbientSpeaker(int id, String label) async {
     final r = await http.post(_uri('/ambient/speakers/label'), headers: _json,
         body: jsonEncode({'id': id, 'label': label}));

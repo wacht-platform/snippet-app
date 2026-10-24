@@ -48,6 +48,7 @@ Future<(String, String)> ambientDeviceIdentity() async {
 }
 
 class AmbientUploader {
+  final http.Client _client = http.Client();
   AmbientUploader({
     required this.baseUrl,
     required this.token,
@@ -103,7 +104,7 @@ class AmbientUploader {
   Future<void> activity(DateTime startedAt, int seq) async {
     try {
       final uri = Uri.parse(baseUrl).replace(path: '/ambient/activity', queryParameters: {'token': token});
-      await http.post(uri, headers: {'content-type': 'application/json'}, body: jsonEncode({'device': device, 'seq': seq, 'started_at': startedAt.toIso8601String()})).timeout(const Duration(seconds: 10));
+      await _client.post(uri, headers: {'content-type': 'application/json'}, body: jsonEncode({'device': device, 'seq': seq, 'started_at': startedAt.toIso8601String()})).timeout(const Duration(seconds: 10));
     } catch (_) {}
   }
 
@@ -111,7 +112,7 @@ class AmbientUploader {
     if (_closed || displaced.value) return;
     try {
       final uri = Uri.parse(baseUrl).replace(path: '/ambient/lease', queryParameters: {'token': token});
-      final response = await http
+      final response = await _client
           .post(uri,
               headers: {'content-type': 'application/json'},
               body: jsonEncode({'device': device, 'label': label}))

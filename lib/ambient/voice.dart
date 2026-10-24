@@ -31,6 +31,7 @@ class AmbientVoice {
   StreamSubscription<dynamic>? _sub;
   Timer? _retry;
   bool _closed = false, _running = false;
+  final http.Client _client = http.Client();
   final Set<int> _finished = {};
   final Map<int, Set<int>> _consumed = {};
   final Map<int, DateTime> _idleSince = {};
@@ -75,7 +76,7 @@ class AmbientVoice {
   Future<void> _catchUp() async {
     try {
       final floor = _chunks.isEmpty ? _last : (_chunks.keys.reduce((a, b) => a < b ? a : b) - 1);
-      final r = await http.get(_uri('/ambient/turns', {'after': '$floor', 'device': device}));
+      final r = await _client.get(_uri('/ambient/turns', {'after': '$floor', 'device': device}));
       if (r.statusCode != 200) return;
       for (final t in (jsonDecode(r.body)['turns'] as List)) {
         final id = t['id'] as int;
@@ -160,7 +161,7 @@ class AmbientVoice {
   Future<Map<String, dynamic>> _position() async => await _sink.invokeMapMethod<String, dynamic>('position') ?? const {};
   Future<Uint8List?> _fetch(int turn, int seq) async {
     for (var attempt = 0; attempt < 30; attempt++) {
-      try { final r = await http.get(_uri('/ambient/turns/$turn/chunks/$seq')); if (r.statusCode == 200) return r.bodyBytes; } catch (_) {}
+      try { final r = await _client.get(_uri('/ambient/turns/$turn/chunks/$seq')); if (r.statusCode == 200) return r.bodyBytes; } catch (_) {}
       await Future<void>.delayed(const Duration(milliseconds: 100));
     }
     return null;
@@ -170,14 +171,14 @@ class AmbientVoice {
     if (map == null || map.isEmpty) return;
     final seq = (map.keys.toList()..sort()).first;
     try {
-      final r = await http.get(_uri('/ambient/turns/$turn/chunks/$seq'));
+      final r = await _client.get(_uri('/ambient/turns/$turn/chunks/$seq'));
       if (r.statusCode != 200) return;
       map.remove(seq);
       _consumed.putIfAbsent(turn, () => {}).add(seq);
       await _sink.invokeMethod('enqueue', {'turn': turn, 'seq': seq, 'pcm': r.bodyBytes, 'silenceMs': 80});
     } catch (_) {}
   }
-  Future<void> _played(int id, int seq, int ms, bool complete) async { try { await http.post(_uri('/ambient/turns/played'), headers: {'content-type':'application/json'}, body: jsonEncode({'id':id,'seq':seq,'played_ms':ms,'complete':complete})); } catch (_) {} }
+  Future<void> _played(int id, int seq, int ms, bool complete) async { try { await _client.post(_uri('/ambient/turns/played'), headers: {'content-type':'application/json'}, body: jsonEncode({'id':id,'seq':seq,'played_ms':ms,'complete':complete})); } catch (_) {} }
   Future<void> _cancel(int turn, int after) async {
     final m = _chunks[turn];
     m?.removeWhere((seq, _) => seq > after);
@@ -186,7 +187,7 @@ class AmbientVoice {
       final seq = pos['seq'] as int? ?? -1;
       final ms = pos['played_ms'] as int? ?? 0;
       if (seq >= 0 && seq > after) {
-        await http.post(_uri('/ambient/barge'), headers: {'content-type': 'application/json'}, body: jsonEncode({'turn': turn, 'seq': seq, 'played_ms': ms}));
+        await _client.post(_uri('/ambient/barge'), headers: {'content-type': 'application/json'}, body: jsonEncode({'turn': turn, 'seq': seq, 'played_ms': ms}));
       }
       await _sink.invokeMethod('cancelAfter', {'turn': turn, 'seq': after, 'fadeMs': 50});
     } catch (_) {}
@@ -200,9 +201,9 @@ class AmbientVoice {
       final ms = pos?['played_ms'] as int? ?? 0;
       _barged.add(turn);
       _finish(turn);
-      try { await http.post(_uri('/ambient/barge'), headers: {'content-type':'application/json'}, body: jsonEncode({'turn':turn,'seq':seq,'played_ms':ms})); } catch (_) {}
+      try { await _client.post(_uri('/ambient/barge'), headers: {'content-type':'application/json'}, body: jsonEncode({'turn':turn,'seq':seq,'played_ms':ms})); } catch (_) {}
     }
     speaking.value = false;
   }
-  Future<void> dispose() async { _closed = true; _retry?.cancel(); _poll?.cancel(); await _sub?.cancel(); await _channel?.sink.close(); await _sink.invokeMethod('stop').catchError((_) {}); speaking.dispose(); state.dispose(); }
+  Future<void> dispose() async { _closed = true; _retry?.cancel(); _poll?.cancel(); _client.close(); await _sub?.cancel(); await _channel?.sink.close(); await _sink.invokeMethod('stop').catchError((_) {}); speaking.dispose(); state.dispose(); }
 }

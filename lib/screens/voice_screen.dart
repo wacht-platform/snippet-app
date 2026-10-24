@@ -101,6 +101,19 @@ class _VoiceScreenState extends State<VoiceScreen> {
   }
 
   Future<void> _editSpeaker(AmbientSpeaker speaker) async {
+    if (!(_speakers?.speakers.any((s) => s.isUser) ?? false)) {
+      final me = await confirmAction(context, title: 'Is this your voice?',
+          body: 'This voice becomes "You". Everything else is then treated as someone else.', confirmLabel: 'This is me', danger: false);
+      if (me == true) {
+        try {
+          await widget.client.claimAmbientSpeaker(speaker.id);
+          await _loadSpeakers();
+        } catch (e) {
+          if (mounted) toast(context, '$e', danger: true);
+        }
+        return;
+      }
+    }
     final label = await promptText(context, title: 'Rename speaker', initial: speaker.label,
         hint: 'Name', saveLabel: 'Save');
     if (label == null || label.trim().isEmpty) return;

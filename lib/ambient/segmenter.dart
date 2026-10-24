@@ -22,7 +22,7 @@ class SpeechSegmenter {
     this.offThreshold = 0.35,
     this.preRollFrames = 10,
     this.minSpeechFrames = 8,
-    this.endSilenceFrames = 25,
+    this.endSilenceFrames = 20,
     this.maxFrames = 1875,
   });
 

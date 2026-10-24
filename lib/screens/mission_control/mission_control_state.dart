@@ -664,7 +664,7 @@ String? voiceClassifierNote(String agentId, String body) {
     final label = mode.group(1) == 'active' ? 'Voice conversation started' : 'Back to passive listening';
     return reason.isEmpty ? label : '$label · $reason';
   }
-  return 'Overheard, not for the assistant: $text';
+  return 'Noted for later: $text';
 }
 
 AmbientTurn? parseAmbientTurn(String text) {
