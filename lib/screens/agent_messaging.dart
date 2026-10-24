@@ -528,10 +528,10 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
       final path =
           '${tempDir.path}/snippet-agent-voice-${DateTime.now().microsecondsSinceEpoch}.m4a';
       await _recorder.start(
-        const RecordConfig(
+        RecordConfig(
           encoder: AudioEncoder.aacLc,
           bitRate: 96000,
-          sampleRate: 16000,
+          sampleRate: kMobile ? 16000 : 44100,
           numChannels: 1,
         ),
         path: path,
@@ -609,8 +609,8 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
   }
 
   Future<Uint8List?> _waitForRecordingFile(String path) async {
-    final file = File(path);
-    const attempts = 40;
+    final file = File(path.startsWith('file://') ? Uri.parse(path).toFilePath() : path);
+    const attempts = 120;
     for (var i = 0; i < attempts; i++) {
       try {
         if (await file.exists()) {
