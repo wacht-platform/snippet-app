@@ -618,7 +618,6 @@ class _AmbientTurnCardState extends State<AmbientTurnCard> {
                       [
                         if (turn.judged.isNotEmpty) 'Judged ${turn.judged}',
                         if (turn.addressed != null) 'reply expected ${(turn.addressed! * 100).round()}%',
-                        if (turn.speaker.isNotEmpty) 'speaker ${turn.speaker}',
                         if (turn.expects.isNotEmpty) 'answering a ${turn.expects} question',
                       ].join(' · '),
                       style: TS.meta()),
