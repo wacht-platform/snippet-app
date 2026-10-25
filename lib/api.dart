@@ -511,63 +511,6 @@ class DaemonClient {
     return AmbientSettings.fromJson(jsonDecode(r.body) as Map<String, dynamic>);
   }
 
-  Future<AmbientSpeakers> getAmbientSpeakers() async {
-    final r = await http.get(_uri('/ambient/speakers'));
-    if (r.statusCode != 200) throw _err('load speakers', r);
-    return AmbientSpeakers.fromJson(jsonDecode(r.body) as Map<String, dynamic>);
-  }
-
-  Future<Map<String, dynamic>> enrollAmbientSpeaker(List<int> wav) async {
-    final r = await http.post(_uri('/ambient/speakers/enroll'),
-        headers: {'content-type': 'audio/wav'}, body: wav);
-    if (r.statusCode != 200) throw r.statusCode == 400 ? r.body : _err('enrol voice', r);
-    return jsonDecode(r.body) as Map<String, dynamic>;
-  }
-
-  Future<void> unenrollAmbientSpeaker() async {
-    final r = await http.post(_uri('/ambient/speakers/unenroll'));
-    if (r.statusCode != 200) throw _err('remove voice enrolment', r);
-  }
-
-  Future<void> clearAmbientSpeakers() async {
-    final r = await http.post(_uri('/ambient/speakers/clear'));
-    if (r.statusCode != 200) throw _err('forget speakers', r);
-  }
-
-  Future<void> claimAmbientSpeaker(int id) async {
-    final r = await http.post(_uri('/ambient/speakers/claim'), headers: _json, body: jsonEncode({'id': id}));
-    if (r.statusCode != 200) throw _err('claim speaker', r);
-  }
-
-  Future<void> labelAmbientSpeaker(int id, String label) async {
-    final r = await http.post(_uri('/ambient/speakers/label'), headers: _json,
-        body: jsonEncode({'id': id, 'label': label}));
-    if (r.statusCode != 200) throw _err('rename speaker', r);
-  }
-
-  Future<List<ModelInfo>> listModels() async {
-    final r = await http.get(_uri('/models'));
-    if (r.statusCode != 200) throw _err('load models', r);
-    return _models(r.body);
-  }
-
-  Future<List<ModelInfo>> downloadModel(String id) async {
-    final r = await http.post(_uri('/models/download'), headers: _json, body: jsonEncode({'id': id}));
-    if (r.statusCode != 200) throw r.statusCode == 400 ? r.body : _err('download model', r);
-    return _models(r.body);
-  }
-
-  Future<List<ModelInfo>> deleteModel(String id) async {
-    final r = await http.post(_uri('/models/delete'), headers: _json, body: jsonEncode({'id': id}));
-    if (r.statusCode != 200) throw r.statusCode == 409 ? r.body : _err('remove model', r);
-    return _models(r.body);
-  }
-
-  List<ModelInfo> _models(String body) => [
-        for (final m in ((jsonDecode(body) as Map<String, dynamic>)['models'] as List? ?? const []))
-          ModelInfo.fromJson((m as Map).cast<String, dynamic>())
-      ];
-
   Future<bool> claimAmbientLease(String device, String label) async {
     final r = await http.post(_uri('/ambient/lease'),
         headers: _json,

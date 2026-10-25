@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -57,6 +58,9 @@ class AmbientVoice {
   final Set<int> _streamDead = {};
   Timer? _streamTick;
   bool _ticking = false;
+  final Map<int, BytesBuilder> _streamBatch = {};
+  final Map<int, int> _streamBatchBytes = {};
+  Timer? _streamFlush;
 
   bool get _busy => _chunks.isNotEmpty || _streams.isNotEmpty;
 
@@ -423,18 +427,39 @@ class AmbientVoice {
     if (data.isEmpty) return;
     st.bytes += data.length;
     st.lastFrame = DateTime.now();
-    unawaited(_sink.invokeMethod('enqueueFrame', {'turn': turn, 'pcm': data}).catchError((Object e) {
-      AmbientDiagnostics.log('voice: stream frame failed $e');
-    }));
+    final batch = _streamBatch.putIfAbsent(turn, () => BytesBuilder(copy: false));
+    batch.add(data);
+    final queued = (_streamBatchBytes[turn] ?? 0) + data.length;
+    _streamBatchBytes[turn] = queued;
+    if (queued >= 4800) {
+      _flushStreamFrames();
+    } else {
+      _streamFlush ??= Timer(const Duration(milliseconds: 100), _flushStreamFrames);
+    }
+  }
+
+  void _flushStreamFrames() {
+    _streamFlush?.cancel();
+    _streamFlush = null;
+    for (final turn in _streamBatch.keys.toList()) {
+      final data = _streamBatch.remove(turn)!.takeBytes();
+      _streamBatchBytes.remove(turn);
+      if (data.isEmpty) continue;
+      unawaited(_sink.invokeMethod('enqueueFrame', {'turn': turn, 'pcm': data}).catchError((Object e) {
+        AmbientDiagnostics.log('voice: stream frame failed $e');
+      }));
+    }
   }
 
   void _streamChanged() {
     speaking.value = _busy;
     if (_streams.isEmpty) {
       _streamTick?.cancel();
+    _streamFlush?.cancel();
+    _flushStreamFrames();
       _streamTick = null;
     } else {
-      _streamTick ??= Timer.periodic(const Duration(milliseconds: 200), (_) => _tickStream());
+      _streamTick ??= Timer.periodic(const Duration(milliseconds: 500), (_) => _tickStream());
     }
   }
 
@@ -565,6 +590,8 @@ class AmbientVoice {
     _retry?.cancel();
     _poll?.cancel();
     _streamTick?.cancel();
+    _streamFlush?.cancel();
+    _flushStreamFrames();
     final duplex = _duplex;
     if (duplex != null) {
       duplex.onTtsFrame = null;

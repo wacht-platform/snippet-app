@@ -24,6 +24,10 @@ class AmbientStream {
   bool _keep = false;
   int _failures = 0;
   Timer? _retry;
+  DateTime? _connectedAt;
+  DateTime? _lastMicFrameAt;
+  int _micFrameSeq = 0;
+  int _maxMicGapMs = 0;
   void Function(int turn, Uint8List pcm)? onTtsFrame;
   void Function(Map<String, dynamic> msg)? onTts;
   void Function(bool open)? onConnection;
@@ -69,6 +73,10 @@ class AmbientStream {
         cancelOnError: true,
       );
       _ws = ws;
+      _connectedAt = DateTime.now();
+      _lastMicFrameAt = null;
+      _micFrameSeq = 0;
+      _maxMicGapMs = 0;
       _failures = 0;
       _send(ws, jsonEncode({'t': 'caps', 'tts_stream': 1}));
       onConnection?.call(true);
@@ -144,6 +152,14 @@ class AmbientStream {
     final out = Uint8List(4 + pcm.length);
     ByteData.sublistView(out).setUint32(0, h, Endian.little);
     out.setRange(4, out.length, pcm);
+    final now = DateTime.now();
+    final previous = _lastMicFrameAt;
+    if (previous != null) {
+      final gap = now.difference(previous).inMilliseconds;
+      if (gap > _maxMicGapMs) _maxMicGapMs = gap;
+    }
+    _lastMicFrameAt = now;
+    _micFrameSeq++;
     _send(ws, out);
   }
 
@@ -174,7 +190,16 @@ class AmbientStream {
 
   void stat(Map<String, Object> values) {
     final ws = _ws;
-    if (ws != null && ws.readyState == WebSocket.open) _send(ws, jsonEncode({'t': 'stat', ...values}));
+    if (ws != null && ws.readyState == WebSocket.open) {
+      _send(ws, jsonEncode({
+        't': 'stat',
+        ...values,
+        'mic_frame_seq': _micFrameSeq,
+        'mic_send_elapsed_ms': DateTime.now().difference(_connectedAt ?? DateTime.now()).inMilliseconds,
+        'mic_max_gap_ms': _maxMicGapMs,
+      }));
+      _maxMicGapMs = 0;
+    }
   }
 
   void ttsPos(int turn, int ms, bool done) {

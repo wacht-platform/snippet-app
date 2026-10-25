@@ -148,7 +148,7 @@ class AmbientCapture {
     });
     _statTimer?.cancel();
     _statTimer = Timer.periodic(const Duration(seconds: 30), (_) {
-      uploader.stat({'frames': _frames, 'speech': _speechFrames, 'loud_low_vad': _loudQuiet, 'held_ms': _heldBytes ~/ 32, 'build': 9, 'segments': _segments, 'threshold': threshold});
+      uploader.stat({'frames': _frames, 'speech': _speechFrames, 'loud_low_vad': _loudQuiet, 'held_ms': _heldBytes ~/ 32, 'build': 10, 'segments': _segments, 'threshold': threshold});
       _frames = 0;
       _speechFrames = 0;
       _loudQuiet = 0;

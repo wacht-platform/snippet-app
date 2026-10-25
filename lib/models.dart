@@ -1639,62 +1639,6 @@ class AmbientDevice {
             ((j['last_seen'] as num?)?.toInt() ?? 0) * 1000);
 }
 
-class ModelInfo {
-  final String id;
-  final String kind;
-  final String name;
-  final String detail;
-  final int sizeMb;
-  final String status;
-  final int done;
-  final int total;
-  final String? error;
-
-  ModelInfo.fromJson(Map<String, dynamic> j)
-      : id = j['id'] as String? ?? '',
-        kind = j['kind'] as String? ?? '',
-        name = j['name'] as String? ?? '',
-        detail = j['detail'] as String? ?? '',
-        sizeMb = (j['size_mb'] as num?)?.toInt() ?? 0,
-        status = j['status'] as String? ?? 'missing',
-        done = (j['done'] as num?)?.toInt() ?? 0,
-        total = (j['total'] as num?)?.toInt() ?? 0,
-        error = j['error'] as String?;
-
-  bool get ready => status == 'ready';
-  bool get downloading => status == 'downloading';
-  int get percent => total <= 0 ? 0 : (done * 100 ~/ total).clamp(0, 100);
-}
-
-class AmbientSpeaker {
-  final int id;
-  final String label;
-  final bool isUser;
-  final int lines;
-  final int lastSeen;
-
-  AmbientSpeaker.fromJson(Map<String, dynamic> j)
-      : id = (j['id'] as num).toInt(),
-        label = j['label'] as String? ?? '',
-        isUser = j['is_user'] as bool? ?? false,
-        lines = (j['lines'] as num?)?.toInt() ?? 0,
-        lastSeen = (j['last_seen'] as num?)?.toInt() ?? 0;
-}
-
-class AmbientSpeakers {
-  final bool modelsReady;
-  final bool enrolled;
-  final List<AmbientSpeaker> speakers;
-
-  AmbientSpeakers.fromJson(Map<String, dynamic> j)
-      : modelsReady = j['models_ready'] as bool? ?? false,
-        enrolled = j['enrolled'] as bool? ?? false,
-        speakers = [
-          for (final speaker in j['speakers'] as List? ?? const [])
-            AmbientSpeaker.fromJson((speaker as Map).cast<String, dynamic>())
-        ];
-}
-
 class AmbientSettings {
   final bool enabled;
   final String mode;
@@ -1705,7 +1649,6 @@ class AmbientSettings {
   final bool conversationOpen;
   final String effectiveMode;
   final bool watcherChatContext;
-  final bool modelsReady;
   final String watcher;
   final bool watcherKeySet;
   final int conversationTimeoutSecs;
@@ -1721,7 +1664,6 @@ class AmbientSettings {
       this.conversationOpen = false,
       this.effectiveMode = '',
       this.watcherChatContext = false,
-      this.modelsReady = false,
       this.watcher = 'classifier',
       this.watcherKeySet = false,
       this.conversationTimeoutSecs = 90,
@@ -1739,7 +1681,6 @@ class AmbientSettings {
       conversationOpen: conversationOpen,
       effectiveMode: effectiveMode,
       watcherChatContext: watcherChatContext,
-      modelsReady: modelsReady,
       watcher: watcher,
       watcherKeySet: watcherKeySet,
       conversationTimeoutSecs: conversationTimeoutSecs,
@@ -1754,7 +1695,6 @@ class AmbientSettings {
         conversationOpen = j['conversation'] != null,
         effectiveMode = j['effective_mode'] as String? ?? '',
         watcherChatContext = j['watcher_chat_context'] == true,
-        modelsReady = j['models_ready'] == true,
         watcher = (j['watcher'] as String? ?? 'classifier') == 'jev' ? 'classifier' : (j['watcher'] as String? ?? 'classifier'),
         watcherKeySet = j['watcher_key_set'] == true,
         conversationTimeoutSecs = (j['conversation_timeout_secs'] as num?)?.toInt() ?? 90,
