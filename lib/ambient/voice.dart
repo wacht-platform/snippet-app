@@ -539,7 +539,7 @@ class AmbientVoice {
 
   Future<void> duck(bool on) async {
     try {
-      await _sink.invokeMethod('volume', {'volume': on ? 0.0 : 1.0});
+      await _sink.invokeMethod('volume', {'volume': on ? 0.25 : 1.0});
     } catch (_) {}
   }
 
