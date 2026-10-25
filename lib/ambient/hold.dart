@@ -1,13 +1,52 @@
-import 'dart:typed_data';
+import 'dart:io';
 
+import 'package:flutter/foundation.dart';
+import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:record/record.dart';
 
 class AmbientHold {
   static int _count = 0;
-  static bool get active => _count > 0;
-  static void _add() => _count++;
+  static DateTime? _remoteUntil;
+
+  static bool get local => _count > 0;
+
+  static bool get active {
+    if (_count > 0) return true;
+    final until = _remoteUntil;
+    if (until == null) return false;
+    if (DateTime.now().isAfter(until)) {
+      _remoteUntil = null;
+      return false;
+    }
+    return true;
+  }
+
+  static void _add() {
+    _count++;
+    if (_count == 1) _publish(true);
+  }
+
   static void _drop() {
-    if (_count > 0) _count--;
+    if (_count == 0) return;
+    _count--;
+    if (_count == 0) _publish(false);
+  }
+
+  static void publishCurrent() => _publish(local);
+
+  static void _publish(bool on) {
+    if (kIsWeb || !Platform.isAndroid) return;
+    try {
+      FlutterForegroundTask.sendDataToTask({'ambient_hold': on});
+    } catch (_) {}
+  }
+
+  static bool receive(Object data) {
+    if (data is! Map || !data.containsKey('ambient_hold')) return false;
+    _remoteUntil = data['ambient_hold'] == true
+        ? DateTime.now().add(const Duration(minutes: 15))
+        : null;
+    return true;
   }
 }
 

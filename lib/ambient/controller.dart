@@ -11,6 +11,7 @@ import '../platform.dart';
 import 'capture.dart';
 import 'voice.dart';
 import 'diagnostics.dart';
+import 'hold.dart';
 import 'uploader.dart';
 
 @pragma('vm:entry-point')
@@ -61,6 +62,11 @@ class _AmbientTaskHandler extends TaskHandler {
           AmbientStatus(error: 'Could not start listening: $e').toMap());
       await FlutterForegroundTask.stopService();
     }
+  }
+
+  @override
+  void onReceiveData(Object data) {
+    AmbientHold.receive(data);
   }
 
   @override
@@ -173,6 +179,7 @@ class AmbientController extends ChangeNotifier {
         callback: ambientServiceEntry,
       );
       if (result is ServiceRequestFailure) return '${result.error}';
+      if (AmbientHold.local) AmbientHold.publishCurrent();
       status = const AmbientStatus(running: true);
       notifyListeners();
       return null;
