@@ -492,6 +492,10 @@ class DaemonClient {
     String? typesafeKey,
     int? conversationTimeoutSecs,
     List<String>? wakePhrases,
+    String? assemblyaiKey,
+    String? deepgramKey,
+    String? deepgramHost,
+    String? ttsVoice,
   }) async {
     final r = await http.post(_uri('/ambient/settings'),
         headers: _json,
@@ -504,6 +508,10 @@ class DaemonClient {
           if (conversationTimeoutSecs != null)
             'conversation_timeout_secs': conversationTimeoutSecs,
           if (wakePhrases != null) 'wake_phrases': wakePhrases,
+          if (assemblyaiKey != null) 'assemblyai_api_key': assemblyaiKey,
+          if (deepgramKey != null) 'deepgram_api_key': deepgramKey,
+          if (deepgramHost != null) 'deepgram_host': deepgramHost,
+          if (ttsVoice != null) 'tts_voice': ttsVoice,
         }));
     if (r.statusCode != 200) {
       throw r.statusCode == 400 ? r.body : _err('save ambient settings', r);

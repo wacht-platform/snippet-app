@@ -1639,6 +1639,23 @@ class AmbientDevice {
             ((j['last_seen'] as num?)?.toInt() ?? 0) * 1000);
 }
 
+class TtsVoice {
+  final String model;
+  final String accent;
+  final String gender;
+
+  TtsVoice.fromJson(Map<String, dynamic> j)
+      : model = j['model'] as String? ?? '',
+        accent = j['accent'] as String? ?? '',
+        gender = j['gender'] as String? ?? '';
+
+  String get name {
+    final parts = model.split('-');
+    final n = parts.length > 1 ? parts[1] : model;
+    return n.isEmpty ? n : n[0].toUpperCase() + n.substring(1);
+  }
+}
+
 class AmbientSettings {
   final bool enabled;
   final String mode;
@@ -1653,6 +1670,12 @@ class AmbientSettings {
   final bool watcherKeySet;
   final int conversationTimeoutSecs;
   final List<String> wakePhrases;
+  final bool assemblyaiKeySet;
+  final bool deepgramKeySet;
+  final String deepgramHost;
+  final List<(String, String)> deepgramHosts;
+  final String ttsVoice;
+  final List<TtsVoice> ttsVoices;
 
   const AmbientSettings(
       {this.enabled = false,
@@ -1667,7 +1690,13 @@ class AmbientSettings {
       this.watcher = 'classifier',
       this.watcherKeySet = false,
       this.conversationTimeoutSecs = 90,
-      this.wakePhrases = const []});
+      this.wakePhrases = const [],
+      this.assemblyaiKeySet = false,
+      this.deepgramKeySet = false,
+      this.deepgramHost = 'api.deepgram.com',
+      this.deepgramHosts = const [],
+      this.ttsVoice = '',
+      this.ttsVoices = const []});
 
   String get shownMode => effectiveMode.isEmpty ? mode : effectiveMode;
 
@@ -1684,7 +1713,13 @@ class AmbientSettings {
       watcher: watcher,
       watcherKeySet: watcherKeySet,
       conversationTimeoutSecs: conversationTimeoutSecs,
-      wakePhrases: wakePhrases);
+      wakePhrases: wakePhrases,
+      assemblyaiKeySet: assemblyaiKeySet,
+      deepgramKeySet: deepgramKeySet,
+      deepgramHost: deepgramHost,
+      deepgramHosts: deepgramHosts,
+      ttsVoice: ttsVoice,
+      ttsVoices: ttsVoices);
 
   AmbientSettings.fromJson(Map<String, dynamic> j)
       : enabled = j['enabled'] == true,
@@ -1699,6 +1734,18 @@ class AmbientSettings {
         watcherKeySet = j['watcher_key_set'] == true,
         conversationTimeoutSecs = (j['conversation_timeout_secs'] as num?)?.toInt() ?? 90,
         wakePhrases = [for (final p in (j['wake_phrases'] as List? ?? const [])) p as String],
+        assemblyaiKeySet = j['assemblyai_key_set'] == true,
+        deepgramKeySet = j['deepgram_key_set'] == true,
+        deepgramHost = j['deepgram_host'] as String? ?? 'api.deepgram.com',
+        deepgramHosts = [
+          for (final h in (j['deepgram_hosts'] as List? ?? const []))
+            ((h as Map)['host'] as String? ?? '', h['label'] as String? ?? '')
+        ],
+        ttsVoice = j['tts_voice'] as String? ?? '',
+        ttsVoices = [
+          for (final v in (j['tts_voices'] as List? ?? const []))
+            TtsVoice.fromJson((v as Map).cast<String, dynamic>())
+        ],
         devices = [
           for (final d in (j['devices'] as List? ?? const []))
             AmbientDevice.fromJson((d as Map).cast<String, dynamic>())

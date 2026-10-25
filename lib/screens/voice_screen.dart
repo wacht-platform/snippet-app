@@ -5,6 +5,7 @@ import '../api.dart';
 import '../models.dart';
 import '../platform.dart';
 import '../settings_form.dart';
+import '../theme.dart';
 import '../widgets.dart';
 import 'shell_nav.dart';
 
@@ -92,6 +93,10 @@ class _VoiceScreenState extends State<VoiceScreen> {
   Future<void> _saveAmbient({
     int? timeout,
     List<String>? phrases,
+    String? assemblyaiKey,
+    String? deepgramKey,
+    String? deepgramHost,
+    String? ttsVoice,
     String? done,
   }) async {
     if (_busy) return;
@@ -99,7 +104,11 @@ class _VoiceScreenState extends State<VoiceScreen> {
     try {
       final next = await widget.client.setAmbientSettings(
           conversationTimeoutSecs: timeout,
-          wakePhrases: phrases);
+          wakePhrases: phrases,
+          assemblyaiKey: assemblyaiKey,
+          deepgramKey: deepgramKey,
+          deepgramHost: deepgramHost,
+          ttsVoice: ttsVoice);
       if (!mounted) return;
       setState(() => _ambient = next);
       if (done != null) toast(context, done);
@@ -124,13 +133,64 @@ class _VoiceScreenState extends State<VoiceScreen> {
     ]);
   }
 
+  Future<void> _editKey(String service, bool keySet, String hint,
+      Future<void> Function(String key) save) async {
+    final key = await promptText(context,
+        title: keySet ? 'Replace $service key' : '$service API key',
+        hint: hint,
+        saveLabel: 'Save key');
+    if (key == null || key.trim().isEmpty || !mounted) return;
+    await save(key.trim());
+  }
+
+  Widget _keyRow(String label, bool keySet, VoidCallback onTap) => SettingsRow(
+        label: label,
+        onTap: _busy ? null : onTap,
+        trailing: Text(keySet ? 'Set' : 'Not set',
+            style: sans(15, color: keySet ? AppColors.fg3 : AppColors.danger)),
+        chevron: true,
+      );
+
+  String _voiceLabel(TtsVoice v) => '${v.name} · ${v.accent} ${v.gender.toLowerCase()}';
+
   List<Widget> _ambientGroups(AmbientSettings a) {
     final timeouts = <int>{30, 60, 90, 180, 300, a.conversationTimeoutSecs}.toList()..sort();
+    final hosts = a.deepgramHosts.isEmpty ? [(a.deepgramHost, a.deepgramHost)] : a.deepgramHosts;
+    final hostLabel = hosts.firstWhere((h) => h.$1 == a.deepgramHost, orElse: () => (a.deepgramHost, a.deepgramHost)).$2;
+    final voice = a.ttsVoices.where((v) => v.model == a.ttsVoice).firstOrNull;
     return [
       SettingsGroup(
-        header: 'Voice processing',
-        footer: 'Speech recognition uses AssemblyAI and spoken replies use Deepgram. Configure their API keys on the server.',
-        children: const [],
+        header: 'Speech services',
+        footer: 'AssemblyAI transcribes what you say and Deepgram speaks the replies. '
+            'Keys stay on the server and are never shown again after saving. '
+            'Pick the Deepgram region closest to the server for the fastest replies.',
+        children: [
+          _keyRow('AssemblyAI key', a.assemblyaiKeySet,
+              () => _editKey('AssemblyAI', a.assemblyaiKeySet, 'Paste the key from assemblyai.com/dashboard',
+                  (k) => _saveAmbient(assemblyaiKey: k, done: 'AssemblyAI key saved'))),
+          _keyRow('Deepgram key', a.deepgramKeySet,
+              () => _editKey('Deepgram', a.deepgramKeySet, 'Paste the key from console.deepgram.com',
+                  (k) => _saveAmbient(deepgramKey: k, done: 'Deepgram key saved'))),
+          SettingsRow(
+            label: 'Deepgram region',
+            trailing: SettingsPopup<String>(
+              label: hostLabel,
+              selected: a.deepgramHost,
+              items: [for (final h in hosts) (h.$1, h.$2)],
+              onSelected: (h) => _saveAmbient(deepgramHost: h, done: 'Region saved'),
+            ),
+          ),
+          if (a.ttsVoices.isNotEmpty)
+            SettingsRow(
+              label: 'Voice',
+              trailing: SettingsPopup<String>(
+                label: voice?.name ?? a.ttsVoice,
+                selected: a.ttsVoice,
+                items: [for (final v in a.ttsVoices) (v.model, _voiceLabel(v))],
+                onSelected: (m) => _saveAmbient(ttsVoice: m, done: 'Voice saved'),
+              ),
+            ),
+        ],
       ),
       SettingsGroup(
         header: 'Conversation',
