@@ -187,6 +187,9 @@ class AmbientAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
             track.release()
             throw IllegalStateException("audio track did not initialise")
         }
+        if (Build.VERSION.SDK_INT >= 31) {
+            try { track.setStartThresholdInFrames(2400) } catch (_: Exception) {}
+        }
         try {
             track.setVolume(currentVolume)
             track.play()
