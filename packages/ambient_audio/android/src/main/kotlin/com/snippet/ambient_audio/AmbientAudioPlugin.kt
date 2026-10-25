@@ -52,6 +52,7 @@ class AmbientAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
         channel?.setMethodCallHandler(null)
         channel = null
         stopTrack()
+        leaveComm()
     }
 
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
@@ -74,6 +75,10 @@ class AmbientAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
                     result.success(null)
                 }
                 "stop" -> result.success(stopTrack())
+                "leave" -> {
+                    leaveComm()
+                    result.success(null)
+                }
                 "enqueueFrame" -> {
                     enqueueFrame(call.argument<Int>("turn") ?: 0, call.argument<ByteArray>("pcm") ?: byteArrayOf())
                     result.success(null)
@@ -162,12 +167,12 @@ class AmbientAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
     }
 
     private fun createSink(): Sink {
-        useComm = false
+        useComm = commActive || enterComm()
         val min = AudioTrack.getMinBufferSize(24000, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT)
         val track = AudioTrack.Builder()
             .setAudioAttributes(
                 AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_MEDIA)
+                    .setUsage(if (useComm) AudioAttributes.USAGE_VOICE_COMMUNICATION else AudioAttributes.USAGE_MEDIA)
                     .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
                     .build()
             )

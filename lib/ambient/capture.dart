@@ -135,7 +135,7 @@ class AmbientCapture {
     });
     _statTimer?.cancel();
     _statTimer = Timer.periodic(const Duration(seconds: 30), (_) {
-      uploader.stat({'frames': _frames, 'speech': _speechFrames, 'loud_low_vad': _loudQuiet, 'held_ms': _heldBytes ~/ 32, 'build': 11, 'segments': _segments, 'threshold': threshold});
+      uploader.stat({'frames': _frames, 'speech': _speechFrames, 'loud_low_vad': _loudQuiet, 'held_ms': _heldBytes ~/ 32, 'build': 12, 'segments': _segments, 'threshold': threshold});
       _frames = 0;
       _speechFrames = 0;
       _loudQuiet = 0;
@@ -200,6 +200,7 @@ class AmbientCapture {
       }
       if (energy / samples.length > 0.0004 && _probability < 0.3) _loudQuiet++;
       segmenter.addFrame(frame, _probability);
+      _duckCheck(_probability >= threshold);
       offset += chunkBytes;
     }
     if (offset < buffer.length) {
@@ -211,8 +212,35 @@ class AmbientCapture {
     _segmenter?.keepOpen = _voice?.state.value?.mode == 'active';
   }
 
+  int _loud = 0;
+  bool _ducked = false;
+  Timer? _unduck;
+
+  void _duckCheck(bool voiced) {
+    final voice = _voice;
+    if (voice == null || !voice.speaking.value) {
+      _loud = 0;
+      return;
+    }
+    _loud = voiced ? _loud + 1 : 0;
+    if (_loud >= 3 && !_ducked) {
+      _ducked = true;
+      unawaited(voice.duck(true));
+      _unduck?.cancel();
+      _unduck = Timer(const Duration(milliseconds: 1500), _restoreVolume);
+    }
+  }
+
+  void _restoreVolume() {
+    _unduck?.cancel();
+    if (!_ducked) return;
+    _ducked = false;
+    unawaited(_voice?.duck(false));
+  }
+
   void _onSpeaking() {
     final on = _voice?.speaking.value ?? false;
+    if (!on) _restoreVolume();
     if (on == _playOn) return;
     _playOn = on;
     uploader.flag('play', on);
@@ -227,6 +255,7 @@ class AmbientCapture {
     await _sub?.cancel();
     await _recorder.stop();
     _segmenter?.close();
+    unawaited(_audio.invokeMethod('leave').catchError((_) {}));
     _vad?.close();
     _vad = null;
     _status.add(current);
