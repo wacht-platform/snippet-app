@@ -92,7 +92,7 @@ class SessionScreen extends StatefulWidget {
 
   /// When embedded in a narrow desktop shell, opens the collapsed sidebar drawer.
   final VoidCallback? onMenu;
-  final Widget? mobileTopBar;
+  final Widget Function(VoidCallback openActions)? mobileTopBar;
 
   /// When set, opening a file from the Files browser opens it as a shell tab
   /// instead of pushing an editor route.
@@ -1233,7 +1233,7 @@ class _SessionScreenState extends State<SessionScreen>
                           if (widget.readOnly)
                             _readOnlyHeader(status)
                           else if (kMobile)
-                            widget.mobileTopBar ?? _mobileHeader(s),
+                            widget.mobileTopBar?.call(() => _openActionsDrawer(s)) ?? _mobileHeader(s),
                           if (widget.readOnly && widget.banner != null)
                             _centerWide(widget.banner!),
                           if (_connError != null) _disconnectedBanner(),

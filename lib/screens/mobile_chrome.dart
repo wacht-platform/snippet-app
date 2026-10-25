@@ -84,9 +84,11 @@ class MobileTopBar extends StatelessWidget {
     required this.onSettings,
     this.sessionsBusy = false,
     this.trailingOrb,
+    this.onActions,
   });
 
   final Widget? trailingOrb;
+  final VoidCallback? onActions;
   final bool mission;
   final VoidCallback onMission;
   final VoidCallback onSessions;
@@ -156,7 +158,10 @@ class MobileTopBar extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Row(children: [
           RoundBtn(icon: 'menu', tooltip: 'Menu', onTap: onMenu),
-          if (trailingOrb != null) const SizedBox(width: 44),
+          if (onActions != null)
+            RoundBtn(icon: 'more-horizontal', tooltip: 'Actions', onTap: onActions)
+          else if (trailingOrb != null)
+            const SizedBox(width: 44),
           const Spacer(),
           Container(
             padding: const EdgeInsets.all(4),
@@ -387,7 +392,7 @@ class BottomFade extends StatelessWidget {
       );
 }
 
-enum MobileMenuPick { newSession, tasks, agents, usage, ambient, machines }
+enum MobileMenuPick { newSession, tasks, agents, usage, machines }
 
 Future<void> showMobileMenu(
   BuildContext context, {
@@ -597,7 +602,6 @@ class _MobileMenuState extends State<_MobileMenu> {
               _row('task', 'Tasks', MobileMenuPick.tasks),
               _row('agent', 'Agents', MobileMenuPick.agents),
               _row('analytics', 'Usage', MobileMenuPick.usage),
-              _row('mic', 'Ambient listening', MobileMenuPick.ambient),
             ],
             _row('server', 'Machines', MobileMenuPick.machines),
             const SizedBox(height: 10),

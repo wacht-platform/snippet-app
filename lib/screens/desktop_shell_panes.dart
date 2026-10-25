@@ -108,7 +108,7 @@ extension _DesktopShellPanesExt on _DesktopShellState {
       onTitle: (title) => _onSessionTitle(t.sessionId!, title),
       onMenu: kMobile ? _showMobileChats : null,
       mobileTopBar: kMobile && t.isMissionControl
-          ? _mobileTopBar(mission: true)
+          ? (openActions) => _mobileTopBar(mission: true, onActions: openActions)
           : null,
       onOpenFileTab: (path, name) =>
           _openFileTab(t.client, t.instanceUrl, path, name),

@@ -124,9 +124,6 @@ extension _DesktopShellMobileExt on _DesktopShellState {
             _goMobileHome(MobileHome.agents);
           case MobileMenuPick.usage:
             _goMobileHome(MobileHome.settings, section: SettingsPage.usage);
-          case MobileMenuPick.ambient:
-            final c = _client;
-            if (c != null) showAmbientStage(context, c);
           case MobileMenuPick.machines:
             _goMobileHome(MobileHome.settings, section: SettingsPage.general);
         }
@@ -135,8 +132,9 @@ extension _DesktopShellMobileExt on _DesktopShellState {
     );
   }
 
-  Widget _mobileTopBar({required bool mission}) => MobileTopBar(
+  Widget _mobileTopBar({required bool mission, VoidCallback? onActions}) => MobileTopBar(
         mission: mission,
+        onActions: onActions,
         sessionsBusy: mission &&
             (_sessions ?? const <SessionInfo>[]).any((s) =>
                 !isDedicatedMcSession(s.id) &&
