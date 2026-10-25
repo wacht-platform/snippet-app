@@ -1676,6 +1676,7 @@ class AmbientSettings {
   final List<(String, String)> deepgramHosts;
   final String ttsVoice;
   final List<TtsVoice> ttsVoices;
+  final String stt;
 
   const AmbientSettings(
       {this.enabled = false,
@@ -1696,7 +1697,8 @@ class AmbientSettings {
       this.deepgramHost = 'api.deepgram.com',
       this.deepgramHosts = const [],
       this.ttsVoice = '',
-      this.ttsVoices = const []});
+      this.ttsVoices = const [],
+      this.stt = 'assemblyai'});
 
   String get shownMode => effectiveMode.isEmpty ? mode : effectiveMode;
 
@@ -1719,7 +1721,8 @@ class AmbientSettings {
       deepgramHost: deepgramHost,
       deepgramHosts: deepgramHosts,
       ttsVoice: ttsVoice,
-      ttsVoices: ttsVoices);
+      ttsVoices: ttsVoices,
+      stt: stt);
 
   AmbientSettings.fromJson(Map<String, dynamic> j)
       : enabled = j['enabled'] == true,
@@ -1742,6 +1745,7 @@ class AmbientSettings {
             ((h as Map)['host'] as String? ?? '', h['label'] as String? ?? '')
         ],
         ttsVoice = j['tts_voice'] as String? ?? '',
+        stt = j['stt'] as String? ?? 'assemblyai',
         ttsVoices = [
           for (final v in (j['tts_voices'] as List? ?? const []))
             TtsVoice.fromJson((v as Map).cast<String, dynamic>())

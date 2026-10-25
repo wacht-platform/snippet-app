@@ -97,6 +97,7 @@ class _VoiceScreenState extends State<VoiceScreen> {
     String? deepgramKey,
     String? deepgramHost,
     String? ttsVoice,
+    String? stt,
     String? done,
   }) async {
     if (_busy) return;
@@ -108,7 +109,8 @@ class _VoiceScreenState extends State<VoiceScreen> {
           assemblyaiKey: assemblyaiKey,
           deepgramKey: deepgramKey,
           deepgramHost: deepgramHost,
-          ttsVoice: ttsVoice);
+          ttsVoice: ttsVoice,
+          stt: stt);
       if (!mounted) return;
       setState(() => _ambient = next);
       if (done != null) toast(context, done);
@@ -161,10 +163,20 @@ class _VoiceScreenState extends State<VoiceScreen> {
     return [
       SettingsGroup(
         header: 'Speech services',
-        footer: 'AssemblyAI transcribes what you say and Deepgram speaks the replies. '
-            'Keys stay on the server and are never shown again after saving. '
+        footer: 'Speech recognition turns what you say into text; Deepgram speaks the replies. '
+            'Deepgram Flux uses the Deepgram key and region, so it needs no AssemblyAI key. '
+            'Keys stay on the server and are never shown after saving. '
             'Pick the Deepgram region closest to the server for the fastest replies.',
         children: [
+          SettingsRow(
+            label: 'Speech recognition',
+            trailing: SettingsPopup<String>(
+              label: a.stt == 'flux' ? 'Deepgram Flux' : 'AssemblyAI',
+              selected: a.stt,
+              items: const [('assemblyai', 'AssemblyAI'), ('flux', 'Deepgram Flux')],
+              onSelected: (v) => _saveAmbient(stt: v, done: 'Speech recognition saved'),
+            ),
+          ),
           _keyRow('AssemblyAI key', a.assemblyaiKeySet,
               () => _editKey('AssemblyAI', a.assemblyaiKeySet, 'Paste the key from assemblyai.com/dashboard',
                   (k) => _saveAmbient(assemblyaiKey: k, done: 'AssemblyAI key saved'))),
