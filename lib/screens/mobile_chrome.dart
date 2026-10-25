@@ -101,6 +101,7 @@ class MobileTopBar extends StatelessWidget {
     required Widget glyph,
     required String label,
     required VoidCallback onTap,
+    VoidCallback? onActiveTap,
     bool dot = false,
   }) {
     return Semantics(
@@ -110,7 +111,12 @@ class MobileTopBar extends StatelessWidget {
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: active
-            ? null
+            ? (onActiveTap == null
+                ? null
+                : () {
+                    HapticFeedback.selectionClick();
+                    onActiveTap();
+                  })
             : () {
                 HapticFeedback.selectionClick();
                 onTap();
@@ -158,10 +164,7 @@ class MobileTopBar extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Row(children: [
           RoundBtn(icon: 'menu', tooltip: 'Menu', onTap: onMenu),
-          if (onActions != null)
-            RoundBtn(icon: 'more-horizontal', tooltip: 'Actions', onTap: onActions)
-          else if (trailingOrb != null)
-            const SizedBox(width: 44),
+          if (trailingOrb != null) const SizedBox(width: 44),
           const Spacer(),
           Container(
             padding: const EdgeInsets.all(4),
@@ -174,6 +177,7 @@ class MobileTopBar extends StatelessWidget {
                     color: mission ? mochiPalette.first.$2 : AppColors.fg4,
                     size: 19),
                 onTap: onMission,
+                onActiveTap: onActions,
               ),
               const SizedBox(width: 2),
               _segment(
