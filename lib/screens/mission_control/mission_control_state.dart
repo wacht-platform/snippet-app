@@ -655,7 +655,6 @@ class AmbientTurn {
     this.context = const [],
     this.judged = '',
     this.addressed,
-    this.speaker = '',
     this.expects = '',
   });
   final String device;
@@ -668,7 +667,6 @@ class AmbientTurn {
   final List<String> context;
   final String judged;
   final double? addressed;
-  final String speaker;
   final String expects;
 }
 
@@ -711,7 +709,6 @@ AmbientTurn? parseAmbientTurn(String text) {
     context: context,
     judged: attrs['judged'] ?? '',
     addressed: double.tryParse(attrs['addressed'] ?? ''),
-    speaker: attrs['speaker'] ?? '',
     expects: attrs['expects'] ?? '',
   );
 }
