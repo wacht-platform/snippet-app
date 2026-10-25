@@ -427,15 +427,9 @@ class AmbientVoice {
     if (data.isEmpty) return;
     st.bytes += data.length;
     st.lastFrame = DateTime.now();
-    final batch = _streamBatch.putIfAbsent(turn, () => BytesBuilder(copy: false));
-    batch.add(data);
-    final queued = (_streamBatchBytes[turn] ?? 0) + data.length;
-    _streamBatchBytes[turn] = queued;
-    if (queued >= 4800) {
-      _flushStreamFrames();
-    } else {
-      _streamFlush ??= Timer(const Duration(milliseconds: 100), _flushStreamFrames);
-    }
+    unawaited(_sink.invokeMethod('enqueueFrame', {'turn': turn, 'pcm': data}).catchError((Object e) {
+      AmbientDiagnostics.log('voice: stream frame failed $e');
+    }));
   }
 
   void _flushStreamFrames() {

@@ -89,6 +89,7 @@ class AmbientUploader {
   static const _maxWorkers = 2;
   bool _closed = false;
   int _failures = 0;
+  int _seqCounter = DateTime.now().millisecondsSinceEpoch ~/ 1000;
 
   Future<Directory> _queueDir() async {
     final existing = _dir;
@@ -100,19 +101,21 @@ class AmbientUploader {
   }
 
   Future<void> start() async {
+    final prefs = await SharedPreferences.getInstance();
+    final key = 'ambient_seq_$device';
+    _seqCounter = max(prefs.getInt(key) ?? 0, DateTime.now().millisecondsSinceEpoch ~/ 1000);
     await _refreshCount();
     _heartbeat = Timer.periodic(const Duration(seconds: 15), (_) => _beat());
     _stream.keepAlive();
     unawaited(_drain(backlog: displaced.value));
   }
 
-  Future<int> _nextSeq() async {
-    final prefs = await SharedPreferences.getInstance();
+  Future<int> _nextSeq() {
+    final next = max(_seqCounter, DateTime.now().millisecondsSinceEpoch ~/ 1000) + 1;
+    _seqCounter = next;
     final key = 'ambient_seq_$device';
-    final current = prefs.getInt(key) ?? 0;
-    final next = max(current, DateTime.now().millisecondsSinceEpoch ~/ 1000) + 1;
-    await prefs.setInt(key, next);
-    return next;
+    unawaited(SharedPreferences.getInstance().then((prefs) => prefs.setInt(key, next)));
+    return Future.value(next);
   }
 
   Future<int> reserveSequence() => _nextSeq();
@@ -199,12 +202,51 @@ class AmbientUploader {
   }
 
   Future<void> _write(AmbientSegment segment) async {
-    final dir = await _queueDir();
     final seqKey = segment.seq;
     final live = seqKey == null ? null : _live.remove(seqKey);
     final streaming = live != null && !live.failed;
     final id = streaming ? live.id : newSegmentId();
     final seq = await (segment.seq ?? _nextSeq());
+    if (streaming) {
+      // Send `end` over the duplex socket immediately before any disk I/O so STT finishes with zero delay.
+      final endFuture = () async {
+        await live.chain;
+        if (live.failed) return StreamDone(0, 'failed');
+        return _stream.end(
+          live.h,
+          live.id,
+          durationMs: segment.duration.inMilliseconds,
+          bytes: segment.pcm.length,
+          media: segment.media,
+          duringPlayback: segment.duringPlayback,
+        );
+      }();
+      final dir = await _queueDir();
+      final path = '${dir.path}/$id.json';
+      _inFlight.add(path);
+      await File('${dir.path}/$id.wav').writeAsBytes(pcm16ToWav(segment.pcm));
+      await File('${dir.path}/$id.json').writeAsString(jsonEncode({
+        'id': id,
+        'started_at': segment.startedAt.toUtc().toIso8601String(),
+        'duration_ms': segment.duration.inMilliseconds,
+        'continued': segment.continued,
+        'during_playback': segment.duringPlayback,
+        'media': segment.media,
+        'seq': seq,
+      }));
+      final done = await endFuture;
+      _inFlight.remove(path);
+      if (done.code == 200) {
+        await _remove('${dir.path}/$id');
+        await _refreshCount();
+      } else {
+        await _trim(dir);
+        await _refreshCount();
+        unawaited(_drain(backlog: displaced.value));
+      }
+      return;
+    }
+    final dir = await _queueDir();
     await File('${dir.path}/$id.wav').writeAsBytes(pcm16ToWav(segment.pcm), flush: true);
     await File('${dir.path}/$id.json').writeAsString(jsonEncode({
       'id': id,
@@ -217,38 +259,7 @@ class AmbientUploader {
     }), flush: true);
     await _trim(dir);
     await _refreshCount();
-    if (streaming) {
-      final path = '${dir.path}/$id.json';
-      _inFlight.add(path);
-      unawaited(_finishLive(live, path, segment));
-    } else {
-      unawaited(_drain(backlog: displaced.value));
-    }
-  }
-
-  Future<void> _finishLive(_Live live, String metaPath, AmbientSegment segment) async {
-    var done = StreamDone(0, 'connection lost');
-    try {
-      await live.chain;
-      if (!live.failed) {
-        done = await _stream.end(
-          live.h,
-          live.id,
-          durationMs: segment.duration.inMilliseconds,
-          bytes: segment.pcm.length,
-          media: segment.media,
-          duringPlayback: segment.duringPlayback,
-        );
-      }
-    } finally {
-      _inFlight.remove(metaPath);
-    }
-    if (done.code == 200) {
-      await _remove(metaPath.substring(0, metaPath.length - 5));
-      await _refreshCount();
-    } else {
-      unawaited(_drain(backlog: displaced.value));
-    }
+    unawaited(_drain(backlog: displaced.value));
   }
 
   Future<void> _trim(Directory dir) async {

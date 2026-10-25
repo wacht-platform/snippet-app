@@ -76,8 +76,6 @@ class AmbientCapture {
   DateTime? _playbackAt;
   Timer? _mediaTimer;
   static const MethodChannel _audio = MethodChannel('snippet/ambient_audio');
-  bool _ducked = false;
-  DateTime? _speechSince;
   AmbientVoice? _voice;
   final ValueNotifier<AmbientVoice?> voiceListenable = ValueNotifier(null);
   double _probability = 0;
@@ -221,38 +219,13 @@ class AmbientCapture {
     _segmenter?.endSilenceFrames = inConversation ? 12 : 20;
   }
 
-  DateTime? _playbackStartedAt;
-
   void _handleBargeIn(bool voiceActive) {
     final voice = _voice;
-    final now = DateTime.now();
     if (voice != null && voice.speaking.value) {
-      _playbackAt = now;
-      _playbackStartedAt ??= now;
+      _playbackAt = DateTime.now();
+      _duringPlayback = voiceActive;
     } else {
-      _playbackStartedAt = null;
-      _speechSince = null;
       _duringPlayback = false;
-      if (_ducked && voice != null) { _ducked = false; unawaited(voice.duck(false)); }
-      return;
-    }
-    if (!voiceActive) {
-      _speechSince = null;
-      if (_ducked) { _ducked = false; unawaited(voice.duck(false)); }
-      _duringPlayback = false;
-      return;
-    }
-    _duringPlayback = true;
-    // Ignore the first 350ms of speaker playback while Android's hardware AEC converges.
-    if (now.difference(_playbackStartedAt!) < const Duration(milliseconds: 350) || _probability < 0.85) {
-      _speechSince = null;
-      return;
-    }
-    final since = _speechSince ??= now;
-    final elapsed = now.difference(since);
-    if (elapsed >= const Duration(milliseconds: 380) && !_ducked) {
-      _ducked = true;
-      unawaited(voice.duck(true));
     }
   }
 

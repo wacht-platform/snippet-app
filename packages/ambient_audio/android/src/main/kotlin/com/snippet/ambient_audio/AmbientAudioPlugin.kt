@@ -162,12 +162,12 @@ class AmbientAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
     }
 
     private fun createSink(): Sink {
-        useComm = enterComm()
+        useComm = false
         val min = AudioTrack.getMinBufferSize(24000, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT)
         val track = AudioTrack.Builder()
             .setAudioAttributes(
                 AudioAttributes.Builder()
-                    .setUsage(if (useComm) AudioAttributes.USAGE_VOICE_COMMUNICATION else AudioAttributes.USAGE_MEDIA)
+                    .setUsage(AudioAttributes.USAGE_MEDIA)
                     .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
                     .build()
             )
@@ -175,12 +175,11 @@ class AmbientAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
                 AudioFormat.Builder().setSampleRate(24000).setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
                     .setEncoding(AudioFormat.ENCODING_PCM_16BIT).build()
             )
-            .setBufferSizeInBytes(maxOf(min, 9600))
+            .setBufferSizeInBytes(maxOf(min, 19200))
             .setTransferMode(AudioTrack.MODE_STREAM)
             .build()
         if (track.state != AudioTrack.STATE_INITIALIZED) {
             track.release()
-            leaveComm()
             throw IllegalStateException("audio track did not initialise")
         }
         try {
@@ -188,7 +187,6 @@ class AmbientAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
             track.play()
         } catch (e: Exception) {
             track.release()
-            leaveComm()
             throw e
         }
         lastPos = idlePos()
@@ -218,7 +216,6 @@ class AmbientAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
         try {
             s.track.release()
         } catch (_: Exception) {}
-        leaveComm()
     }
 
     private fun enqueue(turn: Int, seq: Int, pcm: ByteArray, silenceMs: Int) {
@@ -321,7 +318,7 @@ class AmbientAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
 
     private fun writerLoop(s: Sink) {
         while (!s.stopping) {
-            val item = try { s.queue.poll(2000, TimeUnit.MILLISECONDS) } catch (_: InterruptedException) { return }
+            val item = try { s.queue.poll(30000, TimeUnit.MILLISECONDS) } catch (_: InterruptedException) { return }
             if (item == null) {
                 synchronized(lock) {
                     if (sink === s && s.queue.isEmpty() && !s.stopping) {
