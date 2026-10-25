@@ -31,6 +31,8 @@ class AmbientStream {
   void Function(int turn, Uint8List pcm)? onTtsFrame;
   void Function(Map<String, dynamic> msg)? onTts;
   void Function(bool open)? onConnection;
+  void Function(bool open)? onLink;
+  void Function(int h, int code)? onStreamError;
 
   bool get open => _ws?.readyState == WebSocket.open;
 
@@ -80,6 +82,7 @@ class AmbientStream {
       _failures = 0;
       _send(ws, jsonEncode({'t': 'caps', 'tts_stream': 1}));
       onConnection?.call(true);
+      onLink?.call(true);
       return ws;
     } catch (_) {
       _scheduleRetry();
@@ -105,7 +108,13 @@ class AmbientStream {
     final t = msg['t'];
     if (t == 'done' || t == 'err') {
       final h = (msg['h'] as num?)?.toInt() ?? 0;
-      _waiting.remove(h)?.complete(StreamDone((msg['code'] as num?)?.toInt() ?? 0, '${msg['status'] ?? ''}'));
+      final code = (msg['code'] as num?)?.toInt() ?? 0;
+      final waiter = _waiting.remove(h);
+      if (waiter != null) {
+        waiter.complete(StreamDone(code, '${msg['status'] ?? ''}'));
+      } else if (t == 'err') {
+        onStreamError?.call(h, code);
+      }
     } else if (t == 'tts_start' || t == 'tts_end' || t == 'tts_stop') {
       onTts?.call(msg);
     }
@@ -120,6 +129,7 @@ class AmbientStream {
     }
     if (_ws == null) {
       onConnection?.call(false);
+      onLink?.call(false);
       _scheduleRetry();
     }
   }
@@ -130,7 +140,7 @@ class AmbientStream {
     } catch (_) {}
   }
 
-  Future<bool> start(int h, String id, int seq, DateTime startedAt, {bool continued = false, bool backlog = false, bool live = false}) async {
+  Future<bool> start(int h, String id, int seq, DateTime startedAt, {bool continued = false, bool backlog = false}) async {
     final ws = await _socket();
     if (ws == null) return false;
     _send(ws, jsonEncode({
@@ -141,7 +151,6 @@ class AmbientStream {
       'started_at': startedAt.toUtc().toIso8601String(),
       'continued': continued,
       if (backlog) 'backlog': true,
-      if (live) 'live': true,
     }));
     return true;
   }
@@ -181,6 +190,23 @@ class AmbientStream {
       _waiting.remove(h);
       return StreamDone(0, 'timeout');
     });
+  }
+
+  bool openStream(int h, DateTime startedAt) {
+    final ws = _ws;
+    if (ws == null || ws.readyState != WebSocket.open) return false;
+    _send(ws, jsonEncode({'t': 'open', 'h': h, 'started_at': startedAt.toUtc().toIso8601String()}));
+    return true;
+  }
+
+  void closeStream(int h) {
+    final ws = _ws;
+    if (ws != null && ws.readyState == WebSocket.open) _send(ws, jsonEncode({'t': 'close', 'h': h}));
+  }
+
+  void flag(String kind, bool on) {
+    final ws = _ws;
+    if (ws != null && ws.readyState == WebSocket.open) _send(ws, jsonEncode({'t': kind, 'on': on}));
   }
 
   void abort(int h) {

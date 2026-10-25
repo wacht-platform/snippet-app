@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -48,20 +49,9 @@ Future<(String, String)> ambientDeviceIdentity() async {
   return ('$os-$id', '$name ${id.substring(0, 4)}');
 }
 
-class _Live {
-  _Live(this.h, this.id);
-  final int h;
-  final String id;
-  final List<Uint8List> buffer = [];
-  bool started = false;
-  bool failed = false;
-  Future<void> chain = Future.value();
-}
-
 class AmbientUploader {
   final http.Client _client = http.Client();
   late final AmbientStream _stream = AmbientStream(baseUrl: baseUrl, token: token, device: device);
-  final Map<Future<int>, _Live> _live = {};
 
   AmbientStream get stream => _stream;
   AmbientUploader({
@@ -106,6 +96,7 @@ class AmbientUploader {
     _seqCounter = max(prefs.getInt(key) ?? 0, DateTime.now().millisecondsSinceEpoch ~/ 1000);
     await _refreshCount();
     _heartbeat = Timer.periodic(const Duration(seconds: 15), (_) => _beat());
+    _wire();
     _stream.keepAlive();
     unawaited(_drain(backlog: displaced.value));
   }
@@ -126,42 +117,109 @@ class AmbientUploader {
 
   void stat(Map<String, Object> values) => _stream.stat(values);
 
-  void liveStart(Future<int> seq, DateTime startedAt, bool continued, Uint8List initial) {
-    final live = _Live(_stream.nextHandle(), newSegmentId());
-    live.buffer.add(initial);
-    _live[seq] = live;
-    live.chain = () async {
-      final value = await seq;
-      final ok = await _stream.start(live.h, live.id, value, startedAt, continued: continued, live: true);
-      if (!ok) {
-        live.failed = true;
-        live.buffer.clear();
-        return;
+  int? _gate;
+  bool _gateLive = false;
+  DateTime? _heldAt;
+  final List<Uint8List> _held = [];
+  int _heldBytes = 0;
+  static const _maxHeldBytes = 30 * 32000;
+
+  void _wire() {
+    _stream.onLink = (open) {
+      if (!open) {
+        _gateLive = false;
+      } else if (_gate != null) {
+        _reopen();
       }
-      for (final part in live.buffer) {
-        _stream.chunk(live.h, part);
+    };
+    _stream.onStreamError = (h, code) {
+      if (h != _gate) return;
+      _gateLive = false;
+      if (code == 409) {
+        unawaited(_giveUp());
+      } else if (code == 403) {
+        lastError.value = 'Ambient listening is turned off on the server';
+      } else {
+        lastError.value = 'Live transcription unavailable ($code)';
       }
-      live.buffer.clear();
-      live.started = true;
-    }();
+    };
   }
 
-  void liveChunk(Future<int> seq, Uint8List frame) {
-    final live = _live[seq];
-    if (live == null || live.failed) return;
-    if (live.started) {
-      _stream.chunk(live.h, frame);
+  void gateOpen(DateTime startedAt, List<Uint8List> preRoll) {
+    if (displaced.value) return;
+    _gate = _stream.nextHandle();
+    _gateLive = _stream.openStream(_gate!, startedAt);
+    if (_gateLive) {
+      for (final f in preRoll) {
+        _stream.chunk(_gate!, f);
+      }
     } else {
-      live.buffer.add(frame);
+      _heldAt = startedAt;
+      for (final f in preRoll) {
+        _hold(f);
+      }
     }
   }
 
-  void liveAbort(Future<int> seq) {
-    final live = _live.remove(seq);
-    if (live == null) return;
-    unawaited(live.chain.then((_) {
-      if (!live.failed) _stream.abort(live.h);
-    }));
+  void gateFrame(Uint8List frame) {
+    final h = _gate;
+    if (h == null) return;
+    if (_gateLive && _stream.open) {
+      _stream.chunk(h, frame);
+    } else {
+      _gateLive = false;
+      _heldAt ??= DateTime.now().subtract(const Duration(milliseconds: 32));
+      _hold(frame);
+    }
+  }
+
+  void gateClose() {
+    final h = _gate;
+    _gate = null;
+    if (h == null) return;
+    if (_gateLive) _stream.closeStream(h);
+    _gateLive = false;
+    _spill();
+  }
+
+  void flag(String kind, bool on) => _stream.flag(kind, on);
+
+  void _hold(Uint8List frame) {
+    _held.add(frame);
+    _heldBytes += frame.length;
+    if (_heldBytes >= _maxHeldBytes) _spill();
+  }
+
+  void _spill() {
+    final at = _heldAt;
+    if (_held.isEmpty || at == null) {
+      _held.clear();
+      _heldBytes = 0;
+      _heldAt = null;
+      return;
+    }
+    final b = BytesBuilder(copy: false);
+    for (final f in _held) {
+      b.add(f);
+    }
+    final pcm = b.takeBytes();
+    _held.clear();
+    _heldBytes = 0;
+    _heldAt = null;
+    unawaited(enqueue(AmbientSegment(at, pcm)));
+  }
+
+  void _reopen() {
+    final at = _heldAt;
+    _gate = _stream.nextHandle();
+    _gateLive = _stream.openStream(_gate!, at ?? DateTime.now());
+    if (!_gateLive) return;
+    for (final f in _held) {
+      _stream.chunk(_gate!, f);
+    }
+    _held.clear();
+    _heldBytes = 0;
+    _heldAt = null;
   }
 
   Future<void> _beat() async {
@@ -202,50 +260,8 @@ class AmbientUploader {
   }
 
   Future<void> _write(AmbientSegment segment) async {
-    final seqKey = segment.seq;
-    final live = seqKey == null ? null : _live.remove(seqKey);
-    final streaming = live != null && !live.failed;
-    final id = streaming ? live.id : newSegmentId();
+    final id = newSegmentId();
     final seq = await (segment.seq ?? _nextSeq());
-    if (streaming) {
-      // Send `end` over the duplex socket immediately before any disk I/O so STT finishes with zero delay.
-      final endFuture = () async {
-        await live.chain;
-        if (live.failed) return StreamDone(0, 'failed');
-        return _stream.end(
-          live.h,
-          live.id,
-          durationMs: segment.duration.inMilliseconds,
-          bytes: segment.pcm.length,
-          media: segment.media,
-          duringPlayback: segment.duringPlayback,
-        );
-      }();
-      final dir = await _queueDir();
-      final path = '${dir.path}/$id.json';
-      _inFlight.add(path);
-      await File('${dir.path}/$id.wav').writeAsBytes(pcm16ToWav(segment.pcm));
-      await File('${dir.path}/$id.json').writeAsString(jsonEncode({
-        'id': id,
-        'started_at': segment.startedAt.toUtc().toIso8601String(),
-        'duration_ms': segment.duration.inMilliseconds,
-        'continued': segment.continued,
-        'during_playback': segment.duringPlayback,
-        'media': segment.media,
-        'seq': seq,
-      }));
-      final done = await endFuture;
-      _inFlight.remove(path);
-      if (done.code == 200) {
-        await _remove('${dir.path}/$id');
-        await _refreshCount();
-      } else {
-        await _trim(dir);
-        await _refreshCount();
-        unawaited(_drain(backlog: displaced.value));
-      }
-      return;
-    }
     final dir = await _queueDir();
     await File('${dir.path}/$id.wav').writeAsBytes(pcm16ToWav(segment.pcm), flush: true);
     await File('${dir.path}/$id.json').writeAsString(jsonEncode({

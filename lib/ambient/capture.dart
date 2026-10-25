@@ -9,7 +9,7 @@ import 'package:silero_vad/silero_vad.dart';
 import 'hold.dart';
 
 import 'diagnostics.dart';
-import 'segmenter.dart';
+import 'gate.dart';
 import 'uploader.dart';
 import 'voice.dart';
 
@@ -67,13 +67,12 @@ class AmbientCapture {
   final BytesBuilder _pending = BytesBuilder(copy: false);
 
   SileroVad? _vad;
-  SpeechSegmenter? _segmenter;
+  SpeechGate? _segmenter;
   StreamSubscription<Uint8List>? _sub;
   Timer? _ticker;
   bool _running = false;
-  bool _duringPlayback = false;
-  DateTime? _mediaAt;
-  DateTime? _playbackAt;
+  bool _mediaOn = false;
+  bool _playOn = false;
   Timer? _mediaTimer;
   static const MethodChannel _audio = MethodChannel('snippet/ambient_audio');
   AmbientVoice? _voice;
@@ -106,27 +105,17 @@ class AmbientCapture {
     await AmbientDiagnostics.log('loading detector');
     _vad = SileroVad();
     await AmbientDiagnostics.log('detector loaded, opening microphone');
-    _segmenter = SpeechSegmenter(
+    _segmenter = SpeechGate(
       threshold: threshold,
       offThreshold: threshold - 0.15,
-      onSpeechStart: (startedAt) {
-        final seq = uploader.reserveSequence();
-        return seq;
-      },
-      onDiscard: (seq) {
-        uploader.liveAbort(seq);
-        unawaited(seq.then(uploader.skip));
-      },
-      onLiveStart: uploader.liveStart,
-      onLiveChunk: uploader.liveChunk,
-      onSegment: (segment) {
+      onOpen: (startedAt, preRoll) {
         _segments++;
-        final seen = _mediaAt;
-        final media = seen != null && seen.isAfter(segment.startedAt.subtract(const Duration(seconds: 1)));
-        final heard = _playbackAt;
-        final overlap = heard != null && heard.isAfter(segment.startedAt.subtract(const Duration(milliseconds: 1500)));
-        unawaited(uploader.enqueue(segment.copyWith(duringPlayback: _duringPlayback || overlap, media: media)));
+        uploader.gateOpen(startedAt, preRoll);
+        uploader.flag('media', _mediaOn);
+        uploader.flag('play', _playOn);
       },
+      onFrame: uploader.gateFrame,
+      onClose: uploader.gateClose,
     );
     final stream = await _recorder.startStream(RecordConfig(
         encoder: AudioEncoder.pcm16bits,
@@ -146,7 +135,7 @@ class AmbientCapture {
     });
     _statTimer?.cancel();
     _statTimer = Timer.periodic(const Duration(seconds: 30), (_) {
-      uploader.stat({'frames': _frames, 'speech': _speechFrames, 'loud_low_vad': _loudQuiet, 'held_ms': _heldBytes ~/ 32, 'build': 10, 'segments': _segments, 'threshold': threshold});
+      uploader.stat({'frames': _frames, 'speech': _speechFrames, 'loud_low_vad': _loudQuiet, 'held_ms': _heldBytes ~/ 32, 'build': 11, 'segments': _segments, 'threshold': threshold});
       _frames = 0;
       _speechFrames = 0;
       _loudQuiet = 0;
@@ -159,11 +148,16 @@ class AmbientCapture {
     _voice!.attach(uploader.stream);
     voiceListenable.value = _voice;
     _voice!.state.addListener(_onAmbientState);
+    _voice!.speaking.addListener(_onSpeaking);
     _mediaTimer?.cancel();
     _mediaTimer = Timer.periodic(const Duration(milliseconds: 500), (_) async {
       if (_voice?.speaking.value == true) return;
       try {
-        if (await _audio.invokeMethod<bool>('mediaActive') == true) _mediaAt = DateTime.now();
+        final on = await _audio.invokeMethod<bool>('mediaActive') == true;
+        if (on != _mediaOn) {
+          _mediaOn = on;
+          uploader.flag('media', on);
+        }
       } catch (_) {}
     });
     unawaited(_voice!.start());
@@ -206,7 +200,6 @@ class AmbientCapture {
       }
       if (energy / samples.length > 0.0004 && _probability < 0.3) _loudQuiet++;
       segmenter.addFrame(frame, _probability);
-      _handleBargeIn(segmenter.speaking);
       offset += chunkBytes;
     }
     if (offset < buffer.length) {
@@ -215,18 +208,14 @@ class AmbientCapture {
   }
 
   void _onAmbientState() {
-    final inConversation = _voice?.state.value?.mode == 'active';
-    _segmenter?.endSilenceFrames = inConversation ? 12 : 20;
+    _segmenter?.keepOpen = _voice?.state.value?.mode == 'active';
   }
 
-  void _handleBargeIn(bool voiceActive) {
-    final voice = _voice;
-    if (voice != null && voice.speaking.value) {
-      _playbackAt = DateTime.now();
-      _duringPlayback = voiceActive;
-    } else {
-      _duringPlayback = false;
-    }
+  void _onSpeaking() {
+    final on = _voice?.speaking.value ?? false;
+    if (on == _playOn) return;
+    _playOn = on;
+    uploader.flag('play', on);
   }
 
   Future<void> stop() async {
@@ -237,7 +226,7 @@ class AmbientCapture {
     _statTimer?.cancel();
     await _sub?.cancel();
     await _recorder.stop();
-    _segmenter?.flush();
+    _segmenter?.close();
     _vad?.close();
     _vad = null;
     _status.add(current);
