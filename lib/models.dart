@@ -1604,6 +1604,8 @@ class AmbientEvent {
   final String status;
   final String text;
   final String? error;
+  final String? verdict;
+  final bool kept;
 
   AmbientEvent.fromJson(Map<String, dynamic> j)
       : id = j['id'] as String? ?? '',
@@ -1613,7 +1615,9 @@ class AmbientEvent {
         durationMs = (j['duration_ms'] as num?)?.toInt() ?? 0,
         status = j['status'] as String? ?? '',
         text = j['text'] as String? ?? '',
-        error = j['error'] as String?;
+        error = j['error'] as String?,
+        verdict = j['verdict'] as String?,
+        kept = j['kept'] as bool? ?? true;
 }
 
 class AmbientStats {

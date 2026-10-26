@@ -12,6 +12,7 @@ import '../../../ambient/voice.dart';
 import '../../../api.dart';
 import '../../../models.dart';
 import '../../../platform.dart';
+import '../../../settings_form.dart';
 import '../../../theme.dart';
 import '../../../widgets.dart';
 
@@ -340,10 +341,17 @@ class _AmbientStageState extends State<AmbientStage> {
 
   Future<void> _loadRecent() async {
     try {
-      final events = await widget.client.ambientEvents(limit: 8);
+      final events = await widget.client.ambientEvents(limit: 16);
       if (!mounted) return;
-      setState(() => _recent =
-          events.where((e) => e.text.trim().isNotEmpty).take(3).toList());
+      setState(() => _recent = events
+          .where((e) =>
+              e.status == 'done' &&
+              e.kept &&
+              e.text.trim().isNotEmpty &&
+              !const {'media', 'noise', 'background', 'echo'}
+                  .contains(e.verdict))
+          .take(3)
+          .toList());
     } catch (_) {}
   }
 
@@ -429,119 +437,6 @@ class _AmbientStageState extends State<AmbientStage> {
     );
   }
 
-  Widget _modeSwitch() {
-    const modes = [('passive', 'Passive'), ('active', 'Active')];
-    final index = _mode == 'active' ? 1 : 0;
-    return Container(
-      height: 44,
-      padding: const EdgeInsets.all(3),
-      decoration: BoxDecoration(
-        color: AppColors.surface2,
-        borderRadius: BorderRadius.circular(R.md),
-      ),
-      child: LayoutBuilder(builder: (_, c) {
-        final w = c.maxWidth / 2;
-        return Stack(children: [
-          AnimatedPositioned(
-            duration: Motion.base,
-            curve: Motion.enter,
-            left: index * w,
-            top: 0,
-            bottom: 0,
-            width: w,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: AppColors.surface3,
-                borderRadius: BorderRadius.circular(R.md - 3),
-              ),
-            ),
-          ),
-          Row(children: [
-            for (final (key, label) in modes)
-              Expanded(
-                child: Semantics(
-                  button: true,
-                  selected: _mode == key,
-                  child: MouseRegion(
-                    cursor: SystemMouseCursors.click,
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onTap: _m.settings == null ? null : () => _setMode(key),
-                      child: Center(
-                        child: Row(mainAxisSize: MainAxisSize.min, children: [
-                          AnimatedContainer(
-                            duration: Motion.fast,
-                            width: 6,
-                            height: 6,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: _mode == key
-                                  ? _modeColor(key)
-                                  : AppColors.fg4.withValues(alpha: 0.5),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(label,
-                              style: sans(13,
-                                  weight: W.label,
-                                  color: _mode == key
-                                      ? AppColors.fg1
-                                      : AppColors.fg3)),
-                        ]),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-          ]),
-        ]);
-      }),
-    );
-  }
-
-  Widget _primary() {
-    final label = kIsWeb
-        ? 'Not available in the browser'
-        : _m.busy
-            ? (_live ? 'Stopping' : 'Starting')
-            : _live
-                ? 'Stop listening'
-                : _m.elsewhere
-                    ? 'Listen here instead'
-                    : 'Start listening';
-    final enabled = _canToggle;
-    final fill = !enabled
-        ? AppColors.surface2
-        : _live
-            ? AppColors.surface3
-            : AppColors.accent;
-    final ink = !enabled
-        ? AppColors.fg4
-        : _live
-            ? AppColors.fg1
-            : AppColors.accentFg;
-    return Semantics(
-      button: true,
-      enabled: enabled,
-      child: MouseRegion(
-        cursor: enabled ? SystemMouseCursors.click : SystemMouseCursors.basic,
-        child: GestureDetector(
-          onTap: enabled ? _toggle : null,
-          child: AnimatedContainer(
-            duration: Motion.fast,
-            height: 44,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: fill,
-              borderRadius: BorderRadius.circular(R.md),
-            ),
-            child: Text(label, style: sans(14, weight: W.label, color: ink)),
-          ),
-        ),
-      ),
-    );
-  }
-
   String _ago(DateTime t) {
     final d = DateTime.now().difference(t);
     if (d.inSeconds < 60) return 'now';
@@ -550,58 +445,58 @@ class _AmbientStageState extends State<AmbientStage> {
     return '${d.inDays}d';
   }
 
-  Widget _recentList() => Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Recently heard', style: sans(12, color: AppColors.fg4)),
-          const SizedBox(height: 4),
-          for (final e in _recent)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  SizedBox(
-                    width: 36,
-                    child: Text(_ago(e.startedAt),
-                        style: mono(11, color: AppColors.fg4, height: 1.7)),
-                  ),
-                  Expanded(
-                    child: Text(e.text.trim(),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: sans(13, color: AppColors.fg2, height: 1.45)),
-                  ),
-                ],
-              ),
-            ),
-        ],
-      );
-
-  Widget _key(String k) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+  Widget _surfaceCard({required List<Widget> children, EdgeInsets? padding}) =>
+      Container(
+        padding: padding ?? const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
           color: AppColors.surface2,
-          borderRadius: BorderRadius.circular(R.xs),
+          borderRadius: BorderRadius.circular(R.md),
+          border: Border.all(color: AppColors.line),
         ),
-        child: Text(k, style: mono(11, color: AppColors.fg3)),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: children,
+        ),
       );
 
-  Widget _hints() => Wrap(
-        alignment: WrapAlignment.center,
-        spacing: 12,
-        runSpacing: 6,
+  Widget _recentList() => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          for (final (k, label) in [
-            ('Space', 'start or stop'),
-            ('← →', 'mode'),
-            ('Esc', 'close'),
-          ])
-            Row(mainAxisSize: MainAxisSize.min, children: [
-              _key(k),
-              const SizedBox(width: 6),
-              Text(label, style: sans(12, color: AppColors.fg4)),
-            ]),
+          Padding(
+            padding: const EdgeInsets.only(left: 2, bottom: 6),
+            child: Text('Recently heard',
+                style: sans(12, weight: W.label, color: AppColors.fg3)),
+          ),
+          _surfaceCard(
+            padding: EdgeInsets.zero,
+            children: [
+              for (var i = 0; i < _recent.length; i++) ...[
+                if (i > 0)
+                  Divider(height: 1, thickness: 1, color: AppColors.line),
+                Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Text(_recent[i].text.trim(),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style:
+                                sans(12.5, height: 1.4, color: AppColors.fg2)),
+                      ),
+                      const SizedBox(width: 10),
+                      Text(_ago(_recent[i].startedAt),
+                          style: mono(11, color: AppColors.fg4)),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
         ],
       );
 
@@ -609,132 +504,165 @@ class _AmbientStageState extends State<AmbientStage> {
     final err = _m.error ?? _m.status.error;
     final color = _stateColor(_m.settings, _m.status);
     final popover = wide && widget.anchor != null;
-    final card = Container(
-      width: popover ? 344 : (wide ? 400 : double.infinity),
-      padding: EdgeInsets.fromLTRB(20, wide ? 14 : 8, 14, 18),
+    return Container(
+      width: popover ? 336 : (wide ? 360 : double.infinity),
+      padding: EdgeInsets.fromLTRB(16, wide ? 16 : 10, 16, 16),
       decoration: BoxDecoration(
-        color: AppColors.surface1.withValues(alpha: popover ? 0.92 : 0.97),
-        borderRadius: BorderRadius.circular(wide ? 18 : 24),
-        border: Border.all(
-          color: _live ? color.withValues(alpha: 0.32) : AppColors.border2,
-        ),
+        color: AppColors.surface1,
+        borderRadius: BorderRadius.circular(wide ? R.lg : 20),
+        border: Border.all(color: AppColors.border),
         boxShadow: overlayShadow,
       ),
-      child: Padding(
-        padding: const EdgeInsets.only(right: 6),
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
           if (!wide)
-            Container(
-              width: 36,
-              height: 4,
-              margin: const EdgeInsets.only(bottom: 6, left: 6),
-              decoration: BoxDecoration(
-                color: AppColors.border2,
-                borderRadius: BorderRadius.circular(R.pill),
+            Center(
+              child: Container(
+                width: 36,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 10),
+                decoration: BoxDecoration(
+                  color: AppColors.border2,
+                  borderRadius: BorderRadius.circular(R.pill),
+                ),
               ),
             ),
-          Row(children: [
-            Text('Ambient',
-                style: sans(15, weight: W.strong, color: AppColors.fg1)),
-            const SizedBox(width: 8),
-            _pill(),
-            const Spacer(),
-            Transform.translate(
-              offset: const Offset(8, 0),
-              child: IconBtn('x',
-                  size: 40, iconSize: 18, tooltip: 'Close', onTap: _close),
-            ),
-          ]),
-          const SizedBox(height: 4),
-          Semantics(
-            button: true,
-            label: _live ? 'Hold to stop listening' : 'Hold to start listening',
-            child: GestureDetector(
-              onLongPress: _canToggle ? _toggle : null,
-              child: _Orb(
-                size: orb,
-                color: color,
-                alive: _live,
-                level: _live &&
-                        (_m.status.speaking || _m.status.assistantSpeaking)
-                    ? 1
-                    : 0,
-              ),
-            ),
-          ),
-          const SizedBox(height: 10),
-          ValueListenableBuilder<AmbientVoice?>(
-            valueListenable: AmbientController.instance.voice,
-            builder: (context, voice, _) =>
-                ValueListenableBuilder<AmbientStateEvent?>(
-              valueListenable: voice?.state ?? _emptyAmbientState,
-              builder: (context, event, _) {
-                final caption = _caption(event);
-                final why = event?.reason?.startsWith('mission_control:') == true
-                    ? event!.reason!.substring('mission_control:'.length).trim()
-                    : null;
-                return Column(mainAxisSize: MainAxisSize.min, children: [
-                  AnimatedSwitcher(
-                    duration: Motion.fast,
-                    child: Text(caption,
-                        key: ValueKey(caption),
-                        textAlign: TextAlign.center,
-                        style: sans(15, weight: W.label, color: AppColors.fg1)),
-                  ),
-                  if (why != null && why.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 2),
-                      child: Text(why,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: sans(12, color: AppColors.fg4)),
+          _surfaceCard(
+            padding: const EdgeInsets.all(12),
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Semantics(
+                    button: true,
+                    label: _live ? 'Stop listening' : 'Start listening',
+                    child: GestureDetector(
+                      onTap: _canToggle ? _toggle : null,
+                      onLongPress: _canToggle ? _toggle : null,
+                      child: _Orb(
+                        size: orb,
+                        color: color,
+                        alive: _live,
+                        level: _live &&
+                                (_m.status.speaking ||
+                                    _m.status.assistantSpeaking)
+                            ? 1
+                            : 0,
+                      ),
                     ),
-                ]);
-              },
-            ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ValueListenableBuilder<AmbientVoice?>(
+                      valueListenable: AmbientController.instance.voice,
+                      builder: (context, voice, _) =>
+                          ValueListenableBuilder<AmbientStateEvent?>(
+                        valueListenable: voice?.state ?? _emptyAmbientState,
+                        builder: (context, event, _) {
+                          final caption = _caption(event);
+                          final why = event?.reason
+                                      ?.startsWith('mission_control:') ==
+                                  true
+                              ? event!.reason!
+                                  .substring('mission_control:'.length)
+                                  .trim()
+                              : null;
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Row(children: [
+                                Text('Ambient',
+                                    style: sans(14,
+                                        weight: W.strong,
+                                        color: AppColors.fg1)),
+                                const SizedBox(width: 8),
+                                _pill(),
+                              ]),
+                              const SizedBox(height: 3),
+                              Text(caption,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: sans(12.5, color: AppColors.fg3)),
+                              if (why != null && why.isNotEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 2),
+                                  child: Text(why,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: sans(11.5, color: AppColors.fg4)),
+                                ),
+                            ],
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  if (_m.elsewhere)
+                    Btn('Take over',
+                        small: true,
+                        variant: BtnVariant.secondary,
+                        disabled: !_canToggle,
+                        onTap: _canToggle ? _toggle : null)
+                  else
+                    SettingsSwitch(
+                      value: _live,
+                      onChanged: _canToggle ? (_) => _toggle() : null,
+                    ),
+                ],
+              ),
+            ],
           ),
-          const SizedBox(height: 20),
-          _modeSwitch(),
           const SizedBox(height: 8),
-          AnimatedSwitcher(
-            duration: Motion.fast,
-            child: Text(
-              _mode == 'active'
-                  ? 'Listens and speaks up when it matters'
-                  : 'Listens quietly and keeps a record',
-              key: ValueKey(_mode),
-              textAlign: TextAlign.center,
-              style: sans(13, color: AppColors.fg4),
-            ),
+          _surfaceCard(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text('Mode',
+                            style:
+                                sans(13, weight: W.label, color: AppColors.fg1)),
+                        const SizedBox(height: 2),
+                        Text(
+                          _mode == 'active'
+                              ? 'Speaks up when it matters'
+                              : 'Quiet notes in chat',
+                          style: sans(12, color: AppColors.fg3),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Pills<String>(
+                    items: const [
+                      ('passive', 'Passive'),
+                      ('active', 'Active'),
+                    ],
+                    selected: _mode,
+                    onSelect: _setMode,
+                  ),
+                ],
+              ),
+            ],
           ),
-          const SizedBox(height: 16),
-          _primary(),
-          if (err != null && !kIsWeb)
-            Padding(
-              padding: const EdgeInsets.only(top: 10),
-              child: Text(err,
-                  textAlign: TextAlign.center,
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
-                  style: sans(13, color: AppColors.danger)),
-            ),
+          if (err != null && !kIsWeb) ...[
+            const SizedBox(height: 8),
+            NoteLine(err, error: true),
+          ],
           if (_recent.isNotEmpty) ...[
-            const SizedBox(height: 20),
+            const SizedBox(height: 12),
             _recentList(),
           ],
-          if (!kMobile) ...[
-            const SizedBox(height: 16),
-            _hints(),
-          ],
-        ]),
-      ),
-    );
-    if (!popover) return card;
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(18),
-      child: BackdropFilter(
-        filter: ui.ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-        child: card,
+        ],
       ),
     );
   }
@@ -745,52 +673,24 @@ class _AmbientStageState extends State<AmbientStage> {
     final wide = size.width >= 720;
     final anchor = wide ? widget.anchor : null;
     final still = reduceMotion(context);
-    final orb = anchor != null
-        ? 124.0
-        : (wide ? 160.0 : math.min(size.width * 0.4, 156.0));
+    final orb = wide ? 52.0 : 58.0;
     final panel = ConstrainedBox(
       constraints: BoxConstraints(
         maxHeight: anchor != null
-            ? (size.height - anchor.bottom - 24).clamp(320.0, size.height * 0.86)
+            ? (size.height - anchor.bottom - 24).clamp(280.0, size.height * 0.86)
             : size.height * 0.92,
       ),
       child: SingleChildScrollView(child: _panel(wide, orb)),
     );
     final Widget placed = anchor != null
         ? Builder(builder: (_) {
-            const width = 344.0;
+            const width = 336.0;
             final left =
-                (anchor.center.dx - width + 28).clamp(12.0, size.width - width - 12);
-            final top = (anchor.bottom + 10).clamp(12.0, size.height - 360.0);
+                (anchor.center.dx - width + 24).clamp(12.0, size.width - width - 12);
+            final top = (anchor.bottom + 8).clamp(12.0, size.height - 320.0);
             final alignX =
                 (((anchor.center.dx - left) / width) * 2 - 1).clamp(-0.9, 0.9);
-            final color = _stateColor(_m.settings, _m.status);
             return Stack(children: [
-              Positioned(
-                left: anchor.center.dx - 26,
-                top: anchor.center.dy - 26,
-                width: 52,
-                height: 52,
-                child: IgnorePointer(
-                  child: FadeTransition(
-                    opacity: _a,
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                            color: color.withValues(alpha: 0.45), width: 1.5),
-                        boxShadow: [
-                          BoxShadow(
-                            color: color.withValues(alpha: 0.28),
-                            blurRadius: 18,
-                            spreadRadius: 2,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
               Positioned(
                 left: left,
                 top: top,
@@ -800,7 +700,7 @@ class _AmbientStageState extends State<AmbientStage> {
                       ? panel
                       : ScaleTransition(
                           alignment: Alignment(alignX, -1.0),
-                          scale: Tween(begin: 0.92, end: 1.0).animate(_a),
+                          scale: Tween(begin: 0.94, end: 1.0).animate(_a),
                           child: panel),
                 ),
               ),
