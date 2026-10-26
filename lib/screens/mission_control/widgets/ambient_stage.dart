@@ -121,37 +121,24 @@ class _AmbientModel extends ChangeNotifier {
   }
 }
 
-class _OrbPainter extends CustomPainter {
-  _OrbPainter(this.t, this.level, this.color, this.alive);
-  final double t;
-  final double level;
-  final Color color;
-  final bool alive;
+class _OrbDots {
+  _OrbDots(this.x, this.y, this.size, this.alpha, this.depth);
+  final Float32List x, y, size, alpha, depth;
 
-  @override
-  void paint(Canvas canvas, Size size) {
-    final r = size.shortestSide / 2;
-    final c = size.center(Offset.zero);
-    final tau = math.pi * 2;
-    final breathe = alive ? 1 + math.sin(t * tau) * 0.025 : 1.0;
-    final radius = r * 0.9 * breathe;
-    final step = math.max(size.shortestSide / 40, 2.3);
-    if (alive) {
-      canvas.drawCircle(
-          c,
-          r,
-          Paint()
-            ..shader = RadialGradient(colors: [
-              color.withValues(alpha: 0.16 + level * 0.1),
-              color.withValues(alpha: 0),
-            ]).createShader(Rect.fromCircle(center: c, radius: r)));
-    }
-    final blink = alive && t > 0.86 && t < 0.92;
+  int get length => x.length;
+
+  static final Map<(int, bool, bool), _OrbDots> _cache = {};
+
+  static _OrbDots of(double shortestSide, bool alive, bool blink) =>
+      _cache.putIfAbsent((shortestSide.round(), alive, blink), () => _build(shortestSide, alive, blink));
+
+  static _OrbDots _build(double shortestSide, bool alive, bool blink) {
+    final radius = shortestSide / 2 * 0.9;
+    final step = math.max(shortestSide / 40, 2.3);
     final eyeH = blink ? 0.18 : 1.0;
     final eyes = [Offset(-radius * 0.34, radius * 0.06), Offset(radius * 0.34, radius * 0.06)];
     final eyeRx = radius * 0.085, eyeRy = radius * 0.13 * eyeH;
-    final paint = Paint();
-    final amp = alive ? 0.12 + level * 0.22 : 0.0;
+    final xs = <double>[], ys = <double>[], sizes = <double>[], alphas = <double>[], depths = <double>[];
     final rows = (radius * 2 / step).ceil() + 2;
     for (var j = 0; j < rows; j++) {
       final y = -radius + j * step * 0.866;
@@ -173,21 +160,64 @@ class _OrbPainter extends CustomPainter {
         final nx = x / radius, ny = y / radius;
         final z = math.sqrt(math.max(0.0, 1 - nx * nx - ny * ny));
         final light = (nx * -0.38 + ny * -0.5 + z * 0.78).clamp(0.0, 1.0);
-        var s = step * (0.2 + 0.66 * light) * (1 - math.pow(d, 8) * 0.45);
-        var a = alive ? 0.55 + 0.45 * light : 0.22 + 0.25 * light;
-        if (alive) {
-          final w = math.sin((d * 2.0 - t * 2) * tau);
-          s *= 1 + amp * w;
-          a = (a + w * 0.12).clamp(0.2, 1.0);
-        }
-        paint.color = color.withValues(alpha: a);
-        canvas.drawCircle(c + Offset(x, y), math.max(s / 2, 0.3), paint);
+        xs.add(x);
+        ys.add(y);
+        sizes.add(step * (0.2 + 0.66 * light) * (1 - math.pow(d, 8) * 0.45));
+        alphas.add(alive ? 0.55 + 0.45 * light : 0.22 + 0.25 * light);
+        depths.add(d);
       }
     }
+    return _OrbDots(Float32List.fromList(xs), Float32List.fromList(ys), Float32List.fromList(sizes),
+        Float32List.fromList(alphas), Float32List.fromList(depths));
+  }
+}
+
+class _OrbPainter extends CustomPainter {
+  _OrbPainter(this.t, this.level, this.color, this.alive);
+  final double t;
+  final double level;
+  final Color color;
+  final bool alive;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final r = size.shortestSide / 2;
+    final c = size.center(Offset.zero);
+    final tau = math.pi * 2;
+    if (alive) {
+      canvas.drawCircle(
+          c,
+          r,
+          Paint()
+            ..shader = RadialGradient(colors: [
+              color.withValues(alpha: 0.16 + level * 0.1),
+              color.withValues(alpha: 0),
+            ]).createShader(Rect.fromCircle(center: c, radius: r)));
+    }
+    final dots = _OrbDots.of(size.shortestSide, alive, alive && t > 0.86 && t < 0.92);
+    final amp = alive ? 0.12 + level * 0.22 : 0.0;
+    final rgb = color.toARGB32() & 0xFFFFFF;
+    final paint = Paint();
+    canvas.save();
+    canvas.translate(c.dx, c.dy);
+    canvas.scale(alive ? 1 + math.sin(t * tau) * 0.025 : 1.0);
+    for (var i = 0; i < dots.length; i++) {
+      var s = dots.size[i].toDouble();
+      var a = dots.alpha[i].toDouble();
+      if (alive) {
+        final w = math.sin((dots.depth[i] * 2.0 - t * 2) * tau);
+        s *= 1 + amp * w;
+        a = (a + w * 0.12).clamp(0.2, 1.0);
+      }
+      paint.color = Color(((a * 255).round() << 24) | rgb);
+      canvas.drawCircle(Offset(dots.x[i], dots.y[i]), math.max(s / 2, 0.3), paint);
+    }
+    canvas.restore();
   }
 
   @override
-  bool shouldRepaint(covariant _OrbPainter old) => true;
+  bool shouldRepaint(covariant _OrbPainter old) =>
+      old.t != t || old.level != level || old.color != color || old.alive != alive;
 }
 
 class _Orb extends StatefulWidget {
@@ -223,11 +253,14 @@ class _OrbState extends State<_Orb> with SingleTickerProviderStateMixin {
     final animate = widget.alive && !reduce;
     if (animate && !_c.isAnimating) _c.repeat();
     if (!animate && _c.isAnimating) _c.stop();
-    return AnimatedBuilder(
-      animation: _c,
-      builder: (_, __) => CustomPaint(
-        size: Size.square(widget.size),
-        painter: _OrbPainter(_c.value, widget.level, widget.color, widget.alive),
+    final frames = widget.period.inMilliseconds * 30 / 1000;
+    return RepaintBoundary(
+      child: AnimatedBuilder(
+        animation: _c,
+        builder: (_, __) => CustomPaint(
+          size: Size.square(widget.size),
+          painter: _OrbPainter((_c.value * frames).floor() / frames, widget.level, widget.color, widget.alive),
+        ),
       ),
     );
   }

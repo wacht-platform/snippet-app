@@ -618,6 +618,8 @@ class _SessionScreenState extends State<SessionScreen>
 
   // Stream frame throttle: store the latest pending stream payload and flush
   // at most every 50ms to avoid rebuilding the full widget tree on every token.
+  String _streamText = '';
+  String _streamThinking = '';
   String _pendingLiveText = '';
   String _pendingLiveThinking = '';
   bool _pendingLiveTextVisible = false;

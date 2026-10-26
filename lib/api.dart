@@ -162,7 +162,7 @@ class DaemonClient {
     final uri = base.replace(
       scheme: wsScheme,
       path: '/attach',
-      queryParameters: {'session': sessionId, 'token': token, 'compact': '1'},
+      queryParameters: {'session': sessionId, 'token': token, 'compact': '1', 'stream_delta': '1'},
     );
     return _connectWs(
       uri,
