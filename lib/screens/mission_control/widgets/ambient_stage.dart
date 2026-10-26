@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -9,6 +11,7 @@ import '../../../ambient/controller.dart';
 import '../../../ambient/voice.dart';
 import '../../../api.dart';
 import '../../../models.dart';
+import '../../../platform.dart';
 import '../../../theme.dart';
 import '../../../widgets.dart';
 
@@ -63,6 +66,7 @@ class _AmbientModel extends ChangeNotifier {
     if (on) {
       if (busy) return;
       busy = true;
+      notifyListeners();
       error = await ambient.start(client);
       busy = false;
       notifyListeners();
@@ -287,207 +291,514 @@ class _AmbientHeaderOrbState extends State<AmbientHeaderOrb> {
 
 Future<void> showAmbientStage(BuildContext context, DaemonClient client) {
   return Navigator.of(context, rootNavigator: true).push(PageRouteBuilder<void>(
-    opaque: true,
-    transitionDuration: const Duration(milliseconds: 320),
-    reverseTransitionDuration: const Duration(milliseconds: 220),
-    pageBuilder: (_, __, ___) => AmbientStage(client: client),
-    transitionsBuilder: (_, a, __, child) => FadeTransition(
-      opacity: CurvedAnimation(parent: a, curve: Curves.easeOutCubic),
-      child: ScaleTransition(
-        scale: Tween(begin: 0.96, end: 1.0)
-            .animate(CurvedAnimation(parent: a, curve: Curves.easeOutCubic)),
-        child: child,
-      ),
-    ),
+    opaque: false,
+    transitionDuration: Motion.open,
+    reverseTransitionDuration: Motion.close,
+    pageBuilder: (_, animation, __) =>
+        AmbientStage(client: client, animation: animation),
   ));
 }
 
 class AmbientStage extends StatefulWidget {
-  const AmbientStage({super.key, required this.client});
+  const AmbientStage({super.key, required this.client, required this.animation});
   final DaemonClient client;
+  final Animation<double> animation;
 
   @override
   State<AmbientStage> createState() => _AmbientStageState();
 }
 
 class _AmbientStageState extends State<AmbientStage> {
-  static const _modes = ['passive', 'active'];
   late final _AmbientModel _m = _AmbientModel(widget.client)
     ..addListener(_changed);
-  PageController? _pager;
-  double _page = 0;
-  bool _programmatic = false;
+  late final CurvedAnimation _a = CurvedAnimation(
+      parent: widget.animation, curve: Motion.enter, reverseCurve: Motion.exit);
+  List<AmbientEvent> _recent = const [];
+  Timer? _recentTimer;
+  double _drag = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRecent();
+    _recentTimer =
+        Timer.periodic(const Duration(seconds: 8), (_) => _loadRecent());
+  }
+
+  Future<void> _loadRecent() async {
+    try {
+      final events = await widget.client.ambientEvents(limit: 8);
+      if (!mounted) return;
+      setState(() => _recent =
+          events.where((e) => e.text.trim().isNotEmpty).take(3).toList());
+    } catch (_) {}
+  }
 
   void _changed() {
-    if (!mounted) return;
-    final s = _m.settings;
-    if (s != null && _pager == null) {
-      final i = _modes.indexOf(s.shownMode).clamp(0, 1);
-      _page = i.toDouble();
-      _pager = PageController(initialPage: i, viewportFraction: 0.7)
-        ..addListener(() {
-          if (mounted) setState(() => _page = _pager!.page ?? _page);
-        });
-    } else if (s != null && _pager!.hasClients) {
-      final i = _modes.indexOf(s.shownMode);
-      if (i >= 0 && (_pager!.page ?? i).round() != i) {
-        _programmatic = true;
-        _pager!.animateToPage(i,
-            duration: const Duration(milliseconds: 260),
-            curve: Curves.easeOutCubic);
-      }
-    }
-    setState(() {});
+    if (mounted) setState(() {});
   }
 
   @override
   void dispose() {
+    _recentTimer?.cancel();
     _m.removeListener(_changed);
     _m.dispose();
-    _pager?.dispose();
+    _a.dispose();
     super.dispose();
   }
 
-  String _caption(String mode, bool selected, [AmbientStateEvent? event]) {
-    if (selected && event != null) {
-      if (event.mode == 'passive') return 'Listening quietly';
-      if (event.mode == 'pinned') return 'Ready to talk';
-      if (event.mode == 'active') return 'In conversation';
-      if (event.sub == 'speaking') return 'Speaking';
-      if (event.sub == 'thinking') return 'Thinking';
-      if (event.sub == 'listening') return 'Listening';
-    }
-    if (selected && _m.elsewhere) {
-      return 'Listening on ${_m.settings?.listeningDevice ?? 'another device'}';
-    }
-    if (selected && _m.status.displaced) return 'Another device took over';
-    if (selected && _m.status.assistantSpeaking) return 'Speaking';
-    if (selected && _m.on && _m.listening && (_m.settings?.conversationOpen ?? false)) {
-      return 'In conversation';
-    }
-    final running = selected && _m.on;
-    if (!running) {
-      return mode == 'active'
-          ? 'Listens and speaks up when it matters'
-          : 'Listens quietly and keeps a record';
-    }
-    if (!_m.listening) return 'Starting';
-    if (_m.status.speaking) return 'Hearing you';
-    return mode == 'active' ? 'Listening, ready to speak up' : 'Listening quietly';
+  void _close() => Navigator.of(context).maybePop();
+
+  String get _mode => _m.settings?.shownMode ?? 'passive';
+  bool get _live => _m.on && _m.listening;
+  bool get _canToggle => !kIsWeb && _m.settings != null && !_m.busy;
+
+  void _toggle() {
+    if (!_canToggle) return;
+    HapticFeedback.mediumImpact();
+    _m.press();
   }
 
-  Widget _globe(int i, double size) {
-    final mode = _modes[i];
-    final selected = _m.settings?.shownMode == mode;
-    final dist = (_page - i).abs().clamp(0.0, 1.0);
-    final color = selected ? _stateColor(_m.settings, _m.status) : _modeColor(mode);
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: selected
-          ? () {
-              if (_m.settings != null) {
-                toast(context, _m.on && _m.listening ? 'Hold to stop' : 'Hold to start');
-              }
-            }
-          : () => _pager?.animateToPage(i,
-              duration: const Duration(milliseconds: 260),
-              curve: Curves.easeOutCubic),
-      onLongPress: selected && _m.settings != null && !_m.busy
-          ? () {
-              HapticFeedback.mediumImpact();
-              _m.press();
-            }
-          : null,
-      child: Center(
-        child: Opacity(
-          opacity: 1 - dist * 0.65,
-          child: Transform.scale(
-            scale: 1 - dist * 0.3,
-            child: Column(mainAxisSize: MainAxisSize.min, children: [
-              _Orb(
-                size: size,
-                color: color,
-                alive: selected && _m.listening,
-                level: selected && (_m.status.speaking || _m.status.assistantSpeaking) ? 1 : 0,
+  void _setMode(String mode) {
+    if (_mode == mode) return;
+    HapticFeedback.selectionClick();
+    _m.setMode(mode);
+  }
+
+  String _caption(AmbientStateEvent? event) {
+    if (kIsWeb) return 'Runs in the phone and desktop apps';
+    if (_m.elsewhere) {
+      return 'Listening on ${_m.settings?.listeningDevice ?? 'another device'}';
+    }
+    if (_m.status.displaced) return 'Another device took over';
+    if (_m.busy) return _live ? 'Stopping' : 'Starting';
+    if (!_live) return 'Not listening';
+    if (event != null) {
+      if (event.sub == 'speaking') return 'Speaking';
+      if (event.sub == 'thinking') return 'Thinking';
+      if (event.mode == 'active') return 'In conversation';
+      if (event.mode == 'pinned') return 'Ready to talk';
+    }
+    if (_m.status.assistantSpeaking) return 'Speaking';
+    if (_m.settings?.conversationOpen ?? false) return 'In conversation';
+    if (_m.status.speaking) return 'Hearing you';
+    return _mode == 'active' ? 'Listening, ready to speak up' : 'Listening quietly';
+  }
+
+  (String, Color) _status() {
+    if (kIsWeb) return ('Unavailable', AppColors.fg4);
+    if (_m.on && (_m.error ?? _m.status.error) != null) {
+      return ('Error', AppColors.danger);
+    }
+    if (_m.elsewhere) return ('Elsewhere', AppColors.fg3);
+    if (_live) return ('Live', _modeColor(_mode));
+    return ('Off', AppColors.fg4);
+  }
+
+  Widget _pill() {
+    final (label, color) = _status();
+    return AnimatedContainer(
+      duration: Motion.fast,
+      height: 22,
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.13),
+        borderRadius: BorderRadius.circular(R.pill),
+      ),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Container(
+            width: 6,
+            height: 6,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+        const SizedBox(width: 6),
+        Text(label, style: sans(12, weight: W.label, color: color)),
+      ]),
+    );
+  }
+
+  Widget _modeSwitch() {
+    const modes = [('passive', 'Passive'), ('active', 'Active')];
+    final index = _mode == 'active' ? 1 : 0;
+    return Container(
+      height: 44,
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: AppColors.surface2,
+        borderRadius: BorderRadius.circular(R.md),
+      ),
+      child: LayoutBuilder(builder: (_, c) {
+        final w = c.maxWidth / 2;
+        return Stack(children: [
+          AnimatedPositioned(
+            duration: Motion.base,
+            curve: Motion.enter,
+            left: index * w,
+            top: 0,
+            bottom: 0,
+            width: w,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: AppColors.surface3,
+                borderRadius: BorderRadius.circular(R.md - 3),
               ),
-              const SizedBox(height: 8),
-              Text(mode == 'active' ? 'Active' : 'Passive',
-                  style: sans(16,
-                      weight: W.strong,
-                      color: selected ? AppColors.fg1 : AppColors.fg3)),
-              const SizedBox(height: 3),
-              ValueListenableBuilder<AmbientVoice?>(
-                valueListenable: AmbientController.instance.voice,
-                builder: (context, voice, _) => ValueListenableBuilder<AmbientStateEvent?>(
-                  valueListenable: voice?.state ?? _emptyAmbientState,
-                  builder: (context, event, _) => Column(mainAxisSize: MainAxisSize.min, children: [
-                    AnimatedSwitcher(duration: const Duration(milliseconds: 200), child: Text(_caption(mode, selected, event), key: ValueKey(_caption(mode, selected, event)), textAlign: TextAlign.center, style: sans(13, color: AppColors.fg4))),
-                    if (event?.reason?.startsWith('mission_control:') == true) Text(event!.reason!.substring('mission_control:'.length).trim(), maxLines: 1, overflow: TextOverflow.ellipsis, style: sans(12, color: AppColors.fg4)),
-                  ]),
+            ),
+          ),
+          Row(children: [
+            for (final (key, label) in modes)
+              Expanded(
+                child: Semantics(
+                  button: true,
+                  selected: _mode == key,
+                  child: MouseRegion(
+                    cursor: SystemMouseCursors.click,
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: _m.settings == null ? null : () => _setMode(key),
+                      child: Center(
+                        child: Row(mainAxisSize: MainAxisSize.min, children: [
+                          AnimatedContainer(
+                            duration: Motion.fast,
+                            width: 6,
+                            height: 6,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: _mode == key
+                                  ? _modeColor(key)
+                                  : AppColors.fg4.withValues(alpha: 0.5),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(label,
+                              style: sans(13,
+                                  weight: W.label,
+                                  color: _mode == key
+                                      ? AppColors.fg1
+                                      : AppColors.fg3)),
+                        ]),
+                      ),
+                    ),
+                  ),
                 ),
               ),
-            ]),
+          ]),
+        ]);
+      }),
+    );
+  }
+
+  Widget _primary() {
+    final label = kIsWeb
+        ? 'Not available in the browser'
+        : _m.busy
+            ? (_live ? 'Stopping' : 'Starting')
+            : _live
+                ? 'Stop listening'
+                : _m.elsewhere
+                    ? 'Listen here instead'
+                    : 'Start listening';
+    final enabled = _canToggle;
+    final fill = !enabled
+        ? AppColors.surface2
+        : _live
+            ? AppColors.surface3
+            : AppColors.accent;
+    final ink = !enabled
+        ? AppColors.fg4
+        : _live
+            ? AppColors.fg1
+            : AppColors.accentFg;
+    return Semantics(
+      button: true,
+      enabled: enabled,
+      child: MouseRegion(
+        cursor: enabled ? SystemMouseCursors.click : SystemMouseCursors.basic,
+        child: GestureDetector(
+          onTap: enabled ? _toggle : null,
+          child: AnimatedContainer(
+            duration: Motion.fast,
+            height: 44,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: fill,
+              borderRadius: BorderRadius.circular(R.md),
+            ),
+            child: Text(label, style: sans(14, weight: W.label, color: ink)),
           ),
         ),
       ),
     );
   }
 
+  String _ago(DateTime t) {
+    final d = DateTime.now().difference(t);
+    if (d.inSeconds < 60) return 'now';
+    if (d.inMinutes < 60) return '${d.inMinutes}m';
+    if (d.inHours < 24) return '${d.inHours}h';
+    return '${d.inDays}d';
+  }
+
+  Widget _recentList() => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Recently heard', style: sans(12, color: AppColors.fg4)),
+          const SizedBox(height: 4),
+          for (final e in _recent)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    width: 36,
+                    child: Text(_ago(e.startedAt),
+                        style: mono(11, color: AppColors.fg4, height: 1.7)),
+                  ),
+                  Expanded(
+                    child: Text(e.text.trim(),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: sans(13, color: AppColors.fg2, height: 1.45)),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      );
+
+  Widget _key(String k) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+        decoration: BoxDecoration(
+          color: AppColors.surface2,
+          borderRadius: BorderRadius.circular(R.xs),
+        ),
+        child: Text(k, style: mono(11, color: AppColors.fg3)),
+      );
+
+  Widget _hints() => Wrap(
+        alignment: WrapAlignment.center,
+        spacing: 12,
+        runSpacing: 6,
+        children: [
+          for (final (k, label) in [
+            ('Space', 'start or stop'),
+            ('← →', 'mode'),
+            ('Esc', 'close'),
+          ])
+            Row(mainAxisSize: MainAxisSize.min, children: [
+              _key(k),
+              const SizedBox(width: 6),
+              Text(label, style: sans(12, color: AppColors.fg4)),
+            ]),
+        ],
+      );
+
+  Widget _panel(bool wide, double orb) {
+    final err = _m.error ?? _m.status.error;
+    final color = _stateColor(_m.settings, _m.status);
+    return Container(
+      width: wide ? 400 : double.infinity,
+      padding: EdgeInsets.fromLTRB(20, wide ? 14 : 8, 14, 20),
+      decoration: BoxDecoration(
+        color: AppColors.surface1.withValues(alpha: 0.97),
+        borderRadius: BorderRadius.circular(wide ? 20 : 24),
+        border: Border.all(color: AppColors.border),
+        boxShadow: overlayShadow,
+      ),
+      child: Padding(
+        padding: const EdgeInsets.only(right: 6),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          if (!wide)
+            Container(
+              width: 36,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 6, left: 6),
+              decoration: BoxDecoration(
+                color: AppColors.border2,
+                borderRadius: BorderRadius.circular(R.pill),
+              ),
+            ),
+          Row(children: [
+            Text('Ambient',
+                style: sans(15, weight: W.strong, color: AppColors.fg1)),
+            const SizedBox(width: 8),
+            _pill(),
+            const Spacer(),
+            Transform.translate(
+              offset: const Offset(8, 0),
+              child: IconBtn('x',
+                  size: 40, iconSize: 18, tooltip: 'Close', onTap: _close),
+            ),
+          ]),
+          const SizedBox(height: 4),
+          Semantics(
+            button: true,
+            label: _live ? 'Hold to stop listening' : 'Hold to start listening',
+            child: GestureDetector(
+              onLongPress: _canToggle ? _toggle : null,
+              child: _Orb(
+                size: orb,
+                color: color,
+                alive: _live,
+                level: _live &&
+                        (_m.status.speaking || _m.status.assistantSpeaking)
+                    ? 1
+                    : 0,
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          ValueListenableBuilder<AmbientVoice?>(
+            valueListenable: AmbientController.instance.voice,
+            builder: (context, voice, _) =>
+                ValueListenableBuilder<AmbientStateEvent?>(
+              valueListenable: voice?.state ?? _emptyAmbientState,
+              builder: (context, event, _) {
+                final caption = _caption(event);
+                final why = event?.reason?.startsWith('mission_control:') == true
+                    ? event!.reason!.substring('mission_control:'.length).trim()
+                    : null;
+                return Column(mainAxisSize: MainAxisSize.min, children: [
+                  AnimatedSwitcher(
+                    duration: Motion.fast,
+                    child: Text(caption,
+                        key: ValueKey(caption),
+                        textAlign: TextAlign.center,
+                        style: sans(15, weight: W.label, color: AppColors.fg1)),
+                  ),
+                  if (why != null && why.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(why,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: sans(12, color: AppColors.fg4)),
+                    ),
+                ]);
+              },
+            ),
+          ),
+          const SizedBox(height: 20),
+          _modeSwitch(),
+          const SizedBox(height: 8),
+          AnimatedSwitcher(
+            duration: Motion.fast,
+            child: Text(
+              _mode == 'active'
+                  ? 'Listens and speaks up when it matters'
+                  : 'Listens quietly and keeps a record',
+              key: ValueKey(_mode),
+              textAlign: TextAlign.center,
+              style: sans(13, color: AppColors.fg4),
+            ),
+          ),
+          const SizedBox(height: 16),
+          _primary(),
+          if (err != null && !kIsWeb)
+            Padding(
+              padding: const EdgeInsets.only(top: 10),
+              child: Text(err,
+                  textAlign: TextAlign.center,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: sans(13, color: AppColors.danger)),
+            ),
+          if (_recent.isNotEmpty) ...[
+            const SizedBox(height: 20),
+            _recentList(),
+          ],
+          if (!kMobile) ...[
+            const SizedBox(height: 16),
+            _hints(),
+          ],
+        ]),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final err = _m.error ?? _m.status.error;
-    final width = MediaQuery.sizeOf(context).width;
-    final globe = math.min(width * 0.64, 320.0);
-    return Scaffold(
-      backgroundColor: AppColors.bg,
-      body: SafeArea(
-        child: Column(children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(8, 8, 16, 0),
-            child: Row(children: [
-              IconBtn('chevron-down',
-                  size: 44,
-                  iconSize: 20,
-                  tooltip: 'Minimise',
-                  onTap: () => Navigator.of(context).pop()),
-              const SizedBox(width: 4),
-              Text('Ambient listening', style: sans(15, color: AppColors.fg2)),
-            ]),
-          ),
-          Expanded(
-            child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-              SizedBox(
-                height: globe + 96,
-                child: _pager == null
-                    ? const SizedBox.shrink()
-                    : PageView.builder(
-                        controller: _pager,
-                        itemCount: 2,
-                        physics: const BouncingScrollPhysics(),
-                        onPageChanged: (i) {
-                          if (_programmatic) {
-                            _programmatic = false;
-                            return;
-                          }
-                          HapticFeedback.selectionClick();
-                          _m.setMode(_modes[i]);
-                        },
-                        itemBuilder: (_, i) => _globe(i, globe),
-                      ),
-              ),
-              if (err != null)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(32, 10, 32, 0),
-                  child: Text(err,
-                      textAlign: TextAlign.center,
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
-                      style: sans(13, color: AppColors.danger)),
+    final size = MediaQuery.sizeOf(context);
+    final wide = size.width >= 720;
+    final still = reduceMotion(context);
+    final orb = wide ? 160.0 : math.min(size.width * 0.4, 156.0);
+    final panel = ConstrainedBox(
+      constraints: BoxConstraints(maxHeight: size.height * 0.92),
+      child: SingleChildScrollView(child: _panel(wide, orb)),
+    );
+    final Widget placed = wide
+        ? Center(
+            child: FadeTransition(
+              opacity: _a,
+              child: still
+                  ? panel
+                  : ScaleTransition(
+                      scale: Tween(begin: 0.96, end: 1.0).animate(_a),
+                      child: panel),
+            ),
+          )
+        : Align(
+            alignment: Alignment.bottomCenter,
+            child: AnimatedBuilder(
+              animation: _a,
+              builder: (_, child) => Opacity(
+                opacity: still ? _a.value : 1,
+                child: Transform.translate(
+                  offset: Offset(0, (still ? 0 : (1 - _a.value) * 360) + _drag),
+                  child: child,
                 ),
-            ]),
-          ),
-          const SizedBox(height: 24),
-        ]),
+              ),
+              child: GestureDetector(
+                onVerticalDragUpdate: (d) =>
+                    setState(() => _drag = math.max(0, _drag + d.delta.dy)),
+                onVerticalDragEnd: (d) {
+                  if (_drag > 90 || (d.primaryVelocity ?? 0) > 700) {
+                    _close();
+                  } else {
+                    setState(() => _drag = 0);
+                  }
+                },
+                child: SafeArea(
+                  top: false,
+                  minimum: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+                  child: panel,
+                ),
+              ),
+            ),
+          );
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.escape): _close,
+        const SingleActivator(LogicalKeyboardKey.space): _toggle,
+        const SingleActivator(LogicalKeyboardKey.arrowLeft): () =>
+            _setMode('passive'),
+        const SingleActivator(LogicalKeyboardKey.arrowRight): () =>
+            _setMode('active'),
+      },
+      child: Focus(
+        autofocus: true,
+        child: Material(
+          type: MaterialType.transparency,
+          child: Stack(children: [
+            Positioned.fill(
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: _close,
+                child: AnimatedBuilder(
+                  animation: _a,
+                  builder: (_, __) {
+                    final v = _a.value.clamp(0.0, 1.0);
+                    return BackdropFilter(
+                      filter: ui.ImageFilter.blur(sigmaX: 14 * v, sigmaY: 14 * v),
+                      child: ColoredBox(
+                          color: Colors.black.withValues(alpha: 0.4 * v)),
+                    );
+                  },
+                ),
+              ),
+            ),
+            placed,
+          ]),
+        ),
       ),
     );
   }

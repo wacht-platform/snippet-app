@@ -84,6 +84,7 @@ class AmbientController extends ChangeNotifier {
   AmbientController._();
   static final AmbientController instance = AmbientController._();
 
+  static bool get supported => !kIsWeb;
   static bool get _android => !kIsWeb && Platform.isAndroid;
 
   AmbientStatus status = const AmbientStatus();
@@ -150,6 +151,7 @@ class AmbientController extends ChangeNotifier {
   }
 
   Future<String?> start(DaemonClient client) async {
+    if (!supported) return 'Ambient listening is not available in the browser.';
     _init();
     final granted = kMobile
         ? (await Permission.microphone.request()).isGranted

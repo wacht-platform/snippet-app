@@ -48,6 +48,7 @@ dependencies:
   flutter_foreground_task: ^11.0.3
   ambient_audio:
     path: packages/ambient_audio
+  flutter_soloud: ^4.1.7
 dev_dependencies:
   flutter_test:
     sdk: flutter

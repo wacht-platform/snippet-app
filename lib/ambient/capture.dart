@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart';
 import 'package:record/record.dart';
 import 'package:silero_vad/silero_vad.dart';
 
@@ -10,6 +9,7 @@ import 'hold.dart';
 
 import 'diagnostics.dart';
 import 'gate.dart';
+import 'sink.dart';
 import 'uploader.dart';
 import 'voice.dart';
 
@@ -76,7 +76,7 @@ class AmbientCapture {
   Timer? _mediaTimer;
   Timer? _callTimer;
   bool _callOn = false;
-  static const MethodChannel _audio = MethodChannel('snippet/ambient_audio');
+  final AmbientSink _audio = AmbientSink();
   AmbientVoice? _voice;
   final ValueNotifier<AmbientVoice?> voiceListenable = ValueNotifier(null);
   double _probability = 0;
@@ -155,7 +155,7 @@ class AmbientCapture {
     _mediaTimer = Timer.periodic(const Duration(milliseconds: 500), (_) async {
       if (_voice?.speaking.value == true) return;
       try {
-        final on = await _audio.invokeMethod<bool>('mediaActive') == true;
+        final on = await _audio.mediaActive();
         if (on != _mediaOn) {
           _mediaOn = on;
           uploader.flag('media', on);
@@ -165,7 +165,7 @@ class AmbientCapture {
     _callTimer?.cancel();
     _callTimer = Timer.periodic(const Duration(seconds: 1), (_) async {
       try {
-        final on = await _audio.invokeMethod<bool>('inCall') == true;
+        final on = await _audio.inCall();
         if (on != _callOn) {
           _callOn = on;
           unawaited(AmbientDiagnostics.log(on ? 'call started: listening paused' : 'call ended: listening resumed'));
@@ -269,7 +269,7 @@ class AmbientCapture {
     await _sub?.cancel();
     await _recorder.stop();
     _segmenter?.close();
-    unawaited(_audio.invokeMethod('leave').catchError((_) {}));
+    unawaited(_audio.leave().catchError((_) {}));
     _vad?.close();
     _vad = null;
     _status.add(current);

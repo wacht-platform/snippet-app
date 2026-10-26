@@ -20,7 +20,7 @@ class _FakeDaemon extends DaemonClient {
 
   @override
   Future<List<TaskItem>> tasks(
-          {String? status, String? agentId, int limit = 200}) async =>
+          {String? status, String? agentId, int? limit}) async =>
       _tasks.map(TaskItem.fromJson).toList();
 
   @override

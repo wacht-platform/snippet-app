@@ -4,11 +4,11 @@ import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 import 'diagnostics.dart';
+import 'sink.dart';
 import 'stream.dart';
 
 class AmbientStateEvent {
@@ -34,7 +34,7 @@ class AmbientVoice {
   final String device;
   final ValueNotifier<bool> speaking = ValueNotifier(false);
   final ValueNotifier<AmbientStateEvent?> state = ValueNotifier(null);
-  static const MethodChannel _sink = MethodChannel('snippet/ambient_audio');
+  final AmbientSink _sink = AmbientSink();
 
   final Map<int, Map<int, Map<String, dynamic>>> _chunks = {};
   final Set<int> _ended = {};
@@ -113,7 +113,7 @@ class AmbientVoice {
           unawaited(stopStream(turn));
         case 'ambient_speech_start':
           if (turn != null && !_dead(turn)) {
-            unawaited(_sink.invokeMethod('warm').catchError((_) {}));
+            unawaited(_sink.warm().catchError((_) {}));
             _chunks.putIfAbsent(turn, () => {});
             _prefetch(turn, 0);
             _play();
@@ -233,7 +233,7 @@ class AmbientVoice {
             continue;
           }
           if (seq > (_cancelAfter[turn] ?? 1 << 30)) continue;
-          await _sink.invokeMethod('enqueue', {'turn': turn, 'seq': seq, 'pcm': pcm, 'silenceMs': tail.isEmpty ? 80 : (RegExp(r'[.!?]["\x27)]*$').hasMatch(tail) ? 80 : RegExp(r'[,;:\u2014]$').hasMatch(tail) ? 40 : 0)});
+          await _sink.enqueue(turn, seq, pcm, tail.isEmpty ? 80 : (RegExp(r'[.!?]["\x27)]*$').hasMatch(tail) ? 80 : RegExp(r'[,;:\u2014]$').hasMatch(tail) ? 40 : 0));
           queuedMax = seq;
           enqueuedMax = seq;
           queuedMs[seq] = _duration(pcm);
@@ -296,7 +296,7 @@ class AmbientVoice {
 
   Future<Map<String, dynamic>> _position() async {
     try {
-      return await _sink.invokeMapMethod<String, dynamic>('position') ?? const {};
+      return await _sink.position();
     } catch (e) {
       AmbientDiagnostics.log('voice: position failed $e');
       return const {};
@@ -370,7 +370,7 @@ class AmbientVoice {
       if ((pos['turn'] as int? ?? -1) == turn && (pos['seq'] as int? ?? -1) > after) {
         await _postBarge(turn, pos['seq'] as int, pos['played_ms'] as int? ?? 0);
       }
-      await _sink.invokeMethod('cancelAfter', {'turn': turn, 'seq': after, 'fadeMs': 50});
+      await _sink.cancelAfter(turn, after, fadeMs: 50);
     } catch (e) {
       AmbientDiagnostics.log('voice: cancel failed $e');
     }
@@ -390,7 +390,7 @@ class AmbientVoice {
       case 'tts_start':
         if (turn <= 0 || _streamDead.contains(turn)) return;
         _adoptStream(turn);
-        unawaited(_sink.invokeMethod('warm').catchError((_) {}));
+        unawaited(_sink.warm().catchError((_) {}));
         _streamChanged();
       case 'tts_end':
         if (turn <= 0 || _streamDead.contains(turn)) return;
@@ -427,7 +427,7 @@ class AmbientVoice {
     if (data.isEmpty) return;
     st.bytes += data.length;
     st.lastFrame = DateTime.now();
-    unawaited(_sink.invokeMethod('enqueueFrame', {'turn': turn, 'pcm': data}).catchError((Object e) {
+    unawaited(_sink.enqueueFrame(turn, data).catchError((Object e) {
       AmbientDiagnostics.log('voice: stream frame failed $e');
     }));
   }
@@ -439,7 +439,7 @@ class AmbientVoice {
       final data = _streamBatch.remove(turn)!.takeBytes();
       _streamBatchBytes.remove(turn);
       if (data.isEmpty) continue;
-      unawaited(_sink.invokeMethod('enqueueFrame', {'turn': turn, 'pcm': data}).catchError((Object e) {
+      unawaited(_sink.enqueueFrame(turn, data).catchError((Object e) {
         AmbientDiagnostics.log('voice: stream frame failed $e');
       }));
     }
@@ -467,7 +467,7 @@ class AmbientVoice {
     try {
       Map<String, dynamic> pos = const {};
       try {
-        pos = await _sink.invokeMapMethod<String, dynamic>('streamPosition') ?? const {};
+        pos = await _sink.streamPosition();
       } catch (e) {
         AmbientDiagnostics.log('voice: stream position failed $e');
       }
@@ -521,7 +521,7 @@ class AmbientVoice {
     _streamChanged();
     Map<String, dynamic> pos = const {};
     try {
-      pos = await _sink.invokeMapMethod<String, dynamic>('stopStream', {'turn': turn, 'fadeMs': 25}) ?? const {};
+      pos = await _sink.stopStream(turn, fadeMs: 25);
     } catch (e) {
       AmbientDiagnostics.log('voice: stream stop failed $e');
     }
@@ -533,7 +533,7 @@ class AmbientVoice {
 
   Future<void> duck(bool on) async {
     try {
-      await _sink.invokeMethod('volume', {'volume': on ? 0.25 : 1.0});
+      await _sink.volume(on ? 0.25 : 1.0);
     } catch (_) {}
   }
 
@@ -546,7 +546,7 @@ class AmbientVoice {
     _barged.addAll(turns);
     Map<String, dynamic>? pos;
     try {
-      pos = await _sink.invokeMapMethod<String, dynamic>('stop');
+      pos = await _sink.stop();
     } catch (e) {
       AmbientDiagnostics.log('voice: interrupt stop failed $e');
     }
@@ -567,7 +567,7 @@ class AmbientVoice {
     if (turn != null) _barged.add(turn);
     Map<String, dynamic>? pos;
     try {
-      pos = await _sink.invokeMapMethod<String, dynamic>('stop');
+      pos = await _sink.stop();
     } catch (e) {
       AmbientDiagnostics.log('voice: stop failed $e');
     }
@@ -595,7 +595,7 @@ class AmbientVoice {
     _client.close();
     await _sub?.cancel();
     await _channel?.sink.close();
-    await _sink.invokeMethod('stop').catchError((_) {});
+    await _sink.stop().catchError((_) => const <String, dynamic>{});
     speaking.dispose();
     state.dispose();
   }
