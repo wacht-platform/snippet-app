@@ -173,9 +173,10 @@ class DesktopRecorderStrip extends StatelessWidget {
             customBorder: const CircleBorder(),
             onTap: onTap,
             child: SizedBox.square(
-              dimension: 40,
+              dimension: kMobile ? 40 : 32,
               child: Center(
-                  child: AppIcon(icon, size: 17, color: color ?? AppColors.fg2)),
+                  child: AppIcon(icon,
+                      size: kMobile ? 17 : 15, color: color ?? AppColors.fg2)),
             ),
           ),
         ),

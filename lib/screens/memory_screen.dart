@@ -459,8 +459,11 @@ class _ScopeViewState extends State<_ScopeView> {
                 onPressed: _backFile,
                 style: TextButton.styleFrom(
                   foregroundColor: AppColors.fg3,
-                  minimumSize: const Size(0, 30),
-                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  minimumSize: kMobile ? const Size(0, 30) : const Size(0, 28),
+                  padding: EdgeInsets.symmetric(horizontal: kMobile ? 6 : 8),
+                  tapTargetSize: kMobile
+                      ? null
+                      : MaterialTapTargetSize.shrinkWrap,
                 ),
                 icon: AppIcon('chevron-left', size: 14, color: AppColors.fg3),
                 label: Text(_trail[_trail.length - 2],

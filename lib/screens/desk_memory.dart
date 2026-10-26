@@ -502,7 +502,12 @@ class _DeskMemoryViewState extends State<DeskMemoryView> {
                 alignment: Alignment.centerLeft,
                 child: TextButton.icon(
                   onPressed: () => setState(() => _selected = null),
-                  style: TextButton.styleFrom(foregroundColor: AppColors.fg3),
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppColors.fg3,
+                    minimumSize: const Size(0, 28),
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
                   icon: AppIcon('chevron-left', size: 14, color: AppColors.fg3),
                   label: Text('Memory', style: sans(12.5, color: AppColors.fg3)),
                 ),

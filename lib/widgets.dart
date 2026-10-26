@@ -798,6 +798,17 @@ class IconBtn extends StatelessWidget {
     // desktop the pointer is precise, so `size` is taken at its word.
     final box =
         kMobile && onTap != null && size < M.minTarget ? M.minTarget : size;
+    if (!kMobile) {
+      final btn = _DesktopIconBtn(
+        name: name,
+        onTap: onTap,
+        box: box,
+        ink: box < iconSize + 10 ? box : (iconSize + 10).clamp(24.0, 30.0),
+        iconSize: iconSize,
+        active: active,
+      );
+      return tooltip != null ? Tooltip(message: tooltip!, child: btn) : btn;
+    }
     final btn = Pressable(
       enabled: onTap != null,
       child: Material(
@@ -821,6 +832,84 @@ class IconBtn extends StatelessWidget {
       ),
     );
     return tooltip != null ? Tooltip(message: tooltip!, child: btn) : btn;
+  }
+}
+
+class _DesktopIconBtn extends StatefulWidget {
+  const _DesktopIconBtn({
+    required this.name,
+    required this.onTap,
+    required this.box,
+    required this.ink,
+    required this.iconSize,
+    required this.active,
+  });
+  final String name;
+  final VoidCallback? onTap;
+  final double box;
+  final double ink;
+  final double iconSize;
+  final bool active;
+
+  @override
+  State<_DesktopIconBtn> createState() => _DesktopIconBtnState();
+}
+
+class _DesktopIconBtnState extends State<_DesktopIconBtn> {
+  bool _hover = false;
+  bool _focus = false;
+  bool _down = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = widget.onTap != null;
+    final fill = _down
+        ? AppColors.surface3
+        : widget.active || ((_hover || _focus) && enabled)
+            ? AppColors.surface2
+            : Colors.transparent;
+    final lit = widget.active || (_hover && enabled);
+    return FocusableActionDetector(
+      enabled: enabled,
+      mouseCursor: enabled ? SystemMouseCursors.click : MouseCursor.defer,
+      actions: {
+        ActivateIntent: CallbackAction<ActivateIntent>(
+            onInvoke: (_) => widget.onTap?.call()),
+      },
+      onShowHoverHighlight: (v) => setState(() => _hover = v),
+      onShowFocusHighlight: (v) => setState(() => _focus = v),
+      child: Semantics(
+        button: true,
+        enabled: enabled,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: widget.onTap,
+          onTapDown: enabled ? (_) => setState(() => _down = true) : null,
+          onTapUp: enabled ? (_) => setState(() => _down = false) : null,
+          onTapCancel: enabled ? () => setState(() => _down = false) : null,
+          child: SizedBox(
+            width: widget.box,
+            height: widget.box,
+            child: Center(
+              child: AnimatedContainer(
+                duration: Motion.quick,
+                width: widget.ink,
+                height: widget.ink,
+                decoration: BoxDecoration(
+                  color: fill,
+                  borderRadius: BorderRadius.circular(R.sm),
+                ),
+                child: Center(
+                  child: AppIcon(widget.name,
+                      size: widget.iconSize,
+                      color: lit ? AppColors.fg1 : AppColors.fg2),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 
