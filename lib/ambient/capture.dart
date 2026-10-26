@@ -74,6 +74,8 @@ class AmbientCapture {
   bool _mediaOn = false;
   bool _playOn = false;
   Timer? _mediaTimer;
+  Timer? _callTimer;
+  bool _callOn = false;
   static const MethodChannel _audio = MethodChannel('snippet/ambient_audio');
   AmbientVoice? _voice;
   final ValueNotifier<AmbientVoice?> voiceListenable = ValueNotifier(null);
@@ -160,6 +162,16 @@ class AmbientCapture {
         }
       } catch (_) {}
     });
+    _callTimer?.cancel();
+    _callTimer = Timer.periodic(const Duration(seconds: 1), (_) async {
+      try {
+        final on = await _audio.invokeMethod<bool>('inCall') == true;
+        if (on != _callOn) {
+          _callOn = on;
+          unawaited(AmbientDiagnostics.log(on ? 'call started: listening paused' : 'call ended: listening resumed'));
+        }
+      } catch (_) {}
+    });
     unawaited(_voice!.start());
     _status.add(current);
   }
@@ -174,7 +186,7 @@ class AmbientCapture {
     final vad = _vad;
     final segmenter = _segmenter;
     if (vad == null || segmenter == null) return;
-    if (AmbientHold.active) {
+    if (AmbientHold.active || _callOn) {
       _heldBytes += bytes.length;
       segmenter.abandon();
       _pending.takeBytes();
@@ -251,6 +263,8 @@ class AmbientCapture {
     _running = false;
     _ticker?.cancel();
     _mediaTimer?.cancel();
+    _callTimer?.cancel();
+    _callOn = false;
     _statTimer?.cancel();
     await _sub?.cancel();
     await _recorder.stop();

@@ -5,6 +5,7 @@ import android.media.AudioAttributes
 import android.media.AudioDeviceInfo
 import android.media.AudioFormat
 import android.media.AudioManager
+import android.media.MediaRecorder
 import android.media.AudioTrack
 import android.os.Build
 import android.os.Handler
@@ -68,6 +69,7 @@ class AmbientAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
                     result.success(null)
                 }
                 "mediaActive" -> result.success(audioManager()?.isMusicActive ?: false)
+                "inCall" -> result.success(inCall())
                 "position" -> result.success(position())
                 "volume" -> {
                     currentVolume = call.argument<Double>("volume")?.toFloat() ?: 1f
@@ -112,8 +114,26 @@ class AmbientAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
     private fun hasWired(am: AudioManager): Boolean =
         am.getDevices(AudioManager.GET_DEVICES_OUTPUTS).any { it.type in commTypes }
 
+    private fun inCall(): Boolean {
+        val am = audioManager() ?: return false
+        return try {
+            val mode = am.mode
+            val phone = mode == AudioManager.MODE_IN_CALL ||
+                (Build.VERSION.SDK_INT >= 30 && mode == AudioManager.MODE_CALL_SCREENING) ||
+                (Build.VERSION.SDK_INT >= 33 && (mode == AudioManager.MODE_CALL_REDIRECT || mode == AudioManager.MODE_COMMUNICATION_REDIRECT))
+            val voip = mode == AudioManager.MODE_IN_COMMUNICATION && !commActive
+            val callers = am.activeRecordingConfigurations.count {
+                it.clientAudioSource == MediaRecorder.AudioSource.VOICE_COMMUNICATION
+            }
+            phone || voip || callers >= 2
+        } catch (_: Exception) {
+            false
+        }
+    }
+
     private fun enterComm(): Boolean {
         val am = audioManager() ?: return false
+        if (inCall()) return false
         try {
             if (Build.VERSION.SDK_INT >= 31) {
                 val devices = am.availableCommunicationDevices
