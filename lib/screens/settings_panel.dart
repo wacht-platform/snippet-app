@@ -190,8 +190,6 @@ class SettingsPanel extends StatefulWidget {
   /// presented as its own dialog/drawer.
   final bool embedded;
 
-  final bool fullPage;
-
   /// Phone drill-down. Null shows the section list; a value shows that section.
   ///
   /// Owned by the SHELL, not by this widget: the back handler and the bar's
@@ -214,7 +212,6 @@ class SettingsPanel extends StatefulWidget {
     this.onAdd,
     required this.onClose,
     this.embedded = false,
-    this.fullPage = false,
     this.section,
     this.onSection,
     this.createOnOpen,
@@ -229,7 +226,8 @@ class SettingsPanel extends StatefulWidget {
 class SettingsPanelState extends State<SettingsPanel> {
   late final List<Instance> _instances = [...widget.instances];
 
-  Future<void> _saveInstances(void Function(List<Instance> items) change) async {
+  Future<void> _saveInstances(
+      void Function(List<Instance> items) change) async {
     final items = await InstanceStore().load();
     change(items);
     await InstanceStore().save(items);
@@ -252,6 +250,7 @@ class SettingsPanelState extends State<SettingsPanel> {
         ..addAll(items);
     }
   }
+
   bool _notif = false;
   bool _notifBusy = false;
   final GlobalKey<VaultScreenState> _vaultKey = GlobalKey<VaultScreenState>();
@@ -396,255 +395,165 @@ class SettingsPanelState extends State<SettingsPanel> {
         // app the moment you tapped into it.
         color: AppColors.bg,
         child: CardGroupScope(
-         child: SafeArea(
-          bottom: false,
-          child: AnimatedSwitcher(
-            duration: Motion.base,
-            reverseDuration: Motion.fast,
-            switchInCurve: Motion.enter,
-            switchOutCurve: Motion.exit,
-            // `StackFit.expand`, not the default centered `Stack`: these are
-            // full-body screens, and loose constraints would let each one
-            // shrink-wrap into the middle of the transition.
-            layoutBuilder: (current, previous) => Stack(
-              fit: StackFit.expand,
-              children: [...previous, if (current != null) current],
-            ),
-            transitionBuilder: (child, anim) {
-              final dx = _sectionForward ? 0.06 : -0.06;
-              return FadeTransition(
-                opacity: anim,
-                child: SlideTransition(
-                  position:
-                      Tween<Offset>(begin: Offset(dx, 0), end: Offset.zero)
-                          .animate(anim),
-                  child: child,
-                ),
-              );
-            },
-            // Keyed so entering a section and leaving it are two different
-            // children — the switcher only animates a genuine change of screen.
-            child: KeyedSubtree(
-              key: ValueKey(_mobileSection?.name ?? 'home'),
-              child: _mobileSection == null
-                  ? _mobileSettingsHome()
-                  : _mobileSectionPage(),
+          child: SafeArea(
+            bottom: false,
+            child: AnimatedSwitcher(
+              duration: Motion.base,
+              reverseDuration: Motion.fast,
+              switchInCurve: Motion.enter,
+              switchOutCurve: Motion.exit,
+              // `StackFit.expand`, not the default centered `Stack`: these are
+              // full-body screens, and loose constraints would let each one
+              // shrink-wrap into the middle of the transition.
+              layoutBuilder: (current, previous) => Stack(
+                fit: StackFit.expand,
+                children: [...previous, if (current != null) current],
+              ),
+              transitionBuilder: (child, anim) {
+                final dx = _sectionForward ? 0.06 : -0.06;
+                return FadeTransition(
+                  opacity: anim,
+                  child: SlideTransition(
+                    position:
+                        Tween<Offset>(begin: Offset(dx, 0), end: Offset.zero)
+                            .animate(anim),
+                    child: child,
+                  ),
+                );
+              },
+              // Keyed so entering a section and leaving it are two different
+              // children — the switcher only animates a genuine change of screen.
+              child: KeyedSubtree(
+                key: ValueKey(_mobileSection?.name ?? 'home'),
+                child: _mobileSection == null
+                    ? _mobileSettingsHome()
+                    : _mobileSectionPage(),
+              ),
             ),
           ),
-         ),
         ),
       );
     }
-    final full = widget.fullPage;
-    final scaffold = Scaffold(
-      backgroundColor: AppColors.bg,
-      body: SafeArea(
-        bottom: false,
-        child: LayoutBuilder(builder: (context, c) {
-          if (c.maxWidth >= 560) {
-            return Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // Left Column (Sidebar Rail)
-                Container(
-                  width: full ? 220 : 210,
-                  decoration: BoxDecoration(
-                    color: AppColors.sidebarPanel,
-                    border: full
-                        ? Border(right: BorderSide(color: AppColors.line))
-                        : null,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      if (full) ...[
-                        SizedBox(height: kMacOS ? kTitleBarHeight + 4 : 12),
-                        _backToApp(),
-                        const SizedBox(height: 4),
-                      ] else
-                      Container(
-                        height: 52,
-                        padding: const EdgeInsets.symmetric(horizontal: 18),
-                        alignment: Alignment.centerLeft,
-                        child: Text('Settings',
-                            style: sans(15, color: AppColors.fg1)),
-                      ),
-                      // Nav Items
-                      Expanded(
-                        child: ListView(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 2),
-                          children: [
-                            for (final (page, icon, label) in _nav) ...[
-                              if (_navGroups[page] != null)
-                                Padding(
-                                  padding: const EdgeInsets.fromLTRB(
-                                      10, 14, 10, 4),
-                                  child: Text(_navGroups[page]!.toUpperCase(),
-                                      style: sans(11,
-                                          spacing: 0.9,
-                                          color: AppColors.fg4)),
-                                ),
-                              _settingsNavRow(page, icon, label),
-                            ],
-                          ],
-                        ),
-                      ),
-                      // Machine Status in Sidebar Footer
-                      Container(
-                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-                        child: Row(children: [
-                          Container(
-                            width: 7,
-                            height: 7,
-                            decoration: BoxDecoration(
-                              color: AppColors.ok,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              widget.active?.label.isNotEmpty == true
-                                  ? widget.active!.label
-                                  : 'Connected',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TS.caption(),
-                            ),
-                          ),
-                        ]),
-                      ),
-                    ],
-                  ),
-                ),
-                // Right Column (Content Pane)
-                Expanded(
-                  child: Container(
-                    color: AppColors.bg,
-                    padding: full
-                        ? EdgeInsets.only(top: kMacOS ? kTitleBarHeight : 16)
-                        : EdgeInsets.zero,
-                    child: full
-                        ? _desktopContent()
-                        : LayoutBuilder(
-                      builder: (context, paneConstraints) {
-                        final extra = full
-                            ? ((paneConstraints.maxWidth - 768) / 2)
-                                .clamp(0.0, double.infinity)
-                            : 0.0;
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            if (!_isNested)
-                              Padding(
-                                padding: EdgeInsets.fromLTRB(
-                                    24 + extra,
-                                    full ? 14 : 12,
-                                    (full ? 24 : 10) + extra,
-                                    2),
-                                child: Row(
-                                  crossAxisAlignment: CrossAxisAlignment.center,
-                                  children: [
-                                    Expanded(
-                                      child: SwapText(
-                                        _pageTitle(_page),
-                                        style: full
-                                            ? sans(17,
-                                                weight: FontWeight.w500,
-                                                spacing: -0.2,
-                                                color: AppColors.fg1)
-                                            : sans(15, color: AppColors.fg1),
-                                      ),
-                                    ),
-                                    if (_pageAction(_page) != null)
-                                      _pageAction(_page)!,
-                                    if (!full) ...[
-                                      const SizedBox(width: 6),
-                                      IconBtn('x',
-                                          size: 28,
-                                          iconSize: 14,
-                                          tooltip: 'Close',
-                                          onTap: widget.onClose),
-                                    ],
-                                  ],
-                                ),
-                              ),
-                            Expanded(
-                              child: Swap(
-                                stateKey: _page,
-                                fill: true,
-                                child: _pageBody(),
-                              ),
-                            ),
-                          ],
-                        );
-                      },
-                    ),
-                  ),
-                ),
-              ],
-            );
-          }
-          // Narrow viewport fallback:
-          return Column(children: [
-            Container(
-              height: 46,
-              padding: const EdgeInsets.symmetric(horizontal: 14),
-              decoration: BoxDecoration(
-                color: AppColors.surface1,
-                border: Border(bottom: BorderSide(color: AppColors.border)),
-              ),
-              child: Row(children: [
-                AppIcon('settings', size: 15, color: AppColors.accent),
-                const SizedBox(width: 8),
-                Text('Settings', style: TS.label(AppColors.fg1)),
-                const Spacer(),
-                IconBtn('x',
-                    size: 26,
-                    iconSize: 13,
-                    tooltip: 'Close',
-                    onTap: widget.onClose),
-              ]),
-            ),
-            SizedBox(height: 44, child: _navChips()),
-            Divider(height: 1, color: AppColors.border),
-            Expanded(child: _pageBody()),
-          ]);
-        }),
-      ),
-    );
-    if (!full) return scaffold;
     return CallbackShortcuts(
       bindings: {
         const SingleActivator(LogicalKeyboardKey.escape): widget.onClose,
       },
-      child: Focus(autofocus: true, child: scaffold),
+      child: Focus(
+        autofocus: true,
+        child: Material(
+          color: AppColors.bg,
+          child: LayoutBuilder(builder: (context, c) {
+            if (c.maxWidth >= 560) {
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Container(
+                    width: 210,
+                    decoration: BoxDecoration(
+                      color: AppColors.surface1,
+                      border: Border(right: BorderSide(color: AppColors.line)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Container(
+                          height: 56,
+                          padding: const EdgeInsets.symmetric(horizontal: 18),
+                          alignment: Alignment.centerLeft,
+                          child: Text('Settings',
+                              style: sans(15,
+                                  weight: W.strong, color: AppColors.fg1)),
+                        ),
+                        Expanded(
+                          child: ListView(
+                            padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+                            children: [
+                              for (final (page, icon, label) in _nav) ...[
+                                if (_navGroups[page] != null)
+                                  Padding(
+                                    padding: const EdgeInsets.fromLTRB(
+                                        10, 14, 10, 4),
+                                    child: Text(_navGroups[page]!,
+                                        style: sans(11.5,
+                                            weight: W.label,
+                                            color: AppColors.fg4)),
+                                  ),
+                                _settingsNavRow(page, icon, label),
+                              ],
+                            ],
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(18, 10, 16, 16),
+                          child: Row(children: [
+                            Container(
+                              width: 7,
+                              height: 7,
+                              decoration: BoxDecoration(
+                                color: AppColors.ok,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                widget.active?.label.isNotEmpty == true
+                                    ? widget.active!.label
+                                    : 'Connected',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TS.caption(),
+                              ),
+                            ),
+                          ]),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: Stack(children: [
+                      Positioned.fill(child: _desktopContent()),
+                      Positioned(
+                        top: 12,
+                        right: 12,
+                        child: IconBtn('x',
+                            size: 30,
+                            iconSize: 14,
+                            tooltip: 'Close',
+                            onTap: widget.onClose),
+                      ),
+                    ]),
+                  ),
+                ],
+              );
+            }
+            return Column(children: [
+              Container(
+                height: 46,
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                decoration: BoxDecoration(
+                  color: AppColors.surface1,
+                  border: Border(bottom: BorderSide(color: AppColors.border)),
+                ),
+                child: Row(children: [
+                  Text('Settings', style: TS.label(AppColors.fg1)),
+                  const Spacer(),
+                  IconBtn('x',
+                      size: 26,
+                      iconSize: 13,
+                      tooltip: 'Close',
+                      onTap: widget.onClose),
+                ]),
+              ),
+              SizedBox(height: 44, child: _navChips()),
+              Divider(height: 1, color: AppColors.border),
+              Expanded(child: _desktopContent()),
+            ]);
+          }),
+        ),
+      ),
     );
   }
-
-  Widget _backToApp() => Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8),
-        child: Material(
-          color: Colors.transparent,
-          borderRadius: BorderRadius.circular(9),
-          child: InkWell(
-            borderRadius: BorderRadius.circular(9),
-            onTap: widget.onClose,
-            child: Container(
-              height: 34,
-              padding: const EdgeInsets.symmetric(horizontal: 10),
-              child: Row(children: [
-                AppIcon('chevron-left', size: 15, color: AppColors.fg3),
-                const SizedBox(width: 8),
-                Expanded(
-                    child: Text('Back to app',
-                        style: sans(13.5, color: AppColors.fg2))),
-              ]),
-            ),
-          ),
-        ),
-      );
 
   /// Phone settings HOME.
   Widget _mobileSettingsHome() {
@@ -673,7 +582,8 @@ class SettingsPanelState extends State<SettingsPanel> {
     Widget label(String text) => Padding(
           padding: const EdgeInsets.fromLTRB(16, 24, 16, 7),
           child: Text(text.toUpperCase(),
-              style: sans(12, weight: W.label, spacing: 0.7, color: AppColors.fg4)),
+              style: sans(12,
+                  weight: W.label, spacing: 0.7, color: AppColors.fg4)),
         );
     final name = active?.label.trim() ?? '';
     return ListView(
@@ -728,17 +638,22 @@ class SettingsPanelState extends State<SettingsPanel> {
         ListGroup(children: [
           nav(SettingsPage.models, 'Profiles', 'Models and keys', 'sparkles'),
           nav(SettingsPage.routing, 'Routing', 'Fallback models', 'route'),
-          nav(SettingsPage.accounts, 'Accounts', 'Extra subscriptions', 'users'),
+          nav(SettingsPage.accounts, 'Accounts', 'Extra subscriptions',
+              'users'),
           nav(SettingsPage.usage, 'Usage', 'Tokens and spend', 'gauge'),
         ]),
         label('Work'),
         ListGroup(children: [
-          nav(SettingsPage.memory, 'Memory', 'What agents remember', 'book-marked'),
+          nav(SettingsPage.memory, 'Memory', 'What agents remember',
+              'book-marked'),
           ApprovalsRow(client: widget.client),
           nav(SettingsPage.vault, 'Vault', 'Secrets for agents', 'lock'),
-          nav(SettingsPage.scheduled, 'Scheduled', 'Recurring jobs', 'calendar-clock'),
-          nav(SettingsPage.voice, 'Voice', 'Voice notes and transcription', 'mic'),
-          nav(SettingsPage.webSearch, 'Web search', 'Let agents search the web', 'globe'),
+          nav(SettingsPage.scheduled, 'Scheduled', 'Recurring jobs',
+              'calendar-clock'),
+          nav(SettingsPage.voice, 'Voice', 'Voice notes and transcription',
+              'mic'),
+          nav(SettingsPage.webSearch, 'Web search', 'Let agents search the web',
+              'globe'),
         ]),
         if (kCanNotify) ...[
           label('Phone'),
@@ -941,7 +856,7 @@ class SettingsPanelState extends State<SettingsPanel> {
             _renamingUrl = null;
           }),
           child: Container(
-            height: widget.fullPage ? 36 : 32,
+            height: 34,
             padding: const EdgeInsets.symmetric(horizontal: 10),
             child: Row(children: [
               AppIcon(icon,
@@ -1010,7 +925,8 @@ class SettingsPanelState extends State<SettingsPanel> {
           'Machines this app connects to, and how sessions behave.',
         SettingsPage.routing =>
           'Which model does each kind of work, and who steps in when it hits a limit.',
-        SettingsPage.usage => 'Rate limits and token usage across your providers.',
+        SettingsPage.usage =>
+          'Rate limits and token usage across your providers.',
         SettingsPage.voice => 'Voice notes, transcription and speech services.',
         SettingsPage.webSearch => 'Let agents search the web and read pages.',
         _ => '',
@@ -1107,8 +1023,8 @@ class SettingsPanelState extends State<SettingsPanel> {
 
   Widget _heading(String text) => Padding(
         padding: const EdgeInsets.only(bottom: S.s8),
-        child: Text(text,
-            style: sans(13, weight: W.label, color: AppColors.fg3)),
+        child:
+            Text(text, style: sans(13, weight: W.label, color: AppColors.fg3)),
       );
 
   Widget _machineRow(Instance i) {
@@ -1306,7 +1222,7 @@ class SettingsPanelState extends State<SettingsPanel> {
   }
 
   Widget _generalPage({bool includeNotifications = true}) {
-    if (widget.fullPage) return _nativeGeneral();
+    if (!kMobile) return _nativeGeneral();
     if (_addingMachine) return _addMachinePane();
     return PageBody(children: [
       if (includeNotifications)
@@ -1352,7 +1268,9 @@ class SettingsPanelState extends State<SettingsPanel> {
           const SizedBox(width: 6),
           Text('Connect a machine',
               style: sans(17,
-                  weight: FontWeight.w500, spacing: -0.2, color: AppColors.fg1)),
+                  weight: FontWeight.w500,
+                  spacing: -0.2,
+                  color: AppColors.fg1)),
         ]),
         const SizedBox(height: 22),
         SettingsGroup(

@@ -108,7 +108,8 @@ extension _DesktopShellPanesExt on _DesktopShellState {
       onTitle: (title) => _onSessionTitle(t.sessionId!, title),
       onMenu: kMobile ? _showMobileChats : null,
       mobileTopBar: kMobile && t.isMissionControl
-          ? (openActions) => _mobileTopBar(mission: true, onActions: openActions)
+          ? (openActions) =>
+              _mobileTopBar(mission: true, onActions: openActions)
           : null,
       onOpenFileTab: (path, name) =>
           _openFileTab(t.client, t.instanceUrl, path, name),
@@ -293,8 +294,7 @@ extension _DesktopShellPanesExt on _DesktopShellState {
         rightPanel: _sessionSidePanel(),
         hideRight: _activeTab != null &&
             (_activeTab!.isDraft || _activeTab!.isReadout || _activeTab!.isPrs),
-        panelHostsReadouts: _activeTab != null &&
-            _activeTab!.sessionId != null,
+        panelHostsReadouts: _activeTab != null && _activeTab!.sessionId != null,
         onPaneResize: (delta) => _setState(() {
           final max = MediaQuery.sizeOf(context).width * 0.72;
           _paneWidth = (_paneWidth - delta).clamp(kPaneMinWidth, max);
@@ -349,7 +349,8 @@ extension _DesktopShellPanesExt on _DesktopShellState {
         activeReadout: _activeKey[_Pane.right],
         readoutBody: (r) => _rightTabBody(r,
             _macSessionStatuses[tab.key]?.state, _macSessionControls[tab.key]),
-        onSelectReadout: (r) => _setState(() => _activeKey[_Pane.right] = r.key),
+        onSelectReadout: (r) =>
+            _setState(() => _activeKey[_Pane.right] = r.key),
         onCloseReadout: (r) => _closeRightTab(r.key),
         onClearReadout: () => _setState(() => _activeKey.remove(_Pane.right)),
         onExpandReadout: _openReadoutTab,
@@ -526,26 +527,56 @@ extension _DesktopShellPanesExt on _DesktopShellState {
     final c = _client;
     if (c == null) return;
     final inst = _active;
-    Navigator.of(context).push(PageRouteBuilder<void>(
-      transitionDuration: const Duration(milliseconds: 180),
-      reverseTransitionDuration: const Duration(milliseconds: 140),
-      pageBuilder: (ctx, a1, a2) => _SettingsPanel(
-        client: c,
-        instances: _instances,
-        active: inst,
-        onRemove: _removeInstance,
-        onRename: _renameInstance,
-        onSelect: _selectInstance,
-        onAdd: _onInstanceAdded,
-        onClose: () => Navigator.of(ctx).maybePop(),
-        initialPage: page,
-        fullPage: true,
-      ),
-      transitionsBuilder: (ctx, anim, a2, child) => FadeTransition(
-        opacity: CurvedAnimation(parent: anim, curve: Curves.easeOutCubic),
-        child: child,
-      ),
-    ));
+    showGeneralDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: 'Close settings',
+      barrierColor: Colors.black.withValues(alpha: 0.38),
+      transitionDuration: const Duration(milliseconds: 200),
+      pageBuilder: (ctx, a1, a2) {
+        final size = MediaQuery.sizeOf(ctx);
+        return Center(
+          child: SizedBox(
+            width: (size.width - 80).clamp(320.0, 1000.0),
+            height: (size.height - 80).clamp(360.0, 700.0),
+            child: Container(
+              clipBehavior: Clip.antiAlias,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(R.lg),
+                border: Border.all(color: AppColors.border2),
+              ),
+              child: _SettingsPanel(
+                client: c,
+                instances: _instances,
+                active: inst,
+                onRemove: _removeInstance,
+                onRename: _renameInstance,
+                onSelect: _selectInstance,
+                onAdd: _onInstanceAdded,
+                onClose: () => Navigator.of(ctx).maybePop(),
+                initialPage: page,
+              ),
+            ),
+          ),
+        );
+      },
+      transitionBuilder: (ctx, anim, a2, child) {
+        final t = CurvedAnimation(
+            parent: anim,
+            curve: Curves.easeOutCubic,
+            reverseCurve: Curves.easeInCubic);
+        return BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 6 * t.value, sigmaY: 6 * t.value),
+          child: FadeTransition(
+            opacity: t,
+            child: ScaleTransition(
+              scale: Tween(begin: 0.97, end: 1.0).animate(t),
+              child: child,
+            ),
+          ),
+        );
+      },
+    );
   }
 
   Widget _tabStrip(VoidCallback? onMenu) => CardTabStrip(
@@ -672,8 +703,7 @@ extension _DesktopShellPanesExt on _DesktopShellState {
             child: InkWell(
               borderRadius: BorderRadius.circular(R.sm),
               onTap: () => _setState(() {
-                _section =
-                    inTasks ? ShellSection.sessions : ShellSection.tasks;
+                _section = inTasks ? ShellSection.sessions : ShellSection.tasks;
               }),
               child: SizedBox(
                 width: 28,
@@ -715,38 +745,42 @@ extension _DesktopShellPanesExt on _DesktopShellState {
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
                 child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.only(top: 1),
-                      child: Container(
-                        width: 7,
-                        height: 7,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: healthy == true ? AppColors.ok : AppColors.fg4,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.only(top: 1),
+                        child: Container(
+                          width: 7,
+                          height: 7,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color:
+                                healthy == true ? AppColors.ok : AppColors.fg4,
+                          ),
                         ),
                       ),
-                    ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                        _active == null
-                            ? 'Add machine'
-                            : (_active!.label.isNotEmpty
-                                ? _active!.label
-                                : _active!.name),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: sans(13, color: AppColors.fg2)),
-                  ),
-                ]),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                            _active == null
+                                ? 'Add machine'
+                                : (_active!.label.isNotEmpty
+                                    ? _active!.label
+                                    : _active!.name),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: sans(13, color: AppColors.fg2)),
+                      ),
+                    ]),
               ),
             ),
           ),
         ),
         IconBtn('sliders',
-            size: 28, iconSize: 16, tooltip: 'Settings', onTap: _openShellSettings),
+            size: 28,
+            iconSize: 16,
+            tooltip: 'Settings',
+            onTap: _openShellSettings),
       ]),
     );
   }

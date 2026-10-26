@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -348,11 +349,10 @@ class _DesktopShellState extends State<DesktopShell>
   /// and even an empty pane stays open so the next rail tap lands somewhere.
   Future<Object?> _openShellPanel(ShellPanelRequest request) {
     final existing = _rightTabs.where((t) => t.key == request.key).firstOrNull;
-    final tab = existing ??
-        _RightTab.request(request, originTabKey: _activeTab?.key);
+    final tab =
+        existing ?? _RightTab.request(request, originTabKey: _activeTab?.key);
     tab.originTabKey = _activeTab?.key;
-    if (existing == null &&
-        request.purpose == ShellPanelPurpose.pullRequests) {
+    if (existing == null && request.purpose == ShellPanelPurpose.pullRequests) {
       tab.pane = _Pane.left;
     }
     setState(() {
@@ -445,20 +445,19 @@ class _DesktopShellState extends State<DesktopShell>
 
   List<Widget> _railTools() => [
         ...buildShellRailTools(
-        activeTab: _activeTab,
-        macSessionStatus:
-            _activeTab == null ? null : _macSessionStatuses[_activeTab!.key],
-        isRightPanelActive: _rightPanelActive,
-        onToggleRightPanel: _toggleRightPanel,
-        onSessionAction: _dispatchSessionAction,
-        onOpenGoalPopover: _openGoalPopover,
-      ),
+          activeTab: _activeTab,
+          macSessionStatus:
+              _activeTab == null ? null : _macSessionStatuses[_activeTab!.key],
+          isRightPanelActive: _rightPanelActive,
+          onToggleRightPanel: _toggleRightPanel,
+          onSessionAction: _dispatchSessionAction,
+          onOpenGoalPopover: _openGoalPopover,
+        ),
         if (_activeTab?.sessionId != null)
           Tooltip(
             message: _sidePanelHidden ? 'Show panel' : 'Hide panel',
             child: Material(
-              color:
-                  _sidePanelHidden ? Colors.transparent : AppColors.surface2,
+              color: _sidePanelHidden ? Colors.transparent : AppColors.surface2,
               borderRadius: BorderRadius.circular(8),
               child: InkWell(
                 borderRadius: BorderRadius.circular(8),
@@ -469,9 +468,8 @@ class _DesktopShellState extends State<DesktopShell>
                   child: Center(
                     child: AppIcon('panel-right',
                         size: 16,
-                        color: _sidePanelHidden
-                            ? AppColors.fg3
-                            : AppColors.fg1),
+                        color:
+                            _sidePanelHidden ? AppColors.fg3 : AppColors.fg1),
                   ),
                 ),
               ),
@@ -867,9 +865,8 @@ class _DesktopShellState extends State<DesktopShell>
     final mc = tab?.isMissionControl ?? false;
     final state = tab == null ? null : _macSessionStatuses[tab.key]?.state;
     final workspace = state?.workspace ?? '';
-    final running = tab == null
-        ? false
-        : (_macSessionStatuses[tab.key]?.running ?? false);
+    final running =
+        tab == null ? false : (_macSessionStatuses[tab.key]?.running ?? false);
 
     PaletteItem cmd(String id, String icon, String title, VoidCallback run,
             {String shortcut = '',
@@ -934,14 +931,18 @@ class _DesktopShellState extends State<DesktopShell>
             keywords: const ['diff', 'git', 'modified', 'commit', 'stage']),
         act('memory', 'brain', 'Chat memory', keywords: const ['remember']),
         act('files', 'folder', 'Browse files',
-            shortcut: '⌘ ⇧ E',
-            keywords: const ['explorer', 'file', 'tree']),
+            shortcut: '⌘ ⇧ E', keywords: const ['explorer', 'file', 'tree']),
         act('shell_new', 'terminal', 'New session shell',
             keywords: const ['terminal']),
       ],
       if (inSession && mc) ...[
-        act('autonomy', 'activity', 'Automated wakes',
-            keywords: const ['mission control', 'settings', 'quiet hours', 'autonomous', 'wake']),
+        act('autonomy', 'activity', 'Automated wakes', keywords: const [
+          'mission control',
+          'settings',
+          'quiet hours',
+          'autonomous',
+          'wake'
+        ]),
         act('compact', 'wrap', 'Compact history'),
         act('memory', 'brain', 'Mission Control memory'),
       ],
@@ -951,25 +952,61 @@ class _DesktopShellState extends State<DesktopShell>
           _openMissionControlTab,
           keywords: const ['mc', 'orchestrator', 'tasks']),
       for (final (page, icon, title, keys) in const [
-        (SettingsPage.general, 'server', 'Settings: General & machines',
-            ['machines', 'connection', 'notifications', 'approvals']),
-        (SettingsPage.models, 'sparkles', 'Settings: Profiles',
-            ['inference', 'models', 'providers', 'keys']),
-        (SettingsPage.routing, 'route', 'Settings: Routing',
-            ['fallback', 'limits', 'priority']),
-        (SettingsPage.usage, 'analytics', 'Settings: Usage',
-            ['tokens', 'cost', 'billing', 'limits']),
+        (
+          SettingsPage.general,
+          'server',
+          'Settings: General & machines',
+          ['machines', 'connection', 'notifications', 'approvals']
+        ),
+        (
+          SettingsPage.models,
+          'sparkles',
+          'Settings: Profiles',
+          ['inference', 'models', 'providers', 'keys']
+        ),
+        (
+          SettingsPage.routing,
+          'route',
+          'Settings: Routing',
+          ['fallback', 'limits', 'priority']
+        ),
+        (
+          SettingsPage.usage,
+          'analytics',
+          'Settings: Usage',
+          ['tokens', 'cost', 'billing', 'limits']
+        ),
         (SettingsPage.memory, 'book', 'Settings: Memory', ['remember']),
-        (SettingsPage.scheduled, 'repeat', 'Settings: Scheduled jobs',
-            ['recurring', 'cron']),
-        (SettingsPage.vault, 'lock-key', 'Settings: Vault',
-            ['secrets', 'keys', 'credentials']),
-        (SettingsPage.voice, 'mic', 'Settings: Voice',
-            ['voice notes', 'transcription', 'speech model', 'microphone']),
-        (SettingsPage.webSearch, 'globe', 'Settings: Web search',
-            ['exa', 'search', 'internet', 'browse']),
-        (SettingsPage.accounts, 'users', 'Settings: Accounts',
-            ['subscription', 'rotation', 'chatgpt', 'xai', 'claude']),
+        (
+          SettingsPage.scheduled,
+          'repeat',
+          'Settings: Scheduled jobs',
+          ['recurring', 'cron']
+        ),
+        (
+          SettingsPage.vault,
+          'lock-key',
+          'Settings: Vault',
+          ['secrets', 'keys', 'credentials']
+        ),
+        (
+          SettingsPage.voice,
+          'mic',
+          'Settings: Voice',
+          ['voice notes', 'transcription', 'speech model', 'microphone']
+        ),
+        (
+          SettingsPage.webSearch,
+          'globe',
+          'Settings: Web search',
+          ['exa', 'search', 'internet', 'browse']
+        ),
+        (
+          SettingsPage.accounts,
+          'users',
+          'Settings: Accounts',
+          ['subscription', 'rotation', 'chatgpt', 'xai', 'claude']
+        ),
       ])
         cmd(page.name, icon, title, () => _openShellSettings(page),
             kind: PaletteKind.setting, keywords: keys),
@@ -1122,7 +1159,9 @@ class _DesktopShellState extends State<DesktopShell>
     }
     final name = '${m['name'] ?? ''}';
     final resolved = _instances.where((i) => i.url == url).firstOrNull ??
-        _instances.where((i) => name.isNotEmpty && i.label == name).firstOrNull ??
+        _instances
+            .where((i) => name.isNotEmpty && i.label == name)
+            .firstOrNull ??
         (_instances.length == 1 ? _instances.first : null);
     if (resolved == null) {
       toast(context, 'That machine is no longer saved.', danger: true);
@@ -1251,15 +1290,14 @@ class _DesktopShellState extends State<DesktopShell>
     final client = _client;
     final url = _active?.url;
     if (client == null || url == null) return;
-    final existing =
-        _tabs.indexWhere((t) => t.isDraft && t.instanceUrl == url);
+    final existing = _tabs.indexWhere((t) => t.isDraft && t.instanceUrl == url);
     setState(() {
       if (existing >= 0) {
         if (folder != null) _tabs[existing].draftFolder = folder;
         _activeIndex = existing;
       } else {
-        _tabs.add(_ShellTab.draft(
-            client: client, instanceUrl: url, folder: folder));
+        _tabs.add(
+            _ShellTab.draft(client: client, instanceUrl: url, folder: folder));
         _activeIndex = _tabs.length - 1;
       }
       final root = _tabs[_activeIndex];
