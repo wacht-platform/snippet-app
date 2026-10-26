@@ -3,7 +3,6 @@ import 'package:flutter/services.dart';
 
 import '../../models.dart';
 import '../../platform.dart';
-import '../../components.dart';
 import '../../theme.dart';
 import '../../widgets.dart';
 import '../shell_nav.dart' show kNavPadH, kNavRowHeight;
@@ -25,6 +24,7 @@ class TaskList extends StatelessWidget {
     this.filter = const {},
     this.padding,
     this.appearSince,
+    this.selectedId,
   });
 
   final List<TaskItem> tasks;
@@ -39,13 +39,35 @@ class TaskList extends StatelessWidget {
   /// When the list first showed these tasks; rows mounted long after it show
   /// at rest instead of animating in.
   final DateTime? appearSince;
+  final String? selectedId;
+
+  List<TaskItem> get _visible => tasks
+      .where((t) => filter.isEmpty || filter.contains(t.status))
+      .where((t) => taskMatches(t, query))
+      .toList();
+
+  List<Widget> rows() {
+    final visible = _visible;
+    final rows = [
+      for (final status in TaskStatus.values)
+        ..._group(status, visible.where((t) => t.status == status)),
+    ];
+    return [
+      for (var i = 0; i < rows.length; i++)
+        Appear(
+          key: rows[i].key,
+          index: i,
+          since: appearSince,
+          child: rows[i],
+        ),
+    ];
+  }
+
+  Widget emptyState() => _empty();
 
   @override
   Widget build(BuildContext context) {
-    final visible = tasks
-        .where((t) => filter.isEmpty || filter.contains(t.status))
-        .where((t) => taskMatches(t, query))
-        .toList();
+    final visible = _visible;
     final pad = padding ??
         (kMobile
             ? const EdgeInsets.fromLTRB(M.gutter, 4, M.gutter, 24)
@@ -61,21 +83,7 @@ class TaskList extends StatelessWidget {
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: pad,
-        children: () {
-          final rows = [
-            for (final status in TaskStatus.values)
-              ..._group(status, visible.where((t) => t.status == status)),
-          ];
-          return [
-            for (var i = 0; i < rows.length; i++)
-              Appear(
-                key: rows[i].key,
-                index: i,
-                since: appearSince,
-                child: rows[i],
-              ),
-          ];
-        }(),
+        children: rows(),
       ),
     );
   }
@@ -106,6 +114,7 @@ class TaskList extends StatelessWidget {
         TaskRow(
             key: ValueKey('t-${task.id}'),
             task: task,
+            selected: task.id == selectedId,
             onTap: () => onOpen(task)),
     ];
   }
@@ -191,8 +200,10 @@ class TaskRow extends StatelessWidget {
       {super.key,
       required this.task,
       required this.onTap,
+      this.selected = false,
       this.divider = false});
   final TaskItem task;
+  final bool selected;
   final VoidCallback onTap;
 
   /// A hairline under the row, between rows of one status on a phone.
@@ -285,7 +296,7 @@ class TaskRow extends StatelessWidget {
       final done = task.status == TaskStatus.done ||
           task.status == TaskStatus.cancelled;
       return Material(
-        color: Colors.transparent,
+        color: selected ? AppColors.accentBg : Colors.transparent,
         borderRadius: BorderRadius.circular(7),
         child: InkWell(
           onTap: onTap,

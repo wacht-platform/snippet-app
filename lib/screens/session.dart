@@ -1,3 +1,4 @@
+import 'package:snippet/ambient/hold.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -43,7 +44,6 @@ import '../composer_strip.dart';
 import '../media_views.dart';
 import 'agent_messaging.dart';
 import 'package:xterm/xterm.dart';
-import 'editor.dart';
 import 'files.dart';
 import 'processes.dart';
 import 'git.dart';
@@ -55,6 +55,7 @@ import 'file_changes.dart';
 import 'mobile_chrome.dart';
 import 'session_panels.dart';
 import 'session_coordination_cards.dart';
+import 'mission_control/widgets/ambient_stage.dart';
 import 'mission_control/widgets/autonomy_panel.dart';
 import 'mission_control/mission_control_state.dart'
     show
@@ -66,7 +67,11 @@ import 'mission_control/mission_control_state.dart'
         parseDirectMessage,
         parseCoordinationReply,
         parseParentMessage,
-        parseAssignmentEnvelope;
+        parseAssignmentEnvelope,
+        parseAmbientTurn,
+        supersededAmbientTurns,
+        isAmbientResume,
+        voiceClassifierNote;
 
 part 'session_socket.dart';
 part 'session_appbar.dart';
@@ -88,7 +93,7 @@ class SessionScreen extends StatefulWidget {
 
   /// When embedded in a narrow desktop shell, opens the collapsed sidebar drawer.
   final VoidCallback? onMenu;
-  final Widget? mobileTopBar;
+  final Widget Function(VoidCallback openActions)? mobileTopBar;
 
   /// When set, opening a file from the Files browser opens it as a shell tab
   /// instead of pushing an editor route.
@@ -312,7 +317,7 @@ class _SessionScreenState extends State<SessionScreen>
   final _scaffoldKey = GlobalKey<ScaffoldState>();
   final _composerCardKey = GlobalKey();
   final _modelChipKey = GlobalKey();
-  final AudioRecorder _recorder = AudioRecorder();
+  final AudioRecorder _recorder = HeldRecorder();
   final AudioPlayer _audioPlayer = AudioPlayer();
   StreamSubscription<Amplitude>? _amplitudeSub;
   StreamSubscription<PlayerState>? _playerStateSub;
@@ -573,7 +578,6 @@ class _SessionScreenState extends State<SessionScreen>
   int _attachmentGeneration = 0;
   bool get _anyUploading => _attachments.any((a) => a.uploading);
   final Map<String, bool> _toolRunOpen = {};
-  final Map<String, ValueNotifier<ToolBatch>> _toolBatches = {};
   final Set<String> _openToolRows = {};
   bool _transcriptDirty = true;
 
@@ -614,6 +618,8 @@ class _SessionScreenState extends State<SessionScreen>
 
   // Stream frame throttle: store the latest pending stream payload and flush
   // at most every 50ms to avoid rebuilding the full widget tree on every token.
+  String _streamText = '';
+  String _streamThinking = '';
   String _pendingLiveText = '';
   String _pendingLiveThinking = '';
   bool _pendingLiveTextVisible = false;
@@ -1229,7 +1235,7 @@ class _SessionScreenState extends State<SessionScreen>
                           if (widget.readOnly)
                             _readOnlyHeader(status)
                           else if (kMobile)
-                            widget.mobileTopBar ?? _mobileHeader(s),
+                            widget.mobileTopBar?.call(() => _openActionsDrawer(s)) ?? _mobileHeader(s),
                           if (widget.readOnly && widget.banner != null)
                             _centerWide(widget.banner!),
                           if (_connError != null) _disconnectedBanner(),
@@ -1479,6 +1485,12 @@ class _SessionScreenState extends State<SessionScreen>
                   : const SizedBox(key: ValueKey('mobile-chat')),
             ),
           ),
+          if (_isMissionControl && !kMobile)
+            Positioned(
+              top: 8,
+              right: 16,
+              child: AmbientHeaderOrb(client: widget.client),
+            ),
         ]),
       ),
     );

@@ -4,9 +4,11 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 
 import '../api.dart';
+import '../desktop_layout.dart';
 import '../models.dart';
 import '../panel.dart';
 import '../platform.dart';
+import '../settings_form.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'files.dart';
@@ -152,7 +154,10 @@ class RecurringScreenState extends State<RecurringScreen>
   }
 
   void _refresh() {
-    if (mounted) setState(() => _future = widget.client.recurringJobs());
+    if (!mounted) return;
+    setState(() {
+      _future = widget.client.recurringJobs();
+    });
   }
 
   void add() => _add();
@@ -643,10 +648,341 @@ class RecurringScreenState extends State<RecurringScreen>
     );
   }
 
+  String? _selId;
+
+  bool get _desk =>
+      !kMobile && widget.embedded && widget.onBack == null && !widget.pane;
+
+  void _selectJob(RecurringJob job) {
+    final wasAdding = _adding;
+    setState(() {
+      _adding = false;
+      _selId = job.id;
+      _titleCtrl.text = job.title;
+      _promptCtrl.text = job.prompt;
+      _planCtrl.text = job.planPath ?? '';
+      _dailyCtrl.text = '09:00';
+      _customEveryCtrl.clear();
+      _mode = 'keep';
+      _schedule = job.scheduleLabel;
+    });
+    if (wasAdding) widget.onAddingChanged?.call(false);
+  }
+
+  void _cancelAdd() {
+    setState(() => _adding = false);
+    widget.onAddingChanged?.call(false);
+  }
+
+  Future<void> _saveEdit(RecurringJob job) async {
+    if (_submitting) return;
+    final t = _titleCtrl.text.trim();
+    final p = _promptCtrl.text.trim();
+    final planPath = _planCtrl.text.trim();
+    final sched = switch (_mode) {
+      'keep' => job.scheduleLabel,
+      'daily' => 'daily ${_dailyCtrl.text.trim()}',
+      'onceAt' => 'at ${_dailyCtrl.text.trim()}',
+      'onceIn' => 'in ${_customEveryCtrl.text.trim()}',
+      'custom' => _customSchedule(_customEveryCtrl.text),
+      _ => _schedule,
+    };
+    if (t.isEmpty) {
+      toast(context, 'Title is required', danger: true);
+      return;
+    }
+    if (p.isEmpty && planPath.isEmpty) {
+      toast(context, 'Goal or plan file is required', danger: true);
+      return;
+    }
+    if (sched == null) {
+      toast(context, 'Interval must be at least 5 minutes (e.g. 5m, 2h)',
+          danger: true);
+      return;
+    }
+    setState(() => _submitting = true);
+    try {
+      await widget.client.updateRecurring(
+        job.id,
+        title: t,
+        prompt: p,
+        planPath: planPath,
+        schedule: _mode == 'keep' ? null : sched,
+      );
+      _refresh();
+      if (mounted) toast(context, 'Saved');
+    } catch (e) {
+      if (mounted) toast(context, "Couldn't save $t: $e", danger: true);
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  Widget _deskFields({RecurringJob? job}) {
+    final editing = job != null;
+    return SettingsGroup(
+      header: editing ? 'Edit job' : 'Job details',
+      footer: editing
+          ? 'Currently ${job.scheduleLabel}. Pick a schedule chip to change it.'
+          : 'The first run fires immediately, then repeats. Minimum interval is 5 minutes.',
+      children: [
+        SettingsRow(
+          label: 'Title',
+          trailing: SettingsField(
+              controller: _titleCtrl, hint: 'Nightly review', width: 280),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(S.s16, S.s12, S.s16, S.s12),
+          child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text('Schedule', style: sans(13, color: AppColors.fg1)),
+                const SizedBox(height: S.s8),
+                Wrap(spacing: 6, runSpacing: 6, children: [
+                  for (final s in const [
+                    'every 5m',
+                    'every 15m',
+                    'every 1h',
+                    'every 1d',
+                  ])
+                    _chip(s, _mode == 'preset' && _schedule == s, () {
+                      setState(() {
+                        _mode = 'preset';
+                        _schedule = s;
+                      });
+                    }),
+                  _chip('custom', _mode == 'custom',
+                      () => setState(() => _mode = 'custom')),
+                  _chip('daily', _mode == 'daily',
+                      () => setState(() => _mode = 'daily')),
+                  _chip('once at', _mode == 'onceAt',
+                      () => setState(() => _mode = 'onceAt')),
+                  _chip('once in', _mode == 'onceIn',
+                      () => setState(() => _mode = 'onceIn')),
+                ]),
+                if (_mode == 'custom') ...[
+                  const SizedBox(height: S.s8),
+                  AppField(
+                      label: 'Every (min 5m)',
+                      controller: _customEveryCtrl,
+                      mono: true,
+                      hint: '5m  ·  90m  ·  2h  ·  300s'),
+                ],
+                if (_mode == 'daily') ...[
+                  const SizedBox(height: S.s8),
+                  AppField(
+                      label: 'Time (HH:MM)',
+                      controller: _dailyCtrl,
+                      mono: true,
+                      hint: '09:00'),
+                ],
+                if (_mode == 'onceAt') ...[
+                  const SizedBox(height: S.s8),
+                  AppField(
+                      label: 'Time today/tomorrow (HH:MM)',
+                      controller: _dailyCtrl,
+                      mono: true,
+                      hint: '14:30'),
+                ],
+                if (_mode == 'onceIn') ...[
+                  const SizedBox(height: S.s8),
+                  AppField(
+                      label: 'From now (e.g. 30m, 2h)',
+                      controller: _customEveryCtrl,
+                      mono: true,
+                      hint: '30m'),
+                ],
+                const SizedBox(height: S.s12),
+                AppField(
+                    label: 'Goal',
+                    controller: _promptCtrl,
+                    hint: 'The piece of work to complete',
+                    minLines: 3,
+                    maxLines: 6),
+                const SizedBox(height: S.s12),
+                AppField(
+                  label: 'Plan file (optional)',
+                  controller: _planCtrl,
+                  mono: true,
+                  hint: 'notes/plan.md — pick or type a path',
+                  rightSlot: IconBtn('folder',
+                      size: 28,
+                      iconSize: 14,
+                      tooltip: 'Pick file',
+                      onTap: _pickPlanInline),
+                ),
+              ]),
+        ),
+      ],
+    );
+  }
+
+  Widget _deskDetail(RecurringJob job) {
+    final paused = !_enabled(job);
+    final error = job.lastError?.trim() ?? '';
+    final next = _nextIn(job);
+    return SettingsColumn(children: [
+      SettingsHeader(
+        back: SettingsBack('Scheduled',
+            onTap: () => setState(() => _selId = null)),
+        title: job.title.isEmpty ? job.id : job.title,
+        subtitle: '${job.scheduleLabel} · ${_targetLabel(job)}',
+        actions: [
+          Btn(paused ? 'Resume' : 'Pause',
+              variant: BtnVariant.surface,
+              small: true,
+              icon: paused ? 'play' : 'pause',
+              onTap: () => _toggle(job)),
+          Btn('Save',
+              small: true,
+              disabled: _submitting,
+              onTap: () => _saveEdit(job)),
+        ],
+      ),
+      const SizedBox(height: S.s8),
+      SettingsGroup(children: [
+        SettingsRow(
+          label: 'Status',
+          trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+            Tag(paused ? 'Paused' : 'Active',
+                tone: paused ? Tone.neutral : Tone.accent),
+            if (next.isNotEmpty && !paused) ...[
+              const SizedBox(width: S.s8),
+              Text(next, style: mono(12, color: AppColors.fg3)),
+            ],
+          ]),
+        ),
+        SettingsRow(
+          label: 'Last run',
+          trailing: Text(
+              job.lastRunAt == null ? 'Never' : relativeTime(job.lastRunAt!),
+              style: sans(13, color: AppColors.fg2)),
+        ),
+        if (error.isNotEmpty)
+          SettingsRow(
+            label: 'Last error',
+            sub: error,
+            danger: true,
+          ),
+      ]),
+      _deskFields(job: job),
+      SettingsGroup(children: [
+        SettingsRow(
+          label: 'Delete job',
+          danger: true,
+          onTap: () {
+            setState(() => _selId = null);
+            _remove(job);
+          },
+        ),
+      ]),
+    ]);
+  }
+
+  Widget _deskBody() {
+    return FutureBuilder<List<RecurringJob>>(
+      future: _future,
+      builder: (context, snap) {
+        if (snap.connectionState == ConnectionState.waiting && !snap.hasData) {
+          return const SettingsColumn(children: [
+            SettingsHeader(
+              title: 'Scheduled',
+              subtitle: 'Goals and messages that run on a schedule.',
+            ),
+            SizedBox(height: S.s8),
+            SettingsGroup(
+                children: [SettingsRow(label: 'Loading scheduled jobs…')]),
+          ]);
+        }
+        if (snap.hasError) {
+          return SettingsColumn(children: [
+            const SettingsHeader(
+              title: 'Scheduled',
+              subtitle: 'Goals and messages that run on a schedule.',
+            ),
+            const SizedBox(height: S.s8),
+            SettingsGroup(children: [
+              SettingsRow(
+                label: "Couldn't load scheduled jobs",
+                sub: '${snap.error}',
+                danger: true,
+                trailing: Btn('Retry',
+                    small: true,
+                    variant: BtnVariant.secondary,
+                    onTap: _refresh),
+              ),
+            ]),
+          ]);
+        }
+        final jobs = [
+          for (final j in snap.data ?? const <RecurringJob>[])
+            if (!_removing.contains(j.id)) j
+        ];
+        if (_adding) {
+          return SettingsColumn(children: [
+            SettingsHeader(
+              back: SettingsBack('Scheduled', onTap: _cancelAdd),
+              title: 'New scheduled job',
+              subtitle: 'Schedule a goal or message.',
+              actions: [
+                Btn('Save job',
+                    small: true, disabled: _submitting, onTap: _saveInline),
+              ],
+            ),
+            const SizedBox(height: S.s8),
+            _deskFields(),
+          ]);
+        }
+        final sel = jobs.where((j) => j.id == _selId).firstOrNull;
+        if (sel != null) return _deskDetail(sel);
+        return SettingsColumn(children: [
+          SettingsHeader(
+            title: 'Scheduled',
+            subtitle: 'Goals and messages that run on a schedule.',
+            actions: [
+              if (_canAdd)
+                Btn('New job', small: true, icon: 'plus', onTap: _add),
+            ],
+          ),
+          const SizedBox(height: S.s8),
+          if (jobs.isEmpty)
+            const SettingsGroup(children: [
+              SettingsRow(
+                label: 'No scheduled jobs',
+                sub:
+                    'Run a prompt on a schedule, like a morning triage or a nightly audit.',
+              ),
+            ])
+          else
+            SettingsGroup(children: [for (final j in jobs) _deskRow(j)]),
+        ]);
+      },
+    );
+  }
+
+  Widget _deskRow(RecurringJob job) {
+    final paused = !_enabled(job);
+    final next = _nextIn(job);
+    return SettingsRow(
+      label: job.title.isEmpty ? job.id : job.title,
+      sub: [
+        job.scheduleLabel,
+        _targetLabel(job),
+        if (!paused && next.isNotEmpty) next,
+      ].join(' · '),
+      trailing: paused
+          ? const Tag('Paused')
+          : const Tag('Active', tone: Tone.accent),
+      chevron: true,
+      onTap: () => _selectJob(job),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     super.build(context);
     Theme.of(context); // Rebuild on theme change
+    if (_desk) return _deskBody();
     final body = FutureBuilder<List<RecurringJob>>(
       future: _future,
       builder: (context, snap) {

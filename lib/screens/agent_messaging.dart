@@ -1,6 +1,6 @@
+import 'package:snippet/ambient/hold.dart';
 import 'dart:async';
 import 'dart:io';
-import 'dart:math' as math;
 
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
@@ -345,14 +345,14 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
   final _scroll = ScrollController();
   List<CoordinationEvent> _events = const [];
   bool _loading = true;
-  bool _sending = false;
+  final bool _sending = false;
   String? _error;
   late final Swr<List<CoordinationEvent>> _thread;
 
   final List<_AgentAttachment> _attachments = [];
   int _attachmentGeneration = 0;
 
-  final AudioRecorder _recorder = AudioRecorder();
+  final AudioRecorder _recorder = HeldRecorder();
   AudioPlayer? _player;
 
   AudioPlayer get _audioPlayer {
@@ -367,12 +367,17 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
       if (!mounted) return;
       setState(() => _playbackPosition = position);
     });
+    _durationSub = player.onDurationChanged.listen((duration) {
+      if (!mounted) return;
+      setState(() => _playbackDuration = duration);
+    });
     return _player = player;
   }
 
   StreamSubscription<Amplitude>? _amplitudeSub;
   StreamSubscription<PlayerState>? _playerStateSub;
   StreamSubscription<Duration>? _positionSub;
+  StreamSubscription<Duration>? _durationSub;
   Timer? _recordingTimer;
 
   bool _isRecording = false;
@@ -380,6 +385,7 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
   Uint8List? _recordingBytes;
   Duration _recordingElapsed = Duration.zero;
   Duration _playbackPosition = Duration.zero;
+  Duration _playbackDuration = Duration.zero;
   bool _isPlayingRecording = false;
   final WaveBuffer _waveform = WaveBuffer();
 
@@ -405,6 +411,7 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
     _recordingTimer?.cancel();
     _playerStateSub?.cancel();
     _positionSub?.cancel();
+    _durationSub?.cancel();
     if (_isRecording) {
       unawaited(_recorder.cancel());
     }
@@ -528,15 +535,16 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
       final path =
           '${tempDir.path}/snippet-agent-voice-${DateTime.now().microsecondsSinceEpoch}.m4a';
       await _recorder.start(
-        const RecordConfig(
+        RecordConfig(
           encoder: AudioEncoder.aacLc,
           bitRate: 96000,
-          sampleRate: 16000,
+          sampleRate: kMobile ? 16000 : 44100,
           numChannels: 1,
         ),
         path: path,
       );
       if (!await _recorder.isRecording()) {
+        await _recorder.cancel();
         if (mounted) setState(() => _isRecording = false);
         if (mounted) toast(context, 'Could not start recording.', danger: true);
         return;
@@ -609,8 +617,8 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
   }
 
   Future<Uint8List?> _waitForRecordingFile(String path) async {
-    final file = File(path);
-    const attempts = 40;
+    final file = File(path.startsWith('file://') ? Uri.parse(path).toFilePath() : path);
+    const attempts = 120;
     for (var i = 0; i < attempts; i++) {
       try {
         if (await file.exists()) {
@@ -650,6 +658,7 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
         _recordingBytes = null;
         _recordingElapsed = Duration.zero;
         _playbackPosition = Duration.zero;
+        _playbackDuration = Duration.zero;
         _waveform.clear();
         _isPlayingRecording = false;
       });
@@ -688,6 +697,7 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
           _recordingElapsed = Duration.zero;
           _waveform.clear();
           _playbackPosition = Duration.zero;
+          _playbackDuration = Duration.zero;
           _isPlayingRecording = false;
         });
       }
@@ -1151,12 +1161,22 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
 
   Widget _mobileRecorder() {
     final reviewing = !_isRecording && _recordingPath != null;
-    final position = reviewing ? _playbackPosition : _recordingElapsed;
+    final total = _playbackDuration > Duration.zero
+        ? _playbackDuration
+        : _recordingElapsed;
+    final time = reviewing
+        ? '${_audioTime(_playbackPosition)} / ${_audioTime(total)}'
+        : _audioTime(_recordingElapsed);
+    final progress = !reviewing || total.inMilliseconds <= 0
+        ? null
+        : (_playbackPosition.inMilliseconds / total.inMilliseconds)
+            .clamp(0.0, 1.0);
     if (!kMobile) {
       return DesktopRecorderStrip(
         recording: _isRecording,
-        time: _audioTime(position),
-        wave: LiveRecordingWave(buffer: _waveform, live: _isRecording),
+        time: time,
+        wave: LiveRecordingWave(
+            buffer: _waveform, live: _isRecording, progress: progress),
         playing: _isPlayingRecording,
         onDiscard: () => unawaited(_discardRecording()),
         onPlay: () => unawaited(_toggleRecordingPlayback()),
@@ -1215,7 +1235,7 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
                 Text(reviewing ? 'Voice note' : 'Recording',
                     style: sans(13, color: AppColors.fg2)),
                 const Spacer(),
-                Text(_audioTime(position),
+                Text(time,
                     style: sans(13,
                         tabular: true,
                         color: reviewing ? AppColors.fg3 : AppColors.danger)),
@@ -1225,7 +1245,7 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
                 height: 30,
                 width: double.infinity,
                 child: LiveRecordingWave(
-                    buffer: _waveform, live: _isRecording),
+                    buffer: _waveform, live: _isRecording, progress: progress),
               ),
             ],
           ),

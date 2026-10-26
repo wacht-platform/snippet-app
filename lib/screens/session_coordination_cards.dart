@@ -1,14 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 
-import '../components.dart';
-import '../markdown_widgets.dart';
-import '../mochi.dart';
 import '../platform.dart';
+import '../transcript_card.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'mission_control/mission_control_state.dart'
     show
+        AmbientTurn,
         AssignmentEnvelope,
         AutonomousRound,
         BoardMessage,
@@ -17,16 +15,103 @@ import 'mission_control/mission_control_state.dart'
         WorkerQuestion,
         parseTaskOffer;
 
-/// Work and messages that arrive from another thread (Mission Control, another
-/// agent, the coordination board) share one card, in the plan card's idiom: a
-/// quiet mono meta line (what it is, a reference, its status), an optional
-/// title, and the body as markdown, collapsed to a few lines until expanded.
-class _ThreadCard extends StatefulWidget {
+class _MarkdownBody extends StatefulWidget {
+  final String body;
+  final String? preview;
+  const _MarkdownBody({required this.body, this.preview});
+
+  @override
+  State<_MarkdownBody> createState() => _MarkdownBodyState();
+}
+
+class _MarkdownBodyState extends State<_MarkdownBody> {
+  bool _open = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final body = widget.body.trim();
+    final long = body.length > 240 || '\n'.allMatches(body).length > 2;
+    final text = TranscriptCard.bodyStyle;
+    final sheet = markdownStyle(context).copyWith(
+      p: text,
+      listBullet: text,
+      strong:
+          text.copyWith(color: AppColors.fg1, fontWeight: weightFor(W.strong)),
+      em: text.copyWith(fontStyle: FontStyle.italic),
+      del: text.copyWith(
+          decoration: TextDecoration.lineThrough, color: AppColors.fg3),
+      a: text.copyWith(color: AppColors.accent),
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        AnimatedSize(
+          duration: Motion.fast,
+          curve: Motion.enter,
+          alignment: Alignment.topLeft,
+          child: SizedBox(
+            width: double.infinity,
+            child: !_open && long && widget.preview != null
+                ? Text(widget.preview!,
+                    maxLines: 3, overflow: TextOverflow.ellipsis, style: text)
+                : ConstrainedBox(
+                    constraints: BoxConstraints(
+                        maxHeight: _open || !long
+                            ? double.infinity
+                            : text.fontSize! * 1.45 * 3 + 2),
+                    child: ShaderMask(
+                      blendMode: BlendMode.dstIn,
+                      shaderCallback: (r) => LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: _open || !long
+                            ? const [Colors.white, Colors.white]
+                            : const [
+                                Colors.white,
+                                Colors.white,
+                                Colors.transparent
+                              ],
+                        stops: _open || !long ? null : const [0, 0.55, 1],
+                      ).createShader(r),
+                      child: ClipRect(
+                        child: SingleChildScrollView(
+                          physics: const NeverScrollableScrollPhysics(),
+                          child: MarkdownBody(
+                            data: body,
+                            selectable: _open || !long,
+                            styleSheet: sheet,
+                            builders: {'pre': PreBlockBuilder()},
+                            onTapLink: (_, href, __) =>
+                                openMarkdownLink(href, context),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+          ),
+        ),
+        if (long)
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => setState(() => _open = !_open),
+            child: Padding(
+              padding: const EdgeInsets.only(top: S.s4),
+              child: Text(_open ? 'Show less' : 'Show more',
+                  style: sans(kMobile ? 13 : 12.5,
+                      weight: W.label, color: AppColors.fg3)),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _ThreadCard extends StatelessWidget {
   final String icon;
   final Tone tone;
   final String kind;
   final String? title;
-  final String status;
+  final String? status;
   final String body;
   final String? reference;
   final String? footer;
@@ -36,7 +121,7 @@ class _ThreadCard extends StatefulWidget {
     required this.tone,
     required this.kind,
     this.title,
-    required this.status,
+    this.status,
     required this.body,
     this.reference,
     this.footer,
@@ -44,213 +129,23 @@ class _ThreadCard extends StatefulWidget {
   });
 
   @override
-  State<_ThreadCard> createState() => _ThreadCardState();
-}
-
-class _ThreadCardState extends State<_ThreadCard> {
-  bool _open = false;
-
-  @override
   Widget build(BuildContext context) {
-    Theme.of(context);
-    final (toneFg, _) = toneColors(widget.tone);
-    final body = widget.body.trim();
-    final title = widget.title?.trim() ?? '';
-    final ref = widget.reference?.trim() ?? '';
-    final footer = widget.footer?.trim() ?? '';
-    final long = body.length > 280 || '\n'.allMatches(body).length > 4;
-    final text = sans(14, height: 21 / 14, color: AppColors.fg2);
-    final base = markdownStyle(context);
-    final sheet = base.copyWith(
-      p: text,
-      listBullet: text,
-      strong:
-          text.copyWith(color: AppColors.fg1, fontWeight: weightFor(W.strong)),
-      em: text.copyWith(fontStyle: FontStyle.italic),
-      a: text.copyWith(color: AppColors.accent),
-    );
-    final meta = sans(12, height: 16 / 12, color: AppColors.fg3);
-    if (kMobile) {
-      final head = title.isNotEmpty ? title : widget.kind;
-      final preview = widget.preview ??
-          body
-              .split('\n')
-              .map((l) => l.replaceAll(RegExp(r'[*_`#>]'), '').trim())
-              .firstWhere((l) => l.isNotEmpty, orElse: () => '');
-      final sub = [
-        if (title.isNotEmpty) widget.kind,
-        if (preview.isNotEmpty) preview,
-      ].join(' · ');
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 5),
-        child: Material(
-          color: AppColors.surface1,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-            side: BorderSide(color: AppColors.fg1.withValues(alpha: 0.07)),
-          ),
-          clipBehavior: Clip.antiAlias,
-          child: InkWell(
-            onTap: body.isEmpty && footer.isEmpty
-                ? null
-                : () => setState(() => _open = !_open),
-            child: AnimatedSize(
-              duration: Motion.base,
-              curve: Motion.enter,
-              alignment: Alignment.topCenter,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(14, 11, 12, 11),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(children: [
-                      Container(
-                        width: 28,
-                        height: 28,
-                        decoration: BoxDecoration(
-                          color: toneFg.withValues(alpha: 0.12),
-                          shape: BoxShape.circle,
-                        ),
-                        alignment: Alignment.center,
-                        child: AppIcon(widget.icon, size: 14, color: toneFg),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(children: [
-                              Expanded(
-                                child: Text(head,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: sans(14.5,
-                                        weight: W.strong,
-                                        color: AppColors.fg1)),
-                              ),
-                              const SizedBox(width: 8),
-                              Text(widget.status,
-                                  style: sans(12,
-                                      weight: W.label, color: toneFg)),
-                            ]),
-                            if (sub.isNotEmpty && !_open)
-                              Text(sub,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: sans(12.5, color: AppColors.fg3)),
-                            if (_open && title.isNotEmpty)
-                              Text(widget.kind,
-                                  style: sans(12.5, color: AppColors.fg3)),
-                          ],
-                        ),
-                      ),
-                    ]),
-                    if (_open && body.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(40, 10, 4, 2),
-                        child: MarkdownBody(
-                          data: body,
-                          selectable: true,
-                          styleSheet: sheet,
-                          builders: {'pre': PreBlockBuilder()},
-                          onTapLink: (_, href, __) =>
-                              openMarkdownLink(href, context),
-                        ),
-                      ),
-                    if (_open && footer.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(40, 6, 4, 0),
-                        child: Text(footer,
-                            style: sans(12, height: 1.4, color: AppColors.fg3)),
-                      ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      );
-    }
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.fromLTRB(16, 13, 16, 14),
-        decoration: BoxDecoration(
-          color: AppColors.surface1,
-          borderRadius: BorderRadius.circular(R.lg),
-        ),
-        child: AnimatedSize(
-          duration: Motion.base,
-          curve: Motion.enter,
-          alignment: Alignment.topCenter,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(children: [
-                AppIcon(widget.icon, size: 12, color: toneFg),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    ref.isEmpty ? widget.kind : '${widget.kind} · $ref',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: meta,
-                  ),
-                ),
-                const SizedBox(width: S.s8),
-                Text(widget.status,
-                    style: sans(12, weight: W.label, color: toneFg)),
-              ]),
-              if (title.isNotEmpty) ...[
-                const SizedBox(height: 5),
-                Text(title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: sans(15,
-                        weight: W.strong, height: 20 / 15, color: AppColors.fg1)),
-              ],
-              if (body.isNotEmpty) ...[
-                SizedBox(height: title.isEmpty ? 5 : 3),
-                AnimatedSize(
-                  duration: Motion.fast,
-                  curve: Motion.enter,
-                  alignment: Alignment.topLeft,
-                  child: _open || !long
-                      ? MarkdownBody(
-                          data: body,
-                          selectable: true,
-                          styleSheet: sheet,
-                          builders: {'pre': PreBlockBuilder()},
-                          onTapLink: (_, href, __) => openMarkdownLink(href, context),
-                        )
-                      : widget.preview != null
-                          ? Text(widget.preview!,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: text)
-                          : MarkdownPreview(
-                              data: body, maxLines: 3, style: text),
-                ),
-              ],
-              if (footer.isNotEmpty) ...[
-                const SizedBox(height: 6),
-                Text(footer,
-                    style: sans(12, height: 1.4, color: AppColors.fg3)),
-              ],
-              if (long)
-                InkWell(
-                  onTap: () => setState(() => _open = !_open),
-                  borderRadius: BorderRadius.circular(R.xs),
-                  child: Padding(
-                    padding: const EdgeInsets.only(top: 6, bottom: 2),
-                    child: Text(_open ? 'Show less' : 'Show more', style: meta),
-                  ),
-                ),
-            ],
-          ),
-        ),
-      ),
+    final ref = reference?.trim() ?? '';
+    final foot = footer?.trim() ?? '';
+    return TranscriptCard(
+      icon: icon,
+      tone: tone,
+      kind: ref.isEmpty ? kind : '$kind · $ref',
+      status: status,
+      title: title,
+      footer: foot.isEmpty
+          ? null
+          : Text(foot,
+              style:
+                  sans(kMobile ? 13 : 12.5, height: 1.4, color: AppColors.fg3)),
+      child: body.trim().isEmpty
+          ? null
+          : _MarkdownBody(body: body, preview: preview),
     );
   }
 }
@@ -273,16 +168,16 @@ class MissionEnvelopeCard extends StatelessWidget {
     final (tone, icon, tag) = envelope.isPlan
         ? (Tone.accent, 'list', 'Plan')
         : switch (envelope.eventKind) {
-      'working' => (Tone.run, 'activity', 'Working'),
-      'done' => (Tone.ok, 'check', 'Done'),
-      'blocked' => (Tone.danger, 'alert-triangle', 'Blocked'),
-      'failed' => (Tone.danger, 'x-circle', 'Failed'),
-      'stalled' => (Tone.run, 'alert-triangle', 'Stalled'),
-      'cancelled' => (Tone.neutral, 'x-circle', 'Cancelled'),
-      'message' => (Tone.neutral, 'message', 'Message'),
-      'update' => (Tone.neutral, 'info', 'Update'),
-      _ => (Tone.accent, 'inbox', 'New task'),
-    };
+            'working' => (Tone.run, 'activity', 'Working'),
+            'done' => (Tone.ok, 'check', 'Done'),
+            'blocked' => (Tone.danger, 'alert-triangle', 'Blocked'),
+            'failed' => (Tone.danger, 'x-circle', 'Failed'),
+            'stalled' => (Tone.run, 'alert-triangle', 'Stalled'),
+            'cancelled' => (Tone.neutral, 'x-circle', 'Cancelled'),
+            'message' => (Tone.neutral, 'message', 'Message'),
+            'update' => (Tone.neutral, 'info', 'Update'),
+            _ => (Tone.accent, 'inbox', 'New task'),
+          };
     return _ThreadCard(
       icon: icon,
       tone: tone,
@@ -291,8 +186,8 @@ class MissionEnvelopeCard extends StatelessWidget {
           : envelope.isPlan
               ? 'Worker plan'
               : envelope.isReport
-              ? 'Task report'
-              : 'Task from Mission Control',
+                  ? 'Task report'
+                  : 'Task from Mission Control',
       reference: envelope.taskId.isEmpty ? null : _short(envelope.taskId),
       title: envelope.title.isEmpty
           ? (envelope.isRecurring ? 'Scheduled run' : 'Task')
@@ -406,81 +301,27 @@ class AgentMessageCard extends StatelessWidget {
     required this.agentId,
     required this.body,
     required this.outbound,
+    this.laneTitle,
   });
 
   final String agentId;
   final String body;
   final bool outbound;
+  final String? laneTitle;
 
   @override
   Widget build(BuildContext context) {
     final lane = agentId.startsWith('lane ');
-    if (kMobile) {
-      final who = lane ? 'the lane' : agentId;
-      final label = outbound
-          ? 'Sent to $agentId'
-          : (lane ? 'From $who' : 'Reply from $who');
-      if (outbound) {
-        return Padding(
-          padding: const EdgeInsets.only(left: 48, top: 6, bottom: 6),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: sans(12, color: AppColors.fg4)),
-              const SizedBox(height: 4),
-              Container(
-                padding: const EdgeInsets.fromLTRB(15, 10, 15, 11),
-                decoration: BoxDecoration(
-                  color: AppColors.surface2,
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(20),
-                    topRight: Radius.circular(20),
-                    bottomLeft: Radius.circular(20),
-                    bottomRight: Radius.circular(6),
-                  ),
-                ),
-                child: Text(body.trim(),
-                    style: sans(15.5, height: 22 / 15.5, color: AppColors.fg1)),
-              ),
-            ],
-          ),
-        );
-      }
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: S.s8),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(children: [
-              if (lane)
-                MochiIcon(color: mochiPalette.first.$2, size: 18)
-              else
-                AgentMochi(agentId, size: 18),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: sans(13, weight: W.label, color: AppColors.fg2)),
-              ),
-            ]),
-            const SizedBox(height: 6),
-            Text(body.trim(),
-                style: sans(16, height: 25 / 16, color: AppColors.fg1)),
-          ],
-        ),
-      );
-    }
+    final given = laneTitle?.trim() ?? '';
+    final laneName = given.isNotEmpty ? given : agentId.substring(5).trim();
+    final who = lane ? 'Lane · $laneName' : agentId;
     return _ThreadCard(
       icon: outbound ? 'send' : (lane ? 'message' : 'corner-down-right'),
       tone: outbound ? Tone.neutral : Tone.accent,
       kind: outbound
-          ? 'Message to $agentId'
-          : (lane ? 'Message from $agentId' : 'Reply from $agentId'),
-      status: outbound ? 'Sent' : (lane ? 'Lane' : 'Reply'),
+          ? 'To ${lane ? who : agentId}'
+          : (lane ? who : 'Message from $agentId'),
+      status: outbound ? 'Sent' : null,
       body: body,
     );
   }
@@ -516,6 +357,133 @@ class AssignmentCard extends StatelessWidget {
       status: 'Assigned',
       body: assignment.scope,
       footer: done.isEmpty ? null : 'Done when: $done',
+    );
+  }
+}
+
+class AmbientTurnCard extends StatefulWidget {
+  const AmbientTurnCard({super.key, required this.turn});
+  final AmbientTurn turn;
+
+  @override
+  State<AmbientTurnCard> createState() => _AmbientTurnCardState();
+}
+
+class _AmbientTurnCardState extends State<AmbientTurnCard> {
+  bool _open = false;
+
+  AmbientTurn get turn => widget.turn;
+
+  String get _where {
+    final os = turn.device.split('-').first;
+    return switch (os) {
+      'android' => 'Android',
+      'ios' => 'iPhone',
+      'macos' => 'Mac',
+      'linux' => 'Linux',
+      'windows' => 'Windows',
+      _ => turn.device,
+    };
+  }
+
+  bool get _hasDetail =>
+      turn.context.isNotEmpty ||
+      turn.interruptedReply.isNotEmpty ||
+      turn.judged.isNotEmpty ||
+      turn.addressed != null;
+
+  @override
+  Widget build(BuildContext context) {
+    final at = turn.at;
+    final time = at == null
+        ? ''
+        : '${at.hour.toString().padLeft(2, '0')}:${at.minute.toString().padLeft(2, '0')}';
+    final meta = [
+      _where,
+      if (time.isNotEmpty) time,
+      if (turn.mode == 'passive') 'passive',
+      if (turn.wake) 'wake word',
+      if (turn.continuation) 'continuation',
+      if (turn.interruptedReply.isNotEmpty) 'interrupted a reply',
+      if (turn.context.isNotEmpty)
+        '${turn.context.length} earlier ${turn.context.length == 1 ? 'line' : 'lines'}',
+    ].join(' · ');
+    final detail = sans(kMobile ? 13 : 12.5, height: 1.4, color: AppColors.fg3);
+    return LayoutBuilder(builder: (context, box) {
+      final inset = kMobile
+          ? 48.0
+          : (box.maxWidth.isFinite ? box.maxWidth * 0.18 : 140.0)
+              .clamp(24.0, 140.0);
+      return Padding(
+        padding: EdgeInsets.only(left: inset),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: _hasDetail ? () => setState(() => _open = !_open) : null,
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(14, 9, 14, 10),
+                decoration: BoxDecoration(
+                  color: AppColors.surface2,
+                  borderRadius: BorderRadius.circular(R.lg),
+                ),
+                child: SelectableText(turn.text,
+                    style: sans(kMobile ? 16 : 14,
+                        height: 1.4, color: AppColors.fg1)),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.only(top: S.s4, right: 2),
+              child: Text(meta,
+                  textAlign: TextAlign.end,
+                  style: sans(kMobile ? 12.5 : 12, color: AppColors.fg4)),
+            ),
+            if (_open) ...[
+              const SizedBox(height: S.s6),
+              if (turn.judged.isNotEmpty || turn.addressed != null)
+                Text(
+                    [
+                      if (turn.judged.isNotEmpty) 'Judged ${turn.judged}',
+                      if (turn.addressed != null)
+                        'reply expected ${(turn.addressed! * 100).round()}%',
+                      if (turn.expects.isNotEmpty)
+                        'answering a ${turn.expects} question',
+                    ].join(' · '),
+                    textAlign: TextAlign.end,
+                    style: detail),
+              if (turn.interruptedReply.isNotEmpty) ...[
+                const SizedBox(height: S.s4),
+                Text('Heard of its last reply: ${turn.interruptedReply}',
+                    textAlign: TextAlign.end, style: detail),
+              ],
+              for (final line in turn.context) ...[
+                const SizedBox(height: S.s4),
+                Text('Earlier, not sent: $line',
+                    textAlign: TextAlign.end, style: detail),
+              ],
+            ],
+          ],
+        ),
+      );
+    });
+  }
+}
+
+class SpeakCard extends StatelessWidget {
+  const SpeakCard({super.key, required this.text, this.expecting = ''});
+  final String text;
+  final String expecting;
+
+  @override
+  Widget build(BuildContext context) {
+    final asking = expecting.isNotEmpty && expecting != 'none' && text.contains('?');
+    return TranscriptCard(
+      icon: 'volume',
+      tone: asking ? Tone.accent : Tone.neutral,
+      kind: 'Said aloud',
+      status: asking ? 'Waiting for you' : null,
+      body: text,
     );
   }
 }

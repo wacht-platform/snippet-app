@@ -27,7 +27,7 @@ class _FakeDaemon extends DaemonClient {
 
   @override
   Future<List<TaskItem>> tasks(
-      {String? status, String? agentId, int limit = 200}) async {
+      {String? status, String? agentId, int? limit}) async {
     calls++;
     if (fail) throw Exception('network down');
     return items.map((e) => TaskItem.fromJson(e)).toList();

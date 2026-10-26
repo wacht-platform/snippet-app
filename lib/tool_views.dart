@@ -1,10 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
-import 'package:re_editor/re_editor.dart';
 
 import 'coordination_tool_views.dart';
-import 'highlight.dart';
 import 'media_views.dart';
 import 'theme.dart';
 import 'tool_activity.dart';
@@ -21,7 +17,7 @@ List<Map> _mapItems(dynamic value) =>
 // a rich, tool-specific body for the detail drawer (never raw JSON unless unknown).
 
 /// Lucide-ish glyph name for a tool (resolved via [iconFor]).
-String toolIcon(String tool) => switch (tool) {
+String toolIcon(String tool) => switch (toolBaseName(tool)) {
       'change_files' => 'edit',
       'view_image' => 'image',
       'bash' => 'terminal',
@@ -35,6 +31,7 @@ String toolIcon(String tool) => switch (tool) {
 
 /// One-line, tool-aware summary for the inline activity line.
 String toolArgSummary(String tool, dynamic args) {
+  tool = toolBaseName(tool);
   if (args is! Map) return '';
   String s(String k) => args[k]?.toString() ?? '';
   String first(String v) => v.split('\n').first.trim();
@@ -53,6 +50,10 @@ String toolArgSummary(String tool, dynamic args) {
         if (s('action') != 'list' && s('id').isNotEmpty) s('id'),
       ].join(' '),
     'web_search' => s('query'),
+    'search_content' => [
+        s('query').isNotEmpty ? s('query') : s('pattern'),
+        if (s('path').isNotEmpty) 'in ${s('path')}',
+      ].where((v) => v.isNotEmpty).join(' '),
     'web_read' => s('url'),
     'change_files' => _changesSummary(normalizeChanges(args)),
     'view_image' => s('path'),
@@ -90,7 +91,7 @@ String toolArgSummary(String tool, dynamic args) {
 /// Whether a step has anything behind its row — the one rule the transcript
 /// rows and the tool sheet share.
 bool toolHasDetail(ToolStep step) {
-  final tool = step.tool;
+  final tool = toolBaseName(step.tool);
   final args = step.args;
   final result = step.result;
   String arg(String key) {
@@ -152,7 +153,7 @@ bool toolHasDetail(ToolStep step) {
 }
 
 /// Friendly title for the drawer header.
-String toolTitle(String tool) => switch (tool) {
+String toolTitle(String tool) => switch (toolBaseName(tool)) {
       'change_files' => 'Change',
       'view_image' => 'Image',
       'bash' => 'Run',
@@ -165,7 +166,7 @@ String toolTitle(String tool) => switch (tool) {
       'present_file' => 'Present',
       'read_file' => 'Read',
       'view_file' => 'Read',
-      _ => _humanizeTool(tool),
+      _ => _humanizeTool(toolBaseName(tool)),
     };
 
 String _humanizeTool(String tool) {
@@ -199,85 +200,101 @@ class _ToolPanelError extends StatelessWidget {
   const _ToolPanelError();
   @override
   Widget build(BuildContext context) {
-    return const _ErrorBox('This tool panel could not render its result.');
+    return Text('This tool panel could not render its result.',
+        style: sans(13, color: AppColors.danger));
   }
 }
 
-/// The drawer body for a tool. [result] is the full ToolResult map
-/// ({status, data, error}); null while the call is still pending.
+/// The unframed body for a tool, meant to sit inside one block.
+/// [result] is the full ToolResult map ({status, data, error}); null while
+/// the call is still pending.
 Widget toolDetailView(BuildContext context,
     {required String tool, dynamic args, dynamic result}) {
+  tool = toolBaseName(tool);
   final Map? a = args is Map ? args : null;
   final Map? r = result is Map ? result : null;
   final status = r?['status']?.toString();
   final data = r?['data'];
-  final Map? d = data is Map ? data : null;
+  final Map? d = data is Map ? data : (r != null && status == null ? r : null);
   final err = r?['error'];
   final errMsg = err is Map ? err['message']?.toString() : null;
-
-  final rows = <Widget>[];
+  final running = result == null;
 
   if (status == 'error' && errMsg != null && tool == 'bash') {
-    final cmd = _displayText(a?['command']?.toString() ?? '').trimRight();
-    return _wrap([
-      _ShellPanel(
-          command: cmd,
-          stdout: '',
-          stderr: errMsg,
-          exitCode: null,
-          failed: true),
-    ]);
+    return _wrap(_bashView(a, null, running: false, error: errMsg));
   }
 
-  // Error banner first — applies to every tool.
+  final rows = <Widget>[];
   if (status == 'error' && errMsg != null) {
-    rows.add(_ErrorBox(errMsg));
+    rows.add(_hscroll(Text(_displayText(errMsg).trimRight(),
+        style: _code(AppColors.danger))));
     rows.add(const SizedBox(height: S.s8));
   }
 
-  // Spilled / oversized output (generic wrapper the harness may apply).
   if (d != null &&
       (d['data_omitted'] == true ||
           d['truncated'] == true && d['preview'] != null)) {
-    final body = _toolBody(context, tool, a, d, status);
-    rows.addAll(body);
+    rows.addAll(_toolBody(context, tool, a, d, status, running));
     if (d['preview'] != null) {
-      rows.add(const SizedBox(height: 14));
-      rows.add(const SectionLabel('Preview'));
-      rows.add(const SizedBox(height: 8));
-      rows.add(_CodeBox(_displayText(d['preview'].toString())));
+      rows.add(const SizedBox(height: S.s8));
+      rows.add(_hscroll(
+          Text(_displayText(d['preview'].toString()), style: _code())));
     }
     if (d['hint'] != null) {
-      rows.add(const SizedBox(height: 10));
+      rows.add(const SizedBox(height: S.s8));
       rows.add(_Hint(d['hint'].toString()));
     }
     return _wrap(rows);
   }
 
-  rows.addAll(_toolBody(context, tool, a, d, status));
-
+  rows.addAll(_toolBody(context, tool, a, d, status, running));
   if (rows.isEmpty) {
-    rows.add(Text('No details.', style: TS.meta()));
+    rows.add(Text('No details.', style: sans(_bodySize, color: AppColors.fg3)));
   }
   return _wrap(rows);
 }
 
+double get _bodySize => kMobile ? 13.5 : 13;
+
+TextStyle _code([Color? color]) =>
+    mono(kMobile ? 12.5 : 12, height: 1.45, color: color ?? AppColors.fg2);
+
 Widget _wrap(List<Widget> rows) =>
     Column(crossAxisAlignment: CrossAxisAlignment.start, children: rows);
 
-List<Widget> _toolBody(
-    BuildContext context, String tool, Map? a, Map? d, String? status) {
+Widget _hscroll(Widget child) => _HScroll(child);
+
+class _HScroll extends StatelessWidget {
+  const _HScroll(this.child);
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+        builder: (context, c) => SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minWidth: c.maxWidth),
+            child: IntrinsicWidth(child: child),
+          ),
+        ),
+      );
+}
+
+List<Widget> _toolBody(BuildContext context, String tool, Map? a, Map? d,
+    String? status, bool running) {
   switch (tool) {
     case 'change_files':
       return _changeFilesView(a, d, failed: status == 'error');
     case 'view_image':
       return _imageView(context, a, d);
     case 'bash':
-      return _bashView(a, d);
+      return _bashView(a, d, running: running);
     case 'web_search':
-      return _webSearchView(a, d);
+      return _webSearchView(context, a, d);
     case 'web_read':
       return _webReadView(a, d);
+    case 'search_content':
+      return _searchContentView(a, d);
     case 'set_session_title':
       return _titleView(a, d);
     case 'search_skills':
@@ -291,21 +308,119 @@ List<Widget> _toolBody(
       return _readFileView(a, d);
     default:
       if (d?['custom_tool'] != null) {
-        return _bashView({'command': d?['command'], 'label': tool}, d);
+        return _bashView({'command': d?['command'], 'label': tool}, d,
+            running: running);
       }
       return coordinationToolBody(context, tool, a, d) ?? _simpleFallback(a, d);
   }
 }
 
+// ---- meta + copy ----
+
+List<String> toolMetaParts(ToolStep step) {
+  final tool = toolBaseName(step.tool);
+  final d = step.data;
+  String plural(int n, String one, String many) => '$n ${n == 1 ? one : many}';
+  switch (tool) {
+    case 'bash':
+      final code = step.exitCode;
+      final ms = d?['duration_ms'];
+      final secs = d?['duration_secs'] ?? d?['elapsed_secs'];
+      final time = ms is num
+          ? '${(ms / 1000).toStringAsFixed(1)}s'
+          : secs is num
+              ? '${secs.toStringAsFixed(1)}s'
+              : null;
+      return [
+        if (d?['background'] == true) 'background',
+        if (code != null && code != 0) 'exit $code',
+        if (time != null) time,
+      ];
+    case 'read_file':
+      final entries = d?['entries'];
+      if (entries is List) {
+        final n = (d?['total'] as num?)?.toInt() ?? entries.length;
+        return [plural(n, 'entry', 'entries')];
+      }
+      final total = (d?['total_lines'] as num?)?.toInt();
+      return [if (total != null) plural(total, 'line', 'lines')];
+    case 'search_content':
+      final n = _searchMatches(d).length;
+      return [if (n > 0) plural(n, 'match', 'matches')];
+    case 'web_search':
+      final n = _mapItems(d?['results']).length;
+      return [if (n > 0) plural(n, 'result', 'results')];
+    case 'web_read':
+      final date = d?['published_date']?.toString() ?? '';
+      return [if (date.isNotEmpty) date];
+  }
+  return const [];
+}
+
+String toolCopyText(ToolStep step) {
+  final tool = toolBaseName(step.tool);
+  final a = step.args is Map ? step.args as Map : null;
+  final d = step.data;
+  String t(dynamic v) => v?.toString() ?? '';
+  switch (tool) {
+    case 'bash':
+      return [
+        t(a?['command']),
+        t(d?['stdout'] ?? d?['output_so_far']),
+        t(d?['stderr']),
+      ].where((v) => v.trim().isNotEmpty).join('\n');
+    case 'read_file':
+      final entries = d?['entries'];
+      return entries is List
+          ? entries.map((e) => e.toString().replaceAll('\t', '  ')).join('\n')
+          : t(d?['content']);
+    case 'change_files':
+      return step.changes
+          .map((c) => c['action'] == 'replace'
+              ? t(c['with'])
+              : c['action'] == 'create'
+                  ? t(c['content'])
+                  : '')
+          .where((v) => v.isNotEmpty)
+          .join('\n\n');
+    case 'search_content':
+      return _searchMatches(d)
+          .map((m) => '${m.path}:${m.line} ${m.text}')
+          .join('\n');
+    case 'web_read':
+      return t(d?['text']);
+    case 'web_search':
+      return _mapItems(d?['results'])
+          .map((r) => '${t(r['title'])}\n${t(r['url'])}')
+          .join('\n\n');
+  }
+  return '';
+}
+
 // ---- per-tool views ----
 
-String _changesSummary(dynamic changes) {
-  if (changes is! List || changes.isEmpty) return '';
-  final first = changes.first is Map
-      ? (changes.first as Map)['path']?.toString() ?? ''
-      : '';
-  return changes.length == 1 ? first : '$first (+${changes.length - 1} more)';
-}
+Widget _fileLabel(String name, int adds, int dels, {String note = ''}) =>
+    Row(children: [
+      Flexible(
+        child: Text(name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: mono(kMobile ? 12 : 11.5, color: AppColors.fg3)),
+      ),
+      if (adds > 0) ...[
+        const SizedBox(width: S.s8),
+        Text('+$adds', style: mono(kMobile ? 12 : 11.5, color: AppColors.ok)),
+      ],
+      if (dels > 0) ...[
+        const SizedBox(width: S.s6),
+        Text('−$dels',
+            style: mono(kMobile ? 12 : 11.5, color: AppColors.danger)),
+      ],
+      if (note.isNotEmpty) ...[
+        const SizedBox(width: S.s8),
+        Text(note, style: mono(kMobile ? 12 : 11.5, color: AppColors.fg4)),
+      ],
+    ]);
 
 List<Widget> _changeFilesView(Map? a, Map? d, {bool failed = false}) {
   final changes = normalizeChanges(a);
@@ -313,52 +428,33 @@ List<Widget> _changeFilesView(Map? a, Map? d, {bool failed = false}) {
   final out = <Widget>[];
   for (final raw in changes.whereType<Map>()) {
     String field(String key) => raw[key]?.toString() ?? '';
-    final path = field('path');
-    if (out.isNotEmpty) out.add(const SizedBox(height: S.s8));
+    var label = field('path');
+    var lines = <_DLine>[];
+    var note = '';
     switch (field('action')) {
       case 'replace':
-        final lines = _diff(field('find'), field('with'));
-        final adds = lines.where((l) => l.kind == _DKind.add).length;
-        final dels = lines.where((l) => l.kind == _DKind.del).length;
-        out.add(_ToolPanel(
-          header: _PanelPath(path),
-          trailing: [
-            if (raw['all'] == true) const Tag('All matches', mono: true),
-            if (adds > 0) Tag('+$adds', tone: Tone.ok, mono: true),
-            if (dels > 0) Tag('-$dels', tone: Tone.danger, mono: true),
-          ],
-          copyText: field('with'),
-          padBody: false,
-          body: _DiffBlock.lines(lines),
-        ));
+        lines = _diff(field('find'), field('with'));
+        if (raw['all'] == true) note = 'all matches';
       case 'create':
-        final content = field('content');
-        final n = content.isEmpty
-            ? 0
-            : '\n'.allMatches(content.trimRight()).length + 1;
-        out.add(_ToolPanel(
-          header: _PanelPath(path),
-          trailing: [
-            if (raw['overwrite'] == true)
-              const Tag('Overwrite', tone: Tone.run),
-            Tag('$n ${n == 1 ? 'line' : 'lines'}', mono: true),
-          ],
-          copyText: content,
-          padBody: false,
-          body: _HiCodeBlock(path, content.replaceFirst(RegExp(r'\n$'), '')),
-        ));
+        lines = [
+          for (final l in _splitLines(field('content'))) _DLine(_DKind.add, l)
+        ];
+        if (raw['overwrite'] == true) note = 'overwrite';
       case 'delete':
-        out.add(_ToolPanel(
-          header: _PanelPath(path),
-          trailing: [
-            failed ? const Tag('Delete') : const Tag('Deleted', tone: Tone.danger)
-          ],
-        ));
+        note = failed ? 'delete' : 'deleted';
       case 'move':
-        out.add(_ToolPanel(
-          header: _PanelPath('$path → ${field('to')}'),
-          trailing: [Tag(failed ? 'Move' : 'Moved')],
-        ));
+        label = '$label → ${field('to')}';
+        note = failed ? 'move' : 'moved';
+      default:
+        continue;
+    }
+    final adds = lines.where((l) => l.kind == _DKind.add).length;
+    final dels = lines.where((l) => l.kind == _DKind.del).length;
+    if (out.isNotEmpty) out.add(const SizedBox(height: S.s12));
+    out.add(_fileLabel(label, adds, dels, note: note));
+    if (lines.isNotEmpty) {
+      out.add(const SizedBox(height: S.s4));
+      out.add(_hscroll(_DiffLines(lines)));
     }
   }
   final notes = d?['notes']?.toString();
@@ -367,6 +463,360 @@ List<Widget> _changeFilesView(Map? a, Map? d, {bool failed = false}) {
     out.add(_Hint(notes));
   }
   return out;
+}
+
+(int, int) diffCounts(String find, String replacement) {
+  final lines = _diff(find, replacement);
+  return (
+    lines.where((l) => l.kind == _DKind.add).length,
+    lines.where((l) => l.kind == _DKind.del).length,
+  );
+}
+
+final _errorLine = RegExp(
+    r'^\s*([Ee]rror|[Ff]atal|FATAL|[Pp]anic|[Ee]xception|Traceback)\b|error\[E|\bError:|\bFAILED\b');
+
+List<Widget> _bashView(Map? a, Map? d, {required bool running, String? error}) {
+  final cmd = _displayText(a?['command']?.toString() ?? '').trimRight();
+  final stdout =
+      _displayText((d?['stdout'] ?? d?['output_so_far'])?.toString() ?? '')
+          .trimRight();
+  var stderr = _displayText(d?['stderr']?.toString() ?? '').trimRight();
+  if (error != null && error.trim().isNotEmpty) {
+    final e = _displayText(error).trimRight();
+    stderr = stderr.isEmpty ? e : '$stderr\n$e';
+  }
+  final labelled = (a?['label']?.toString() ?? '').trim().isNotEmpty;
+  final showCommand = cmd.isNotEmpty &&
+      (labelled || running || cmd.contains('\n') || cmd.length > 60);
+  final spans = <InlineSpan>[];
+  void line(String text, Color color) {
+    if (spans.isNotEmpty) spans.add(const TextSpan(text: '\n'));
+    spans.add(TextSpan(text: text, style: TextStyle(color: color)));
+  }
+
+  if (showCommand) {
+    final cmdLines = cmd.split('\n');
+    for (var i = 0; i < cmdLines.length; i++) {
+      if (spans.isNotEmpty) spans.add(const TextSpan(text: '\n'));
+      spans.add(TextSpan(
+          text: i == 0 ? '\$ ' : '  ', style: TextStyle(color: AppColors.fg4)));
+      spans.add(
+          TextSpan(text: cmdLines[i], style: TextStyle(color: AppColors.fg1)));
+    }
+  }
+  if (stdout.isNotEmpty) {
+    if (showCommand) spans.add(const TextSpan(text: '\n'));
+    for (final l in stdout.split('\n')) {
+      line(l, _errorLine.hasMatch(l) ? AppColors.danger : AppColors.fg2);
+    }
+  }
+  if (stderr.isNotEmpty) {
+    if (showCommand || stdout.isNotEmpty) spans.add(const TextSpan(text: '\n'));
+    for (final l in stderr.split('\n')) {
+      line(l, AppColors.danger);
+    }
+  }
+  if (spans.isEmpty) {
+    return [
+      Text(running ? 'No output yet' : 'No output',
+          style: sans(_bodySize, color: AppColors.fg3))
+    ];
+  }
+  return [_hscroll(Text.rich(TextSpan(style: _code(), children: spans)))];
+}
+
+Widget _numberedCode(String text, {int start = 1}) {
+  final lines = text.split('\n');
+  final width = '${start + lines.length - 1}'.length;
+  final numbers = [
+    for (var i = 0; i < lines.length; i++) '${start + i}'.padLeft(width)
+  ].join('\n');
+  return _hscroll(Row(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(numbers, style: _code(AppColors.fg4)),
+      const SizedBox(width: 14),
+      Text(text, style: _code()),
+    ],
+  ));
+}
+
+List<Widget> _readFileView(Map? a, Map? d) {
+  final entries = d?['entries'];
+  if (entries is List) {
+    if (entries.isEmpty) {
+      return [
+        Text('Empty folder', style: sans(_bodySize, color: AppColors.fg3))
+      ];
+    }
+    return [
+      for (final e in entries)
+        () {
+          final parts = e.toString().split('\t');
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 2),
+            child: Row(children: [
+              Expanded(
+                child: Text(parts.first,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: _code(AppColors.fg1)),
+              ),
+              if (parts.length > 1) ...[
+                const SizedBox(width: S.s12),
+                Text(parts.sublist(1).join(' '), style: _code(AppColors.fg3)),
+              ],
+            ]),
+          );
+        }(),
+    ];
+  }
+  if (d?['binary'] == true) {
+    return [
+      Text('Binary file, ${d?['bytes'] ?? '?'} bytes',
+          style: sans(_bodySize, color: AppColors.fg3))
+    ];
+  }
+  final content = _displayText((d?['content'] ?? '').toString());
+  if (content.isEmpty) {
+    return [Text('Empty file', style: sans(_bodySize, color: AppColors.fg3))];
+  }
+  final start = ((d?['start_line'] ?? d?['offset']) as num?)?.toInt() ?? 1;
+  final body = content.replaceFirst(RegExp(r'\n$'), '');
+  final all = body.split('\n');
+  const cap = 400;
+  final shown = all.length > cap ? all.take(cap).join('\n') : body;
+  return [
+    _numberedCode(shown, start: start < 1 ? 1 : start),
+    if (all.length > cap) ...[
+      const SizedBox(height: S.s6),
+      Text('Showing the first $cap of ${all.length} lines',
+          style: sans(12.5, color: AppColors.fg3)),
+    ],
+  ];
+}
+
+class _Match {
+  const _Match(this.path, this.line, this.text);
+  final String path;
+  final String line;
+  final String text;
+}
+
+List<_Match> _searchMatches(Map? d) {
+  final raw = d?['matches'] ?? d?['results'];
+  if (raw is! List) return const [];
+  String s(dynamic v) => v?.toString() ?? '';
+  return [
+    for (final m in raw)
+      if (m is Map)
+        _Match(s(m['path'] ?? m['file']), s(m['line'] ?? m['line_number']),
+            s(m['text'] ?? m['content'] ?? m['line_text']).trim())
+      else
+        () {
+          final parts = m.toString().split(':');
+          return parts.length >= 3
+              ? _Match(parts[0], parts[1], parts.sublist(2).join(':').trim())
+              : _Match('', '', m.toString());
+        }(),
+  ];
+}
+
+List<Widget> _searchContentView(Map? a, Map? d) {
+  final query = (a?['query'] ?? a?['pattern'] ?? '').toString();
+  final matches = _searchMatches(d);
+  if (matches.isEmpty) {
+    final text = _displayText((d?['output'] ?? d?['text'] ?? '').toString());
+    return [
+      Text(text.trim().isEmpty ? 'No matches' : text.trimRight(),
+          style: sans(_bodySize, color: AppColors.fg3))
+    ];
+  }
+  return [
+    for (final m in matches)
+      Padding(
+        padding: const EdgeInsets.symmetric(vertical: 3),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          if (m.path.isNotEmpty)
+            Text(m.line.isEmpty ? m.path : '${m.path}:${m.line}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: mono(kMobile ? 12 : 11.5, color: AppColors.fg3)),
+          if (m.text.isNotEmpty) _highlightedLine(m.text, query),
+        ]),
+      ),
+  ];
+}
+
+String _host(String url) {
+  final host = Uri.tryParse(url)?.host ?? '';
+  return host.startsWith('www.') ? host.substring(4) : host;
+}
+
+List<Widget> _webSearchView(BuildContext context, Map? a, Map? d) {
+  final results = _mapItems(d?['results']);
+  if (results.isEmpty) return const [];
+  return [
+    for (var i = 0; i < results.length; i++)
+      Padding(
+        padding: EdgeInsets.only(top: i == 0 ? 0 : S.s12),
+        child: _WebResult(
+          title: results[i]['title']?.toString() ?? '',
+          url: results[i]['url']?.toString() ?? '',
+          date: results[i]['published_date']?.toString() ?? '',
+          snippet: results[i]['snippet']?.toString() ?? '',
+        ),
+      ),
+  ];
+}
+
+class _WebResult extends StatelessWidget {
+  const _WebResult(
+      {required this.title,
+      required this.url,
+      required this.date,
+      required this.snippet});
+  final String title;
+  final String url;
+  final String date;
+  final String snippet;
+
+  @override
+  Widget build(BuildContext context) {
+    final host = _host(url);
+    final meta = [if (host.isNotEmpty) host, if (date.isNotEmpty) date];
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: url.isEmpty ? null : () => openMarkdownLink(url, context),
+        child: Text(title.isEmpty ? (host.isEmpty ? url : host) : title,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: sans(_bodySize + 0.5,
+                weight: W.label, color: AppColors.accent)),
+      ),
+      if (meta.isNotEmpty)
+        Padding(
+          padding: const EdgeInsets.only(top: 1),
+          child: Text(meta.join(' · '),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: mono(kMobile ? 12 : 11.5, color: AppColors.fg3)),
+        ),
+      if (snippet.isNotEmpty)
+        Padding(
+          padding: const EdgeInsets.only(top: 3),
+          child: Text(snippet,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              style: sans(_bodySize, height: 1.45, color: AppColors.fg2)),
+        ),
+    ]);
+  }
+}
+
+List<Widget> _webReadView(Map? a, Map? d) {
+  final out = <Widget>[];
+  final title = d?['title']?.toString() ?? '';
+  if (title.isNotEmpty) {
+    out.add(Text(title,
+        style: sans(_bodySize + 1, weight: W.label, color: AppColors.fg1)));
+  }
+  final text = d?['text']?.toString();
+  if (text != null && text.trim().isNotEmpty) {
+    if (out.isNotEmpty) out.add(const SizedBox(height: S.s6));
+    out.add(Text(_displayText(text).trim(),
+        style: sans(_bodySize, height: 1.5, color: AppColors.fg2)));
+  }
+  return out;
+}
+
+List<Widget> _simpleFallback(Map? a, Map? d) {
+  final bits = <String>[];
+  void take(dynamic v) {
+    if (v is String && v.trim().isNotEmpty) bits.add(v.trim());
+  }
+
+  if (a != null) {
+    for (final k in const [
+      'title',
+      'id',
+      'name',
+      'path',
+      'query',
+      'content',
+      'text'
+    ]) {
+      take(a[k]);
+    }
+  }
+  if (d != null) {
+    for (final k in const [
+      'title',
+      'id',
+      'name',
+      'path',
+      'content',
+      'text',
+      'message'
+    ]) {
+      take(d[k]);
+    }
+  }
+  if (bits.isEmpty) {
+    return [Text('Done', style: sans(_bodySize, color: AppColors.fg3))];
+  }
+  return [
+    Text(_displayText(bits.first).trimRight(),
+        style: sans(_bodySize, height: 1.45, color: AppColors.fg2))
+  ];
+}
+
+// ---- shared pieces ----
+
+Widget _highlightedLine(String text, String query) {
+  final base = _code();
+  final q = query.trim();
+  if (q.isEmpty) {
+    return Text(text,
+        maxLines: 2, overflow: TextOverflow.ellipsis, style: base);
+  }
+  final lower = text.toLowerCase();
+  final needle = q.toLowerCase();
+  final spans = <InlineSpan>[];
+  var i = 0;
+  while (i < text.length) {
+    final at = lower.indexOf(needle, i);
+    if (at < 0) {
+      spans.add(TextSpan(text: text.substring(i)));
+      break;
+    }
+    if (at > i) spans.add(TextSpan(text: text.substring(i, at)));
+    spans.add(TextSpan(
+      text: text.substring(at, at + needle.length),
+      style: TextStyle(color: AppColors.accent, fontWeight: weightFor(W.label)),
+    ));
+    i = at + needle.length;
+  }
+  return Text.rich(TextSpan(style: base, children: spans),
+      maxLines: 2, overflow: TextOverflow.ellipsis);
+}
+
+class _Hint extends StatelessWidget {
+  final String text;
+  const _Hint(this.text);
+  @override
+  Widget build(BuildContext context) =>
+      Text(text, style: sans(_bodySize - 1, color: AppColors.fg3));
+}
+
+String _changesSummary(dynamic changes) {
+  if (changes is! List || changes.isEmpty) return '';
+  final first = changes.first is Map
+      ? (changes.first as Map)['path']?.toString() ?? ''
+      : '';
+  return changes.length == 1 ? first : '$first (+${changes.length - 1} more)';
 }
 
 List<Widget> _imageView(BuildContext context, Map? a, Map? d) {
@@ -385,130 +835,6 @@ List<Widget> _imageView(BuildContext context, Map? a, Map? d) {
       ),
     ),
   ];
-}
-
-String _previewLines(String text, {int maxLines = 6}) {
-  final lines = text.split('\n');
-  if (lines.length <= maxLines) return text;
-  return '${lines.take(maxLines).join('\n')}\n…';
-}
-
-List<Widget> _bashView(Map? a, Map? d) {
-  final cmd = _displayText(a?['command']?.toString() ?? '').trimRight();
-  final stdout = _previewLines(_displayText(
-          (d?['stdout'] ?? d?['output_so_far'])?.toString() ?? '')
-      .trimRight());
-  final stderr =
-      _previewLines(_displayText(d?['stderr']?.toString() ?? '').trimRight());
-  final exit = (d?['exit_code'] as num?)?.toInt();
-  final labelled = (a?['label']?.toString() ?? '').trim().isNotEmpty;
-  if (cmd.isEmpty && stdout.isEmpty && stderr.isEmpty) {
-    return [Text('No output', style: TS.meta())];
-  }
-  return [
-    _ShellPanel(
-        command: cmd,
-        stdout: stdout,
-        stderr: stderr,
-        exitCode: exit,
-        background: d?['background'] == true,
-        movedAfter: (d?['moved_after_secs'] as num?)?.toInt(),
-        showCommand: labelled)
-  ];
-}
-
-List<Widget> _readFileView(Map? a, Map? d) {
-  final path = (d?['path'] ?? a?['path'] ?? '').toString();
-  final entries = d?['entries'];
-  if (entries is List) {
-    final total = (d?['total'] as num?)?.toInt() ?? entries.length;
-    final lines = entries.map((e) {
-      final parts = e.toString().split('\t');
-      return parts.length == 2
-          ? '${parts[0].padRight(36)} ${parts[1]}'
-          : e.toString();
-    }).join('\n');
-    return [
-      _ToolPanel(
-        header: _PanelPath(path, icon: 'folder'),
-        trailing: [
-          Tag('$total ${total == 1 ? 'entry' : 'entries'}', mono: true)
-        ],
-        copyText: lines,
-        body: _PanelText(lines.isEmpty ? '(empty folder)' : lines),
-      ),
-    ];
-  }
-  if (d?['binary'] == true) {
-    return [
-      _ToolPanel(
-        header: _PanelPath(path),
-        body:
-            Text('Binary file, ${d?['bytes'] ?? '?'} bytes', style: TS.meta()),
-      ),
-    ];
-  }
-  final content = (d?['content'] ?? '').toString();
-  final total = (d?['total_lines'] as num?)?.toInt();
-  if (content.isEmpty && path.isEmpty) return const [];
-  return [
-    _ToolPanel(
-      header: _PanelPath(path),
-      trailing: [
-        if (total != null)
-          Tag('$total ${total == 1 ? 'line' : 'lines'}', mono: true),
-      ],
-      copyText: content,
-      body: _PanelText(content.isEmpty
-          ? '(empty file)'
-          : _previewLines(content, maxLines: 400)),
-    ),
-  ];
-}
-
-List<Widget> _webSearchView(Map? a, Map? d) {
-  final results = _mapItems(d?['results']);
-  if (results.isEmpty) return const [];
-  final query = a?['query']?.toString() ?? '';
-  return [
-    _ToolPanel(
-      header: _PanelPath(query, icon: 'globe'),
-      trailing: [
-        Tag('${results.length} ${results.length == 1 ? 'result' : 'results'}',
-            mono: true),
-      ],
-      body: _SearchHitList(children: [
-        for (final res in results)
-          _ResultCard(
-            title: res['title']?.toString() ?? '',
-            url: res['url']?.toString() ?? '',
-            date: res['published_date']?.toString(),
-            snippet: res['snippet']?.toString(),
-            query: query,
-          ),
-      ]),
-    ),
-  ];
-}
-
-List<Widget> _webReadView(Map? a, Map? d) {
-  final out = <Widget>[];
-  final title = d?['title']?.toString() ?? '';
-  if (title.isNotEmpty) {
-    out.add(Text(title,
-        style: sans(kMobile ? 14 : 13, weight: W.label, color: AppColors.fg1)));
-    out.add(const SizedBox(height: 4));
-  }
-  if (d?['published_date'] != null) {
-    out.add(
-        Text('${d?['published_date']}', style: mono(10, color: AppColors.fg3)));
-  }
-  final text = d?['text']?.toString();
-  if (text != null && text.isNotEmpty) {
-    if (out.isNotEmpty) out.add(const SizedBox(height: 8));
-    out.add(_CodeBox(text, useSans: true));
-  }
-  return out;
 }
 
 List<Widget> _titleView(Map? a, Map? d) {
@@ -574,159 +900,6 @@ List<Widget> _presentView(BuildContext context, Map? a, Map? d) {
   ];
 }
 
-List<Widget> _simpleFallback(Map? a, Map? d) {
-  final bits = <String>[];
-  void take(dynamic v) {
-    if (v is String && v.trim().isNotEmpty) bits.add(v.trim());
-  }
-
-  if (a != null) {
-    for (final k in const [
-      'title',
-      'id',
-      'name',
-      'path',
-      'query',
-      'content',
-      'text'
-    ]) {
-      take(a[k]);
-    }
-  }
-  if (d != null) {
-    for (final k in const [
-      'title',
-      'id',
-      'name',
-      'path',
-      'content',
-      'text',
-      'message'
-    ]) {
-      take(d[k]);
-    }
-  }
-  if (bits.isEmpty) {
-    return [Text('Done', style: sans(13, color: AppColors.fg3))];
-  }
-  return [
-    _CodeBox(_previewLines(_displayText(bits.first).trimRight(), maxLines: 8),
-        useSans: true)
-  ];
-}
-
-// ---- shared pieces ----
-
-class _SearchHitList extends StatelessWidget {
-  final List<Widget> children;
-  const _SearchHitList({required this.children});
-  @override
-  Widget build(BuildContext context) {
-    Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        for (var i = 0; i < children.length; i++) ...[
-          if (i > 0) Divider(height: 1, thickness: 1, color: AppColors.border),
-          children[i],
-        ],
-      ],
-    );
-  }
-}
-
-Widget _highlightedLine(String text, String query) {
-  final base = mono(11, height: 1.45, color: AppColors.fg2);
-  final q = query.trim();
-  if (q.isEmpty) return Text(text, style: base);
-  final lower = text.toLowerCase();
-  final needle = q.toLowerCase();
-  final spans = <InlineSpan>[];
-  var i = 0;
-  while (i < text.length) {
-    final at = lower.indexOf(needle, i);
-    if (at < 0) {
-      spans.add(TextSpan(text: text.substring(i)));
-      break;
-    }
-    if (at > i) spans.add(TextSpan(text: text.substring(i, at)));
-    spans.add(TextSpan(
-      text: text.substring(at, at + needle.length),
-      style: mono(11, height: 1.45, color: AppColors.accent, weight: W.label)
-          .copyWith(backgroundColor: AppColors.accentBg),
-    ));
-    i = at + needle.length;
-  }
-  return Text.rich(TextSpan(style: base, children: spans));
-}
-
-class _ResultCard extends StatelessWidget {
-  final String title;
-  final String url;
-  final String? date;
-  final String? snippet;
-  final String query;
-  const _ResultCard(
-      {required this.title,
-      required this.url,
-      this.date,
-      this.snippet,
-      this.query = ''});
-  @override
-  Widget build(BuildContext context) {
-    Theme.of(context); // Rebuild on theme change
-    final snippetText = snippet ?? '';
-    final dateText = date ?? '';
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: S.s4),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        if (title.isNotEmpty)
-          Text(title,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: sans(13, weight: W.label, color: AppColors.accent)),
-        if (url.isNotEmpty) ...[
-          if (title.isNotEmpty) const SizedBox(height: 2),
-          Text(url,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: mono(11, color: AppColors.fg3)),
-        ],
-        if (snippetText.isNotEmpty) ...[
-          const SizedBox(height: 4),
-          _highlightedLine(snippetText, query),
-        ],
-        if (dateText.isNotEmpty) ...[
-          const SizedBox(height: 4),
-          Text(dateText, style: mono(10, color: AppColors.fg3)),
-        ],
-      ]),
-    );
-  }
-}
-
-class _ErrorBox extends StatelessWidget {
-  final String message;
-  const _ErrorBox(this.message);
-  @override
-  Widget build(BuildContext context) {
-    return InsetPanel(
-      tone: Tone.danger,
-      padding: const EdgeInsets.fromLTRB(S.s12, S.s8, S.s12, S.s8),
-      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Padding(
-            padding: const EdgeInsets.only(top: S.s2),
-            child:
-                AppIcon('alert-triangle', size: 14, color: AppColors.danger)),
-        const SizedBox(width: S.s8),
-        Expanded(
-            child:
-                SelectableText(message, style: _panelCode(AppColors.danger))),
-      ]),
-    );
-  }
-}
-
 class _ToolMarkdown extends StatelessWidget {
   final String data;
   const _ToolMarkdown(this.data);
@@ -743,22 +916,6 @@ class _ToolMarkdown extends StatelessWidget {
   }
 }
 
-class _Hint extends StatelessWidget {
-  final String text;
-  const _Hint(this.text);
-  @override
-  Widget build(BuildContext context) => InsetPanel(
-        padding: const EdgeInsets.fromLTRB(S.s12, S.s8, S.s12, S.s8),
-        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Padding(
-              padding: const EdgeInsets.only(top: S.s2),
-              child: AppIcon('alert-circle', size: 14, color: AppColors.fg3)),
-          const SizedBox(width: S.s8),
-          Expanded(child: Text(text, style: TS.meta(AppColors.fg2))),
-        ]),
-      );
-}
-
 // Tool previews may be JSON strings that were encoded once for the result
 // envelope. Restore escaped control characters for display without changing the
 // underlying command/file data.
@@ -767,292 +924,10 @@ String _displayText(String text) => text
     .replaceAll(r'\n', '\n')
     .replaceAll(r'\r', '\r');
 
-class _ShellPanel extends StatelessWidget {
-  final String command;
-  final String stdout;
-  final String stderr;
-  final int? exitCode;
-  final bool failed;
-  final bool background;
-  final int? movedAfter;
-  final bool showCommand;
-  const _ShellPanel(
-      {required this.command,
-      required this.stdout,
-      required this.stderr,
-      this.exitCode,
-      this.failed = false,
-      this.background = false,
-      this.movedAfter,
-      this.showCommand = false});
-
-  @override
-  Widget build(BuildContext context) {
-    final copyText = [
-      if (command.isNotEmpty) command,
-      if (stdout.isNotEmpty) stdout,
-      if (stderr.isNotEmpty) stderr,
-    ].join('\n');
-    final multiLine = command.contains('\n');
-    // The command appears once: in the body when it would not fit the header
-    // (labelled, multi-line or long), otherwise in the header alone.
-    final withCommand =
-        (showCommand || multiLine || command.length > 60) && command.isNotEmpty;
-    final hasOutput = stdout.isNotEmpty || stderr.isNotEmpty || withCommand;
-    return _ToolPanel(
-      header: withCommand
-          ? Text('shell', style: _panelCode(AppColors.fg3))
-          : Text.rich(
-              TextSpan(children: [
-                TextSpan(text: '\$ ', style: _panelCode(AppColors.accent)),
-                TextSpan(text: command, style: _panelCode(AppColors.fg1)),
-              ]),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-      trailing: [
-        if (background)
-          Tag(movedAfter != null
-                  ? 'Background after ${movedAfter}s'
-                  : 'Background',
-              tone: Tone.run)
-        else if (exitCode != null)
-          Tag('exit $exitCode',
-              tone: exitCode == 0 ? Tone.ok : Tone.danger, mono: true)
-        else if (failed)
-          const Tag('Failed', tone: Tone.danger, dot: true),
-      ],
-      copyText: copyText,
-      body: hasOutput
-          ? Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (withCommand) ...[
-                  _PanelCommand(command),
-                  if (stdout.isNotEmpty || stderr.isNotEmpty)
-                    const SizedBox(height: S.s8),
-                ],
-                if (stdout.isNotEmpty) _PanelText(stdout),
-                if (stdout.isNotEmpty && stderr.isNotEmpty)
-                  const SizedBox(height: S.s6),
-                if (stderr.isNotEmpty)
-                  _PanelText(stderr, color: AppColors.danger),
-              ],
-            )
-          : null,
-    );
-  }
+List<String> _splitLines(String text) {
+  final t = text.trimRight();
+  return t.isEmpty ? const [] : t.split('\n');
 }
-
-TextStyle _panelCode([Color? color]) =>
-    mono(12, height: 1.4, color: color ?? AppColors.fg2);
-
-class _PanelCommand extends StatelessWidget {
-  const _PanelCommand(this.command);
-
-  final String command;
-
-  @override
-  Widget build(BuildContext context) {
-    final text = SelectableText.rich(TextSpan(children: [
-      TextSpan(text: '\$ ', style: _panelCode(AppColors.accent)),
-      TextSpan(text: command, style: _panelCode(AppColors.fg1)),
-    ]));
-    if (!kMobile) return text;
-    return NotificationListener<ScrollNotification>(
-      onNotification: (_) => true,
-      child: SingleChildScrollView(scrollDirection: Axis.horizontal, child: text),
-    );
-  }
-}
-
-class _PanelText extends StatelessWidget {
-  const _PanelText(this.text, {this.color});
-
-  final String text;
-  final Color? color;
-
-  @override
-  Widget build(BuildContext context) {
-    final body = SelectableText(text, style: _panelCode(color));
-    if (!kMobile) return body;
-    return NotificationListener<ScrollNotification>(
-      onNotification: (_) => true,
-      child: SingleChildScrollView(scrollDirection: Axis.horizontal, child: body),
-    );
-  }
-}
-
-class _PanelPath extends StatelessWidget {
-  const _PanelPath(this.text, {this.icon = 'file'});
-
-  final String text;
-  final String icon;
-
-  @override
-  Widget build(BuildContext context) {
-    if (text.isEmpty) return const SizedBox.shrink();
-    return Row(children: [
-      AppIcon(icon, size: 14, color: AppColors.fg3),
-      const SizedBox(width: S.s6),
-      Flexible(
-        child: Text(text,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: _panelCode(AppColors.fg1)),
-      ),
-    ]);
-  }
-}
-
-class _ToolPanel extends StatelessWidget {
-  const _ToolPanel({
-    this.header,
-    this.trailing = const [],
-    this.body,
-    this.copyText,
-    this.padBody = true,
-  });
-
-  final Widget? header;
-  final List<Widget> trailing;
-  final Widget? body;
-  final String? copyText;
-  final bool padBody;
-
-  @override
-  Widget build(BuildContext context) {
-    final copy = copyText;
-    return Container(
-      width: double.infinity,
-      clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
-        color: AppColors.raised,
-        borderRadius: BorderRadius.circular(R.md),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (header != null ||
-              trailing.isNotEmpty ||
-              (copy != null && copy.isNotEmpty))
-            Container(
-              constraints: const BoxConstraints(minHeight: 28),
-              color: AppColors.overlay,
-              padding: const EdgeInsets.fromLTRB(S.s8, S.s2, S.s2, S.s2),
-              child: Row(children: [
-                if (header != null)
-                  Expanded(child: header!)
-                else
-                  const Spacer(),
-                const SizedBox(width: S.s6),
-                for (final t in trailing) ...[t, const SizedBox(width: S.s6)],
-                if (copy != null && copy.isNotEmpty)
-                  Tooltip(
-                    message: 'Copy',
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(R.sm),
-                      onTap: () {
-                        HapticFeedback.selectionClick();
-                        Clipboard.setData(ClipboardData(text: copy));
-                        toast(context, 'Copied');
-                      },
-                      child: SizedBox.square(
-                        dimension: 28,
-                        child: Center(
-                            child: AppIcon('copy',
-                                size: 13, color: AppColors.fg3)),
-                      ),
-                    ),
-                  )
-                else
-                  const SizedBox(width: S.s8),
-              ]),
-            ),
-          if (body != null)
-            padBody
-                ? Padding(
-                    padding: const EdgeInsets.fromLTRB(S.s8, S.s6, S.s8, S.s8),
-                    child: body)
-                : body!,
-        ],
-      ),
-    );
-  }
-}
-
-/// Plain monospace block (selectable). Optional add tint or sans font.
-class _CodeBox extends StatelessWidget {
-  final String text;
-  final bool useSans;
-  const _CodeBox(this.text, {this.useSans = false});
-  @override
-  Widget build(BuildContext context) {
-    return _ToolPanel(
-      copyText: text,
-      body: useSans
-          ? SelectableText(text, style: TS.ui(AppColors.fg2))
-          : _PanelText(text),
-    );
-  }
-}
-
-/// Read-only code block with syntax highlighting (by filename) + line numbers,
-/// matching the file viewer. Bounded height with its own scroll for the drawer.
-class _HiCodeBlock extends StatefulWidget {
-  final String filename;
-  final String text;
-  const _HiCodeBlock(this.filename, this.text);
-  @override
-  State<_HiCodeBlock> createState() => _HiCodeBlockState();
-}
-
-class _HiCodeBlockState extends State<_HiCodeBlock> {
-  final CodeLineEditingController _c = CodeLineEditingController();
-
-  @override
-  void initState() {
-    super.initState();
-    _c.text = widget.text;
-  }
-
-  @override
-  void dispose() {
-    _c.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    Theme.of(context); // Rebuild on theme change
-    final lineCount = '\n'.allMatches(widget.text).length + 1;
-    // Snug height for short files; cap + internal scroll for long ones.
-    final h = (lineCount * 20.0 + 10).clamp(32.0, 320.0);
-    return SizedBox(
-      width: double.infinity,
-      height: h,
-      child: CodeEditor(
-        controller: _c,
-        readOnly: true,
-        showCursorWhenReadOnly: false,
-        wordWrap: false,
-        style: codeEditorStyle(widget.filename, background: AppColors.raised),
-        indicatorBuilder:
-            (context, editingController, chunkController, notifier) {
-          return Row(children: [
-            DefaultCodeLineNumber(
-                controller: editingController, notifier: notifier),
-            DefaultCodeChunkIndicator(
-                width: 20, controller: chunkController, notifier: notifier),
-          ]);
-        },
-      ),
-    );
-  }
-}
-
-// ---- diff ----
 
 enum _DKind { ctx, add, del }
 
@@ -1065,8 +940,8 @@ class _DLine {
 /// Line-level unified diff via LCS. Falls back to remove-all/add-all for very
 /// large inputs (keeps it O(1) instead of O(n·m)).
 List<_DLine> _diff(String aStr, String bStr) {
-  final a = aStr.split('\n');
-  final b = bStr.split('\n');
+  final a = _splitLines(aStr);
+  final b = _splitLines(bStr);
   final n = a.length, m = b.length;
   if (n * m > 250000) {
     return [
@@ -1107,19 +982,17 @@ List<_DLine> _diff(String aStr, String bStr) {
   return out;
 }
 
-class _DiffBlock extends StatelessWidget {
+// ---- diff ----
+
+class _DiffLines extends StatelessWidget {
   final List<_DLine> diffLines;
-  const _DiffBlock.lines(this.diffLines);
+  const _DiffLines(this.diffLines);
+
   @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: S.s4),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+  Widget build(BuildContext context) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [for (final l in diffLines) _row(l)],
-      ),
-    );
-  }
+      );
 
   Widget _row(_DLine l) {
     final (Color bg, Color fg, String sign) = switch (l.kind) {
@@ -1128,13 +1001,11 @@ class _DiffBlock extends StatelessWidget {
       _DKind.ctx => (Colors.transparent, AppColors.fg3, ' '),
     };
     return Container(
-      width: double.infinity,
       color: bg,
-      padding: const EdgeInsets.symmetric(horizontal: S.s8),
+      padding: const EdgeInsets.symmetric(horizontal: S.s6),
       child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        SizedBox(width: 16, child: Text(sign, style: _panelCode(fg))),
-        Expanded(
-            child: Text(l.text.isEmpty ? ' ' : l.text, style: _panelCode(fg))),
+        SizedBox(width: 14, child: Text(sign, style: _code(fg))),
+        Text(l.text.isEmpty ? ' ' : l.text, style: _code(fg)),
       ]),
     );
   }

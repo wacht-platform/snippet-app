@@ -162,7 +162,7 @@ class DaemonClient {
     final uri = base.replace(
       scheme: wsScheme,
       path: '/attach',
-      queryParameters: {'session': sessionId, 'token': token, 'compact': '1'},
+      queryParameters: {'session': sessionId, 'token': token, 'compact': '1', 'stream_delta': '1'},
     );
     return _connectWs(
       uri,
@@ -451,27 +451,88 @@ class DaemonClient {
 
   Future<VoiceSettings> setVoice({
     bool? enabled,
-    String? speechModel,
-    String? language,
-    List<String>? keyterms,
     int? maxSeconds,
-    String? apiKey,
   }) async {
     final r = await http.post(_uri('/config/voice'),
         headers: _json,
         body: jsonEncode({
           if (enabled != null) 'enabled': enabled,
-          if (speechModel != null) 'speech_model': speechModel,
-          if (language != null) 'language': language,
-          if (keyterms != null) 'keyterms': keyterms,
           if (maxSeconds != null) 'max_seconds': maxSeconds,
-          if (apiKey != null) 'api_key': apiKey,
         }));
     if (r.statusCode != 200) {
       throw r.statusCode == 400 ? r.body : _err('save voice settings', r);
     }
     invalidateConfig();
     return VoiceSettings.fromJson(jsonDecode(r.body) as Map<String, dynamic>);
+  }
+
+  Future<List<AmbientEvent>> ambientEvents({int limit = 50, String? query}) async {
+    final r = await http.get(_uri('/ambient/events', {
+      'limit': '$limit',
+      if (query != null && query.trim().isNotEmpty) 'q': query.trim(),
+    }));
+    if (r.statusCode != 200) throw _err('load ambient events', r);
+    final json = jsonDecode(r.body) as Map<String, dynamic>;
+    return ((json['events'] as List?) ?? [])
+        .map((e) => AmbientEvent.fromJson((e as Map).cast<String, dynamic>()))
+        .toList();
+  }
+
+  Future<AmbientSettings> getAmbientSettings() async {
+    final r = await http.get(_uri('/ambient/settings'));
+    if (r.statusCode != 200) throw _err('load ambient settings', r);
+    return AmbientSettings.fromJson(jsonDecode(r.body) as Map<String, dynamic>);
+  }
+
+  Future<AmbientSettings> setAmbientSettings({
+    bool? enabled,
+    String? mode,
+    String? watcher,
+    bool? watcherChatContext,
+    String? typesafeKey,
+    int? conversationTimeoutSecs,
+    List<String>? wakePhrases,
+    String? assemblyaiKey,
+    String? deepgramKey,
+    String? deepgramHost,
+    String? ttsVoice,
+    String? stt,
+  }) async {
+    final r = await http.post(_uri('/ambient/settings'),
+        headers: _json,
+        body: jsonEncode({
+          if (enabled != null) 'enabled': enabled,
+          if (mode != null) 'mode': mode,
+          if (watcher != null) 'watcher': watcher,
+          if (watcherChatContext != null) 'watcher_chat_context': watcherChatContext,
+          if (typesafeKey != null) 'typesafe_api_key': typesafeKey,
+          if (conversationTimeoutSecs != null)
+            'conversation_timeout_secs': conversationTimeoutSecs,
+          if (wakePhrases != null) 'wake_phrases': wakePhrases,
+          if (assemblyaiKey != null) 'assemblyai_api_key': assemblyaiKey,
+          if (deepgramKey != null) 'deepgram_api_key': deepgramKey,
+          if (deepgramHost != null) 'deepgram_host': deepgramHost,
+          if (ttsVoice != null) 'tts_voice': ttsVoice,
+          if (stt != null) 'stt': stt,
+        }));
+    if (r.statusCode != 200) {
+      throw r.statusCode == 400 ? r.body : _err('save ambient settings', r);
+    }
+    return AmbientSettings.fromJson(jsonDecode(r.body) as Map<String, dynamic>);
+  }
+
+  Future<bool> claimAmbientLease(String device, String label) async {
+    final r = await http.post(_uri('/ambient/lease'),
+        headers: _json,
+        body: jsonEncode({'device': device, 'label': label, 'claim': true}));
+    if (r.statusCode != 200) throw _err('claim ambient listening', r);
+    return (jsonDecode(r.body) as Map<String, dynamic>)['held'] == true;
+  }
+
+  Future<AmbientStats> ambientStats() async {
+    final r = await http.get(_uri('/ambient/stats'));
+    if (r.statusCode != 200) throw _err('load ambient stats', r);
+    return AmbientStats.fromJson(jsonDecode(r.body) as Map<String, dynamic>);
   }
 
   Future<Map<String, List<Account>>> getAccounts() async {
@@ -1536,17 +1597,30 @@ class DaemonClient {
   Future<List<TaskItem>> tasks({
     String? status,
     String? agentId,
-    int limit = 200,
+    int? limit,
   }) async {
-    final query = <String, String>{'limit': '$limit', 'view': 'summary'};
-    if (status != null && status.isNotEmpty) query['status'] = status;
-    if (agentId != null && agentId.isNotEmpty) query['agent_id'] = agentId;
-    final r = await http.get(_uri('/coordination/tasks', query));
-    if (r.statusCode != 200) throw _err('list tasks', r);
-    final list = jsonDecode(r.body) as List;
-    return list
-        .map((e) => TaskItem.fromJson(e as Map<String, dynamic>))
-        .toList();
+    const page = 500;
+    final out = <TaskItem>[];
+    while (true) {
+      final size = limit == null ? page : (limit - out.length).clamp(1, page);
+      final query = <String, String>{'limit': '$size', 'view': 'summary'};
+      if (status != null && status.isNotEmpty) query['status'] = status;
+      if (agentId != null && agentId.isNotEmpty) query['agent_id'] = agentId;
+      if (out.isNotEmpty) {
+        query['after_priority'] = '${out.last.priority}';
+        query['after_created'] = out.last.createdAt;
+        query['after_id'] = out.last.id;
+      }
+      final r = await http.get(_uri('/coordination/tasks', query));
+      if (r.statusCode != 200) throw _err('list tasks', r);
+      final list = (jsonDecode(r.body) as List)
+          .map((e) => TaskItem.fromJson(e as Map<String, dynamic>))
+          .toList();
+      out.addAll(list);
+      if (list.length < size || (limit != null && out.length >= limit)) {
+        return out;
+      }
+    }
   }
 
   /// POST /coordination/tasks.

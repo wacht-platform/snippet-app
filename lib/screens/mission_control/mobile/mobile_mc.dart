@@ -93,12 +93,14 @@ class MobileMissionControl extends StatelessWidget {
           children: [
             MissionControlHeader.compact(state: state),
             Expanded(
-              child: ActivityFeed(
-                state: state,
-                onTapTask: (task) => _openTaskSheet(context, state, task),
-                onTapQuestion: (question) =>
-                    _openQuestionReply(context, state, question),
-              ),
+              child: Stack(children: [
+                ActivityFeed(
+                  state: state,
+                  onTapTask: (task) => _openTaskSheet(context, state, task),
+                  onTapQuestion: (question) =>
+                      _openQuestionReply(context, state, question),
+                ),
+              ]),
             ),
             MissionComposer(state: state),
           ],

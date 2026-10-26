@@ -1,0 +1,19 @@
+name: ambient_audio
+description: Native PCM sink for ambient voice replies.
+version: 0.0.1
+publish_to: none
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+  flutter: ">=3.3.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+flutter:
+  plugin:
+    platforms:
+      android:
+        package: com.snippet.ambient_audio
+        pluginClass: AmbientAudioPlugin

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../api.dart';
+import '../desktop_layout.dart';
 import '../models.dart';
 import '../platform.dart';
 import '../theme.dart';
@@ -41,6 +42,7 @@ class InferenceProfilesScreenState extends State<InferenceProfilesScreen>
   bool _inEditor = false;
   InferenceProfile? _editProfile;
   bool? _keepTaskProfile;
+  bool get _desk => !kMobile && widget.embedded && widget.onBack == null;
 
   Future<void> _setKeepTaskProfile(bool on) async {
     setState(() => _keepTaskProfile = on);
@@ -59,7 +61,9 @@ class InferenceProfilesScreenState extends State<InferenceProfilesScreen>
   void addProfile() => _edit(null);
 
   void _submitted(InferenceProfile draft, Future<void> save) {
-    setState(() => _saving[draft.name] = draft);
+    setState(() {
+      _saving[draft.name] = draft;
+    });
     save.then((_) {
       if (!mounted) return;
       widget.client.invalidateConfig();
@@ -137,15 +141,6 @@ class InferenceProfilesScreenState extends State<InferenceProfilesScreen>
     });
   }
 
-  Future<void> _run(Future<void> Function() op, String onError) async {
-    try {
-      await op();
-      _refresh();
-    } catch (e) {
-      if (mounted) toast(context, '$onError: $e', danger: true);
-    }
-  }
-
   Future<void> _edit(InferenceProfile? p) async {
     if (kMobile && widget.embedded) {
       final saved = await Navigator.of(context).push<bool>(
@@ -190,6 +185,7 @@ class InferenceProfilesScreenState extends State<InferenceProfilesScreen>
   Widget build(BuildContext context) {
     super.build(context);
     Theme.of(context); // Rebuild on theme change
+    if (_desk) return _deskView();
     if (_inEditor) {
       final editing = _editProfile;
       final editor = InferenceProfileEditor(
@@ -233,6 +229,15 @@ class InferenceProfilesScreenState extends State<InferenceProfilesScreen>
       builder: (context, snap) {
         if (snap.connectionState == ConnectionState.waiting && !snap.hasData) {
           return const ListSkeleton();
+        }
+        if (snap.hasError && !snap.hasData) {
+          return EmptyState(
+            icon: 'alert-triangle',
+            title: "Couldn't load profiles",
+            body: '${snap.error}',
+            action: Btn('Retry',
+                small: true, onTap: () => setState(() => _load(force: true))),
+          );
         }
         final cfg = snap.data;
         final profiles = _withSaving(cfg?.profiles ?? const []);
@@ -314,6 +319,116 @@ class InferenceProfilesScreenState extends State<InferenceProfilesScreen>
           Expanded(child: body),
         ]),
       ),
+    );
+  }
+
+  Widget _deskView() {
+    if (_inEditor) {
+      final editing = _editProfile;
+      return InferenceProfileEditor(
+        client: widget.client,
+        existing: editing,
+        embedded: true,
+        onDelete: editing == null
+            ? null
+            : () async {
+                if (await _confirmDelete(editing)) _closeEditor();
+              },
+        onClose: _closeEditor,
+        onSaved: () => _closeEditor(saved: true),
+        onSubmit: _submitted,
+      );
+    }
+    return FutureBuilder<ServerConfig>(
+      future: _future,
+      builder: (context, snap) {
+        if (snap.connectionState == ConnectionState.waiting && !snap.hasData) {
+          return const SettingsColumn(children: [
+            SettingsHeader(
+              title: 'Profiles',
+              subtitle: 'Models and credentials for chats and background work.',
+            ),
+            SizedBox(height: S.s8),
+            SettingsGroup(children: [SettingsRow(label: 'Loading profiles…')]),
+          ]);
+        }
+        if (snap.hasError && !snap.hasData) {
+          return SettingsColumn(children: [
+            const SettingsHeader(
+              title: 'Profiles',
+              subtitle: 'Models and credentials for chats and background work.',
+            ),
+            const SizedBox(height: S.s8),
+            SettingsGroup(children: [
+              SettingsRow(
+                label: "Couldn't load profiles",
+                sub: '${snap.error}',
+                danger: true,
+                trailing: Btn('Retry',
+                    small: true,
+                    variant: BtnVariant.secondary,
+                    onTap: () => setState(() => _load(force: true))),
+              ),
+            ]),
+          ]);
+        }
+        final cfg = snap.data;
+        final profiles = _withSaving(cfg?.profiles ?? const []);
+        final keep = _keepTaskProfile ?? cfg?.keepTaskProfile ?? true;
+        return SettingsColumn(children: [
+          SettingsHeader(
+            title: 'Profiles',
+            subtitle: 'Models and credentials for chats and background work.',
+            actions: [
+              Btn('Add profile',
+                  icon: 'plus', small: true, onTap: () => _edit(null)),
+            ],
+          ),
+          const SizedBox(height: S.s8),
+          if (profiles.isEmpty)
+            SettingsGroup(children: [
+              SettingsRow(
+                label: 'No inference profiles yet',
+                sub: 'Add an API key or a local model provider to start sessions.',
+                trailing: Btn('Add profile',
+                    small: true,
+                    variant: BtnVariant.secondary,
+                    onTap: () => _edit(null)),
+              ),
+            ])
+          else ...[
+            SettingsGroup(
+              footer:
+                  'New chats use the active profile. Lanes and background work follow Routing.',
+              children: [
+                for (final p in profiles)
+                  SettingsRow(
+                    label: p.name,
+                    sub: '${p.provider} · ${p.model}',
+                    leading: ProviderLogo(p.provider, size: 16),
+                    onTap: () => _edit(p),
+                    chevron: true,
+                    trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                      if (!p.usable) const WarnChip(),
+                      if (p.active) ...[
+                        if (!p.usable) const SizedBox(width: S.s6),
+                        const Tag('Active', tone: Tone.ok, dot: true),
+                      ],
+                    ]),
+                  ),
+              ],
+            ),
+            SettingsGroup(children: [
+              SettingsRow(
+                label: "Keep a task's model",
+                sub: 'Chats stay on the model a task used.',
+                trailing:
+                    SettingsSwitch(value: keep, onChanged: _setKeepTaskProfile),
+              ),
+            ]),
+          ],
+        ]);
+      },
     );
   }
 

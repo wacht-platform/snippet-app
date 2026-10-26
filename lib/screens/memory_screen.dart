@@ -5,7 +5,9 @@ import '../models.dart';
 import '../motion.dart';
 import '../platform.dart';
 import '../pull_refresh.dart';
+import '../settings_form.dart';
 import '../theme.dart';
+import '../desktop_layout.dart';
 import '../widgets.dart';
 import 'shell_nav.dart';
 
@@ -107,6 +109,12 @@ class _MemoryScreenState extends State<MemoryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (!kMobile &&
+        widget.embedded &&
+        widget.initialKey == null &&
+        widget.onBack == null) {
+      return _deskDialog();
+    }
     final open = _open;
     final scope = _openScope;
     final title = open == null ? 'Memory' : scopeTitle(scope, open);
@@ -230,6 +238,118 @@ class _MemoryScreenState extends State<MemoryScreen> {
       ),
     );
   }
+
+  Widget _deskDialog() {
+    final open = _open;
+    if (open != null) {
+      final scope = _openScope;
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(S.s32, S.s24, S.s32, 0),
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 680),
+                child: SettingsHeader(
+                  back: SettingsBack('Memory', onTap: _close),
+                  title: scopeTitle(scope, open),
+                  subtitle: scope == null ? null : scopeStatus(scope),
+                ),
+              ),
+            ),
+          ),
+          Expanded(
+            child: _ScopeView(
+              key: ValueKey(open),
+              client: widget.client,
+              scopeKey: open,
+              scope: scope,
+              hideSubtitle: true,
+            ),
+          ),
+        ],
+      );
+    }
+    final scopes = _scopes;
+    if (scopes == null) {
+      return SettingsColumn(children: [
+        const SettingsHeader(
+          title: 'Memory',
+          subtitle:
+              'What your agents remember, kept as files in git and consolidated in the background.',
+        ),
+        const SizedBox(height: S.s8),
+        SettingsGroup(children: [
+          _error == null
+              ? const SettingsRow(label: 'Loading memory…')
+              : SettingsRow(
+                  label: "Couldn't load memory",
+                  sub: _error,
+                  danger: true,
+                  trailing: Btn('Retry',
+                      small: true, variant: BtnVariant.secondary, onTap: _load),
+                ),
+        ]),
+      ]);
+    }
+    final global = scopes.where((s) => s.kind == 'global').toList();
+    final projects = scopes.where((s) => s.kind == 'project').toList()
+      ..sort((a, b) => (b.lastCommitAt ?? 0).compareTo(a.lastCommitAt ?? 0));
+    final agents = scopes.where((s) => s.kind == 'agent').toList()
+      ..sort((a, b) => a.label.compareTo(b.label));
+    final sessions = scopes.where((s) => s.kind == 'session').toList()
+      ..sort((a, b) => (b.lastCommitAt ?? 0).compareTo(a.lastCommitAt ?? 0));
+    final shownSessions = _allSessions ? sessions : sessions.take(5).toList();
+    Widget group(String label, List<MemoryScope> items, {Widget? extra}) {
+      if (items.isEmpty) return const SizedBox.shrink();
+      return SettingsGroup(
+        header: label.isEmpty ? null : label,
+        children: [
+          for (final s in items)
+            SettingsRow(
+              label: scopeTitle(s, s.key),
+              sub: scopeStatus(s),
+              leading: IconTile(scopeIcon(s.kind)),
+              chevron: true,
+              onTap: () => _openScopeKey(s.key),
+            ),
+          if (extra != null) extra,
+        ],
+      );
+    }
+
+    return SettingsColumn(children: [
+      const SettingsHeader(
+        title: 'Memory',
+        subtitle:
+            'What your agents remember, kept as files in git and consolidated in the background.',
+      ),
+      const SizedBox(height: S.s8),
+      if (scopes.isEmpty)
+        const SettingsGroup(children: [
+          SettingsRow(
+              label: 'Nothing remembered yet',
+              sub: 'Memory fills in as agents work.'),
+        ])
+      else ...[
+        group('', global),
+        group('Projects', projects),
+        group('Agents', agents),
+        group(
+          'Sessions',
+          shownSessions,
+          extra: sessions.length > 5 && !_allSessions
+              ? SettingsRow(
+                  label: 'Show all ${sessions.length} sessions',
+                  onTap: () => setState(() => _allSessions = true),
+                )
+              : null,
+        ),
+      ],
+    ]);
+  }
 }
 
 String scopeTitle(MemoryScope? s, String key) {
@@ -280,11 +400,13 @@ class _ScopeView extends StatefulWidget {
   final DaemonClient client;
   final String scopeKey;
   final MemoryScope? scope;
+  final bool hideSubtitle;
   const _ScopeView({
     super.key,
     required this.client,
     required this.scopeKey,
     required this.scope,
+    this.hideSubtitle = false,
   });
 
   @override
@@ -363,7 +485,7 @@ class _ScopeViewState extends State<_ScopeView> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (s != null)
+          if (s != null && !widget.hideSubtitle)
             Padding(
               padding: EdgeInsets.fromLTRB(side + 4, 0, side, 8),
               child: Text(scopeStatus(s),
@@ -403,9 +525,10 @@ class _ScopeViewState extends State<_ScopeView> {
       ),
     );
     if (kMobile) return page;
-    return Center(
+    return Align(
+      alignment: Alignment.topCenter,
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 768),
+        constraints: const BoxConstraints(maxWidth: 680 + 48),
         child: page,
       ),
     );
@@ -459,8 +582,11 @@ class _ScopeViewState extends State<_ScopeView> {
                 onPressed: _backFile,
                 style: TextButton.styleFrom(
                   foregroundColor: AppColors.fg3,
-                  minimumSize: const Size(0, 30),
-                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  minimumSize: kMobile ? const Size(0, 30) : const Size(0, 28),
+                  padding: EdgeInsets.symmetric(horizontal: kMobile ? 6 : 8),
+                  tapTargetSize: kMobile
+                      ? null
+                      : MaterialTapTargetSize.shrinkWrap,
                 ),
                 icon: AppIcon('chevron-left', size: 14, color: AppColors.fg3),
                 label: Text(_trail[_trail.length - 2],

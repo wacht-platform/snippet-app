@@ -91,15 +91,16 @@ extension _SessionScreenRecorderExt on _SessionScreenState {
       final path =
           '${tempDir.path}/snippet-voice-${DateTime.now().microsecondsSinceEpoch}.m4a';
       await _recorder.start(
-        const RecordConfig(
+        RecordConfig(
           encoder: AudioEncoder.aacLc,
           bitRate: 96000,
-          sampleRate: 16000,
+          sampleRate: kMobile ? 16000 : 44100,
           numChannels: 1,
         ),
         path: path,
       );
       if (!await _recorder.isRecording()) {
+        await _recorder.cancel();
         if (mounted) _setState(() => _isRecording = false);
         _toast('Could not start recording.');
         return;
@@ -171,8 +172,8 @@ extension _SessionScreenRecorderExt on _SessionScreenState {
   /// Wait until [path] exists and is non-empty. AVCaptureAudioFileOutput on
   /// macOS writes the container asynchronously after stopRecording().
   Future<Uint8List?> _waitForRecordingFile(String path) async {
-    final file = File(path);
-    const attempts = 40; // ~2s
+    final file = File(path.startsWith('file://') ? Uri.parse(path).toFilePath() : path);
+    const attempts = 120; // ~6s
     for (var i = 0; i < attempts; i++) {
       try {
         if (await file.exists()) {
@@ -194,7 +195,7 @@ extension _SessionScreenRecorderExt on _SessionScreenState {
       } else if (_audioPlayer.state == PlayerState.paused) {
         await _audioPlayer.resume();
       } else {
-        await _audioPlayer.play(DeviceFileSource(path));
+        await _audioPlayer.play(DeviceFileSource(path), position: _playbackPosition);
       }
     } catch (e) {
       _toast('Could not play recording: $e');
@@ -297,104 +298,48 @@ extension _SessionScreenRecorderExt on _SessionScreenState {
     return '$minutes:${remainder.toString().padLeft(2, '0')}';
   }
 
-  /// The phone composer while a voice note is being recorded or reviewed:
-  /// the whole bar becomes the recorder, with a live waveform and one send.
   Widget _mobileRecorder(bool running) {
     final reviewing = !_isRecording && _recordingPath != null;
-    final position = reviewing ? _playbackPosition : _recordingElapsed;
-    final total = _playbackDuration.inMilliseconds;
-    final progress = !reviewing || total <= 0
+    final total = _playbackDuration > Duration.zero
+        ? _playbackDuration
+        : _recordingElapsed;
+    final showPosition = reviewing &&
+        (_isPlayingRecording || _playbackPosition > Duration.zero);
+    final time = !reviewing
+        ? _audioTime(_recordingElapsed)
+        : '${_audioTime(showPosition ? _playbackPosition : Duration.zero)} / ${_audioTime(total)}';
+    final progress = !reviewing || total.inMilliseconds <= 0
         ? null
-        : (_playbackPosition.inMilliseconds / total).clamp(0.0, 1.0);
-    if (!kMobile) {
-      return DesktopRecorderStrip(
-        recording: _isRecording,
-        time: _audioTime(position),
-        wave: LiveRecordingWave(
-            buffer: _waveform, live: _isRecording, progress: progress),
-        playing: _isPlayingRecording,
-        onDiscard: () => unawaited(_discardRecording()),
-        onPlay: () => unawaited(_toggleRecordingPlayback()),
-        onStop: () => unawaited(_stopRecording()),
-        onSend: () => unawaited(_sendMessage()),
-      );
-    }
-    Widget roundBtn(String icon, String tip, VoidCallback onTap,
-            {Color? fill, Color? ink}) =>
-        Tooltip(
-          message: tip,
-          child: Material(
-            color: fill ?? AppColors.surface2,
-            borderRadius: BorderRadius.circular(14),
-            child: InkWell(
-              borderRadius: BorderRadius.circular(14),
-              onTap: onTap,
-              child: SizedBox.square(
-                dimension: 46,
-                child: Center(
-                    child:
-                        AppIcon(icon, size: 19, color: ink ?? AppColors.fg1)),
-              ),
-            ),
-          ),
-        );
-    return Container(
-      padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
-      decoration: BoxDecoration(
-        color: AppColors.surface1,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Row(children: [
-        if (reviewing) ...[
-          roundBtn('trash', 'Discard', () => unawaited(_discardRecording()),
-              ink: AppColors.fg3),
-          const SizedBox(width: 10),
-          roundBtn(
-              _isPlayingRecording ? 'pause' : 'play',
-              _isPlayingRecording ? 'Pause' : 'Play',
-              () => unawaited(_toggleRecordingPlayback())),
-          const SizedBox(width: 10),
-        ],
-        Expanded(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(children: [
-                if (!reviewing) ...[
-                  StatusDot(
-                      status: 'running', size: 8, color: AppColors.danger),
-                  const SizedBox(width: 6),
-                ],
-                Text(reviewing ? 'Voice note' : 'Recording',
-                    style: sans(13, color: AppColors.fg2)),
-                const Spacer(),
-                Text(_audioTime(position),
-                    style: sans(13,
-                        tabular: true,
-                        color: reviewing ? AppColors.fg3 : AppColors.danger)),
-              ]),
-              const SizedBox(height: 6),
-              SizedBox(
-                height: 30,
-                width: double.infinity,
-                child: LiveRecordingWave(
-                    buffer: _waveform, live: _isRecording, progress: progress),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(width: 10),
-        if (_isRecording)
-          roundBtn('stop', 'Stop', () => unawaited(_stopRecording()),
-              fill: AppColors.surface3)
-        else
-          roundBtn(
-              'arrow-up', 'Send voice note', () => unawaited(_sendMessage()),
-              fill: AppColors.accentFill, ink: AppColors.accentFg),
-      ]),
+        : (_playbackPosition.inMilliseconds / total.inMilliseconds)
+            .clamp(0.0, 1.0);
+    return DesktopRecorderStrip(
+      recording: _isRecording,
+      time: time,
+      wave: LiveRecordingWave(
+          buffer: _waveform, live: _isRecording, progress: progress),
+      playing: _isPlayingRecording,
+      onDiscard: () => unawaited(_discardRecording()),
+      onPlay: () => unawaited(_toggleRecordingPlayback()),
+      onStop: () => unawaited(_stopRecording()),
+      onSend: () => unawaited(_sendMessage()),
+      onSeek: reviewing ? (f) => unawaited(_seekRecording(f, total)) : null,
     );
+  }
+
+  Future<void> _seekRecording(double fraction, Duration total) async {
+    if (total <= Duration.zero) return;
+    final target = Duration(milliseconds: (total.inMilliseconds * fraction).round());
+    try {
+      if (_audioPlayer.state == PlayerState.stopped ||
+          _audioPlayer.state == PlayerState.completed) {
+        final path = _recordingPath;
+        if (path == null) return;
+        await _audioPlayer.setSource(DeviceFileSource(path));
+      }
+      await _audioPlayer.seek(target);
+      _playbackPosition = target;
+      _recorderTick.value++;
+    } catch (_) {}
   }
 
   Widget _ctxOption(String icon, String label, String value) {

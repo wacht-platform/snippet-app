@@ -1,7 +1,6 @@
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 export 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
-import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -798,6 +797,17 @@ class IconBtn extends StatelessWidget {
     // desktop the pointer is precise, so `size` is taken at its word.
     final box =
         kMobile && onTap != null && size < M.minTarget ? M.minTarget : size;
+    if (!kMobile) {
+      final btn = _DesktopIconBtn(
+        name: name,
+        onTap: onTap,
+        box: box,
+        ink: box < iconSize + 10 ? box : (iconSize + 10).clamp(24.0, 30.0),
+        iconSize: iconSize,
+        active: active,
+      );
+      return tooltip != null ? Tooltip(message: tooltip!, child: btn) : btn;
+    }
     final btn = Pressable(
       enabled: onTap != null,
       child: Material(
@@ -821,6 +831,84 @@ class IconBtn extends StatelessWidget {
       ),
     );
     return tooltip != null ? Tooltip(message: tooltip!, child: btn) : btn;
+  }
+}
+
+class _DesktopIconBtn extends StatefulWidget {
+  const _DesktopIconBtn({
+    required this.name,
+    required this.onTap,
+    required this.box,
+    required this.ink,
+    required this.iconSize,
+    required this.active,
+  });
+  final String name;
+  final VoidCallback? onTap;
+  final double box;
+  final double ink;
+  final double iconSize;
+  final bool active;
+
+  @override
+  State<_DesktopIconBtn> createState() => _DesktopIconBtnState();
+}
+
+class _DesktopIconBtnState extends State<_DesktopIconBtn> {
+  bool _hover = false;
+  bool _focus = false;
+  bool _down = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = widget.onTap != null;
+    final fill = _down
+        ? AppColors.surface3
+        : widget.active || ((_hover || _focus) && enabled)
+            ? AppColors.surface2
+            : Colors.transparent;
+    final lit = widget.active || (_hover && enabled);
+    return FocusableActionDetector(
+      enabled: enabled,
+      mouseCursor: enabled ? SystemMouseCursors.click : MouseCursor.defer,
+      actions: {
+        ActivateIntent: CallbackAction<ActivateIntent>(
+            onInvoke: (_) => widget.onTap?.call()),
+      },
+      onShowHoverHighlight: (v) => setState(() => _hover = v),
+      onShowFocusHighlight: (v) => setState(() => _focus = v),
+      child: Semantics(
+        button: true,
+        enabled: enabled,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: widget.onTap,
+          onTapDown: enabled ? (_) => setState(() => _down = true) : null,
+          onTapUp: enabled ? (_) => setState(() => _down = false) : null,
+          onTapCancel: enabled ? () => setState(() => _down = false) : null,
+          child: SizedBox(
+            width: widget.box,
+            height: widget.box,
+            child: Center(
+              child: AnimatedContainer(
+                duration: Motion.quick,
+                width: widget.ink,
+                height: widget.ink,
+                decoration: BoxDecoration(
+                  color: fill,
+                  borderRadius: BorderRadius.circular(R.sm),
+                ),
+                child: Center(
+                  child: AppIcon(widget.name,
+                      size: widget.iconSize,
+                      color: lit ? AppColors.fg1 : AppColors.fg2),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -1364,14 +1452,16 @@ class _LongPressCopyState extends State<_LongPressCopy> {
       GestureDetector(onLongPress: _copy, child: widget.child);
 }
 
-/// Dim note (centered) / error (left-aligned, capped at two lines).
+/// Dim note / error card (labelled, danger-tinted).
 class NoteLine extends StatelessWidget {
   final String text;
   final bool error;
 
   /// What went wrong, as the card's header (errors only).
   final String? label;
-  const NoteLine(this.text, {super.key, this.error = false, this.label});
+  final int count;
+  const NoteLine(this.text,
+      {super.key, this.error = false, this.label, this.count = 1});
   @override
   Widget build(BuildContext context) {
     Theme.of(context); // Rebuild on theme change
@@ -1379,75 +1469,67 @@ class NoteLine extends StatelessWidget {
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 3),
         child: Text(text,
-            maxLines: 2,
+            maxLines: 3,
             overflow: TextOverflow.ellipsis,
-            style: sans(12, height: 1.4, color: AppColors.fg3)),
+            style: sans(kMobile ? 13 : 12.5, height: 1.4, color: AppColors.fg3)),
       );
     }
-    if (kMobile) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 6),
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-          decoration: BoxDecoration(
-            color: Color.lerp(AppColors.surface1, AppColors.danger, 0.06),
-            border:
-                Border.all(color: AppColors.danger.withValues(alpha: 0.28)),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Padding(
-              padding: const EdgeInsets.only(top: 2),
-              child: AppIcon('alert-circle', size: 16, color: AppColors.danger),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (label != null)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 2),
-                      child: Text(label!,
-                          style: sans(14,
-                              weight: W.label, color: AppColors.fg1)),
-                    ),
-                  SelectableText(text,
-                      minLines: 1,
-                      maxLines: 6,
-                      style: sans(14, height: 20 / 14, color: AppColors.fg2)),
-                ],
-              ),
-            ),
-          ]),
-        ),
-      );
-    }
+    final limit = text.toLowerCase().contains('session limit') ||
+        text.toLowerCase().contains('usage limit') ||
+        text.toLowerCase().contains('rate limit');
+    final tone = limit ? AppColors.run : AppColors.danger;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.fromLTRB(12, 9, 12, 10),
-        decoration: BoxDecoration(
-          color: AppColors.surface1,
-          border: Border.all(color: AppColors.danger.withValues(alpha: 0.35)),
-          borderRadius: BorderRadius.circular(R.md),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(children: [
-              AppIcon('alert-triangle', size: 12, color: AppColors.danger),
-              const SizedBox(width: 6),
-              Text(label ?? 'Error', style: mono(10, color: AppColors.danger)),
-            ]),
-            const SizedBox(height: 5),
-            SelectableText(text,
-                minLines: 1,
-                maxLines: 6,
-                style: sans(13, height: 1.45, color: AppColors.fg2)),
-          ],
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: Color.lerp(AppColors.surface1, tone, 0.06),
+            borderRadius: BorderRadius.circular(R.md),
+            border: Border.all(color: tone.withValues(alpha: 0.22)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: AppIcon(limit ? 'clock' : 'alert-triangle',
+                    size: 13, color: tone),
+              ),
+              const SizedBox(width: 8),
+              Flexible(
+                child: SelectableText.rich(
+                    TextSpan(children: [
+                      if (label != null)
+                        TextSpan(
+                            text: '$label  ',
+                            style: TextStyle(
+                                color: AppColors.fg1,
+                                fontWeight: weightFor(W.label))),
+                      TextSpan(text: text),
+                    ]),
+                    minLines: 1,
+                    maxLines: 5,
+                    style: sans(kMobile ? 13 : 12.5,
+                        height: 1.4, color: AppColors.fg2)),
+              ),
+              if (count > 1) ...[
+                const SizedBox(width: 8),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: tone.withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(R.pill),
+                  ),
+                  child: Text('×$count',
+                      style: mono(11, weight: W.label, color: tone)),
+                ),
+              ],
+            ],
+          ),
         ),
       ),
     );
@@ -1951,6 +2033,7 @@ const _lucide = <String, IconData>{
   'user': LucideIcons.user,
   'sparkles': LucideIcons.sparkles,
   'mic': LucideIcons.mic,
+  'volume': LucideIcons.volume2,
   'mic-off': LucideIcons.micOff,
   'shield': LucideIcons.shield,
   'goal': LucideIcons.goal,

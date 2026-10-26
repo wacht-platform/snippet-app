@@ -121,27 +121,13 @@ class ServerConfig {
 
 class VoiceSettings {
   final bool enabled;
-  final String speechModel;
-  final String language;
-  final List<String> keyterms;
   final int maxSeconds;
-  final bool keySet;
-  final List<String> speechModels;
   final int minSeconds;
   final int maxSecondsLimit;
 
   VoiceSettings.fromJson(Map<String, dynamic> j)
       : enabled = j['enabled'] != false,
-        speechModel = j['speech_model'] as String? ?? '',
-        language = j['language'] as String? ?? '',
-        keyterms = [for (final t in (j['keyterms'] as List? ?? const [])) t as String],
         maxSeconds = (j['max_seconds'] as num?)?.toInt() ?? 180,
-        keySet = j['key_set'] == true,
-        speechModels = [
-          for (final m in (j['speech_models'] as List? ??
-              const ['universal-3-5-pro', 'universal-2']))
-            m as String
-        ],
         minSeconds = (j['min_seconds'] as num?)?.toInt() ?? 30,
         maxSecondsLimit = (j['max_seconds_limit'] as num?)?.toInt() ?? 600;
 }
@@ -883,6 +869,22 @@ String rateWindowLabel(int minutes) {
   return 'limit';
 }
 
+String limitWindowLabel(RateWindow r) {
+  const buckets = [(300, '5h'), (10080, '7d'), (43200, '30d')];
+  var i = 0;
+  if (r.windowMinutes > 0) {
+    i = buckets.indexWhere((b) => r.windowMinutes <= b.$1 * 1.05);
+    if (i < 0) i = buckets.length - 1;
+  }
+  if (r.resetsAt > 0) {
+    final left = (r.resetsAt - DateTime.now().millisecondsSinceEpoch ~/ 1000) / 60;
+    while (i < buckets.length - 1 && left > buckets[i].$1 * 1.05) {
+      i++;
+    }
+  }
+  return buckets[i].$2;
+}
+
 /// "resets in 2h 14m · 15:45" from a Unix-epoch-seconds reset time. Durations
 /// normalize up — minutes → hours → days (so a weekly window reads "6d 6h", not
 /// "150h 54m"). The local clock time is appended only for near resets (< 1 day
@@ -1592,4 +1594,169 @@ class ArtifactInfo {
             .map((v) => ArtifactVersion.fromJson(v as Map<String, dynamic>))
             .toList(),
       );
+}
+
+class AmbientEvent {
+  final String id;
+  final String device;
+  final DateTime startedAt;
+  final int durationMs;
+  final String status;
+  final String text;
+  final String? error;
+  final String? verdict;
+  final bool kept;
+
+  AmbientEvent.fromJson(Map<String, dynamic> j)
+      : id = j['id'] as String? ?? '',
+        device = j['device'] as String? ?? '',
+        startedAt = DateTime.tryParse(j['started_at'] as String? ?? '')?.toLocal() ??
+            DateTime.fromMillisecondsSinceEpoch(0),
+        durationMs = (j['duration_ms'] as num?)?.toInt() ?? 0,
+        status = j['status'] as String? ?? '',
+        text = j['text'] as String? ?? '',
+        error = j['error'] as String?,
+        verdict = j['verdict'] as String?,
+        kept = j['kept'] as bool? ?? true;
+}
+
+class AmbientStats {
+  final int segments;
+  final int audioSeconds;
+  final Map<String, int> byStatus;
+
+  AmbientStats.fromJson(Map<String, dynamic> j)
+      : segments = (j['segments'] as num?)?.toInt() ?? 0,
+        audioSeconds = (j['audio_seconds'] as num?)?.toInt() ?? 0,
+        byStatus = {
+          for (final e in ((j['by_status'] as Map?) ?? {}).entries)
+            e.key as String: (e.value as num).toInt()
+        };
+}
+
+class AmbientDevice {
+  final String device;
+  final DateTime lastSeen;
+  AmbientDevice.fromJson(Map<String, dynamic> j)
+      : device = j['device'] as String? ?? '',
+        lastSeen = DateTime.fromMillisecondsSinceEpoch(
+            ((j['last_seen'] as num?)?.toInt() ?? 0) * 1000);
+}
+
+class TtsVoice {
+  final String model;
+  final String accent;
+  final String gender;
+
+  TtsVoice.fromJson(Map<String, dynamic> j)
+      : model = j['model'] as String? ?? '',
+        accent = j['accent'] as String? ?? '',
+        gender = j['gender'] as String? ?? '';
+
+  String get name {
+    final parts = model.split('-');
+    final n = parts.length > 1 ? parts[1] : model;
+    return n.isEmpty ? n : n[0].toUpperCase() + n.substring(1);
+  }
+}
+
+class AmbientSettings {
+  final bool enabled;
+  final String mode;
+  final bool keySet;
+  final List<AmbientDevice> devices;
+  final String? listeningId;
+  final String? listeningDevice;
+  final bool conversationOpen;
+  final String effectiveMode;
+  final bool watcherChatContext;
+  final String watcher;
+  final bool watcherKeySet;
+  final int conversationTimeoutSecs;
+  final List<String> wakePhrases;
+  final bool assemblyaiKeySet;
+  final bool deepgramKeySet;
+  final String deepgramHost;
+  final List<(String, String)> deepgramHosts;
+  final String ttsVoice;
+  final List<TtsVoice> ttsVoices;
+  final String stt;
+
+  const AmbientSettings(
+      {this.enabled = false,
+      this.mode = 'passive',
+      this.keySet = true,
+      this.devices = const [],
+      this.listeningId,
+      this.listeningDevice,
+      this.conversationOpen = false,
+      this.effectiveMode = '',
+      this.watcherChatContext = false,
+      this.watcher = 'classifier',
+      this.watcherKeySet = false,
+      this.conversationTimeoutSecs = 90,
+      this.wakePhrases = const [],
+      this.assemblyaiKeySet = false,
+      this.deepgramKeySet = false,
+      this.deepgramHost = 'api.deepgram.com',
+      this.deepgramHosts = const [],
+      this.ttsVoice = '',
+      this.ttsVoices = const [],
+      this.stt = 'assemblyai'});
+
+  String get shownMode =>
+      (enabled && effectiveMode.isNotEmpty) ? effectiveMode : mode;
+
+  AmbientSettings withMode(String next) => AmbientSettings(
+      enabled: enabled,
+      mode: next,
+      keySet: keySet,
+      devices: devices,
+      listeningId: listeningId,
+      listeningDevice: listeningDevice,
+      conversationOpen: next == 'active' ? conversationOpen : false,
+      effectiveMode: next,
+      watcherChatContext: watcherChatContext,
+      watcher: watcher,
+      watcherKeySet: watcherKeySet,
+      conversationTimeoutSecs: conversationTimeoutSecs,
+      wakePhrases: wakePhrases,
+      assemblyaiKeySet: assemblyaiKeySet,
+      deepgramKeySet: deepgramKeySet,
+      deepgramHost: deepgramHost,
+      deepgramHosts: deepgramHosts,
+      ttsVoice: ttsVoice,
+      ttsVoices: ttsVoices,
+      stt: stt);
+
+  AmbientSettings.fromJson(Map<String, dynamic> j)
+      : enabled = j['enabled'] == true,
+        mode = j['mode'] as String? ?? 'passive',
+        keySet = j['key_set'] != false,
+        listeningId = j['listening_id'] as String?,
+        listeningDevice = j['listening_device'] as String?,
+        conversationOpen = j['conversation'] != null,
+        effectiveMode = j['effective_mode'] as String? ?? '',
+        watcherChatContext = j['watcher_chat_context'] == true,
+        watcher = (j['watcher'] as String? ?? 'classifier') == 'jev' ? 'classifier' : (j['watcher'] as String? ?? 'classifier'),
+        watcherKeySet = j['watcher_key_set'] == true,
+        conversationTimeoutSecs = (j['conversation_timeout_secs'] as num?)?.toInt() ?? 90,
+        wakePhrases = [for (final p in (j['wake_phrases'] as List? ?? const [])) p as String],
+        assemblyaiKeySet = j['assemblyai_key_set'] == true,
+        deepgramKeySet = j['deepgram_key_set'] == true,
+        deepgramHost = j['deepgram_host'] as String? ?? 'api.deepgram.com',
+        deepgramHosts = [
+          for (final h in (j['deepgram_hosts'] as List? ?? const []))
+            ((h as Map)['host'] as String? ?? '', h['label'] as String? ?? '')
+        ],
+        ttsVoice = j['tts_voice'] as String? ?? '',
+        stt = j['stt'] as String? ?? 'assemblyai',
+        ttsVoices = [
+          for (final v in (j['tts_voices'] as List? ?? const []))
+            TtsVoice.fromJson((v as Map).cast<String, dynamic>())
+        ],
+        devices = [
+          for (final d in (j['devices'] as List? ?? const []))
+            AmbientDevice.fromJson((d as Map).cast<String, dynamic>())
+        ];
 }

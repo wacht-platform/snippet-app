@@ -128,8 +128,15 @@ extension _SessionScreenSocketExt on _SessionScreenState {
         return;
       }
       if (wire == 'stream') {
-        final text = (j['text'] as String?) ?? '';
-        final thinking = (j['thinking'] as String?) ?? '';
+        final append = j['append'] == true;
+        final text = append
+            ? _streamText + ((j['text'] as String?) ?? '')
+            : (j['text'] as String?) ?? '';
+        final thinking = append
+            ? _streamThinking + ((j['thinking'] as String?) ?? '')
+            : (j['thinking'] as String?) ?? '';
+        _streamText = text;
+        _streamThinking = thinking;
         final visible = j['text_visible'] == true;
         if (!mounted) return;
         // Ignore non-empty stream while the run is idle/stopped — a late

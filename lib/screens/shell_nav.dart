@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../platform.dart';
 import '../theme.dart';
 import '../widgets.dart';
-import 'mobile_chrome.dart';
 
 /// Design-language primitives for the shell sidebar.
 ///
@@ -348,8 +347,8 @@ class NavBackRow extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(S.s4, 0, S.s12, 0),
             child: Row(children: [
               IconBtn('chevron-left',
-                  size: M.minTarget,
-                  iconSize: 22,
+                  size: 32,
+                  iconSize: 18,
                   tooltip: 'Back',
                   onTap: onBack),
               const SizedBox(width: S.s2),

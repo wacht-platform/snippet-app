@@ -208,13 +208,40 @@ class _EditorScreenState extends State<EditorScreen> {
               onBack: _maybePop,
               actions: [
                 if (!_loading && _error == null) ...[
-                  _UndoRedo(controller: _controller),
-                  IconBtn('wrap',
-                      size: 36,
-                      iconSize: 18,
-                      active: _wrap,
-                      tooltip: _wrap ? 'Stop wrapping lines' : 'Wrap lines',
-                      onTap: () => setState(() => _wrap = !_wrap)),
+                  _UndoRedo(controller: _controller, compact: kMobile),
+                  if (kMobile)
+                    Builder(
+                      builder: (anchor) => IconBtn('more-horizontal',
+                          size: 36,
+                          iconSize: 18,
+                          tooltip: 'More', onTap: () async {
+                        final pick = await showAppMenu<String>(context,
+                            anchor: anchor,
+                            minWidth: 200,
+                            items: [
+                              if (_controller.canRedo)
+                                appMenuRow<String>(
+                                    value: 'redo', icon: 'redo', label: 'Redo'),
+                              appMenuRow<String>(
+                                  value: 'wrap',
+                                  icon: 'wrap',
+                                  label: 'Wrap lines',
+                                  selected: _wrap),
+                            ]);
+                        if (!mounted) return;
+                        if (pick == 'redo' && _controller.canRedo) {
+                          _controller.redo();
+                        }
+                        if (pick == 'wrap') setState(() => _wrap = !_wrap);
+                      }),
+                    )
+                  else
+                    IconBtn('wrap',
+                        size: 36,
+                        iconSize: 18,
+                        active: _wrap,
+                        tooltip: _wrap ? 'Stop wrapping lines' : 'Wrap lines',
+                        onTap: () => setState(() => _wrap = !_wrap)),
                   const SizedBox(width: S.s4),
                   Btn(_saving ? 'Saving' : 'Save',
                       small: true,
@@ -404,8 +431,9 @@ class _Key extends StatelessWidget {
 }
 
 class _UndoRedo extends StatefulWidget {
-  const _UndoRedo({required this.controller});
+  const _UndoRedo({required this.controller, this.compact = false});
   final CodeLineEditingController controller;
+  final bool compact;
 
   @override
   State<_UndoRedo> createState() => _UndoRedoState();
@@ -454,11 +482,12 @@ class _UndoRedoState extends State<_UndoRedo> {
           iconSize: 18,
           tooltip: 'Undo',
           onTap: c.canUndo ? c.undo : null),
-      IconBtn('redo',
-          size: 36,
-          iconSize: 18,
-          tooltip: 'Redo',
-          onTap: c.canRedo ? c.redo : null),
+      if (!widget.compact)
+        IconBtn('redo',
+            size: 36,
+            iconSize: 18,
+            tooltip: 'Redo',
+            onTap: c.canRedo ? c.redo : null),
     ]);
   }
 }

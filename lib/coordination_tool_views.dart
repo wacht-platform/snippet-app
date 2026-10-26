@@ -62,6 +62,119 @@ bool? coordinationHasDetail(String tool, Map? a, Map? d) {
   return null;
 }
 
+String _statusTitle(String status) {
+  final t = status.replaceAll('_', ' ');
+  return t.isEmpty ? t : '${t[0].toUpperCase()}${t.substring(1)}';
+}
+
+String _count(int n, String one, String many) => '$n ${n == 1 ? one : many}';
+
+/// The (verb, object) sentence for a Mission Control or coordination tool, or
+/// null when [tool] is not one of them.
+(String, String)? coordinationSentence(String tool, Map? a, Map? d,
+    {required bool running}) {
+  String arg(String k) => a?[k]?.toString().trim() ?? '';
+  final task = d?['task'] is Map ? d!['task'] as Map : null;
+  String taskTitle() {
+    final t = _s(task?['title']);
+    return t.isNotEmpty ? t : arg('title');
+  }
+
+  final known = d != null;
+  (String, String) listed(String key, String one, String many, String doing,
+      {String done = 'Listed'}) {
+    final list = d?[key];
+    if (running || !known || list is! List) return (doing, '');
+    return (done, _count(list.length, one, many));
+  }
+
+  switch (tool) {
+    case 'create_mission_task':
+      return (running ? 'Creating task' : 'Created task', taskTitle());
+    case 'update_mission_task':
+      return (running ? 'Updating task' : 'Updated task', taskTitle());
+    case 'retry_mission_task':
+      return (running ? 'Retrying task' : 'Retried task', taskTitle());
+    case 'cancel_mission_task':
+      return (running ? 'Cancelling task' : 'Cancelled task', taskTitle());
+    case 'report_mission_task':
+      if (running) return ('Reporting', '');
+      final status = _s(task?['status']);
+      final title = _s(task?['title']);
+      if (status.isEmpty && title.isEmpty) return ('Filed a task report', '');
+      final head = status.isEmpty
+          ? 'Reported on'
+          : 'Reported ${_statusTitle(status)} on';
+      return title.isEmpty ? (head.replaceAll(' on', ''), '') : (head, title);
+    case 'inspect_task':
+      return (
+        running ? 'Inspecting task' : 'Inspected task',
+        _s(d?['title']).isNotEmpty ? _s(d?['title']) : arg('id')
+      );
+    case 'inspect_session':
+      return (
+        running ? 'Inspecting session' : 'Inspected session',
+        _s(d?['title']).isNotEmpty ? _s(d?['title']) : arg('id')
+      );
+    case 'list_mission_tasks':
+      return listed('tasks', 'task', 'tasks', 'Listing tasks');
+    case 'list_sessions':
+      return listed('sessions', 'session', 'sessions', 'Listing sessions');
+    case 'list_profiles':
+      return listed('profiles', 'profile', 'profiles', 'Listing profiles');
+    case 'list_coordination_agents':
+      return listed('agents', 'agent', 'agents', 'Looking at agents',
+          done: 'Looked at');
+    case 'read_coordination_board':
+      return (
+        running ? 'Reading the coordination board' : 'Read the coordination board',
+        ''
+      );
+    case 'read_coordination_thread':
+      return (
+        running
+            ? 'Reading the coordination thread'
+            : 'Read the coordination thread',
+        ''
+      );
+    case 'read_agent_thread':
+      final peer = arg('agent_id').isNotEmpty ? arg('agent_id') : arg('peer_id');
+      return peer.isEmpty
+          ? (running ? 'Reading an agent thread' : 'Read an agent thread', '')
+          : (running ? 'Reading thread with' : 'Read thread with', peer);
+    case 'read_agent_inbox':
+      return (running ? 'Checking the inbox' : 'Checked the inbox', '');
+    case 'send_agent_message':
+      final to = [arg('to'), arg('agent_id'), arg('recipient'), arg('peer_id')]
+          .firstWhere((v) => v.isNotEmpty, orElse: () => '');
+      return to.isEmpty
+          ? (running ? 'Messaging an agent' : 'Messaged an agent', '')
+          : (running ? 'Messaging' : 'Messaged', to);
+    case 'post_coordination_message':
+      return (
+        running ? 'Posting to the coordination thread' : 'Posted to the coordination thread',
+        ''
+      );
+    case 'post_task_coordination':
+      return (running ? 'Posting to the task thread' : 'Posted to the task thread', '');
+    case 'message_mission_control':
+      return (running ? 'Messaging Mission Control' : 'Messaged Mission Control', '');
+    case 'record_coordination_note':
+      return (running ? 'Recording a note' : 'Recorded a coordination note', '');
+    case 'create_recurring_job':
+      return (running ? 'Scheduling' : 'Scheduled', arg('title'));
+    case 'assign_task_agent':
+      return (running ? 'Assigning task' : 'Assigned task', arg('agent_id'));
+    case 'archive_mission_session':
+      return (running ? 'Archiving a session' : 'Archived a session', '');
+    case 'create_mission_session':
+      return (running ? 'Starting a session' : 'Started a session', '');
+    case 'register_agent':
+      return (running ? 'Registering an agent' : 'Registered an agent', '');
+  }
+  return null;
+}
+
 /// The detail body for Mission Control and coordination tools, or null when
 /// [tool] is not one of them.
 List<Widget>? coordinationToolBody(
@@ -106,7 +219,7 @@ List<Widget>? coordinationToolBody(
       final question = _s(d['pending_question']);
       return [
         _Header(
-          title: _s(d['title']).isEmpty ? 'Session' : _s(d['title']),
+          title: '',
           status: _s(d['status']),
           meta: _s(d['workspace']),
         ),
@@ -174,7 +287,7 @@ List<Widget>? coordinationToolBody(
     case 'create_recurring_job':
       return [
         _Header(
-            title: arg('title').isEmpty ? 'Recurring job' : arg('title'),
+            title: '',
             status: '',
             meta: arg('schedule')),
         if (arg('prompt').isNotEmpty)
@@ -220,22 +333,9 @@ class _ItemList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (items.isEmpty) return Text(empty, style: TS.meta());
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.surface1,
-        border: Border.all(
-            color: kMobile
-                ? AppColors.fg1.withValues(alpha: 0.08)
-                : AppColors.border),
-        borderRadius: BorderRadius.circular(kMobile ? 14 : R.md),
-      ),
-      child: Column(children: [
-        for (var i = 0; i < items.length; i++) ...[
-          if (i > 0) Container(height: 1, color: AppColors.border),
-          _row(items[i]),
-        ],
-      ]),
-    );
+    return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [for (final item in items) _row(item)]);
   }
 
   Widget _row(Map item) {
@@ -243,7 +343,7 @@ class _ItemList extends StatelessWidget {
     final m = meta(item);
     final t = title(item);
     return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 9, 12, 9),
+      padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         crossAxisAlignment:
             multiline ? CrossAxisAlignment.start : CrossAxisAlignment.center,
@@ -292,7 +392,20 @@ class _Header extends StatelessWidget {
       {required this.title, required this.status, required this.meta});
 
   @override
-  Widget build(BuildContext context) => Column(
+  Widget build(BuildContext context) {
+    if (title.isEmpty) {
+      return Text.rich(TextSpan(children: [
+        if (status.isNotEmpty)
+          TextSpan(
+              text: _statusLabel(status),
+              style: _label(_statusColor(status))),
+        if (status.isNotEmpty && meta.isNotEmpty)
+          TextSpan(text: ' · ', style: _label(AppColors.fg3)),
+        if (meta.isNotEmpty)
+          TextSpan(text: meta, style: _label(AppColors.fg3)),
+      ]));
+    }
+    return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -316,6 +429,7 @@ class _Header extends StatelessWidget {
           ],
         ],
       );
+  }
 }
 
 class _TaskSummary extends StatelessWidget {
@@ -334,7 +448,7 @@ class _TaskSummary extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _Header(
-          title: _s(task['title']).isEmpty ? 'Task' : _s(task['title']),
+          title: '',
           status: _s(task['status']),
           meta: id.isEmpty ? '' : 'task ${_short(id)}',
         ),
@@ -358,7 +472,7 @@ class _Section extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.only(top: 14),
+        padding: const EdgeInsets.only(top: 10),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

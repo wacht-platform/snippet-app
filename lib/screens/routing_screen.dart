@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../api.dart';
 import '../models.dart';
 import '../platform.dart';
+import '../settings_form.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'shell_nav.dart';
@@ -185,7 +186,8 @@ class _RoutingScreenState extends State<RoutingScreen> {
     await _save(key, next);
   }
 
-  Widget _chainWrap(String key, List<String> chosen) {
+  Widget _chainWrap(String key, List<String> chosen,
+      {WrapAlignment alignment = WrapAlignment.start}) {
     final profiles = _config?.profiles ?? const <InferenceProfile>[];
     final byName = {for (final p in profiles) p.name: p};
     final limited = _config?.limited ?? const {};
@@ -194,6 +196,7 @@ class _RoutingScreenState extends State<RoutingScreen> {
         key == 'lanes' || key == 'memory' ? 'Session model' : 'Active profile';
 
     return Wrap(
+      alignment: alignment,
       spacing: 8,
       runSpacing: 8,
       crossAxisAlignment: WrapCrossAlignment.center,
@@ -324,28 +327,12 @@ class _RoutingScreenState extends State<RoutingScreen> {
 
   Widget _desktopRouteRow(String key, String title, String about) {
     final chosen = _routes[key] ?? const [];
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 16),
-      decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: AppColors.line)),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          SizedBox(
-            width: 180,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: sans(13.5, color: AppColors.fg1)),
-                const SizedBox(height: 2),
-                Text(about, style: sans(12, color: AppColors.fg4)),
-              ],
-            ),
-          ),
-          const SizedBox(width: 20),
-          Expanded(child: _chainWrap(key, chosen)),
-        ],
+    return SettingsRow(
+      label: title,
+      sub: about,
+      trailing: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 360),
+        child: _chainWrap(key, chosen, alignment: WrapAlignment.end),
       ),
     );
   }
@@ -374,6 +361,33 @@ class _RoutingScreenState extends State<RoutingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (!kMobile && _config == null) {
+      return SettingsGroup(children: [
+        _error == null
+            ? const SettingsRow(label: 'Loading routing…')
+            : SettingsRow(
+                label: "Couldn't load routing",
+                sub: '$_error',
+                danger: true,
+                trailing: Btn('Retry',
+                    small: true,
+                    variant: BtnVariant.secondary,
+                    onTap: () => _load(force: true)),
+              ),
+      ]);
+    }
+    if (!kMobile) {
+      return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        SettingsGroup(
+          footer:
+              'Select a model to make it primary, reorder it, swap it or remove it. The first model handles the work; the rest step in when it hits a limit.',
+          children: [
+            for (final (key, title, about) in _routeDefs)
+              _desktopRouteRow(key, title, about),
+          ],
+        ),
+      ]);
+    }
     final Widget body;
     if (_config == null) {
       body = _error == null
@@ -385,7 +399,7 @@ class _RoutingScreenState extends State<RoutingScreen> {
               action:
                   Btn('Retry', small: true, onTap: () => _load(force: true)),
             );
-    } else if (kMobile) {
+    } else {
       body = ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 40),
         children: [
@@ -416,19 +430,6 @@ class _RoutingScreenState extends State<RoutingScreen> {
               ],
             ),
           ),
-        ],
-      );
-    } else {
-      body = PageBody(
-        topPadding: 4,
-        children: [
-          Text(
-            'Which model does each kind of work, and who steps in when it hits a limit.',
-            style: sans(13.5, height: 1.55, color: AppColors.fg3),
-          ),
-          const SizedBox(height: 18),
-          for (final (key, title, about) in _routeDefs)
-            _desktopRouteRow(key, title, about),
         ],
       );
     }

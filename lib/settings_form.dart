@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import 'menu_widgets.dart';
 import 'platform.dart';
 import 'theme.dart';
 import 'widgets.dart';
@@ -39,6 +38,9 @@ class SettingsGroup extends StatelessWidget {
           clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(
             color: AppColors.surface1,
+            borderRadius: BorderRadius.circular(kMobile ? 14 : 10),
+          ),
+          foregroundDecoration: BoxDecoration(
             borderRadius: BorderRadius.circular(kMobile ? 14 : 10),
             border: Border.all(color: AppColors.line),
           ),
@@ -96,9 +98,8 @@ class SettingsRow extends StatelessWidget {
                   labelWidget ??
                       Text(label,
                           style: sans(kMobile ? 15 : 13,
-                              color: danger
-                                  ? AppColors.danger
-                                  : AppColors.fg1)),
+                              color:
+                                  danger ? AppColors.danger : AppColors.fg1)),
                   if (sub != null && sub!.isNotEmpty) ...[
                     const SizedBox(height: 2),
                     Text(sub!,
@@ -172,7 +173,9 @@ class SettingsPopup<T> extends StatelessWidget {
     required this.selected,
     required this.onSelected,
     this.leading,
+    this.sheetHeightFactor,
   });
+  final double? sheetHeightFactor;
   final String label;
   final List<(T, String)> items;
   final T selected;
@@ -190,6 +193,7 @@ class SettingsPopup<T> extends StatelessWidget {
           onTap: () async {
             final picked = await showAppMenu<T>(context,
                 anchor: anchor,
+                sheetHeightFactor: sheetHeightFactor,
                 items: [
                   for (final (v, l) in items)
                     appMenuItem(value: v, label: l, selected: v == selected),
@@ -198,7 +202,8 @@ class SettingsPopup<T> extends StatelessWidget {
           },
           child: Container(
             height: kMobile ? 32 : 26,
-            padding: EdgeInsets.fromLTRB(kMobile ? 4 : 10, 0, kMobile ? 0 : 8, 0),
+            padding:
+                EdgeInsets.fromLTRB(kMobile ? 4 : 10, 0, kMobile ? 0 : 8, 0),
             child: Row(mainAxisSize: MainAxisSize.min, children: [
               if (leading != null) ...[leading!, const SizedBox(width: 7)],
               Text(label,
@@ -249,8 +254,9 @@ class SettingsField extends StatelessWidget {
       width: kMobile ? (width > 210 ? 210 : width) : width,
       child: Container(
         height: kMobile ? 34 : 28,
-        padding:
-            kMobile ? EdgeInsets.zero : const EdgeInsets.symmetric(horizontal: 9),
+        padding: kMobile
+            ? EdgeInsets.zero
+            : const EdgeInsets.symmetric(horizontal: 9),
         decoration: kMobile
             ? null
             : BoxDecoration(

@@ -83,8 +83,12 @@ class MobileTopBar extends StatelessWidget {
     required this.onMenu,
     required this.onSettings,
     this.sessionsBusy = false,
+    this.trailingOrb,
+    this.onActions,
   });
 
+  final Widget? trailingOrb;
+  final VoidCallback? onActions;
   final bool mission;
   final VoidCallback onMission;
   final VoidCallback onSessions;
@@ -97,6 +101,7 @@ class MobileTopBar extends StatelessWidget {
     required Widget glyph,
     required String label,
     required VoidCallback onTap,
+    VoidCallback? onActiveTap,
     bool dot = false,
   }) {
     return Semantics(
@@ -106,7 +111,12 @@ class MobileTopBar extends StatelessWidget {
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: active
-            ? null
+            ? (onActiveTap == null
+                ? null
+                : () {
+                    HapticFeedback.selectionClick();
+                    onActiveTap();
+                  })
             : () {
                 HapticFeedback.selectionClick();
                 onTap();
@@ -154,6 +164,7 @@ class MobileTopBar extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Row(children: [
           RoundBtn(icon: 'menu', tooltip: 'Menu', onTap: onMenu),
+          if (trailingOrb != null) const SizedBox(width: 44),
           const Spacer(),
           Container(
             padding: const EdgeInsets.all(4),
@@ -166,6 +177,7 @@ class MobileTopBar extends StatelessWidget {
                     color: mission ? mochiPalette.first.$2 : AppColors.fg4,
                     size: 19),
                 onTap: onMission,
+                onActiveTap: onActions,
               ),
               const SizedBox(width: 2),
               _segment(
@@ -179,6 +191,7 @@ class MobileTopBar extends StatelessWidget {
             ]),
           ),
           const Spacer(),
+          if (trailingOrb != null) trailingOrb!,
           RoundBtn(icon: 'settings', tooltip: 'Settings', onTap: onSettings),
         ]),
       ),

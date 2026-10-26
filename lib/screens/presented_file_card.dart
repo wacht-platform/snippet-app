@@ -96,74 +96,15 @@ class PresentedFileCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (mediaKindOf(path) == MediaKind.image) return _image(context);
-    final body = kMobile
-        ? Padding(
-            padding: const EdgeInsets.fromLTRB(12, 12, 6, 12),
-            child: Row(children: [
-              Container(
-                width: 40,
-                height: 40,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: AppColors.surface2,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: AppIcon(_icon, size: 18, color: AppColors.fg2),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(_name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: sans(15, weight: W.label, color: AppColors.fg1)),
-                    const SizedBox(height: 2),
-                    Text(caption.isNotEmpty ? caption : _kindLabel,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: sans(13, color: AppColors.fg3)),
-                  ],
-                ),
-              ),
-              _downloadButton(context),
-            ]),
-          )
-        : Padding(
-            padding: const EdgeInsets.fromLTRB(10, 5, 6, 5),
-            child: Row(children: [
-              AppIcon(_icon, size: 14, color: AppColors.fg3),
-              const SizedBox(width: S.s8),
-              Expanded(
-                child: Text.rich(
-                  TextSpan(children: [
-                    TextSpan(text: _name, style: TS.ui(AppColors.fg1)),
-                    TextSpan(text: '  $_kindLabel', style: TS.meta(AppColors.fg4)),
-                    if (caption.isNotEmpty)
-                      TextSpan(text: '  $caption', style: TS.ui(AppColors.fg3)),
-                  ]),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              _downloadButton(context),
-            ]),
-          );
-    return Padding(
-      padding: EdgeInsets.symmetric(vertical: kMobile ? 4 : 3),
-      child: Tooltip(
-        message: path,
-        waitDuration: const Duration(milliseconds: 600),
-        child: Material(
-          color: AppColors.surface1,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(kMobile ? 14 : 10),
-          ),
-          clipBehavior: Clip.antiAlias,
-          child: InkWell(onTap: () => _open(context), child: body),
-        ),
+    return Tooltip(
+      message: path,
+      waitDuration: const Duration(milliseconds: 600),
+      child: MediaRow(
+        icon: _icon,
+        name: _name,
+        detail: [_kindLabel, if (caption.isNotEmpty) caption].join(' · '),
+        onTap: () => _open(context),
+        trailing: _downloadButton(context),
       ),
     );
   }
@@ -186,6 +127,93 @@ class PresentedFileCard extends StatelessWidget {
             _downloadButton(context),
           ]),
         ]),
+      ),
+    );
+  }
+}
+
+class MediaRow extends StatelessWidget {
+  const MediaRow({
+    super.key,
+    required this.icon,
+    required this.name,
+    required this.detail,
+    required this.onTap,
+    this.trailing,
+  });
+
+  final String icon;
+  final String name;
+  final String detail;
+  final VoidCallback onTap;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    final nameStyle = sans(kMobile ? 14 : 13.5, weight: W.label, color: AppColors.fg1);
+    final detailStyle = sans(kMobile ? 13 : 12.5, color: AppColors.fg3);
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: kMobile ? 4 : 3),
+      child: Material(
+        color: AppColors.surface1,
+        borderRadius: BorderRadius.circular(10),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: kMobile ? 52 : 40),
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(kMobile ? 10 : 8, 0, 8, 0),
+              child: Row(children: [
+                Container(
+                  width: 32,
+                  height: 32,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: AppColors.accentBg,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: AppIcon(icon, size: 16, color: AppColors.accent),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: kMobile
+                      ? Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: nameStyle),
+                            if (detail.isNotEmpty)
+                              Text(detail,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: detailStyle),
+                          ],
+                        )
+                      : Text.rich(
+                          TextSpan(children: [
+                            TextSpan(text: name, style: nameStyle),
+                            if (detail.isNotEmpty)
+                              TextSpan(text: '  $detail', style: detailStyle),
+                          ]),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                ),
+                if (trailing != null) ...[
+                  const SizedBox(width: 4),
+                  trailing!,
+                ],
+                const SizedBox(width: 4),
+                AppIcon('chevron-right', size: 14, color: AppColors.fg4),
+                const SizedBox(width: 4),
+              ]),
+            ),
+          ),
+        ),
       ),
     );
   }

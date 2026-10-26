@@ -105,22 +105,12 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
           isSessionRunning && run.any((w) => w is DenseToolRow && w.pending);
       final toolKey = 'transcript-tools-$start';
       final open = _toolRunOpen[toolKey] ?? false;
-      final batch = ToolBatch([
-        for (final r in run.whereType<DenseToolRow>())
-          ToolStep(tool: r.tool, args: r.args, result: r.result),
-      ], running: running);
-      final live =
-          _toolBatches.putIfAbsent(toolKey, () => ValueNotifier(batch));
-      // An open sheet listens to this; update it after the frame so the sheet
-      // never rebuilds in the middle of the transcript's own build.
-      WidgetsBinding.instance.addPostFrameCallback((_) => live.value = batch);
       out.add(KeyedSubtree(
         key: ValueKey(toolKey),
         child: ToolRun(
           List.of(run),
           running: running,
           open: open,
-          batch: live,
           onOpenChanged: (nextOpen) {
             if (!mounted) return;
             _setState(() {
@@ -136,11 +126,47 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
       runStartKey = null;
     }
 
+    String? laneTitleFor(String agentId) {
+      if (!agentId.startsWith('lane ')) return null;
+      final id = agentId.substring(5).trim();
+      for (final l in _state?.lanes ?? const <LaneInfo>[]) {
+        if (l.id == id) return l.title;
+      }
+      return null;
+    }
+
     LaneInfo? liveLane(String id) {
       for (final l in _state?.lanes ?? const <LaneInfo>[]) {
         if (l.id == id) return l;
       }
       return null;
+    }
+
+    final superseded = supersededAmbientTurns([
+      for (final e in events)
+        if (e['kind'] == 'user_input' || e['kind'] == 'steer') _s(e['text']),
+    ]);
+
+    final resultOf = <int, int>{};
+    final pairedResults = <int>{};
+    {
+      final open = <String, List<int>>{};
+      for (var i = 0; i < events.length; i++) {
+        final kind = events[i]['kind'];
+        final name = _s(events[i]['tool_name']);
+        if (kind == 'tool_call') {
+          (open[name] ??= []).add(i);
+        } else if (kind == 'tool_result') {
+          final waiting = open[name];
+          if (waiting != null && waiting.isNotEmpty) {
+            final call = waiting.removeAt(0);
+            if (i > call + 1) {
+              resultOf[call] = i;
+              pairedResults.add(i);
+            }
+          }
+        }
+      }
     }
 
     for (var idx = 0; idx < events.length; idx++) {
@@ -154,10 +180,37 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
           // Meta-tools render via their own events (note → note, ask_user →
           // user_question, delegate_task → lane_spawned). Skip their generic tool
           // lines so they don't double up.
+          if (_isSpeakTool(_s(e['tool_name']))) {
+            endTools(key);
+            final args = e['arguments'];
+            final spoken = args is Map ? _s(args['text']).trim() : '';
+            if (spoken.isNotEmpty) {
+              addEvent(
+                  key,
+                  SpeakCard(
+                      text: spoken,
+                      expecting: args is Map ? _s(args['expecting']) : ''));
+            }
+            break;
+          }
           if (_isMetaTool(_s(e['tool_name']))) break;
+          final paired = resultOf[idx];
+          if (paired != null) {
+            final r = events[paired];
+            addToolRow(
+                toolRow(abs,
+                    tool: _s(e['tool_name']),
+                    args: e['arguments'],
+                    result: r['result'],
+                    resultAt: _transcriptStart + paired,
+                    clipped: r['result_clipped'] == true),
+                abs);
+            break;
+          }
           pending = e;
           pendingKey = abs;
         case 'tool_result':
+          if (pairedResults.contains(idx)) break;
           {
             final p = pending;
             if (p != null) {
@@ -174,7 +227,7 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
               pendingKey = null;
             } else {
               final name = _s(e['tool_name']);
-              if (_isMetaTool(name)) break;
+              if (_isMetaTool(name) || _isSpeakTool(name)) break;
               addToolRow(
                   toolRow(abs,
                       tool: name,
@@ -226,6 +279,30 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
             addEvent(key, ParentMessageCard(body: parent));
             break;
           }
+          if (isAmbientResume(text)) {
+            addEvent(key, const NoteLine('Resumed after background noise'));
+            break;
+          }
+          if (text.trimLeft().startsWith('<ambient_context_alert')) {
+            addEvent(
+                key, const NoteLine('Voice classifier flagged out-of-context speech'));
+            break;
+          }
+          if (text.trimLeft().startsWith('<ambient_check_in')) {
+            addEvent(key, const NoteLine('Checked recent microphone activity'));
+            break;
+          }
+          final ambient = parseAmbientTurn(text);
+          if (ambient != null) {
+            if (ambient.ids.isNotEmpty &&
+                ambient.ids.every(superseded.contains)) break;
+            addEvent(
+                key,
+                Padding(
+                    padding: const EdgeInsets.only(top: 4, bottom: 20),
+                    child: AmbientTurnCard(turn: ambient)));
+            break;
+          }
           final assignment = parseAssignmentEnvelope(text);
           if (assignment != null) {
             addEvent(key, AssignmentCard(assignment: assignment));
@@ -242,6 +319,11 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
         case 'assistant_text':
           endTools(key);
           final reply = _s(e['text']);
+          if (idx + 1 < events.length &&
+              events[idx + 1]['kind'] == 'model_error' &&
+              _s(events[idx + 1]['message']).trim() == reply.trim()) {
+            break;
+          }
           addEvent(
               key,
               Padding(
@@ -249,17 +331,46 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
                   child: Bubble(mine: false, text: reply)));
         case 'agent_message':
           endTools(key);
+          final voiceNote = e['outbound'] == true
+              ? null
+              : voiceClassifierNote(_s(e['agent_id']), _s(e['body']));
+          if (voiceNote != null) {
+            addEvent(key, NoteLine(voiceNote));
+            break;
+          }
           addEvent(
               key,
               AgentMessageCard(
                 agentId: _s(e['agent_id']),
                 body: _s(e['body']),
                 outbound: e['outbound'] == true,
+                laneTitle: laneTitleFor(_s(e['agent_id'])),
               ));
         case 'model_error':
           endTools(key);
-          addEvent(key,
-              NoteLine(_s(e['message']), error: true, label: 'Model error'));
+          final msg = _s(e['message']).trim();
+          var count = 1;
+          var look = idx + 1;
+          while (look < events.length) {
+            final nk = events[look]['kind'] as String? ?? '';
+            if (nk == 'assistant_text' &&
+                _s(events[look]['text']).trim() == msg) {
+              look++;
+              continue;
+            }
+            if (nk == 'model_error' &&
+                _s(events[look]['message']).trim() == msg) {
+              count++;
+              idx = look;
+              look++;
+              continue;
+            }
+            break;
+          }
+          addEvent(
+              key,
+              NoteLine(msg,
+                  error: true, label: 'Model error', count: count));
         case 'profile_switched':
           endTools(key);
           addEvent(
@@ -293,7 +404,8 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
                 options: [
                   for (final o in (e['options'] as List? ?? const [])) '$o'
                 ],
-                settled: events.skip(idx + 1).any((x) => later.contains(x['kind'])),
+                settled:
+                    events.skip(idx + 1).any((x) => later.contains(x['kind'])),
               ));
         case 'invalid_tool_call':
           endTools(key);
@@ -343,7 +455,8 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
               artifactVersion == newestArtifact[artifactId] &&
                       artifactShowsInline(artifactKind, display)
                   ? ArtifactInline(
-                      key: ValueKey('artifact-inline-$artifactId-$artifactVersion'),
+                      key: ValueKey(
+                          'artifact-inline-$artifactId-$artifactVersion'),
                       client: widget.client,
                       session: widget.sessionId,
                       id: artifactId,
@@ -462,6 +575,8 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
   }
 
   // Meta-tools have dedicated event rendering, so their generic tool lines are skipped.
+  bool _isSpeakTool(String n) => n == 'speak' || n.endsWith('__speak');
+
   bool _isMetaTool(String n) =>
       n == 'update_plan' ||
       n == 'ask_user' ||
@@ -696,7 +811,8 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
                       'No checkpoints yet — you can still fork the full history.',
                       style: TS.meta()),
                   const SizedBox(height: 12),
-                  Btn('Fork full history', onTap: () => _confirmFork(null, sheet: true)),
+                  Btn('Fork full history',
+                      onTap: () => _confirmFork(null, sheet: true)),
                 ],
               ),
             )

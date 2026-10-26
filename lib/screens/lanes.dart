@@ -91,9 +91,13 @@ List<Widget> laneSections(List<LaneInfo> lanes,
   final running = lanes.where((l) => l.running).toList();
   final failed = lanes.where((l) => l.status == 'failed').toList();
   final cancelled = lanes.where((l) => l.status == 'cancelled').toList();
+  final paused = lanes.where((l) => l.status == 'paused').toList();
   final completed = lanes
-      .where(
-          (l) => !l.running && l.status != 'failed' && l.status != 'cancelled')
+      .where((l) =>
+          !l.running &&
+          l.status != 'failed' &&
+          l.status != 'cancelled' &&
+          l.status != 'paused')
       .toList();
   final out = <Widget>[];
   void section(String label, List<LaneInfo> items, Tone tone) {
@@ -111,6 +115,7 @@ List<Widget> laneSections(List<LaneInfo> lanes,
   }
 
   section('In progress', running, Tone.run);
+  section('Paused', paused, Tone.neutral);
   section('Failed', failed, Tone.danger);
   section('Completed', completed, Tone.ok);
   section('Cancelled', cancelled, Tone.neutral);
@@ -164,11 +169,12 @@ class _LaneDetailCardState extends State<LaneDetailCard> {
   Widget build(BuildContext context) {
     final failed = lane.status == 'failed';
     final cancelled = lane.status == 'cancelled';
+    final paused = lane.status == 'paused';
     final tone = lane.running
         ? Tone.run
         : failed
             ? Tone.danger
-            : cancelled
+            : cancelled || paused
                 ? Tone.neutral
                 : Tone.ok;
     final (toneFg, _) = toneColors(tone);
@@ -178,7 +184,9 @@ class _LaneDetailCardState extends State<LaneDetailCard> {
             ? 'failed'
             : cancelled
                 ? 'cancelled'
-                : 'done';
+                : paused
+                    ? 'paused · time limit'
+                    : 'done';
     final activity = lane.activity?.trim();
     final summary = lane.summary?.trim();
     final error = lane.error?.trim();

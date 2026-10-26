@@ -132,8 +132,9 @@ extension _DesktopShellMobileExt on _DesktopShellState {
     );
   }
 
-  Widget _mobileTopBar({required bool mission}) => MobileTopBar(
+  Widget _mobileTopBar({required bool mission, VoidCallback? onActions}) => MobileTopBar(
         mission: mission,
+        onActions: onActions,
         sessionsBusy: mission &&
             (_sessions ?? const <SessionInfo>[]).any((s) =>
                 !isDedicatedMcSession(s.id) &&
@@ -141,6 +142,9 @@ extension _DesktopShellMobileExt on _DesktopShellState {
         onMission: _goMission,
         onSessions: () => _goMobileHome(MobileHome.chats),
         onMenu: _openMobileMenu,
+        trailingOrb: mission && _client != null
+            ? AmbientHeaderOrb(client: _client!)
+            : null,
         onSettings: () => _goMobileHome(MobileHome.settings),
       );
 

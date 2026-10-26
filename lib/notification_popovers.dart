@@ -366,9 +366,14 @@ class _NotificationPopoversState extends State<NotificationPopovers> {
                                             MaterialTapTargetSize.shrinkWrap,
                                       ),
                                       padding: EdgeInsets.zero,
+                                      visualDensity: kMobile
+                                          ? null
+                                          : VisualDensity.compact,
+                                      iconSize: kMobile ? 24 : 16,
                                       constraints:
-                                          const BoxConstraints.tightFor(
-                                              width: 44, height: 36),
+                                          BoxConstraints.tightFor(
+                                              width: kMobile ? 44 : 28,
+                                              height: kMobile ? 36 : 28),
                                       icon: Container(
                                         width: 24,
                                         height: 24,

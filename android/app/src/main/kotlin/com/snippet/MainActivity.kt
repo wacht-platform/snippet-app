@@ -31,6 +31,7 @@ class MainActivity : FlutterActivity() {
         deliver(intent, fromNewIntent = false)
     }
 
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // Intent is also handled after the engine is ready so a cold start

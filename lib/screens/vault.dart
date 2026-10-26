@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../api.dart';
+import '../desktop_layout.dart';
 import '../platform.dart';
 import '../theme.dart';
 import '../widgets.dart';
@@ -167,6 +168,7 @@ class VaultScreenState extends State<VaultScreen> {
   @override
   Widget build(BuildContext context) {
     Theme.of(context); // Rebuild on theme change
+    if (!kMobile && widget.embedded) return _desktopPage();
     Widget body;
     if (_loading && _names == null) {
       body = const ListSkeleton(subtitle: false);
@@ -228,6 +230,82 @@ class VaultScreenState extends State<VaultScreen> {
       ),
     );
   }
+
+  Widget _desktopPage() {
+    final names = _names ?? const <String>[];
+    final Widget content;
+    if (_loading && _names == null) {
+      content = const SettingsGroup(
+        children: [SettingsRow(label: 'Loading secrets…')],
+      );
+    } else if (_error != null && _names == null) {
+      content = SettingsGroup(children: [
+        SettingsRow(
+          label: "Couldn't load secrets",
+          sub: _error,
+          trailing: Btn('Retry', small: true, variant: BtnVariant.surface, onTap: _load),
+        ),
+      ]);
+    } else {
+      content = SettingsGroup(
+        footer: 'Values stay on this machine and are never shown again.',
+        children: [
+          if (_adding) ..._desktopForm(),
+          for (final n in names) _secretRow(n),
+          if (names.isEmpty && !_adding)
+            SettingsRow(
+                label: 'No secrets yet',
+                sub: 'Add one and agents can use it as \$NAME.'),
+        ],
+      );
+    }
+    return SettingsColumn(children: [
+      SettingsHeader(
+        title: 'Vault',
+        subtitle: 'Secrets agents can use as \$NAME without seeing the value.',
+        actions: [
+          if (!_adding) Btn('Add secret', small: true, icon: 'plus', onTap: _add),
+        ],
+      ),
+      const SizedBox(height: S.s8),
+      content,
+    ]);
+  }
+
+  List<Widget> _desktopForm() => [
+        SettingsRow(
+          label: 'Name',
+          sub: 'Use it as \$NAME in shell commands.',
+          trailing: SettingsField(
+              controller: _name, hint: 'STRIPE_KEY', mono: true, width: 260),
+        ),
+        SettingsRow(
+          label: 'Value',
+          sub: 'Sent to the daemon on save and redacted from output.',
+          trailing: SettingsField(
+              controller: _value,
+              hint: 'sk_live_…',
+              mono: true,
+              obscure: true,
+              width: 260),
+        ),
+        SettingsRow(
+          label: _formError ?? '',
+          labelWidget: _formError == null
+              ? const SizedBox.shrink()
+              : Text(_formError!, style: sans(12, color: AppColors.danger)),
+          trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+            Btn('Cancel',
+                small: true,
+                variant: BtnVariant.surface,
+                disabled: _busy,
+                onTap: _cancel),
+            const SizedBox(width: 8),
+            Btn(_busy ? 'Saving…' : 'Save secret',
+                small: true, disabled: _busy, onTap: _save),
+          ]),
+        ),
+      ];
 
   Widget _addRow(bool empty) => SettingsRow(
         label: 'Add secret',
