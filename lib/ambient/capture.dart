@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:record/record.dart';
 import 'package:silero_vad/silero_vad.dart';
 
+import '../platform.dart';
 import 'hold.dart';
 
 import 'diagnostics.dart';
@@ -126,8 +127,8 @@ class AmbientCapture {
         sampleRate: 16000,
         numChannels: 1,
         audioInterruption: AudioInterruptionMode.none,
-        echoCancel: true,
-        noiseSuppress: true,
+        echoCancel: !kMacOS,
+        noiseSuppress: !kMacOS,
         androidConfig: const AndroidRecordConfig(
             audioSource: AndroidAudioSource.voiceCommunication)));
     _running = true;
@@ -234,7 +235,7 @@ class AmbientCapture {
       _silentFrames = peak == 0 ? _silentFrames + 1 : 0;
       if (_silentFrames == 94) {
         _error =
-            'The microphone is only sending silence. Allow microphone access for this app (on a Mac: System Settings, Privacy & Security, Microphone; when launched with flutter run, allow the terminal app).';
+            'The microphone is only sending silence. Check the input device in System Settings, Sound, and that microphone access is allowed for this app.';
         unawaited(AmbientDiagnostics.log('microphone silent for 3s'));
       } else if (_silentFrames == 0 &&
           _error != null &&
