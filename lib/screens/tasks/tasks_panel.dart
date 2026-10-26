@@ -6,6 +6,7 @@ import '../../motion.dart';
 import '../../platform.dart';
 import '../../theme.dart';
 import '../../widgets.dart';
+import '../../desktop_layout.dart';
 import '../list_search_field.dart';
 import '../shell_nav.dart';
 import 'create_task_form.dart';
@@ -217,8 +218,159 @@ class TasksPanelState extends State<TasksPanel> {
         ]),
       );
 
+  static const _wideMin = 900.0;
+
   @override
   Widget build(BuildContext context) {
+    if (kMobile) return _stacked();
+    return LayoutBuilder(
+      builder: (context, c) => c.maxWidth >= _wideMin ? _wide() : _stacked(),
+    );
+  }
+
+  Widget _desktopSearch() => Container(
+        height: 32,
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        decoration: BoxDecoration(
+          color: AppColors.surface1,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: AppColors.line),
+        ),
+        child: Row(children: [
+          AppIcon('search', size: 14, color: AppColors.fg4),
+          const SizedBox(width: 8),
+          Expanded(
+            child: TextField(
+              controller: _search,
+              autofocus: true,
+              onChanged: (v) => setState(() => _query = v),
+              style: sans(13, color: AppColors.fg1),
+              decoration: InputDecoration(
+                isCollapsed: true,
+                border: InputBorder.none,
+                hintText: 'Search tasks',
+                hintStyle: sans(13, color: AppColors.fg4),
+              ),
+            ),
+          ),
+          if (_query.isNotEmpty)
+            IconBtn('x',
+                size: 20,
+                iconSize: 10,
+                tooltip: 'Clear',
+                onTap: () {
+                  _search.clear();
+                  setState(() => _query = '');
+                }),
+        ]),
+      );
+
+  Widget _wide() {
+    final list = TaskList(
+      appearSince: _shownAt,
+      tasks: _feed.tasks,
+      query: _query,
+      filter: _filter,
+      selectedId: _selectedTaskId,
+      onOpen: _open,
+      onRefresh: _feed.refresh,
+    );
+    final error = _feed.error;
+    Widget? empty;
+    var rows = const <Widget>[];
+    if (_feed.loading) {
+      empty = Center(child: Spinner(size: 20, color: AppColors.fg3));
+    } else if (error != null) {
+      empty = Column(mainAxisSize: MainAxisSize.min, children: [
+        Text('Could not load tasks', style: sans(13, color: AppColors.fg2)),
+        const SizedBox(height: 10),
+        Btn('Retry', small: true, onTap: _feed.refresh),
+      ]);
+    } else {
+      _shownAt ??= _feed.tasks.isNotEmpty ? DateTime.now() : null;
+      rows = list.rows();
+      empty = list.emptyState();
+    }
+    final Widget detail;
+    if (_creatingTask) {
+      detail = Align(
+        alignment: Alignment.topLeft,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 680),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                    S.s40, S.s32, S.s40, S.s16),
+                child: Text('New task',
+                    style: sans(20,
+                        weight: W.strong,
+                        spacing: -0.2,
+                        color: AppColors.fg1)),
+              ),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 28),
+                  child: CreateTaskForm(
+                    client: widget.client,
+                    onCreated: () {
+                      setState(() => _creatingTask = false);
+                      _feed.refresh();
+                    },
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    } else if (_selectedTaskId != null) {
+      detail = TaskDetailScreen(
+        key: ValueKey('pane-task-$_selectedTaskId'),
+        client: widget.client,
+        taskId: _selectedTaskId!,
+        pane: true,
+      );
+    } else {
+      detail = const DetailEmpty('Select a task');
+    }
+    return ColoredBox(
+      color: AppColors.windowBg,
+      child: MasterDetail(
+        masterWidth: 380,
+        master: MasterPane(
+          title: 'Tasks',
+          actions: [
+            IconBtn('search',
+                size: 28,
+                iconSize: 15,
+                active: _searchOpen,
+                tooltip: 'Search tasks',
+                onTap: _toggleSearch),
+            const SizedBox(width: S.s4),
+            HeaderAction('New task', onTap: create),
+          ],
+          search: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (_searchOpen) _desktopSearch(),
+              if (_feed.tasks.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: S.s4),
+                  child: _statusStrip(),
+                ),
+            ],
+          ),
+          empty: empty,
+          children: rows,
+        ),
+        detail: detail,
+      ),
+    );
+  }
+
+  Widget _stacked() {
     if (!kMobile && _selectedTaskId != null) {
       return ColoredBox(
         color: AppColors.windowBg,

@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 
 import '../api.dart';
+import '../desktop_layout.dart';
 import '../models.dart';
 import '../panel.dart';
 import '../platform.dart';
@@ -643,10 +644,316 @@ class RecurringScreenState extends State<RecurringScreen>
     );
   }
 
+  String? _selId;
+
+  bool get _desk =>
+      !kMobile && widget.embedded && widget.onBack == null && !widget.pane;
+
+  void _selectJob(RecurringJob job) {
+    final wasAdding = _adding;
+    setState(() {
+      _adding = false;
+      _selId = job.id;
+      _titleCtrl.text = job.title;
+      _promptCtrl.text = job.prompt;
+      _planCtrl.text = job.planPath ?? '';
+      _dailyCtrl.text = '09:00';
+      _customEveryCtrl.clear();
+      _mode = 'keep';
+      _schedule = job.scheduleLabel;
+    });
+    if (wasAdding) widget.onAddingChanged?.call(false);
+  }
+
+  void _cancelAdd() {
+    setState(() => _adding = false);
+    widget.onAddingChanged?.call(false);
+  }
+
+  Future<void> _saveEdit(RecurringJob job) async {
+    if (_submitting) return;
+    final t = _titleCtrl.text.trim();
+    final p = _promptCtrl.text.trim();
+    final planPath = _planCtrl.text.trim();
+    final sched = switch (_mode) {
+      'keep' => job.scheduleLabel,
+      'daily' => 'daily ${_dailyCtrl.text.trim()}',
+      'onceAt' => 'at ${_dailyCtrl.text.trim()}',
+      'onceIn' => 'in ${_customEveryCtrl.text.trim()}',
+      'custom' => _customSchedule(_customEveryCtrl.text),
+      _ => _schedule,
+    };
+    if (t.isEmpty) {
+      toast(context, 'Title is required', danger: true);
+      return;
+    }
+    if (p.isEmpty && planPath.isEmpty) {
+      toast(context, 'Goal or plan file is required', danger: true);
+      return;
+    }
+    if (sched == null) {
+      toast(context, 'Interval must be at least 5 minutes (e.g. 5m, 2h)',
+          danger: true);
+      return;
+    }
+    setState(() => _submitting = true);
+    try {
+      await widget.client.updateRecurring(
+        job.id,
+        title: t,
+        prompt: p,
+        planPath: planPath,
+        schedule: _mode == 'keep' ? null : sched,
+      );
+      _refresh();
+      if (mounted) toast(context, 'Saved');
+    } catch (e) {
+      if (mounted) toast(context, "Couldn't save $t: $e", danger: true);
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  Widget _formControl(Widget child) =>
+      SizedBox(width: double.infinity, child: child);
+
+  Widget _deskFields({RecurringJob? job}) {
+    final editing = job != null;
+    return Column(children: [
+      DesktopFormRow(
+        label: 'Title',
+        control: _formControl(AppField(
+            controller: _titleCtrl, hint: 'Nightly review')),
+      ),
+      DesktopFormRow(
+        label: 'Schedule',
+        description: editing
+            ? 'Currently ${job.scheduleLabel}. Pick one to change it.'
+            : 'The first run fires immediately, then repeats. Minimum interval is 5 minutes.',
+        control: _formControl(
+            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Wrap(spacing: 6, runSpacing: 6, children: [
+            for (final s in const [
+              'every 5m',
+              'every 15m',
+              'every 1h',
+              'every 1d',
+            ])
+              _chip(s, _mode == 'preset' && _schedule == s, () {
+                setState(() {
+                  _mode = 'preset';
+                  _schedule = s;
+                });
+              }),
+            _chip('custom', _mode == 'custom',
+                () => setState(() => _mode = 'custom')),
+            _chip('daily', _mode == 'daily',
+                () => setState(() => _mode = 'daily')),
+            _chip('once at', _mode == 'onceAt',
+                () => setState(() => _mode = 'onceAt')),
+            _chip('once in', _mode == 'onceIn',
+                () => setState(() => _mode = 'onceIn')),
+          ]),
+          if (_mode == 'custom') ...[
+            const SizedBox(height: S.s8),
+            AppField(
+                label: 'Every (min 5m)',
+                controller: _customEveryCtrl,
+                mono: true,
+                hint: '5m  ·  90m  ·  2h  ·  300s'),
+          ],
+          if (_mode == 'daily') ...[
+            const SizedBox(height: S.s8),
+            AppField(
+                label: 'Time (HH:MM)',
+                controller: _dailyCtrl,
+                mono: true,
+                hint: '09:00'),
+          ],
+          if (_mode == 'onceAt') ...[
+            const SizedBox(height: S.s8),
+            AppField(
+                label: 'Time today/tomorrow (HH:MM)',
+                controller: _dailyCtrl,
+                mono: true,
+                hint: '14:30'),
+          ],
+          if (_mode == 'onceIn') ...[
+            const SizedBox(height: S.s8),
+            AppField(
+                label: 'From now (e.g. 30m, 2h)',
+                controller: _customEveryCtrl,
+                mono: true,
+                hint: '30m'),
+          ],
+        ])),
+      ),
+      DesktopFormRow(
+        label: 'Goal',
+        description: 'The piece of work to complete on each run.',
+        control: _formControl(AppField(
+            controller: _promptCtrl,
+            hint: 'The piece of work to complete',
+            minLines: 3,
+            maxLines: 8)),
+      ),
+      DesktopFormRow(
+        label: 'Plan file',
+        description: 'Optional. Reread on every run.',
+        divider: false,
+        control: _formControl(AppField(
+          controller: _planCtrl,
+          mono: true,
+          hint: 'notes/plan.md — pick or type a path',
+          rightSlot: IconBtn('folder',
+              size: 28,
+              iconSize: 14,
+              tooltip: 'Pick file',
+              onTap: _pickPlanInline),
+        )),
+      ),
+    ]);
+  }
+
+  Widget _deskDetail(List<RecurringJob> jobs) {
+    if (_adding) {
+      return DetailPane(
+        key: const ValueKey('new-job'),
+        title: 'New job',
+        subtitle: 'Schedule a goal or message',
+        actions: [
+          Btn('Cancel', variant: BtnVariant.surface, small: true, onTap: _cancelAdd),
+          Btn('Save job', small: true, disabled: _submitting, onTap: _saveInline),
+        ],
+        child: _deskFields(),
+      );
+    }
+    final job = jobs.where((j) => j.id == _selId).firstOrNull;
+    if (job == null) return const DetailEmpty('Select a job to see or edit it.');
+    final paused = !_enabled(job);
+    final error = job.lastError?.trim() ?? '';
+    final next = _nextIn(job);
+    return DetailPane(
+      key: ValueKey('job-${job.id}'),
+      title: job.title.isEmpty ? job.id : job.title,
+      subtitle: '${job.scheduleLabel} · ${_targetLabel(job)}',
+      actions: [
+        Btn(paused ? 'Resume' : 'Pause',
+            variant: BtnVariant.surface,
+            small: true,
+            icon: paused ? 'play' : 'pause',
+            onTap: () => _toggle(job)),
+        Btn('Delete',
+            variant: BtnVariant.danger,
+            small: true,
+            icon: 'trash',
+            onTap: () {
+              setState(() => _selId = null);
+              _remove(job);
+            }),
+        Btn('Save', small: true, disabled: _submitting, onTap: () => _saveEdit(job)),
+      ],
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        DesktopFormRow(
+          label: 'Status',
+          control: Row(mainAxisSize: MainAxisSize.min, children: [
+            Tag(paused ? 'Paused' : 'Active',
+                tone: paused ? Tone.neutral : Tone.accent),
+            if (next.isNotEmpty && !paused) ...[
+              const SizedBox(width: S.s8),
+              Text(next, style: mono(12, color: AppColors.fg3)),
+            ],
+          ]),
+        ),
+        DesktopFormRow(
+          label: 'Last run',
+          control: Text(
+              job.lastRunAt == null ? 'Never' : relativeTime(job.lastRunAt!),
+              style: sans(13, color: AppColors.fg2)),
+          divider: error.isNotEmpty,
+        ),
+        if (error.isNotEmpty)
+          DesktopFormRow(
+            label: 'Last error',
+            divider: false,
+            control: Text(error,
+                textAlign: TextAlign.right,
+                style: sans(13, color: AppColors.danger)),
+          ),
+        const SizedBox(height: S.s24),
+        _deskFields(job: job),
+      ]),
+    );
+  }
+
+  Widget _deskBody() {
+    return FutureBuilder<List<RecurringJob>>(
+      future: _future,
+      builder: (context, snap) {
+        if (snap.connectionState == ConnectionState.waiting && !snap.hasData) {
+          return const ListSkeleton();
+        }
+        if (snap.hasError) {
+          return Padding(
+            padding: const EdgeInsets.all(S.s24),
+            child: Text('${snap.error}',
+                style: sans(13, height: 1.4, color: AppColors.danger)),
+          );
+        }
+        final jobs = [
+          for (final j in snap.data ?? const <RecurringJob>[])
+            if (!_removing.contains(j.id)) j
+        ];
+        return Material(
+          color: Colors.transparent,
+          child: MasterDetail(
+            master: MasterPane(
+              title: 'Scheduled jobs',
+              actions: [
+                if (_canAdd && widget.onAddingChanged == null && !_adding)
+                  HeaderAction('New job', onTap: _add),
+              ],
+              empty: const EmptyState(
+                icon: 'repeat',
+                title: 'No scheduled jobs',
+                body:
+                    'Run a prompt on a schedule, like a morning triage or a nightly audit.',
+              ),
+              children: [for (final j in jobs) _deskRow(j)],
+            ),
+            detail: _deskDetail(jobs),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _deskRow(RecurringJob job) {
+    final paused = !_enabled(job);
+    final next = _nextIn(job);
+    return ListRow(
+      title: job.title.isEmpty ? job.id : job.title,
+      titleWidget: Row(children: [
+        Flexible(
+          child: Text(job.title.isEmpty ? job.id : job.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: sans(13.5, color: paused ? AppColors.fg3 : AppColors.fg1)),
+        ),
+        if (paused) ...[const SizedBox(width: S.s8), const Tag('Paused')],
+      ]),
+      subtitle: [job.scheduleLabel, if (!paused && next.isNotEmpty) next]
+          .join(' · '),
+      selected: !_adding && _selId == job.id,
+      onTap: () => _selectJob(job),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     super.build(context);
     Theme.of(context); // Rebuild on theme change
+    if (_desk) return _deskBody();
     final body = FutureBuilder<List<RecurringJob>>(
       future: _future,
       builder: (context, snap) {

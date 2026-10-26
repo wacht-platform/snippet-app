@@ -24,12 +24,14 @@ class TaskDetailScreen extends StatefulWidget {
     required this.taskId,
     this.onClose,
     this.embedded = false,
+    this.pane = false,
   });
 
   final DaemonClient client;
   final String taskId;
   final VoidCallback? onClose;
   final bool embedded;
+  final bool pane;
 
   @override
   State<TaskDetailScreen> createState() => _TaskDetailScreenState();
@@ -324,11 +326,37 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     final t = task;
     return Scaffold(
       backgroundColor:
-          !kMobile && widget.embedded ? AppColors.windowBg : AppColors.bg,
+          !kMobile && (widget.embedded || widget.pane) ? AppColors.windowBg : AppColors.bg,
       body: SafeArea(
         bottom: false,
         child: Column(children: [
-          if (kMobile)
+          if (!kMobile && widget.pane)
+            Align(
+              alignment: Alignment.topLeft,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 840),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                      S.s40, S.s32, S.s40, S.s8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(t?.title ?? 'Task',
+                          style: sans(20,
+                              weight: W.strong,
+                              spacing: -0.2,
+                              color: AppColors.fg1)),
+                      if (t != null) ...[
+                        const SizedBox(height: S.s4),
+                        Text(t.status.label,
+                            style: sans(13, color: AppColors.fg3)),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            )
+          else if (kMobile)
             MobileBackBar(
               title: t?.title ?? 'Task',
               subtitle: t?.status.label,
@@ -362,7 +390,20 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
               compact: true,
               bordered: false,
             ),
-          Expanded(child: _body(t)),
+          Expanded(
+            child: !kMobile && widget.pane
+                ? Align(
+                    alignment: Alignment.topLeft,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 840),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: S.s24),
+                        child: _body(t),
+                      ),
+                    ),
+                  )
+                : _body(t),
+          ),
         ]),
       ),
     );

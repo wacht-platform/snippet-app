@@ -14,6 +14,8 @@ const _routeDefs = <(String, String, String)>[
   ('memory', 'Memory', 'Reflection and compaction notes'),
 ];
 
+const _routeLabelWidth = 260.0;
+
 String limitLabel(int resetsAt) {
   final t = DateTime.fromMillisecondsSinceEpoch(resetsAt * 1000);
   final hh = t.hour.toString().padLeft(2, '0');
@@ -333,17 +335,19 @@ class _RoutingScreenState extends State<RoutingScreen> {
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           SizedBox(
-            width: 180,
+            width: _routeLabelWidth,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: sans(13.5, color: AppColors.fg1)),
+                Text(title,
+                    style: sans(13.5, weight: W.label, color: AppColors.fg1)),
                 const SizedBox(height: 2),
-                Text(about, style: sans(12, color: AppColors.fg4)),
+                Text(about,
+                    style: sans(12.5, height: 1.45, color: AppColors.fg3)),
               ],
             ),
           ),
-          const SizedBox(width: 20),
+          const SizedBox(width: S.s24),
           Expanded(child: _chainWrap(key, chosen)),
         ],
       ),
@@ -419,16 +423,35 @@ class _RoutingScreenState extends State<RoutingScreen> {
         ],
       );
     } else {
-      body = PageBody(
-        topPadding: 4,
+      body = ListView(
+        padding: widget.embedded
+            ? EdgeInsets.zero
+            : const EdgeInsets.fromLTRB(S.s16, S.s4, S.s16, S.s40),
         children: [
-          Text(
-            'Which model does each kind of work, and who steps in when it hits a limit.',
-            style: sans(13.5, height: 1.55, color: AppColors.fg3),
+          Container(
+            padding: const EdgeInsets.only(bottom: S.s8),
+            decoration: BoxDecoration(
+              border: Border(bottom: BorderSide(color: AppColors.line)),
+            ),
+            child: Row(children: [
+              SizedBox(
+                  width: _routeLabelWidth,
+                  child: Text('Work',
+                      style:
+                          sans(13, weight: W.label, color: AppColors.fg3))),
+              const SizedBox(width: S.s24),
+              Text('Primary model, then fallbacks',
+                  style: sans(13, weight: W.label, color: AppColors.fg3)),
+            ]),
           ),
-          const SizedBox(height: 18),
           for (final (key, title, about) in _routeDefs)
             _desktopRouteRow(key, title, about),
+          Padding(
+            padding: const EdgeInsets.only(top: S.s12),
+            child: Text(
+                'Select a model to make it primary, reorder it, swap it or remove it. The first model handles the work; the rest step in when it hits a limit.',
+                style: sans(12.5, height: 1.5, color: AppColors.fg4)),
+          ),
         ],
       );
     }

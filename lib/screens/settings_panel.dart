@@ -23,6 +23,7 @@ import 'voice_screen.dart';
 import 'web_search_screen.dart';
 import 'accounts_screen.dart';
 import '../motion.dart';
+import '../desktop_layout.dart';
 import 'memory_screen.dart';
 
 /// Rows for the machine popover/sheet: live dot (re-pinged on open), label,
@@ -269,7 +270,7 @@ class SettingsPanelState extends State<SettingsPanel> {
 
   bool get _isNested => switch (_page) {
         SettingsPage.general => _addingMachine,
-        SettingsPage.models => _modelsEditing,
+        SettingsPage.models => !kMobile || _modelsEditing,
         _ => false,
       };
 
@@ -446,7 +447,7 @@ class SettingsPanelState extends State<SettingsPanel> {
               children: [
                 // Left Column (Sidebar Rail)
                 Container(
-                  width: full ? 272 : 210,
+                  width: full ? 220 : 210,
                   decoration: BoxDecoration(
                     color: AppColors.sidebarPanel,
                     border: full
@@ -524,7 +525,9 @@ class SettingsPanelState extends State<SettingsPanel> {
                     padding: full
                         ? EdgeInsets.only(top: kMacOS ? kTitleBarHeight : 16)
                         : EdgeInsets.zero,
-                    child: LayoutBuilder(
+                    child: full
+                        ? _desktopContent()
+                        : LayoutBuilder(
                       builder: (context, paneConstraints) {
                         final extra = full
                             ? ((paneConstraints.maxWidth - 768) / 2)
@@ -907,7 +910,7 @@ class SettingsPanelState extends State<SettingsPanel> {
       };
 
   Widget? _pageAction(SettingsPage page) => switch (page) {
-        SettingsPage.general => _addingMachine || widget.fullPage
+        SettingsPage.general => _addingMachine
             ? null
             : HeaderAction('Add machine', onTap: _addMachine),
         SettingsPage.models => _modelsEditing
@@ -938,7 +941,7 @@ class SettingsPanelState extends State<SettingsPanel> {
             _renamingUrl = null;
           }),
           child: Container(
-            height: 32,
+            height: widget.fullPage ? 36 : 32,
             padding: const EdgeInsets.symmetric(horizontal: 10),
             child: Row(children: [
               AppIcon(icon,
@@ -992,6 +995,43 @@ class SettingsPanelState extends State<SettingsPanel> {
           ),
       ],
     );
+  }
+
+  static const _plainPages = {
+    SettingsPage.general,
+    SettingsPage.routing,
+    SettingsPage.usage,
+    SettingsPage.voice,
+    SettingsPage.webSearch,
+  };
+
+  String _pageSubtitle(SettingsPage page) => switch (page) {
+        SettingsPage.general =>
+          'Machines this app connects to, and how sessions behave.',
+        SettingsPage.routing =>
+          'Which model does each kind of work, and who steps in when it hits a limit.',
+        SettingsPage.usage => 'Rate limits and token usage across your providers.',
+        SettingsPage.voice => 'Voice notes, transcription and speech services.',
+        SettingsPage.webSearch => 'Let agents search the web and read pages.',
+        _ => '',
+      };
+
+  Widget _desktopContent() {
+    final page = _page;
+    final Widget child;
+    if (_plainPages.contains(page)) {
+      final action = _pageAction(page);
+      child = DesktopPage(
+        title: _pageTitle(page),
+        subtitle: _pageSubtitle(page),
+        actions: [if (action != null) action],
+        scroll: false,
+        child: _pageBody(),
+      );
+    } else {
+      child = _pageBody();
+    }
+    return Swap(stateKey: page, fill: true, child: child);
   }
 
   Widget _pageBody() {
@@ -1065,107 +1105,209 @@ class SettingsPanelState extends State<SettingsPanel> {
     }
   }
 
-  Future<void> _renameViaPrompt(Instance i) async {
-    final name = await promptText(context, title: 'Rename machine', initial: i.label);
-    if (name == null || name.trim().isEmpty || !mounted) return;
-    _renameController.text = name.trim();
-    await _commitRename(i);
+  Widget _heading(String text) => Padding(
+        padding: const EdgeInsets.only(bottom: S.s8),
+        child: Text(text,
+            style: sans(13, weight: W.label, color: AppColors.fg3)),
+      );
+
+  Widget _machineRow(Instance i) {
+    final isActive = i.url == widget.active?.url;
+    final renaming = _renamingUrl == i.url;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(S.s16, S.s8, S.s8, S.s8),
+      child: SizedBox(
+        height: 40,
+        child: Row(children: [
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: isActive ? AppColors.ok : AppColors.fg4,
+            ),
+          ),
+          const SizedBox(width: S.s12),
+          if (renaming)
+            Expanded(
+              child: InlineEditField(
+                controller: _renameController,
+                hint: 'Machine name',
+                commitOnTapOutside: false,
+                showActions: true,
+                onSubmit: () => _commitRename(i),
+                onCancel: () => setState(() => _renamingUrl = null),
+              ),
+            )
+          else ...[
+            Flexible(
+              flex: 2,
+              child: Text(i.label.isEmpty ? i.url : i.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: sans(13.5, weight: W.label, color: AppColors.fg1)),
+            ),
+            const SizedBox(width: S.s16),
+            Expanded(
+              flex: 3,
+              child: Text(hostOf(i.url),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: mono(12, color: AppColors.fg3)),
+            ),
+            if (isActive)
+              const Tag('Active', tone: Tone.ok, dot: true)
+            else if (widget.onSelect != null)
+              TextAction('Connect', onTap: () => _selectInstance(i)),
+            const SizedBox(width: S.s4),
+            IconBtn('edit',
+                size: 30,
+                iconSize: 15,
+                tooltip: 'Rename machine',
+                onTap: () => _startRename(i)),
+            IconBtn('trash',
+                size: 30,
+                iconSize: 15,
+                tooltip: 'Remove machine',
+                onTap: () => _confirmRemove(i)),
+          ],
+        ]),
+      ),
+    );
+  }
+
+  Widget _inlineAddMachine() {
+    void close() => setState(() {
+          _addingMachine = false;
+          _addMachineError = null;
+        });
+    final canConnect =
+        !_addMachineBusy && _addMachinePaste.text.trim().isNotEmpty;
+    return Container(
+      margin: const EdgeInsets.only(bottom: S.s16),
+      padding: const EdgeInsets.symmetric(horizontal: S.s20),
+      decoration: BoxDecoration(
+        color: AppColors.surface1,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.line),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        DesktopFormRow(
+          label: 'On the other machine',
+          description: 'It prints a link and a QR code. If snippet is already '
+              'running there, snippet serve --status shows them again.',
+          control: Row(mainAxisSize: MainAxisSize.min, children: [
+            SelectableText('snippet serve',
+                style: mono(12.5, color: AppColors.fg1)),
+            const SizedBox(width: S.s8),
+            IconBtn('copy', size: 28, iconSize: 14, tooltip: 'Copy command',
+                onTap: () {
+              Clipboard.setData(const ClipboardData(text: 'snippet serve'));
+              toast(context, 'Copied');
+            }),
+          ]),
+        ),
+        DesktopFormRow(
+          label: 'Link',
+          description: 'Paste the link it printed.',
+          divider: false,
+          control: Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              SettingsField(
+                controller: _addMachinePaste,
+                hint: 'https://…?token=…',
+                mono: true,
+                width: 380,
+                onChanged: (_) => setState(() {}),
+                onSubmitted: (_) => _submitAddMachine(),
+              ),
+              if (_addMachineError != null) ...[
+                const SizedBox(height: S.s8),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 380),
+                  child: Text(_addMachineError!,
+                      textAlign: TextAlign.right,
+                      style: sans(12, height: 1.4, color: AppColors.danger)),
+                ),
+              ],
+              const SizedBox(height: S.s12),
+              Row(mainAxisSize: MainAxisSize.min, children: [
+                SettingsPill('Cancel', onTap: _addMachineBusy ? null : close),
+                const SizedBox(width: S.s8),
+                SettingsPill(_addMachineBusy ? 'Connecting…' : 'Connect',
+                    onTap: canConnect ? _submitAddMachine : null),
+              ]),
+            ],
+          ),
+        ),
+      ]),
+    );
   }
 
   Widget _nativeGeneral() {
     if (_manual == null) _loadManual();
-    return PageBody(
+    return ListView(
+      padding: EdgeInsets.zero,
       children: [
-        SettingsGroup(
-          header: 'Machines',
-          footer:
+        _heading('Machines'),
+        if (_addingMachine) _inlineAddMachine(),
+        if (_instances.isEmpty && !_addingMachine)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: S.s16),
+            child: Text(
+                'No saved machines. Run snippet serve on one and add its link.',
+                style: sans(13, color: AppColors.fg3)),
+          )
+        else if (_instances.isNotEmpty)
+          Container(
+            clipBehavior: Clip.antiAlias,
+            decoration: BoxDecoration(
+              color: AppColors.surface1,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: AppColors.line),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (var k = 0; k < _instances.length; k++) ...[
+                  if (k > 0) Container(height: 1, color: AppColors.line),
+                  _machineRow(_instances[k]),
+                ],
+              ],
+            ),
+          ),
+        Padding(
+          padding: const EdgeInsets.only(top: S.s8, bottom: S.s32),
+          child: Text(
               'Snippet talks to the daemon on each machine. Run snippet serve on a new one and paste the link it prints.',
-          children: [
-            for (final i in _instances)
-              SettingsRow(
-                label: i.label.isEmpty ? i.url : i.label,
-                sub: i.url,
-                leading: Container(
-                  width: 7,
-                  height: 7,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: i.url == widget.active?.url
-                        ? AppColors.ok
-                        : AppColors.fg4,
-                  ),
-                ),
-                onTap: i.url == widget.active?.url || widget.onSelect == null
-                    ? null
-                    : () => _selectInstance(i),
-                trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-                  Text(i.url == widget.active?.url ? 'In use' : 'Connect',
-                      style: sans(12.5,
-                          color: i.url == widget.active?.url
-                              ? AppColors.fg4
-                              : AppColors.accent)),
-                  const SizedBox(width: 6),
-                  Builder(
-                    builder: (anchor) => IconBtn('more-horizontal',
-                        size: 26,
-                        iconSize: 14,
-                        tooltip: 'More',
-                        onTap: () async {
-                          final pick = await showAppMenu<String>(context,
-                              anchor: anchor,
-                              items: [
-                                appMenuItem(
-                                    value: 'rename',
-                                    icon: 'edit',
-                                    label: 'Rename'),
-                                appMenuItem(
-                                    value: 'remove',
-                                    icon: 'trash',
-                                    label: 'Remove',
-                                    danger: true),
-                              ]);
-                          if (pick == 'rename') _renameViaPrompt(i);
-                          if (pick == 'remove') _confirmRemove(i);
-                        }),
-                  ),
-                ]),
-              ),
-            SettingsRow(
-              label: 'Add a machine…',
-              onTap: _addMachine,
-              trailing: Text('Pair', style: sans(12.5, color: AppColors.accent)),
-            ),
-          ],
+              style: sans(12.5, height: 1.5, color: AppColors.fg4)),
         ),
-        SettingsGroup(
-          header: 'Approvals',
-          footer: 'Applies to every session on this machine.',
-          children: [
-            SettingsRow(
-              label: 'Ask before running commands',
-              sub: 'Off lets agents run shell commands and edit files without stopping to ask.',
-              trailing: SettingsSwitch(
-                  value: _manual ?? false,
-                  onChanged: _manual == null ? null : _setManual),
-            ),
-          ],
+        _heading('Sessions'),
+        DesktopFormRow(
+          label: 'Ask before running commands',
+          description:
+              'Off lets agents run shell commands and edit files without stopping to ask. Applies to every session on this machine.',
+          divider: kCanNotify,
+          control: SettingsSwitch(
+              value: _manual ?? false,
+              onChanged: _manual == null ? null : _setManual),
         ),
         if (kCanNotify)
-          SettingsGroup(header: 'Notifications', children: [
-            SettingsRow(
-              label: 'Notify me',
-              sub: 'When a session needs you or finishes.',
-              trailing: SettingsSwitch(
-                  value: _notif, onChanged: _notifBusy ? null : _toggleNotif),
-            ),
-          ]),
+          DesktopFormRow(
+            label: 'Notifications',
+            description: 'When a session needs you or finishes.',
+            divider: false,
+            control: SettingsSwitch(
+                value: _notif, onChanged: _notifBusy ? null : _toggleNotif),
+          ),
       ],
     );
   }
 
   Widget _generalPage({bool includeNotifications = true}) {
-    if (_addingMachine) return _addMachinePane();
     if (widget.fullPage) return _nativeGeneral();
+    if (_addingMachine) return _addMachinePane();
     return PageBody(children: [
       if (includeNotifications)
         const SectionHeader('Machines',

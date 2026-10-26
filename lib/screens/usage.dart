@@ -168,23 +168,16 @@ class _UsageScreenState extends State<UsageScreen> {
         ],
       );
     } else {
-      body = PageBody(
-        topPadding: 4,
+      body = ListView(
+        padding: widget.embedded
+            ? EdgeInsets.zero
+            : const EdgeInsets.fromLTRB(S.s16, S.s4, S.s16, S.s40),
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Expanded(
-                child: Text(
-                  'Rate limits and token usage across your providers.',
-                  style: sans(13.5, height: 1.5, color: AppColors.fg3),
-                ),
-              ),
-              const SizedBox(width: 16),
-              _PeriodTabs(value: _period, onChanged: _setPeriod),
-            ],
+          Align(
+            alignment: Alignment.centerLeft,
+            child: _PeriodTabs(value: _period, onChanged: _setPeriod),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: S.s20),
           AnimatedSwitcher(
             duration: Motion.quick,
             child: KeyedSubtree(
@@ -198,7 +191,7 @@ class _UsageScreenState extends State<UsageScreen> {
             padding: const EdgeInsets.only(top: 2),
             child: Text(
               'Every model call is recorded against the provider and model that served it. Input includes cached tokens; rate limits come from each provider\'s own reports.',
-              style: sans(12, height: 1.5, color: AppColors.fg4),
+              style: sans(12.5, height: 1.5, color: AppColors.fg4),
             ),
           ),
         ],

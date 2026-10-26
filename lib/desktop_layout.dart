@@ -22,28 +22,38 @@ class DesktopPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final titleBlock = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title,
+            style: sans(20,
+                weight: W.strong, spacing: -0.2, color: AppColors.fg1)),
+        if (subtitle != null && subtitle!.isNotEmpty) ...[
+          const SizedBox(height: S.s4),
+          Text(subtitle!, style: sans(13, color: AppColors.fg3)),
+        ],
+      ],
+    );
+    final buttons = Wrap(spacing: S.s8, runSpacing: S.s8, children: actions);
     final header = Padding(
       padding: const EdgeInsets.only(bottom: S.s24),
-      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(title,
-                  style: sans(20,
-                      weight: W.strong, spacing: -0.2, color: AppColors.fg1)),
-              if (subtitle != null && subtitle!.isNotEmpty) ...[
-                const SizedBox(height: S.s4),
-                Text(subtitle!, style: sans(13, color: AppColors.fg3)),
-              ],
-            ],
-          ),
-        ),
-        for (var i = 0; i < actions.length; i++) ...[
-          if (i > 0) const SizedBox(width: S.s8),
-          actions[i],
-        ],
-      ]),
+      child: LayoutBuilder(
+        builder: (_, c) => actions.isEmpty
+            ? titleBlock
+            : c.maxWidth < 520
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                        titleBlock,
+                        const SizedBox(height: S.s12),
+                        buttons
+                      ])
+                : Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Expanded(child: titleBlock),
+                    const SizedBox(width: S.s16),
+                    buttons,
+                  ]),
+      ),
     );
     final body = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -76,11 +86,18 @@ class MasterDetail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      SizedBox(width: masterWidth, child: master),
-      VerticalDivider(width: 1, thickness: 1, color: AppColors.line),
-      Expanded(child: detail),
-    ]);
+    return LayoutBuilder(
+      builder: (_, c) =>
+          Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        SizedBox(
+            width: c.maxWidth.isFinite
+                ? masterWidth.clamp(0, c.maxWidth * 0.4).toDouble()
+                : masterWidth,
+            child: master),
+        VerticalDivider(width: 1, thickness: 1, color: AppColors.line),
+        Expanded(child: detail),
+      ]),
+    );
   }
 }
 
@@ -192,27 +209,37 @@ class DesktopFormRow extends StatelessWidget {
           ? BoxDecoration(
               border: Border(bottom: BorderSide(color: AppColors.line)))
           : null,
-      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        SizedBox(
-          width: 260,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(label,
-                  style: sans(13.5, weight: W.label, color: AppColors.fg1)),
-              if (description != null && description!.isNotEmpty) ...[
-                const SizedBox(height: 2),
-                Text(description!,
-                    style: sans(12.5, height: 1.45, color: AppColors.fg3)),
-              ],
+      child: LayoutBuilder(builder: (_, c) {
+        final text = Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label,
+                style: sans(13.5, weight: W.label, color: AppColors.fg1)),
+            if (description != null && description!.isNotEmpty) ...[
+              const SizedBox(height: 2),
+              Text(description!,
+                  style: sans(12.5, height: 1.45, color: AppColors.fg3)),
             ],
+          ],
+        );
+        if (c.maxWidth < 520) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              text,
+              const SizedBox(height: S.s8),
+              Align(alignment: Alignment.centerLeft, child: control),
+            ],
+          );
+        }
+        return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          SizedBox(width: c.maxWidth < 760 ? 200 : 260, child: text),
+          const SizedBox(width: S.s24),
+          Expanded(
+            child: Align(alignment: Alignment.centerRight, child: control),
           ),
-        ),
-        const SizedBox(width: S.s24),
-        Expanded(
-          child: Align(alignment: Alignment.centerRight, child: control),
-        ),
-      ]),
+        ]);
+      }),
     );
   }
 }

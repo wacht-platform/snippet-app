@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../api.dart';
+import '../../desktop_layout.dart';
 import '../../models.dart';
 import '../../panel.dart';
 import '../../theme.dart';
@@ -39,6 +40,7 @@ class _CoordinationAgentDirectoryState
   List<CoordinationAgent> agents = const [];
   String? error;
   bool loading = true;
+  String? _selectedId;
 
   @override
   void initState() {
@@ -114,8 +116,86 @@ class _CoordinationAgentDirectoryState
     await _awaitNewAgent();
   }
 
+  static const _wideMin = 900.0;
+
   @override
   Widget build(BuildContext context) {
+    if (kMobile) return _stacked(context);
+    return LayoutBuilder(
+      builder: (context, c) =>
+          c.maxWidth >= _wideMin ? _wide() : _stacked(context),
+    );
+  }
+
+  Widget _wide() {
+    CoordinationAgent? selected;
+    for (final a in agents) {
+      if (a.id == _selectedId) selected = a;
+    }
+    Widget? empty;
+    if (loading) {
+      empty = Center(child: Spinner(size: 20, color: AppColors.fg3));
+    } else if (error != null) {
+      empty = Column(mainAxisSize: MainAxisSize.min, children: [
+        Text('Could not load agents', style: sans(13, color: AppColors.fg2)),
+        const SizedBox(height: 10),
+        Btn('Retry', small: true, onTap: refresh),
+      ]);
+    } else {
+      empty = Column(mainAxisSize: MainAxisSize.min, children: [
+        Text('Build your agent team',
+            style: sans(13, weight: W.label, color: AppColors.fg2)),
+        const SizedBox(height: 6),
+        Text(
+            'Create a specialised agent with its own identity and workspace-independent sessions.',
+            textAlign: TextAlign.center,
+            style: sans(12.5, color: AppColors.fg3, height: 1.45)),
+      ]);
+    }
+    return Material(
+      color: AppColors.windowBg,
+      child: MasterDetail(
+        master: MasterPane(
+          title: 'Agents',
+          actions: [HeaderAction('Build agent', onTap: _create)],
+          empty: empty,
+          children: loading || error != null
+              ? const []
+              : [
+                  for (final a in agents)
+                    ListRow(
+                      key: ValueKey('agent-${a.id}'),
+                      title: a.displayName,
+                      subtitle: a.role.trim().isEmpty
+                          ? '@${a.handle}'
+                          : a.role.trim(),
+                      selected: a.id == _selectedId,
+                      leading: Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: a.available
+                              ? AppColors.ok
+                              : AppColors.fg4,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      onTap: () => setState(() => _selectedId = a.id),
+                    ),
+                ],
+        ),
+        detail: selected == null
+            ? const DetailEmpty('Select an agent')
+            : _AgentPane(
+                key: ValueKey('agent-pane-${selected.id}'),
+                agent: selected,
+                client: widget.client,
+              ),
+      ),
+    );
+  }
+
+  Widget _stacked(BuildContext context) {
     final body = PullToRefresh(
       onRefresh: refresh,
       child: loading
@@ -170,6 +250,91 @@ class _CoordinationAgentDirectoryState
         label: const Text('Create agent'),
       ),
       body: body,
+    );
+  }
+}
+
+class _AgentPane extends StatelessWidget {
+  const _AgentPane({super.key, required this.agent, required this.client});
+  final CoordinationAgent agent;
+  final DaemonClient client;
+
+  @override
+  Widget build(BuildContext context) {
+    final status = agent.status.trim().isEmpty
+        ? (agent.available ? 'Online' : 'Offline')
+        : agent.status.trim()[0].toUpperCase() +
+            agent.status.trim().substring(1);
+    return Align(
+      alignment: Alignment.topLeft,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 840),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(S.s40, S.s32, S.s40, S.s16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(children: [
+                    AgentMochi(agent.id, size: 40),
+                    const SizedBox(width: S.s12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(agent.displayName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: sans(20,
+                                  weight: W.strong,
+                                  spacing: -0.2,
+                                  color: AppColors.fg1)),
+                          const SizedBox(height: S.s4),
+                          Text(
+                            [
+                              '@${agent.handle}',
+                              if (agent.role.trim().isNotEmpty)
+                                agent.role.trim(),
+                            ].join(' · '),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: sans(13, color: AppColors.fg3),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: S.s12),
+                    Tag(status,
+                        tone: agent.available ? Tone.ok : Tone.neutral,
+                        dot: true),
+                  ]),
+                  if (agent.capabilities.isNotEmpty) ...[
+                    const SizedBox(height: S.s16),
+                    Wrap(
+                      spacing: S.s6,
+                      runSpacing: S.s6,
+                      children: [
+                        for (final cap in agent.capabilities)
+                          Tag(cap, mono: true),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            Divider(height: 1, color: AppColors.line),
+            Expanded(
+              child: CoordinationAgentDetail(
+                agent: agent,
+                client: client,
+                embedded: true,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

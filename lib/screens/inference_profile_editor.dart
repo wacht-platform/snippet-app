@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/services.dart';
 
 import '../api.dart';
+import '../desktop_layout.dart';
 import '../models.dart';
 import '../platform.dart';
 import '../theme.dart';
@@ -61,9 +62,11 @@ class InferenceProfileEditor extends StatefulWidget {
 
   final void Function(InferenceProfile draft, Future<void> save)? onSubmit;
   final VoidCallback? onDelete;
+  final bool detail;
   const InferenceProfileEditor(
       {super.key,
       this.onDelete,
+      this.detail = false,
       required this.client,
       this.existing,
       this.embedded = false,
@@ -71,10 +74,30 @@ class InferenceProfileEditor extends StatefulWidget {
       this.onSaved,
       this.onSubmit});
   @override
-  State<InferenceProfileEditor> createState() => _InferenceProfileEditorState();
+  State<InferenceProfileEditor> createState() =>
+      InferenceProfileEditorState();
 }
 
-class _InferenceProfileEditorState extends State<InferenceProfileEditor> {
+class InferenceProfileEditorState extends State<InferenceProfileEditor> {
+  String _baseline = '';
+
+  String _snapshot() => [
+        _provider,
+        _name.text,
+        _baseUrl.text,
+        _model.text,
+        _ctx.text,
+        _compact.text,
+        _key.text,
+        _images,
+        _active,
+        _stream,
+        _xSearch,
+        _effort,
+      ].join('\u0001');
+
+  bool get dirty => _snapshot() != _baseline;
+
   late String _provider;
   late final TextEditingController _name;
   late final TextEditingController _baseUrl;
@@ -133,6 +156,7 @@ class _InferenceProfileEditorState extends State<InferenceProfileEditor> {
     _model.addListener(_scheduleReasoning);
     _modelSearch.addListener(() => setState(() {}));
     _loadReasoning();
+    _baseline = _snapshot();
   }
 
   String _reasoningKey = '';
@@ -452,6 +476,13 @@ class _InferenceProfileEditorState extends State<InferenceProfileEditor> {
         'x_search': _isXai && _xSearch,
       });
       submit(draft, _persist());
+      if (widget.detail) {
+        setState(() {
+          _busy = false;
+          _baseline = _snapshot();
+        });
+        return;
+      }
       _dismiss();
       return;
     }
@@ -496,6 +527,7 @@ class _InferenceProfileEditorState extends State<InferenceProfileEditor> {
     final pills = [..._providers];
     if (!pills.any((p) => p.$1 == _provider))
       pills.insert(0, (_provider, _provider));
+    if (widget.detail && !kMobile) return _detailBuild(pills);
     final title = _isEdit ? 'Edit profile' : 'Add profile';
     final footer = kMobile
         ? Padding(
@@ -541,6 +573,287 @@ class _InferenceProfileEditorState extends State<InferenceProfileEditor> {
     if (widget.embedded) return body;
     return Scaffold(
       body: SafeArea(bottom: false, child: body),
+    );
+  }
+
+  Widget? _subscriptionSignIn() {
+    if (_isChatgpt) {
+      return _SubSignIn(
+        client: widget.client,
+        signedInLabel: 'Signed in to ChatGPT',
+        blurb: 'ChatGPT uses your Plus / Pro / Team subscription — no API key.',
+        buttonLabel: 'Sign in with ChatGPT',
+        signedIn: (c) => c.chatgptSignedIn(),
+        begin: (c) => c.chatgptLoginBegin(),
+        signOut: (c) => c.chatgptLogout(),
+      );
+    }
+    if (_isXai) {
+      return _SubSignIn(
+        client: widget.client,
+        signedInLabel: 'Signed in to xAI',
+        blurb: 'Grok uses your SuperGrok / X Premium subscription — no API key.',
+        buttonLabel: 'Sign in with SuperGrok / X Premium',
+        signedIn: (c) => c.xaiSignedIn(),
+        begin: (c) => c.xaiLoginBegin(),
+        signOut: (c) => c.xaiLogout(),
+      );
+    }
+    if (_isClaudeCode || _isAntigravity) {
+      return _CliAgentStatus(
+          key: ValueKey(_provider), client: widget.client, provider: _provider);
+    }
+    return null;
+  }
+
+  Future<void> _makeActive() async {
+    setState(() => _active = true);
+    await _save();
+  }
+
+  Widget _detailBuild(List<(String, String)> pills) {
+    final modelName = _model.text.trim();
+    final title = _isEdit
+        ? widget.existing!.name
+        : (_name.text.trim().isNotEmpty ? _name.text.trim() : 'New profile');
+    final effortLabel =
+        '${(_reasoning?['label'] as String?) ?? 'Reasoning'} effort';
+    final compact = (int.tryParse(_compact.text.trim()) ?? 90).clamp(10, 100);
+    final signIn = _subscriptionSignIn();
+    final canSave = !_busy && modelName.isNotEmpty && (!_isEdit || dirty);
+    final rows = <Widget>[
+      if (!_isEdit)
+        DesktopFormRow(
+          label: 'Name',
+          description: 'Defaults to the provider.',
+          control: SettingsField(
+              controller: _name,
+              width: 280,
+              hint: 'Defaults to the provider',
+              onChanged: (_) => setState(() {})),
+        ),
+      DesktopFormRow(
+        label: 'Provider',
+        control: _isEdit
+            ? Row(mainAxisSize: MainAxisSize.min, children: [
+                ProviderLogo(_provider, size: 14),
+                const SizedBox(width: 8),
+                Text(_providerLabel(_provider),
+                    style: sans(13, color: AppColors.fg2)),
+              ])
+            : SettingsPopup<String>(
+                label: _providerLabel(_provider),
+                leading: ProviderLogo(_provider, size: 12),
+                items: pills,
+                selected: _provider,
+                onSelected: (val) => setState(() {
+                  _provider = val;
+                  _images = _defaultImages(val);
+                  _catalogModels = null;
+                  _showModelBrowser = false;
+                  _modelSearch.clear();
+                  _scheduleReasoning();
+                }),
+              ),
+      ),
+      DesktopFormRow(
+        label: 'Model',
+        description: _modelHint,
+        divider: !(_showModelBrowser && _catalogModels != null),
+        control: SettingsField(
+          controller: _model,
+          width: 280,
+          mono: true,
+          onChanged: (_) {
+            setState(() {});
+            _scheduleReasoning();
+          },
+          hint: _isChatgpt
+              ? 'gpt-5.1-codex'
+              : _isClaudeCode
+                  ? 'sonnet'
+                  : _isAntigravity
+                      ? 'gemini-3.8-flash-high'
+                      : 'claude-sonnet-4.5',
+          suffix: _loadingModels
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: Center(child: Spinner(size: 12)))
+              : GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: _busy ? null : _browseModels,
+                  child: Padding(
+                    padding: const EdgeInsets.only(left: 2),
+                    child: AppIcon(
+                      _showModelBrowser ? 'x' : 'chevrons-up-down',
+                      size: 13,
+                      color: AppColors.fg4,
+                    ),
+                  ),
+                ),
+        ),
+      ),
+      if (_showModelBrowser && _catalogModels != null)
+        Container(
+          padding: const EdgeInsets.only(bottom: S.s16),
+          decoration: BoxDecoration(
+              border: Border(bottom: BorderSide(color: AppColors.line))),
+          child: _inlineModelBrowser(),
+        ),
+      DesktopFormRow(
+        label: effortLabel,
+        control: _effortAdjustable
+            ? SettingsPopup<String>(
+                label: _effortItems
+                        .where((i) => i.$1 == _effort)
+                        .firstOrNull
+                        ?.$2 ??
+                    'Default',
+                items: _effortItems,
+                selected: _effort,
+                onSelected: (v) => setState(() => _effort = v),
+              )
+            : Text(
+                _reasoning?['control'] == 'model'
+                    ? 'Set by the model'
+                    : 'Not adjustable',
+                style: sans(13, color: AppColors.fg3)),
+      ),
+      DesktopFormRow(
+        label: 'Context window',
+        description: 'Tokens. Blank keeps the default.',
+        control: SettingsField(
+            controller: _ctx,
+            width: 160,
+            mono: true,
+            number: true,
+            hint: '200000'),
+      ),
+      DesktopFormRow(
+        label: 'Compact at',
+        description: 'History is summarised when the window is this full.',
+        control: Row(mainAxisSize: MainAxisSize.min, children: [
+          SizedBox(
+            width: 200,
+            child: SliderTheme(
+              data: SliderTheme.of(context).copyWith(
+                trackHeight: 3,
+                activeTrackColor: AppColors.accent,
+                inactiveTrackColor: AppColors.surface3,
+                thumbColor: AppColors.fg1,
+                overlayShape: SliderComponentShape.noOverlay,
+                thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
+              ),
+              child: Slider(
+                value: compact.toDouble(),
+                min: 10,
+                max: 100,
+                divisions: 18,
+                onChanged: (v) => setState(() => _compact.text = '${v.round()}'),
+              ),
+            ),
+          ),
+          SizedBox(
+            width: 44,
+            child: Text('$compact%',
+                textAlign: TextAlign.right,
+                style: sans(13, color: AppColors.fg2)),
+          ),
+        ]),
+      ),
+      if (_usesOpenAiAdapter(_provider))
+        DesktopFormRow(
+          label: 'Stream responses',
+          description: 'For models that return nothing otherwise.',
+          control: SettingsSwitch(
+              value: _stream, onChanged: (v) => setState(() => _stream = v)),
+        ),
+      if (signIn != null)
+        DesktopFormRow(
+          label: 'Connection',
+          description: 'Keys stay on the machine running snippet.',
+          control: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 380), child: signIn),
+        )
+      else
+        DesktopFormRow(
+          label: 'API key',
+          description: 'Keys stay on the machine running snippet.',
+          control: SettingsField(
+            controller: _key,
+            width: 280,
+            mono: true,
+            obscure: !_showKey,
+            hint: _isEdit && widget.existing!.hasKey ? 'Saved' : 'sk-…',
+            onChanged: (_) => setState(() {}),
+            suffix: GestureDetector(
+              onTap: () => setState(() => _showKey = !_showKey),
+              child: Text(_showKey ? 'Hide' : 'Show',
+                  style: sans(11.5, color: AppColors.fg3)),
+            ),
+          ),
+        ),
+      if (_needsBaseUrl(_provider))
+        DesktopFormRow(
+          label: 'Base URL',
+          control: SettingsField(
+              controller: _baseUrl,
+              width: 280,
+              mono: true,
+              onChanged: (_) => setState(() {}),
+              hint: 'https://api.example.com/v1'),
+        ),
+      DesktopFormRow(
+        label: 'Supports images',
+        description: 'Send screenshots and diagrams to this model.',
+        control: SettingsSwitch(
+            value: _images, onChanged: (v) => setState(() => _images = v)),
+      ),
+      if (_isXai)
+        DesktopFormRow(
+          label: 'X search',
+          description: 'Let Grok search X with xAI’s server-side tool.',
+          control: SettingsSwitch(
+              value: _xSearch, onChanged: (v) => setState(() => _xSearch = v)),
+        ),
+      DesktopFormRow(
+        label: 'Use for new sessions',
+        description: 'Make this the active profile.',
+        divider: false,
+        control: SettingsSwitch(
+            value: _active, onChanged: (v) => setState(() => _active = v)),
+      ),
+      if (_error != null)
+        Padding(
+          padding: const EdgeInsets.only(top: S.s12),
+          child: Text(_error!, style: sans(12, color: AppColors.danger)),
+        ),
+    ];
+    return DetailPane(
+      title: title,
+      subtitle: [
+        _providerLabel(_provider),
+        if (modelName.isNotEmpty) modelName,
+        if (_active) 'used for new sessions',
+      ].join(' · '),
+      actions: [
+        if (_isEdit && !widget.existing!.active && !_active)
+          Btn('Make active',
+              variant: BtnVariant.secondary,
+              small: true,
+              disabled: _busy || modelName.isEmpty,
+              onTap: _makeActive),
+        if (_isEdit && widget.onDelete != null)
+          Btn('Delete',
+              variant: BtnVariant.danger, small: true, onTap: widget.onDelete),
+        Btn(_busy ? 'Saving…' : (_isEdit ? 'Save' : 'Add profile'),
+            small: true, disabled: !canSave, onTap: _save),
+      ],
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: rows,
+      ),
     );
   }
 
@@ -616,41 +929,10 @@ class _InferenceProfileEditorState extends State<InferenceProfileEditor> {
                 SettingsPill('Delete', danger: true, onTap: widget.onDelete),
             ]),
           );
+    final signIn = _subscriptionSignIn();
     final connection = <Widget>[
-      if (_isChatgpt)
-        Padding(
-          padding: const EdgeInsets.all(12),
-          child: _SubSignIn(
-            client: widget.client,
-            signedInLabel: 'Signed in to ChatGPT',
-            blurb: 'ChatGPT uses your Plus / Pro / Team subscription — no API key.',
-            buttonLabel: 'Sign in with ChatGPT',
-            signedIn: (c) => c.chatgptSignedIn(),
-            begin: (c) => c.chatgptLoginBegin(),
-            signOut: (c) => c.chatgptLogout(),
-          ),
-        )
-      else if (_isXai)
-        Padding(
-          padding: const EdgeInsets.all(12),
-          child: _SubSignIn(
-            client: widget.client,
-            signedInLabel: 'Signed in to xAI',
-            blurb: 'Grok uses your SuperGrok / X Premium subscription — no API key.',
-            buttonLabel: 'Sign in with SuperGrok / X Premium',
-            signedIn: (c) => c.xaiSignedIn(),
-            begin: (c) => c.xaiLoginBegin(),
-            signOut: (c) => c.xaiLogout(),
-          ),
-        )
-      else if (_isClaudeCode || _isAntigravity)
-        Padding(
-          padding: const EdgeInsets.all(12),
-          child: _CliAgentStatus(
-              key: ValueKey(_provider),
-              client: widget.client,
-              provider: _provider),
-        )
+      if (signIn != null)
+        Padding(padding: const EdgeInsets.all(12), child: signIn)
       else
         SettingsRow(
           label: 'API key',
@@ -1004,7 +1286,7 @@ class _ModelPickerSheetState extends State<_ModelPickerSheet> {
       else if (m.reasoning != null)
         m.reasoning! ? 'reasoning' : 'no reasoning',
       if ((m.contextWindow ?? 0) > 0)
-        _InferenceProfileEditorState._fmtCtx(m.contextWindow!),
+        InferenceProfileEditorState._fmtCtx(m.contextWindow!),
     ];
     final subtitle = [
       if (m.displayName != null) m.displayName!,

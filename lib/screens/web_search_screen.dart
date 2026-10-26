@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../api.dart';
+import '../desktop_layout.dart';
 import '../platform.dart';
 import '../settings_form.dart';
 import '../theme.dart';
@@ -164,7 +165,32 @@ class _WebSearchScreenState extends State<WebSearchScreen> {
         children: _groups(keySet),
       );
     } else {
-      body = PageBody(topPadding: 4, children: _groups(keySet));
+      body = ListView(
+        padding: widget.embedded
+            ? EdgeInsets.zero
+            : const EdgeInsets.fromLTRB(S.s16, S.s4, S.s16, S.s40),
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(bottom: S.s4),
+            child: Text('Exa',
+                style: sans(13, weight: W.label, color: AppColors.fg3)),
+          ),
+          DesktopFormRow(
+            label: 'Exa key',
+            description: keySet
+                ? 'On for new sessions'
+                : 'Off until a key is saved',
+            divider: false,
+            control: _desktopKey(keySet),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(top: S.s8),
+            child: Text(
+                'Agents get web_search and web_read, powered by Exa, in sessions that start after the key is saved. The key stays on this machine.',
+                style: sans(12.5, height: 1.5, color: AppColors.fg4)),
+          ),
+        ],
+      );
     }
     if (widget.embedded && widget.onBack != null) {
       return Column(

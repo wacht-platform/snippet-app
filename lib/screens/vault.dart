@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../api.dart';
+import '../desktop_layout.dart';
 import '../platform.dart';
 import '../theme.dart';
 import '../widgets.dart';
@@ -40,6 +41,8 @@ class VaultScreenState extends State<VaultScreen> {
 
   /// Desktop only: the inline add form is open in the list.
   bool _adding = false;
+
+  String? _selected;
 
   bool get isAdding => _adding;
 
@@ -189,6 +192,8 @@ class VaultScreenState extends State<VaultScreen> {
           ]),
         ),
       );
+    } else if (!kMobile) {
+      body = _desktop(_names ?? const []);
     } else {
       final names = _names ?? const [];
       body = PageBody(children: [
@@ -226,6 +231,120 @@ class VaultScreenState extends State<VaultScreen> {
           Expanded(child: body),
         ]),
       ),
+    );
+  }
+
+  void _select(String name) {
+    if (_adding) _cancel();
+    setState(() => _selected = name);
+  }
+
+  Widget _desktop(List<String> names) {
+    final current =
+        _selected != null && names.contains(_selected) ? _selected : names.firstOrNull;
+    final Widget detail;
+    if (_adding) {
+      detail = DetailPane(
+        title: 'New secret',
+        subtitle: 'The value is stored on this machine and never shown again.',
+        actions: [
+          Btn('Cancel',
+              variant: BtnVariant.surface,
+              small: true,
+              disabled: _busy,
+              onTap: _cancel),
+          Btn(_busy ? 'Saving…' : 'Save secret',
+              small: true, disabled: _busy, onTap: _save),
+        ],
+        child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              DesktopFormRow(
+                label: 'Name',
+                description: 'Use it as \$NAME in shell commands.',
+                control: SettingsField(
+                    controller: _name,
+                    hint: 'STRIPE_KEY',
+                    mono: true,
+                    width: 260),
+              ),
+              DesktopFormRow(
+                label: 'Value',
+                description: 'Sent to the daemon on save and redacted from output.',
+                divider: _formError != null,
+                control: SettingsField(
+                    controller: _value,
+                    hint: 'sk_live_…',
+                    mono: true,
+                    obscure: true,
+                    width: 260),
+              ),
+              if (_formError != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: S.s12),
+                  child: Text(_formError!,
+                      style: sans(12.5, color: AppColors.danger)),
+                ),
+            ]),
+      );
+    } else if (current == null) {
+      detail = const DetailEmpty('Select a secret');
+    } else {
+      detail = DetailPane(
+        key: ValueKey('secret-$current'),
+        title: current,
+        subtitle: 'Used as \$$current in shell commands',
+        actions: [
+          Btn('Remove',
+              variant: BtnVariant.danger,
+              small: true,
+              icon: 'trash',
+              onTap: () => _remove(current)),
+        ],
+        child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              DesktopFormRow(
+                label: 'Name',
+                control: Text(current,
+                    style: mono(13, color: AppColors.fg1)),
+              ),
+              DesktopFormRow(
+                label: 'Value',
+                description: 'Kept on this machine and never shown again.',
+                divider: false,
+                control: Text('Stored, not shown',
+                    style: sans(13, color: AppColors.fg3)),
+              ),
+            ]),
+      );
+    }
+    return MasterDetail(
+      master: MasterPane(
+        title: 'Vault',
+        actions: [
+          IconBtn('plus',
+              size: 28,
+              iconSize: 14,
+              tooltip: 'Add secret',
+              onTap: _add),
+        ],
+        empty: Text('No secrets yet',
+            style: sans(13, color: AppColors.fg3)),
+        children: [
+          for (final n in names)
+            ListRow(
+              title: n,
+              titleWidget: Text(n,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: mono(12.5, color: AppColors.fg1)),
+              selected: !_adding && n == current,
+              onTap: () => _select(n),
+            ),
+        ],
+      ),
+      detail: detail,
     );
   }
 
