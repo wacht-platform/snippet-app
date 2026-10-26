@@ -92,7 +92,9 @@ class AmbientCapture {
         probability: _probability,
         segments: _segments,
         pending: uploader.pending.value,
-        error: uploader.displaced.value ? null : (_error ?? uploader.lastError.value),
+        error: uploader.displaced.value
+            ? null
+            : (_error ?? uploader.lastError.value),
         displaced: uploader.displaced.value,
         assistantSpeaking: _voice?.speaking.value ?? false,
       );
@@ -126,7 +128,8 @@ class AmbientCapture {
         audioInterruption: AudioInterruptionMode.none,
         echoCancel: true,
         noiseSuppress: true,
-        androidConfig: const AndroidRecordConfig(audioSource: AndroidAudioSource.voiceCommunication)));
+        androidConfig: const AndroidRecordConfig(
+            audioSource: AndroidAudioSource.voiceCommunication)));
     _running = true;
     _error = null;
     _sub = stream.listen(_onAudio, onError: (Object e) {
@@ -137,7 +140,17 @@ class AmbientCapture {
     });
     _statTimer?.cancel();
     _statTimer = Timer.periodic(const Duration(seconds: 30), (_) {
-      uploader.stat({'frames': _frames, 'speech': _speechFrames, 'loud_low_vad': _loudQuiet, 'held_ms': _heldBytes ~/ 32, 'build': 12, 'segments': _segments, 'threshold': threshold});
+      uploader.stat({
+        'frames': _frames,
+        'speech': _speechFrames,
+        'loud_low_vad': _loudQuiet,
+        'held_ms': _heldBytes ~/ 32,
+        'build': 12,
+        'segments': _segments,
+        'threshold': threshold,
+        'peak': double.parse(_peak.toStringAsFixed(4))
+      });
+      _peak = 0;
       _frames = 0;
       _speechFrames = 0;
       _loudQuiet = 0;
@@ -168,7 +181,9 @@ class AmbientCapture {
         final on = await _audio.inCall();
         if (on != _callOn) {
           _callOn = on;
-          unawaited(AmbientDiagnostics.log(on ? 'call started: listening paused' : 'call ended: listening resumed'));
+          unawaited(AmbientDiagnostics.log(on
+              ? 'call started: listening paused'
+              : 'call ended: listening resumed'));
         }
       } catch (_) {}
     });
@@ -181,6 +196,8 @@ class AmbientCapture {
   int _speechFrames = 0;
   int _loudQuiet = 0;
   int _heldBytes = 0;
+  int _silentFrames = 0;
+  double _peak = 0;
 
   void _onAudio(Uint8List bytes) {
     final vad = _vad;
@@ -197,7 +214,8 @@ class AmbientCapture {
     final buffer = _pending.takeBytes();
     var offset = 0;
     while (buffer.length - offset >= chunkBytes) {
-      final frame = Uint8List.fromList(buffer.sublist(offset, offset + chunkBytes));
+      final frame =
+          Uint8List.fromList(buffer.sublist(offset, offset + chunkBytes));
       final view = ByteData.sublistView(frame);
       final samples = Float32List(SileroVad.chunkSamples);
       for (var i = 0; i < samples.length; i++) {
@@ -207,8 +225,21 @@ class AmbientCapture {
       _frames++;
       if (_probability >= threshold) _speechFrames++;
       var energy = 0.0;
+      var peak = 0.0;
       for (final x in samples) {
         energy += x * x;
+        if (x.abs() > peak) peak = x.abs();
+      }
+      if (peak > _peak) _peak = peak;
+      _silentFrames = peak == 0 ? _silentFrames + 1 : 0;
+      if (_silentFrames == 94) {
+        _error =
+            'The microphone is only sending silence. Allow microphone access for this app (on a Mac: System Settings, Privacy & Security, Microphone; when launched with flutter run, allow the terminal app).';
+        unawaited(AmbientDiagnostics.log('microphone silent for 3s'));
+      } else if (_silentFrames == 0 &&
+          _error != null &&
+          _error!.startsWith('The microphone is only sending silence')) {
+        _error = null;
       }
       if (energy / samples.length > 0.0004 && _probability < 0.3) _loudQuiet++;
       segmenter.addFrame(frame, _probability);
