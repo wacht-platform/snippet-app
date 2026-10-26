@@ -1,7 +1,6 @@
 import 'package:snippet/ambient/hold.dart';
 import 'dart:async';
 import 'dart:io';
-import 'dart:math' as math;
 
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
@@ -346,7 +345,7 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
   final _scroll = ScrollController();
   List<CoordinationEvent> _events = const [];
   bool _loading = true;
-  bool _sending = false;
+  final bool _sending = false;
   String? _error;
   late final Swr<List<CoordinationEvent>> _thread;
 

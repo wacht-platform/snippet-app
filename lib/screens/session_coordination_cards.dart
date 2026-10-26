@@ -1,8 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 
-import '../components.dart';
-import '../markdown_widgets.dart';
 import '../platform.dart';
 import '../transcript_card.dart';
 import '../theme.dart';

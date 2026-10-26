@@ -44,7 +44,6 @@ import '../composer_strip.dart';
 import '../media_views.dart';
 import 'agent_messaging.dart';
 import 'package:xterm/xterm.dart';
-import 'editor.dart';
 import 'files.dart';
 import 'processes.dart';
 import 'git.dart';
@@ -579,7 +578,6 @@ class _SessionScreenState extends State<SessionScreen>
   int _attachmentGeneration = 0;
   bool get _anyUploading => _attachments.any((a) => a.uploading);
   final Map<String, bool> _toolRunOpen = {};
-  final Map<String, ValueNotifier<ToolBatch>> _toolBatches = {};
   final Set<String> _openToolRows = {};
   bool _transcriptDirty = true;
 

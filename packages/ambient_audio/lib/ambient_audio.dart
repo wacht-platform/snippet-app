@@ -1,1 +1,1 @@
-library ambient_audio;
+library;

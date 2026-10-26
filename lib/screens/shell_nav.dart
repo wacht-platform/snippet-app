@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../platform.dart';
 import '../theme.dart';
 import '../widgets.dart';
-import 'mobile_chrome.dart';
 
 /// Design-language primitives for the shell sidebar.
 ///

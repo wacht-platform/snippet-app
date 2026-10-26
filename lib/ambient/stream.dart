@@ -140,7 +140,7 @@ class AmbientStream {
     } catch (_) {}
   }
 
-  Future<bool> start(int h, String id, int seq, DateTime startedAt, {bool continued = false, bool backlog = false}) async {
+  Future<bool> start(int h, String id, int seq, DateTime startedAt, {bool backlog = false}) async {
     final ws = await _socket();
     if (ws == null) return false;
     _send(ws, jsonEncode({
@@ -149,7 +149,6 @@ class AmbientStream {
       'id': id,
       'seq': seq,
       'started_at': startedAt.toUtc().toIso8601String(),
-      'continued': continued,
       if (backlog) 'backlog': true,
     }));
     return true;
@@ -172,7 +171,7 @@ class AmbientStream {
     _send(ws, out);
   }
 
-  Future<StreamDone> end(int h, String id, {required int durationMs, required int bytes, bool media = false, bool duringPlayback = false}) {
+  Future<StreamDone> end(int h, String id, {required int durationMs, required int bytes}) {
     final ws = _ws;
     if (ws == null || ws.readyState != WebSocket.open) return Future.value(StreamDone(0, 'connection lost'));
     final done = Completer<StreamDone>();
@@ -183,8 +182,6 @@ class AmbientStream {
       'id': id,
       'duration_ms': durationMs,
       'bytes': bytes,
-      'media': media,
-      'during_playback': duringPlayback,
     }));
     return done.future.timeout(const Duration(seconds: 40), onTimeout: () {
       _waiting.remove(h);
@@ -231,11 +228,6 @@ class AmbientStream {
   void ttsPos(int turn, int ms, bool done) {
     final ws = _ws;
     if (ws != null && ws.readyState == WebSocket.open) _send(ws, jsonEncode({'t': 'tts_pos', 'turn': turn, 'ms': ms, 'done': done}));
-  }
-
-  void skip(int seq) {
-    final ws = _ws;
-    if (ws != null && ws.readyState == WebSocket.open) _send(ws, jsonEncode({'t': 'skip', 'seq': seq}));
   }
 
   void close() {

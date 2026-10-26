@@ -4,7 +4,6 @@
 
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -13,7 +12,6 @@ import 'models.dart';
 import 'platform.dart';
 import 'theme.dart';
 import 'tool_activity.dart';
-import 'tool_sheet.dart' show ToolBatch;
 import 'tool_views.dart';
 import 'transcript_card.dart';
 import 'widgets.dart';
@@ -327,16 +325,11 @@ class ToolRun extends StatefulWidget {
   final bool running;
   final bool open;
   final ValueChanged<bool>? onOpenChanged;
-
-  /// Kept for call sites that still pass a live batch; the timeline expands
-  /// inline instead of opening a sheet.
-  final ValueListenable<ToolBatch>? batch;
   const ToolRun(this.rows,
       {super.key,
       this.running = false,
       this.open = false,
-      this.onOpenChanged,
-      this.batch});
+      this.onOpenChanged});
   @override
   State<ToolRun> createState() => _ToolRunState();
 }

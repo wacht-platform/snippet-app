@@ -105,22 +105,12 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
           isSessionRunning && run.any((w) => w is DenseToolRow && w.pending);
       final toolKey = 'transcript-tools-$start';
       final open = _toolRunOpen[toolKey] ?? false;
-      final batch = ToolBatch([
-        for (final r in run.whereType<DenseToolRow>())
-          ToolStep(tool: r.tool, args: r.args, result: r.result),
-      ], running: running);
-      final live =
-          _toolBatches.putIfAbsent(toolKey, () => ValueNotifier(batch));
-      // An open sheet listens to this; update it after the frame so the sheet
-      // never rebuilds in the middle of the transcript's own build.
-      WidgetsBinding.instance.addPostFrameCallback((_) => live.value = batch);
       out.add(KeyedSubtree(
         key: ValueKey(toolKey),
         child: ToolRun(
           List.of(run),
           running: running,
           open: open,
-          batch: live,
           onOpenChanged: (nextOpen) {
             if (!mounted) return;
             _setState(() {

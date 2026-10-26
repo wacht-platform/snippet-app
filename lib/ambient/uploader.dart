@@ -11,7 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'diagnostics.dart';
 
-import 'segmenter.dart';
+import 'segment.dart';
 import 'stream.dart';
 import 'wav.dart';
 
@@ -107,12 +107,6 @@ class AmbientUploader {
     final key = 'ambient_seq_$device';
     unawaited(SharedPreferences.getInstance().then((prefs) => prefs.setInt(key, next)));
     return Future.value(next);
-  }
-
-  Future<int> reserveSequence() => _nextSeq();
-
-  Future<void> skip(int seq) async {
-    _stream.skip(seq);
   }
 
   void stat(Map<String, Object> values) => _stream.stat(values);
@@ -261,16 +255,13 @@ class AmbientUploader {
 
   Future<void> _write(AmbientSegment segment) async {
     final id = newSegmentId();
-    final seq = await (segment.seq ?? _nextSeq());
+    final seq = await _nextSeq();
     final dir = await _queueDir();
     await File('${dir.path}/$id.wav').writeAsBytes(pcm16ToWav(segment.pcm), flush: true);
     await File('${dir.path}/$id.json').writeAsString(jsonEncode({
       'id': id,
       'started_at': segment.startedAt.toUtc().toIso8601String(),
       'duration_ms': segment.duration.inMilliseconds,
-      'continued': segment.continued,
-      'during_playback': segment.duringPlayback,
-      'media': segment.media,
       'seq': seq,
     }), flush: true);
     await _trim(dir);
@@ -376,8 +367,7 @@ class AmbientUploader {
       final h = _stream.nextHandle();
       final id = info['id'] as String;
       final started = DateTime.tryParse(info['started_at'] as String) ?? DateTime.now();
-      final opened = await _stream.start(h, id, (info['seq'] as num).toInt(), started,
-          continued: info['continued'] == true, backlog: backlog);
+      final opened = await _stream.start(h, id, (info['seq'] as num).toInt(), started, backlog: backlog);
       if (!opened) {
         lastError.value = 'Upload failed: no connection';
         return false;
@@ -387,9 +377,7 @@ class AmbientUploader {
       }
       final response = await _stream.end(h, id,
           durationMs: (info['duration_ms'] as num).toInt(),
-          bytes: pcm.length,
-          media: info['media'] == true,
-          duringPlayback: info['during_playback'] == true);
+          bytes: pcm.length);
       if (response.code == 200) {
         await _remove(stem);
         return true;

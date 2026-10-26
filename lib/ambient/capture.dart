@@ -68,14 +68,14 @@ class AmbientCapture {
   final BytesBuilder _pending = BytesBuilder(copy: false);
 
   SileroVad? _vad;
-  SpeechGate? _segmenter;
+  SpeechGate? _gate;
   StreamSubscription<Uint8List>? _sub;
   Timer? _ticker;
   bool _running = false;
   bool _mediaOn = false;
   bool _playOn = false;
-  Timer? _mediaTimer;
-  Timer? _callTimer;
+  Timer? _pollTimer;
+  bool _polling = false;
   bool _callOn = false;
   final AmbientSink _audio = AmbientSink();
   AmbientVoice? _voice;
@@ -89,7 +89,7 @@ class AmbientCapture {
 
   AmbientStatus get current => AmbientStatus(
         running: _running,
-        speaking: _segmenter?.speaking ?? false,
+        speaking: _gate?.speaking ?? false,
         probability: _probability,
         segments: _segments,
         pending: uploader.pending.value,
@@ -103,14 +103,12 @@ class AmbientCapture {
   Future<void> start() async {
     if (_running) return;
     await AmbientDiagnostics.log('uploader starting');
-    uploader.displaced.addListener(() {
-      if (uploader.displaced.value) unawaited(stop());
-    });
+    uploader.displaced.addListener(_onDisplaced);
     await uploader.start();
     await AmbientDiagnostics.log('loading detector');
     _vad = SileroVad();
     await AmbientDiagnostics.log('detector loaded, opening microphone');
-    _segmenter = SpeechGate(
+    _gate = SpeechGate(
       threshold: threshold,
       offThreshold: threshold - 0.15,
       onOpen: (startedAt, preRoll) {
@@ -165,31 +163,36 @@ class AmbientCapture {
     voiceListenable.value = _voice;
     _voice!.state.addListener(_onAmbientState);
     _voice!.speaking.addListener(_onSpeaking);
-    _mediaTimer?.cancel();
-    _mediaTimer = Timer.periodic(const Duration(milliseconds: 500), (_) async {
-      if (_voice?.speaking.value == true) return;
-      try {
-        final on = await _audio.mediaActive();
-        if (on != _mediaOn) {
-          _mediaOn = on;
-          uploader.flag('media', on);
-        }
-      } catch (_) {}
-    });
-    _callTimer?.cancel();
-    _callTimer = Timer.periodic(const Duration(seconds: 1), (_) async {
-      try {
-        final on = await _audio.inCall();
-        if (on != _callOn) {
-          _callOn = on;
-          unawaited(AmbientDiagnostics.log(on
-              ? 'call started: listening paused'
-              : 'call ended: listening resumed'));
-        }
-      } catch (_) {}
-    });
+    _pollTimer?.cancel();
+    _pollTimer = Timer.periodic(const Duration(milliseconds: 500), (_) => _pollAudioState());
     unawaited(_voice!.start());
     _status.add(current);
+  }
+
+  void _onDisplaced() {
+    if (uploader.displaced.value) unawaited(stop());
+  }
+
+  Future<void> _pollAudioState() async {
+    if (_polling) return;
+    _polling = true;
+    try {
+      if (_voice?.speaking.value != true) {
+        final media = await _audio.mediaActive();
+        if (media != _mediaOn) {
+          _mediaOn = media;
+          uploader.flag('media', media);
+        }
+      }
+      final call = await _audio.inCall();
+      if (call != _callOn) {
+        _callOn = call;
+        unawaited(AmbientDiagnostics.log(call ? 'call started: listening paused' : 'call ended: listening resumed'));
+      }
+    } catch (_) {
+    } finally {
+      _polling = false;
+    }
   }
 
   Timer? _statTimer;
@@ -202,11 +205,11 @@ class AmbientCapture {
 
   void _onAudio(Uint8List bytes) {
     final vad = _vad;
-    final segmenter = _segmenter;
-    if (vad == null || segmenter == null) return;
+    final gate = _gate;
+    if (vad == null || gate == null) return;
     if (AmbientHold.active || _callOn) {
       _heldBytes += bytes.length;
-      segmenter.abandon();
+      gate.abandon();
       _pending.takeBytes();
       return;
     }
@@ -249,12 +252,12 @@ class AmbientCapture {
                       const Duration(milliseconds: 300)));
       if (selfPlaying) {
         _probability = 0;
-        segmenter.addFrame(Uint8List(chunkBytes), 0);
+        gate.addFrame(Uint8List(chunkBytes), 0);
         offset += chunkBytes;
         continue;
       }
       if (energy / samples.length > 0.0004 && _probability < 0.3) _loudQuiet++;
-      segmenter.addFrame(frame, _probability);
+      gate.addFrame(frame, _probability);
       _duckCheck(_probability >= threshold);
       offset += chunkBytes;
     }
@@ -264,7 +267,7 @@ class AmbientCapture {
   }
 
   void _onAmbientState() {
-    _segmenter?.keepOpen = _voice?.state.value?.mode == 'active';
+    _gate?.keepOpen = _voice?.state.value?.mode == 'active';
   }
 
   int _loud = 0;
@@ -308,13 +311,13 @@ class AmbientCapture {
     if (!_running) return;
     _running = false;
     _ticker?.cancel();
-    _mediaTimer?.cancel();
-    _callTimer?.cancel();
+    _pollTimer?.cancel();
+    uploader.displaced.removeListener(_onDisplaced);
     _callOn = false;
     _statTimer?.cancel();
     await _sub?.cancel();
     await _recorder.stop();
-    _segmenter?.close();
+    _gate?.close();
     unawaited(_audio.leave().catchError((_) {}));
     _vad?.close();
     _vad = null;
