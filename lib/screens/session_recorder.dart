@@ -100,6 +100,7 @@ extension _SessionScreenRecorderExt on _SessionScreenState {
         path: path,
       );
       if (!await _recorder.isRecording()) {
+        await _recorder.cancel();
         if (mounted) _setState(() => _isRecording = false);
         _toast('Could not start recording.');
         return;
@@ -194,7 +195,7 @@ extension _SessionScreenRecorderExt on _SessionScreenState {
       } else if (_audioPlayer.state == PlayerState.paused) {
         await _audioPlayer.resume();
       } else {
-        await _audioPlayer.play(DeviceFileSource(path));
+        await _audioPlayer.play(DeviceFileSource(path), position: _playbackPosition);
       }
     } catch (e) {
       _toast('Could not play recording: $e');

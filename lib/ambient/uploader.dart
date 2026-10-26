@@ -247,7 +247,7 @@ class AmbientUploader {
 
   Future<void> enqueue(AmbientSegment segment) {
     final next = _writes.then((_) => _write(segment)).catchError((Object e) {
-      lastError.value = 'Could not save a segment: $e';
+      lastError.value = 'Could not save a segment: ${AmbientDiagnostics.redact('$e')}';
     });
     _writes = next;
     return next;
@@ -395,7 +395,7 @@ class AmbientUploader {
           : 'Upload failed (${response.code})';
       return false;
     } catch (e) {
-      lastError.value = 'Upload failed: $e';
+      lastError.value = 'Upload failed: ${AmbientDiagnostics.redact('$e')}';
       return false;
     }
   }

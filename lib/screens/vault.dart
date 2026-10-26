@@ -168,7 +168,7 @@ class VaultScreenState extends State<VaultScreen> {
   @override
   Widget build(BuildContext context) {
     Theme.of(context); // Rebuild on theme change
-    if (!kMobile) return _desktopPage();
+    if (!kMobile && widget.embedded) return _desktopPage();
     Widget body;
     if (_loading && _names == null) {
       body = const ListSkeleton(subtitle: false);

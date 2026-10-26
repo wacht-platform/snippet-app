@@ -230,6 +230,15 @@ class InferenceProfilesScreenState extends State<InferenceProfilesScreen>
         if (snap.connectionState == ConnectionState.waiting && !snap.hasData) {
           return const ListSkeleton();
         }
+        if (snap.hasError && !snap.hasData) {
+          return EmptyState(
+            icon: 'alert-triangle',
+            title: "Couldn't load profiles",
+            body: '${snap.error}',
+            action: Btn('Retry',
+                small: true, onTap: () => setState(() => _load(force: true))),
+          );
+        }
         final cfg = snap.data;
         final profiles = _withSaving(cfg?.profiles ?? const []);
         return PageBody(children: [
@@ -341,6 +350,26 @@ class InferenceProfilesScreenState extends State<InferenceProfilesScreen>
             ),
             SizedBox(height: S.s8),
             SettingsGroup(children: [SettingsRow(label: 'Loading profiles…')]),
+          ]);
+        }
+        if (snap.hasError && !snap.hasData) {
+          return SettingsColumn(children: [
+            const SettingsHeader(
+              title: 'Profiles',
+              subtitle: 'Models and credentials for chats and background work.',
+            ),
+            const SizedBox(height: S.s8),
+            SettingsGroup(children: [
+              SettingsRow(
+                label: "Couldn't load profiles",
+                sub: '${snap.error}',
+                danger: true,
+                trailing: Btn('Retry',
+                    small: true,
+                    variant: BtnVariant.secondary,
+                    onTap: () => setState(() => _load(force: true))),
+              ),
+            ]),
           ]);
         }
         final cfg = snap.data;

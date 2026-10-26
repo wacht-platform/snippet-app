@@ -238,7 +238,7 @@ class ImageThumb extends StatelessWidget {
                   AppIcon('image', size: 18, color: AppColors.fg4),
                   if (height >= 72) ...[
                     const SizedBox(height: 4),
-                    Text('Image no longer on the machine',
+                    Text('Couldn’t load image',
                         textAlign: TextAlign.center,
                         style: sans(11, color: AppColors.fg4)),
                   ],

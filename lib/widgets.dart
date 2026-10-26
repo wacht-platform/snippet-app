@@ -1500,7 +1500,16 @@ class NoteLine extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               Flexible(
-                child: SelectableText(text,
+                child: SelectableText.rich(
+                    TextSpan(children: [
+                      if (label != null)
+                        TextSpan(
+                            text: '$label  ',
+                            style: TextStyle(
+                                color: AppColors.fg1,
+                                fontWeight: weightFor(W.label))),
+                      TextSpan(text: text),
+                    ]),
                     minLines: 1,
                     maxLines: 5,
                     style: sans(kMobile ? 13 : 12.5,

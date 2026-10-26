@@ -78,7 +78,7 @@ class ToolStep {
     final r = result;
     if (r is Map && (r['status'] ?? '').toString() == 'error') return true;
     final code = exitCode;
-    return tool == 'bash' && code != null && code != 0;
+    return toolBaseName(tool) == 'bash' && code != null && code != 0;
   }
 
   List<Map> get changes => normalizeChanges(args);
@@ -157,7 +157,7 @@ String _fileName(String path) => path.split('/').last;
 String toolObject(ToolStep step) {
   final summary = toolArgSummary(step.tool, step.args);
   if (summary.isEmpty) return '';
-  if (step.tool == 'view_image') return _fileName(summary);
+  if (toolBaseName(step.tool) == 'view_image') return _fileName(summary);
   return summary;
 }
 
@@ -205,7 +205,7 @@ int _lineCount(dynamic text) {
 List<FileChange> fileChanges(Iterable<ToolStep> steps) {
   final byPath = <String, FileChange>{};
   for (final step in steps) {
-    if (step.tool != 'change_files' || step.failed) continue;
+    if (toolBaseName(step.tool) != 'change_files' || step.failed) continue;
     for (final c in step.changes) {
       final action = c['action']?.toString() ?? '';
       final path = action == 'move'
@@ -246,7 +246,7 @@ String activitySummary(List<ToolStep> steps) {
   final edited = fileChanges(steps).length;
   var ran = 0, read = 0, searched = 0, pages = 0, other = 0;
   for (final s in steps) {
-    switch (s.tool) {
+    switch (toolBaseName(s.tool)) {
       case 'change_files':
         break;
       case 'bash':
@@ -265,7 +265,7 @@ String activitySummary(List<ToolStep> steps) {
         other++;
     }
   }
-  final changeSteps = steps.where((s) => s.tool == 'change_files').length;
+  final changeSteps = steps.where((s) => toolBaseName(s.tool) == 'change_files').length;
   final parts = [
     if (ran > 0) 'ran $ran ${_plural(ran, 'command', 'commands')}',
     if (changeSteps > 0)

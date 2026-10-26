@@ -59,7 +59,7 @@ class _AmbientTaskHandler extends TaskHandler {
     } catch (e, st) {
       await AmbientDiagnostics.log('service failed to start: $e\n$st');
       FlutterForegroundTask.sendDataToMain(
-          AmbientStatus(error: 'Could not start listening: $e').toMap());
+          AmbientStatus(error: 'Could not start listening: ${AmbientDiagnostics.redact('$e')}').toMap());
       await FlutterForegroundTask.stopService();
     }
   }
@@ -161,7 +161,7 @@ class AmbientController extends ChangeNotifier {
     try {
       await client.claimAmbientLease(deviceId, deviceLabel);
     } catch (e) {
-      return 'Could not claim listening: $e';
+      return 'Could not claim listening: ${AmbientDiagnostics.redact('$e')}';
     }
     if (_android) {
       final notifications = await FlutterForegroundTask.checkNotificationPermission();
@@ -186,6 +186,9 @@ class AmbientController extends ChangeNotifier {
       notifyListeners();
       return null;
     }
+    await _localSub?.cancel();
+    await _local?.dispose();
+    _local = null;
     try {
       final capture = AmbientCapture(AmbientUploader(
           baseUrl: client.baseUrl,
@@ -203,7 +206,7 @@ class AmbientController extends ChangeNotifier {
       await _localSub?.cancel();
       await _local?.dispose();
       _local = null;
-      return 'Could not start listening: $e';
+      return 'Could not start listening: ${AmbientDiagnostics.redact('$e')}';
     }
   }
 

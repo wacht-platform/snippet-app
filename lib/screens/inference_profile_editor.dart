@@ -579,6 +579,7 @@ class InferenceProfileEditorState extends State<InferenceProfileEditor> {
   Widget? _subscriptionSignIn() {
     if (_isChatgpt) {
       return _SubSignIn(
+        key: const ValueKey('chatgpt'),
         client: widget.client,
         signedInLabel: 'Signed in to ChatGPT',
         blurb: 'ChatGPT uses your Plus / Pro / Team subscription — no API key.',
@@ -590,6 +591,7 @@ class InferenceProfileEditorState extends State<InferenceProfileEditor> {
     }
     if (_isXai) {
       return _SubSignIn(
+        key: const ValueKey('xai'),
         client: widget.client,
         signedInLabel: 'Signed in to xAI',
         blurb: 'Grok uses your SuperGrok / X Premium subscription — no API key.',
@@ -1460,6 +1462,7 @@ class _SubSignIn extends StatefulWidget {
       DaemonClient) begin;
   final Future<void> Function(DaemonClient) signOut;
   const _SubSignIn({
+    super.key,
     required this.client,
     required this.signedInLabel,
     required this.blurb,

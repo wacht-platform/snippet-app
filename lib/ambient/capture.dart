@@ -132,7 +132,7 @@ class AmbientCapture {
     _running = true;
     _error = null;
     _sub = stream.listen(_onAudio, onError: (Object e) {
-      _error = '$e';
+      _error = AmbientDiagnostics.redact('$e');
     });
     _ticker = Timer.periodic(const Duration(milliseconds: 500), (_) {
       if (!_status.isClosed) _status.add(current);
@@ -238,7 +238,7 @@ class AmbientCapture {
       _silentFrames = peak == 0 ? _silentFrames + 1 : 0;
       if (_silentFrames == 94) {
         _error =
-            'The microphone is only sending silence. Check the input device in System Settings, Sound, and that microphone access is allowed for this app.';
+            'The microphone is only sending silence. Check the input device and that microphone access is allowed for this app.';
         unawaited(AmbientDiagnostics.log('microphone silent for 3s'));
       } else if (_silentFrames == 0 &&
           _error != null &&

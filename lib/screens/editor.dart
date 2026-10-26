@@ -219,8 +219,9 @@ class _EditorScreenState extends State<EditorScreen> {
                             anchor: anchor,
                             minWidth: 200,
                             items: [
-                              appMenuRow<String>(
-                                  value: 'redo', icon: 'redo', label: 'Redo'),
+                              if (_controller.canRedo)
+                                appMenuRow<String>(
+                                    value: 'redo', icon: 'redo', label: 'Redo'),
                               appMenuRow<String>(
                                   value: 'wrap',
                                   icon: 'wrap',

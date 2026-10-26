@@ -17,7 +17,7 @@ List<ToolStep> sessionChangeSteps(List<Map<String, dynamic>> events) {
       final p = pending;
       pending = null;
       final tool = (p?['tool_name'] ?? e['tool_name'])?.toString() ?? '';
-      if (tool != 'change_files') continue;
+      if (toolBaseName(tool) != 'change_files') continue;
       out.add(ToolStep(tool: tool, args: p?['arguments'], result: e['result']));
     }
   }

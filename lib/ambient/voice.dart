@@ -82,7 +82,9 @@ class AmbientVoice {
       final c = WebSocketChannel.connect(u);
       _channel = c;
       _sub = c.stream.listen(_frame, onError: (_) => _reconnect(), onDone: _reconnect);
-      _failures = 0;
+      c.ready.then((_) {
+        if (identical(_channel, c)) _failures = 0;
+      }, onError: (_) {});
       _catchUp();
     } catch (_) {
       _reconnect();

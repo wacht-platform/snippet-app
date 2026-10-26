@@ -261,6 +261,7 @@ class _AccountsScreenState extends State<AccountsScreen> {
       ];
 
   void _selectKey(String? key) {
+    _poll?.cancel();
     setState(() {
       _selectedKey = key;
       _renaming = false;
@@ -270,6 +271,7 @@ class _AccountsScreenState extends State<AccountsScreen> {
   }
 
   void _startAdd(String provider) {
+    _poll?.cancel();
     _token.clear();
     _label.clear();
     setState(() {
@@ -446,7 +448,10 @@ class _AccountsScreenState extends State<AccountsScreen> {
     final uri = Uri.tryParse('${pending.result['verification_uri'] ?? ''}');
     return SettingsColumn(children: [
       SettingsHeader(
-        back: _backTo('Accounts', () => setState(() => _pendingSignIn = null)),
+        back: _backTo('Accounts', () {
+          _poll?.cancel();
+          setState(() => _pendingSignIn = null);
+        }),
         title: 'Finish sign-in',
         subtitle: '${_title(pending.provider)} · waiting for the sign-in page',
         actions: [

@@ -544,6 +544,7 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
         path: path,
       );
       if (!await _recorder.isRecording()) {
+        await _recorder.cancel();
         if (mounted) setState(() => _isRecording = false);
         if (mounted) toast(context, 'Could not start recording.', danger: true);
         return;
