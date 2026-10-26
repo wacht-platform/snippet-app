@@ -95,6 +95,7 @@ class _VoiceScreenState extends State<VoiceScreen> {
     List<String>? phrases,
     String? assemblyaiKey,
     String? deepgramKey,
+    String? typesafeKey,
     String? deepgramHost,
     String? ttsVoice,
     String? stt,
@@ -108,6 +109,7 @@ class _VoiceScreenState extends State<VoiceScreen> {
           wakePhrases: phrases,
           assemblyaiKey: assemblyaiKey,
           deepgramKey: deepgramKey,
+          typesafeKey: typesafeKey,
           deepgramHost: deepgramHost,
           ttsVoice: ttsVoice,
           stt: stt);
@@ -208,6 +210,15 @@ class _VoiceScreenState extends State<VoiceScreen> {
                   'Paste the key from console.deepgram.com',
                   (k) => _saveAmbient(
                       deepgramKey: k, done: 'Deepgram key saved'))),
+          _keyRow(
+              'Typesafe key',
+              a.watcherKeySet,
+              () => _editKey(
+                  'Typesafe',
+                  a.watcherKeySet,
+                  'Paste your Typesafe API key',
+                  (k) => _saveAmbient(
+                      typesafeKey: k, done: 'Typesafe key saved'))),
           SettingsRow(
             label: 'Deepgram region',
             trailing: SettingsPopup<String>(
