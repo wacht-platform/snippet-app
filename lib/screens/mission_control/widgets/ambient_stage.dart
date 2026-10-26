@@ -445,6 +445,15 @@ class _AmbientStageState extends State<AmbientStage> {
           onChanged: _canToggle ? (_) => _toggle() : null,
         );
 
+  Widget _modePills() => Pills<String>(
+        items: const [
+          ('passive', 'Passive'),
+          ('active', 'Active'),
+        ],
+        selected: _mode,
+        onSelect: _setMode,
+      );
+
   Widget _panel(bool wide, double orb) {
     final err = _m.error ?? _m.status.error;
     final color = _stateColor(_m.settings, _m.status);
@@ -497,14 +506,7 @@ class _AmbientStageState extends State<AmbientStage> {
               children: [
                 Text('Mode', style: sans(12, color: AppColors.fg3)),
                 const Spacer(),
-                Pills<String>(
-                  items: const [
-                    ('passive', 'Passive'),
-                    ('active', 'Active'),
-                  ],
-                  selected: _mode,
-                  onSelect: _setMode,
-                ),
+                _modePills(),
               ],
             ),
           ] else ...[
@@ -526,14 +528,7 @@ class _AmbientStageState extends State<AmbientStage> {
             Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Pills<String>(
-                  items: const [
-                    ('passive', 'Passive'),
-                    ('active', 'Active'),
-                  ],
-                  selected: _mode,
-                  onSelect: _setMode,
-                ),
+                _modePills(),
                 const Spacer(),
                 _toggleControl(),
               ],

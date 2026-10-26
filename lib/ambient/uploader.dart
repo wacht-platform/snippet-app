@@ -272,22 +272,19 @@ class AmbientUploader {
   Future<void> _trim(Directory dir) async {
     final files = await dir.list().where((e) => e is File && e.path.endsWith('.wav')).cast<File>().toList();
     files.sort((a, b) => a.path.compareTo(b.path));
-    final sizes = <File, int>{};
+    final sizes = <int>[];
     var total = 0;
     for (final f in files) {
       try {
-        final n = await f.length();
-        sizes[f] = n;
-        total += n;
+        sizes.add(await f.length());
       } on FileSystemException {
-        continue;
+        sizes.add(0);
       }
+      total += sizes.last;
     }
-    if (total <= _maxQueueBytes) return;
-    for (final f in files) {
-      if (total <= _maxQueueBytes) break;
-      total -= sizes[f] ?? 0;
-      await _remove(f.path.substring(0, f.path.length - 4));
+    for (var i = 0; i < files.length && total > _maxQueueBytes; i++) {
+      total -= sizes[i];
+      await _remove(files[i].path.substring(0, files[i].path.length - 4));
     }
   }
 
