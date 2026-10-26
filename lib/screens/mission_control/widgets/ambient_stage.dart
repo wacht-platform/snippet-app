@@ -97,11 +97,15 @@ class _AmbientModel extends ChangeNotifier {
 
   Future<void> setMode(String mode) async {
     final before = settings;
-    if (before == null || before.mode == mode) return;
+    if (before == null ||
+        (before.mode == mode && before.shownMode == mode)) {
+      return;
+    }
     settings = before.withMode(mode);
     notifyListeners();
     try {
-      settings = await client.setAmbientSettings(mode: mode);
+      final saved = await client.setAmbientSettings(mode: mode);
+      settings = saved.withMode(mode);
     } catch (e) {
       settings = before;
       error = '$e';

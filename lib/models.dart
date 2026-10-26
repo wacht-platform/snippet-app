@@ -1704,7 +1704,8 @@ class AmbientSettings {
       this.ttsVoices = const [],
       this.stt = 'assemblyai'});
 
-  String get shownMode => effectiveMode.isEmpty ? mode : effectiveMode;
+  String get shownMode =>
+      (enabled && effectiveMode.isNotEmpty) ? effectiveMode : mode;
 
   AmbientSettings withMode(String next) => AmbientSettings(
       enabled: enabled,
@@ -1713,8 +1714,8 @@ class AmbientSettings {
       devices: devices,
       listeningId: listeningId,
       listeningDevice: listeningDevice,
-      conversationOpen: conversationOpen,
-      effectiveMode: effectiveMode,
+      conversationOpen: next == 'active' ? conversationOpen : false,
+      effectiveMode: next,
       watcherChatContext: watcherChatContext,
       watcher: watcher,
       watcherKeySet: watcherKeySet,
