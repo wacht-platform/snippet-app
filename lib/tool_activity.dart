@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'coordination_tool_views.dart';
 import 'tool_views.dart';
 
 List<Map<String, dynamic>> normalizeChanges(dynamic args) {
@@ -62,15 +63,33 @@ class ToolStep {
 
   bool get running => result == null;
 
-  bool get failed =>
-      result is Map && (result['status'] ?? '').toString() == 'error';
+  Map? get data {
+    final r = result;
+    if (r is! Map) return null;
+    return r['data'] is Map ? r['data'] as Map : r;
+  }
+
+  int? get exitCode {
+    final v = data?['exit_code'];
+    return v is num ? v.toInt() : null;
+  }
+
+  bool get failed {
+    final r = result;
+    if (r is Map && (r['status'] ?? '').toString() == 'error') return true;
+    final code = exitCode;
+    return tool == 'bash' && code != null && code != 0;
+  }
 
   List<Map> get changes => normalizeChanges(args);
 }
 
+String toolBaseName(String tool) =>
+    tool.startsWith('mcp__') ? tool.substring(tool.lastIndexOf('__') + 2) : tool;
+
 enum ToolKind { change, run, web, other }
 
-ToolKind toolKind(String tool) => switch (tool) {
+ToolKind toolKind(String tool) => switch (toolBaseName(tool)) {
       'change_files' => ToolKind.change,
       'bash' || 'manage_process' => ToolKind.run,
       'web_search' || 'web_read' => ToolKind.web,
@@ -78,6 +97,7 @@ ToolKind toolKind(String tool) => switch (tool) {
     };
 
 String toolVerb(String tool, {required bool running}) {
+  tool = toolBaseName(tool);
   final (done, doing) = switch (tool) {
     'change_files' => ('Changed', 'Changing'),
     'view_image' => ('Viewed', 'Viewing'),
@@ -95,6 +115,7 @@ String toolVerb(String tool, {required bool running}) {
     'ping_user' => ('Pinged you', 'Pinging you'),
     'update_brief' => ('Updated its brief', 'Updating its brief'),
     'schedule_wake' || 'schedule_followup' => ('Scheduled a wake-up', 'Scheduling a wake-up'),
+    'search_content' => ('Searched', 'Searching'),
     _ => (
         'Used ${toolTitle(tool).toLowerCase()}',
         'Using ${toolTitle(tool).toLowerCase()}'
@@ -142,10 +163,15 @@ String toolObject(ToolStep step) {
 
 (String, String) toolSentenceParts(ToolStep step, {bool? running}) {
   final isRunning = running ?? step.running;
-  if (step.tool == 'change_files') return _changeParts(step, isRunning);
+  final name = toolBaseName(step.tool);
+  if (name == 'change_files') return _changeParts(step, isRunning);
   // A labelled command already reads as a sentence ("Run the network tests"),
   // so it stands alone; "Ran" is only for a bare command line.
-  final label = step.tool == 'bash' && step.args is Map
+  final coordination = coordinationSentence(name,
+      step.args is Map ? step.args as Map : null, step.data,
+      running: isRunning);
+  if (coordination != null) return coordination;
+  final label = name == 'bash' && step.args is Map
       ? ((step.args as Map)['label']?.toString().trim() ?? '')
       : '';
   if (label.isNotEmpty) return (label, '');
@@ -196,8 +222,10 @@ List<FileChange> fileChanges(Iterable<ToolStep> steps) {
       if (kind == FileChangeKind.deleted) change.kind = kind;
       switch (action) {
         case 'replace':
-          change.added += _lineCount(c['with']);
-          change.removed += _lineCount(c['find']);
+          final (added, removed) =
+              diffCounts(c['find']?.toString() ?? '', c['with']?.toString() ?? '');
+          change.added += added;
+          change.removed += removed;
         case 'create':
           change.added += _lineCount(c['content']);
       }
@@ -206,27 +234,54 @@ List<FileChange> fileChanges(Iterable<ToolStep> steps) {
   return byPath.values.toList();
 }
 
+String _plural(int n, String one, String many) => n == 1 ? one : many;
+
+String _joinPhrases(List<String> parts) {
+  if (parts.length < 2) return parts.join();
+  return '${parts.sublist(0, parts.length - 1).join(', ')} and ${parts.last}';
+}
+
 String activitySummary(List<ToolStep> steps) {
   if (steps.length == 1) return toolSentence(steps.first);
-  String plural(int n, String one, String many) => n == 1 ? one : many;
-  int count(ToolKind kind) =>
-      steps.where((s) => toolKind(s.tool) == kind).length;
-  final changeSteps = count(ToolKind.change);
-  final changed = fileChanges(steps).length;
-  final runs = count(ToolKind.run);
-  final searches = count(ToolKind.web);
-  final groups = <(int, String)>[
+  final edited = fileChanges(steps).length;
+  var ran = 0, read = 0, searched = 0, pages = 0, other = 0;
+  for (final s in steps) {
+    switch (s.tool) {
+      case 'change_files':
+        break;
+      case 'bash':
+      case 'manage_process':
+        ran++;
+      case 'read_file':
+      case 'view_file':
+      case 'view_image':
+        read++;
+      case 'search_content':
+      case 'web_search':
+        searched++;
+      case 'web_read':
+        pages++;
+      default:
+        other++;
+    }
+  }
+  final changeSteps = steps.where((s) => s.tool == 'change_files').length;
+  final parts = [
+    if (ran > 0) 'ran $ran ${_plural(ran, 'command', 'commands')}',
     if (changeSteps > 0)
-      (changeSteps, 'changed $changed ${plural(changed, 'file', 'files')}'),
-    if (runs > 0) (runs, 'ran $runs ${plural(runs, 'command', 'commands')}'),
-    if (searches > 0)
-      (searches, '$searches web ${plural(searches, 'search', 'searches')}'),
+      edited > 0
+          ? 'edited $edited ${_plural(edited, 'file', 'files')}'
+          : 'made $changeSteps ${_plural(changeSteps, 'change', 'changes')}',
+    if (read > 0) 'read $read ${_plural(read, 'file', 'files')}',
+    if (searched > 0)
+      'searched $searched ${_plural(searched, 'time', 'times')}',
+    if (pages > 0) 'read $pages ${_plural(pages, 'page', 'pages')}',
+    if (other > 0)
+      _otherPhrase(other, hasOthers: ran + changeSteps + read + searched + pages > 0),
   ];
-  if (groups.isEmpty) return '${steps.length} steps';
-  final rest = steps.length - groups.fold<int>(0, (sum, g) => sum + g.$1);
-  final sentence = [
-    for (final g in groups) g.$2,
-    if (rest > 0) '$rest more',
-  ].join(', ');
+  final sentence = _joinPhrases(parts);
   return '${sentence[0].toUpperCase()}${sentence.substring(1)}';
 }
+
+String _otherPhrase(int n, {required bool hasOthers}) =>
+    '$n ${hasOthers ? 'other ' : ''}${_plural(n, 'step', 'steps')}';

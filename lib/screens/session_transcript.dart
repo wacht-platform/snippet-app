@@ -136,6 +136,15 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
       runStartKey = null;
     }
 
+    String? laneTitleFor(String agentId) {
+      if (!agentId.startsWith('lane ')) return null;
+      final id = agentId.substring(5).trim();
+      for (final l in _state?.lanes ?? const <LaneInfo>[]) {
+        if (l.id == id) return l.title;
+      }
+      return null;
+    }
+
     LaneInfo? liveLane(String id) {
       for (final l in _state?.lanes ?? const <LaneInfo>[]) {
         if (l.id == id) return l;
@@ -288,6 +297,7 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
                 agentId: _s(e['agent_id']),
                 body: _s(e['body']),
                 outbound: e['outbound'] == true,
+                laneTitle: laneTitleFor(_s(e['agent_id'])),
               ));
         case 'model_error':
           endTools(key);

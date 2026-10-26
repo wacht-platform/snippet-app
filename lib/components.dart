@@ -134,7 +134,7 @@ class SectionHeader extends StatelessWidget {
   }
 }
 
-class TextAction extends StatelessWidget {
+class TextAction extends StatefulWidget {
   const TextAction(this.label,
       {super.key, this.onTap, this.icon, this.danger = false});
 
@@ -144,24 +144,42 @@ class TextAction extends StatelessWidget {
   final VoidCallback? onTap;
 
   @override
+  State<TextAction> createState() => _TextActionState();
+}
+
+class _TextActionState extends State<TextAction> {
+  bool _hover = false;
+
+  @override
   Widget build(BuildContext context) {
-    final color = onTap == null
+    final base = widget.onTap == null
         ? AppColors.fg4
-        : danger
+        : widget.danger
             ? AppColors.danger
             : AppColors.accent;
+    final color = _hover && widget.onTap != null
+        ? (widget.danger ? AppColors.danger : AppColors.accentHover)
+        : base;
     return InkWell(
-      onTap: onTap,
+      onTap: widget.onTap,
+      onHover: kMobile ? null : (v) => setState(() => _hover = v),
+      hoverColor: kMobile ? null : Colors.transparent,
+      highlightColor: kMobile ? null : Colors.transparent,
       borderRadius: BorderRadius.circular(R.sm),
       child: Container(
-        constraints: BoxConstraints(minHeight: kMobile ? M.minTarget : 28),
-        padding: const EdgeInsets.symmetric(horizontal: S.s8),
+        constraints: BoxConstraints(minHeight: kMobile ? M.minTarget : 24),
+        padding: EdgeInsets.symmetric(horizontal: kMobile ? S.s8 : S.s4),
         alignment: Alignment.center,
         child: Row(mainAxisSize: MainAxisSize.min, children: [
-          Text(label, style: TS.label(color)),
-          if (icon != null) ...[
+          Text(widget.label,
+              style: TS.label(color).copyWith(
+                  decoration: _hover && widget.onTap != null
+                      ? TextDecoration.underline
+                      : null,
+                  decorationColor: color)),
+          if (widget.icon != null) ...[
             const SizedBox(width: S.s4),
-            AppIcon(icon!, size: 14, color: color),
+            AppIcon(widget.icon!, size: 14, color: color),
           ],
         ]),
       ),

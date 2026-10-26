@@ -1453,7 +1453,7 @@ class _LongPressCopyState extends State<_LongPressCopy> {
       GestureDetector(onLongPress: _copy, child: widget.child);
 }
 
-/// Dim note (centered) / error (left-aligned, capped at two lines).
+/// Dim note / error card (labelled, danger-tinted).
 class NoteLine extends StatelessWidget {
   final String text;
   final bool error;
@@ -1468,74 +1468,36 @@ class NoteLine extends StatelessWidget {
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 3),
         child: Text(text,
-            maxLines: 2,
+            maxLines: 3,
             overflow: TextOverflow.ellipsis,
-            style: sans(12, height: 1.4, color: AppColors.fg3)),
-      );
-    }
-    if (kMobile) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 6),
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-          decoration: BoxDecoration(
-            color: Color.lerp(AppColors.surface1, AppColors.danger, 0.06),
-            border:
-                Border.all(color: AppColors.danger.withValues(alpha: 0.28)),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Padding(
-              padding: const EdgeInsets.only(top: 2),
-              child: AppIcon('alert-circle', size: 16, color: AppColors.danger),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (label != null)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 2),
-                      child: Text(label!,
-                          style: sans(14,
-                              weight: W.label, color: AppColors.fg1)),
-                    ),
-                  SelectableText(text,
-                      minLines: 1,
-                      maxLines: 6,
-                      style: sans(14, height: 20 / 14, color: AppColors.fg2)),
-                ],
-              ),
-            ),
-          ]),
-        ),
+            style: sans(kMobile ? 13 : 12.5, height: 1.4, color: AppColors.fg3)),
       );
     }
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Container(
         width: double.infinity,
-        padding: const EdgeInsets.fromLTRB(12, 9, 12, 10),
+        padding: const EdgeInsets.fromLTRB(14, 11, 14, 12),
         decoration: BoxDecoration(
-          color: AppColors.surface1,
-          border: Border.all(color: AppColors.danger.withValues(alpha: 0.35)),
-          borderRadius: BorderRadius.circular(R.md),
+          color: Color.lerp(AppColors.surface1, AppColors.danger, 0.08),
+          borderRadius: BorderRadius.circular(R.lg - 2),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(children: [
-              AppIcon('alert-triangle', size: 12, color: AppColors.danger),
-              const SizedBox(width: 6),
-              Text(label ?? 'Error', style: mono(10, color: AppColors.danger)),
+              AppIcon('alert-triangle', size: 14, color: AppColors.danger),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(label ?? 'Error',
+                    style: sans(13, weight: W.label, color: AppColors.danger)),
+              ),
             ]),
-            const SizedBox(height: 5),
+            const SizedBox(height: 4),
             SelectableText(text,
                 minLines: 1,
                 maxLines: 6,
-                style: sans(13, height: 1.45, color: AppColors.fg2)),
+                style: sans(13.5, height: 1.45, color: AppColors.fg2)),
           ],
         ),
       ),
