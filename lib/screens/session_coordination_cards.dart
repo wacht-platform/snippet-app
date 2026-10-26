@@ -477,7 +477,7 @@ class SpeakCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final asking = expecting.isNotEmpty && expecting != 'none';
+    final asking = expecting.isNotEmpty && expecting != 'none' && text.contains('?');
     return TranscriptCard(
       icon: 'volume',
       tone: asking ? Tone.accent : Tone.neutral,
