@@ -259,22 +259,41 @@ class _FileViewerState extends State<FileViewer> {
   Widget build(BuildContext context) {
     Theme.of(context); // Rebuild on theme change
     final f = _f;
+    final editable = !_isMedia && !(f?.binary ?? false);
+    void edit() => presentScreen(
+          context,
+          style: PanelStyle.dialog,
+          dismissible: false,
+          builder: (_, close) => EditorScreen(
+              client: widget.client,
+              path: widget.path,
+              name: widget.name,
+              onClose: close),
+        ).then((_) => _load());
     final actions = <Widget>[
-      IconBtn('download',
-          tooltip: 'Download', onTap: _downloading ? null : _download),
-      if (!_isMedia && !(f?.binary ?? false))
-        IconBtn('edit',
-            tooltip: 'Edit',
-            onTap: () => presentScreen(
-                  context,
-                  style: PanelStyle.dialog,
-                  dismissible: false,
-                  builder: (_, close) => EditorScreen(
-                      client: widget.client,
-                      path: widget.path,
-                      name: widget.name,
-                      onClose: close),
-                ).then((_) => _load())),
+      if (kMobile && editable)
+        Builder(
+          builder: (anchor) =>
+              IconBtn('more-horizontal', tooltip: 'More', onTap: () async {
+            final pick = await showAppMenu<String>(context,
+                anchor: anchor,
+                minWidth: 200,
+                items: [
+                  appMenuRow<String>(
+                      value: 'edit', icon: 'edit', label: 'Edit'),
+                  appMenuRow<String>(
+                      value: 'download', icon: 'download', label: 'Download'),
+                ]);
+            if (!mounted) return;
+            if (pick == 'edit') edit();
+            if (pick == 'download' && !_downloading) _download();
+          }),
+        )
+      else ...[
+        IconBtn('download',
+            tooltip: 'Download', onTap: _downloading ? null : _download),
+        if (editable) IconBtn('edit', tooltip: 'Edit', onTap: edit),
+      ],
     ];
     return Scaffold(
       backgroundColor: readingBg,
