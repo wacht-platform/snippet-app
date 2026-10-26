@@ -656,7 +656,11 @@ class AmbientTurn {
     this.judged = '',
     this.addressed,
     this.expects = '',
+    this.ids = const [],
+    this.continuationOf = const [],
   });
+  final List<String> ids;
+  final List<String> continuationOf;
   final String device;
   final DateTime? at;
   final String text;
@@ -710,8 +714,38 @@ AmbientTurn? parseAmbientTurn(String text) {
     judged: attrs['judged'] ?? '',
     addressed: double.tryParse(attrs['addressed'] ?? ''),
     expects: attrs['expects'] ?? '',
+    ids: _idList(attrs['ids']),
+    continuationOf: _idList(attrs['continuation_of']),
   );
 }
+
+List<String> _idList(String? raw) =>
+    [for (final s in (raw ?? '').split(',')) if (s.trim().isNotEmpty) s.trim()];
+
+String _spokenKey(String s) =>
+    s.toLowerCase().replaceAll(RegExp(r'[^a-z0-9 ]'), '').replaceAll(RegExp(r' +'), ' ').trim();
+
+/// Ambient turn ids whose words a later continuation repeats in full, so the
+/// earlier bubble can be dropped.
+Set<String> supersededAmbientTurns(Iterable<String> texts) {
+  final byId = <String, String>{};
+  final out = <String>{};
+  for (final text in texts) {
+    final turn = parseAmbientTurn(text);
+    if (turn == null) continue;
+    final key = _spokenKey(turn.text);
+    for (final parent in turn.continuationOf) {
+      final prev = byId[parent];
+      if (prev != null && prev.isNotEmpty && key.startsWith(prev)) out.add(parent);
+    }
+    for (final id in turn.ids) {
+      byId[id] = key;
+    }
+  }
+  return out;
+}
+
+bool isAmbientResume(String text) => text.trimLeft().startsWith('<ambient_resume>');
 
 /// Project harness events into the Mission Control chat feed.
 List<FeedItem> feedItemsFromEvents(List<Map<String, dynamic>> events) {

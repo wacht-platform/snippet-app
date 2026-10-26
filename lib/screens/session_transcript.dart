@@ -143,6 +143,11 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
       return null;
     }
 
+    final superseded = supersededAmbientTurns([
+      for (final e in events)
+        if (e['kind'] == 'user_input' || e['kind'] == 'steer') _s(e['text']),
+    ]);
+
     for (var idx = 0; idx < events.length; idx++) {
       final e = events[idx];
       final key = eventKey(e);
@@ -235,8 +240,13 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
             addEvent(key, ParentMessageCard(body: parent));
             break;
           }
+          if (isAmbientResume(text)) {
+            addEvent(key, const NoteLine('Resumed after background noise'));
+            break;
+          }
           final ambient = parseAmbientTurn(text);
           if (ambient != null) {
+            if (ambient.ids.isNotEmpty && ambient.ids.every(superseded.contains)) break;
             addEvent(
                 key,
                 Padding(

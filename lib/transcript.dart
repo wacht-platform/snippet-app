@@ -570,7 +570,8 @@ class LaneNotice extends StatelessWidget {
     final lane = live();
     final failed = lane?.status == 'failed';
     final running = lane?.running ?? false;
-    final done = lane != null && !running && !failed;
+    final paused = lane?.status == 'paused';
+    final done = lane != null && !running && !failed && !paused;
     final activity = lane?.activity?.trim();
     final displaySummary = summary?.trim().isNotEmpty == true
         ? summary!.trim()
@@ -588,7 +589,9 @@ class LaneNotice extends StatelessWidget {
             ? 'Failed'
             : done
                 ? 'Completed'
-                : 'Queued';
+                : paused
+                    ? 'Paused'
+                    : 'Queued';
 
     {
       final agent = lane?.agent?.trim() ?? '';
