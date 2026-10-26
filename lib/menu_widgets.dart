@@ -211,6 +211,7 @@ Future<T?> showAppMenu<T>(
   /// actions, say — where a left-aligned popover would open away from the button
   /// it belongs to.
   bool alignEnd = false,
+  double? sheetHeightFactor,
 }) {
   final bg = color ?? AppColors.surface1;
 
@@ -245,17 +246,23 @@ Future<T?> showAppMenu<T>(
                               borderRadius: BorderRadius.circular(R.pill)))),
                   const SizedBox(height: S.s8),
                   Flexible(
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.symmetric(horizontal: S.s4),
-                      child: Material(
-                        color: Colors.transparent,
-                        child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              for (final item in items)
-                                _appMenuSheetEntry(sheet, item),
-                            ]),
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                          maxHeight: sheetHeightFactor == null
+                              ? double.infinity
+                              : media.size.height * sheetHeightFactor),
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.symmetric(horizontal: S.s4),
+                        child: Material(
+                          color: Colors.transparent,
+                          child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                for (final item in items)
+                                  _appMenuSheetEntry(sheet, item),
+                              ]),
+                        ),
                       ),
                     ),
                   ),

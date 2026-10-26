@@ -153,43 +153,64 @@ class _VoiceScreenState extends State<VoiceScreen> {
         chevron: true,
       );
 
-  String _voiceLabel(TtsVoice v) => '${v.name} · ${v.accent} ${v.gender.toLowerCase()}';
+  String _voiceLabel(TtsVoice v) =>
+      '${v.name} · ${v.accent} ${v.gender.toLowerCase()}';
 
   List<Widget> _ambientGroups(AmbientSettings a) {
-    final timeouts = <int>{30, 60, 90, 180, 300, a.conversationTimeoutSecs}.toList()..sort();
-    final hosts = a.deepgramHosts.isEmpty ? [(a.deepgramHost, a.deepgramHost)] : a.deepgramHosts;
-    final hostLabel = hosts.firstWhere((h) => h.$1 == a.deepgramHost, orElse: () => (a.deepgramHost, a.deepgramHost)).$2;
+    final timeouts =
+        <int>{30, 60, 90, 180, 300, a.conversationTimeoutSecs}.toList()..sort();
+    final hosts = a.deepgramHosts.isEmpty
+        ? [(a.deepgramHost, a.deepgramHost)]
+        : a.deepgramHosts;
+    final hostLabel = hosts
+        .firstWhere((h) => h.$1 == a.deepgramHost,
+            orElse: () => (a.deepgramHost, a.deepgramHost))
+        .$2;
     final voice = a.ttsVoices.where((v) => v.model == a.ttsVoice).firstOrNull;
     return [
       SettingsGroup(
         header: 'Speech services',
-        footer: 'Speech recognition turns what you say into text; Deepgram speaks the replies. '
-            'Deepgram Flux uses the Deepgram key and region, so it needs no AssemblyAI key. '
-            'Keys stay on the server and are never shown after saving. '
-            'Pick the Deepgram region closest to the server for the fastest replies.',
+        footer: 'Keys stay on the server.',
         children: [
           SettingsRow(
             label: 'Speech recognition',
             trailing: SettingsPopup<String>(
               label: a.stt == 'flux' ? 'Deepgram Flux' : 'AssemblyAI',
               selected: a.stt,
-              items: const [('assemblyai', 'AssemblyAI'), ('flux', 'Deepgram Flux')],
-              onSelected: (v) => _saveAmbient(stt: v, done: 'Speech recognition saved'),
+              items: const [
+                ('assemblyai', 'AssemblyAI'),
+                ('flux', 'Deepgram Flux')
+              ],
+              onSelected: (v) =>
+                  _saveAmbient(stt: v, done: 'Speech recognition saved'),
             ),
           ),
-          _keyRow('AssemblyAI key', a.assemblyaiKeySet,
-              () => _editKey('AssemblyAI', a.assemblyaiKeySet, 'Paste the key from assemblyai.com/dashboard',
-                  (k) => _saveAmbient(assemblyaiKey: k, done: 'AssemblyAI key saved'))),
-          _keyRow('Deepgram key', a.deepgramKeySet,
-              () => _editKey('Deepgram', a.deepgramKeySet, 'Paste the key from console.deepgram.com',
-                  (k) => _saveAmbient(deepgramKey: k, done: 'Deepgram key saved'))),
+          _keyRow(
+              'AssemblyAI key',
+              a.assemblyaiKeySet,
+              () => _editKey(
+                  'AssemblyAI',
+                  a.assemblyaiKeySet,
+                  'Paste the key from assemblyai.com/dashboard',
+                  (k) => _saveAmbient(
+                      assemblyaiKey: k, done: 'AssemblyAI key saved'))),
+          _keyRow(
+              'Deepgram key',
+              a.deepgramKeySet,
+              () => _editKey(
+                  'Deepgram',
+                  a.deepgramKeySet,
+                  'Paste the key from console.deepgram.com',
+                  (k) => _saveAmbient(
+                      deepgramKey: k, done: 'Deepgram key saved'))),
           SettingsRow(
             label: 'Deepgram region',
             trailing: SettingsPopup<String>(
               label: hostLabel,
               selected: a.deepgramHost,
               items: [for (final h in hosts) (h.$1, h.$2)],
-              onSelected: (h) => _saveAmbient(deepgramHost: h, done: 'Region saved'),
+              onSelected: (h) =>
+                  _saveAmbient(deepgramHost: h, done: 'Region saved'),
             ),
           ),
           if (a.ttsVoices.isNotEmpty)
@@ -197,17 +218,18 @@ class _VoiceScreenState extends State<VoiceScreen> {
               label: 'Voice',
               trailing: SettingsPopup<String>(
                 label: voice?.name ?? a.ttsVoice,
+                sheetHeightFactor: 0.5,
                 selected: a.ttsVoice,
                 items: [for (final v in a.ttsVoices) (v.model, _voiceLabel(v))],
-                onSelected: (m) => _saveAmbient(ttsVoice: m, done: 'Voice saved'),
+                onSelected: (m) =>
+                    _saveAmbient(ttsVoice: m, done: 'Voice saved'),
               ),
             ),
         ],
       ),
       SettingsGroup(
         header: 'Conversation',
-        footer: 'Saying a wake phrase at the start of a sentence opens a spoken '
-            'conversation with Mission Control, even in Passive mode.',
+        footer: 'A wake phrase starts a conversation, even in Passive mode.',
         children: [
           SettingsRow(
             label: 'Wake phrases',
@@ -236,7 +258,6 @@ class _VoiceScreenState extends State<VoiceScreen> {
       ..sort();
     return [
       SettingsGroup(
-        footer: 'Voice notes are transcribed by the configured cloud speech service before the message is sent.',
         children: [
           SettingsRow(
             label: 'Voice notes',
