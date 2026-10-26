@@ -542,6 +542,10 @@ extension _DesktopShellPanesExt on _DesktopShellState {
             child: Container(
               clipBehavior: Clip.antiAlias,
               decoration: BoxDecoration(
+                color: AppColors.bg,
+                borderRadius: BorderRadius.circular(R.lg),
+              ),
+              foregroundDecoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(R.lg),
                 border: Border.all(color: AppColors.border2),
               ),

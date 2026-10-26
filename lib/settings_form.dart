@@ -39,6 +39,9 @@ class SettingsGroup extends StatelessWidget {
           decoration: BoxDecoration(
             color: AppColors.surface1,
             borderRadius: BorderRadius.circular(kMobile ? 14 : 10),
+          ),
+          foregroundDecoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(kMobile ? 14 : 10),
             border: Border.all(color: AppColors.line),
           ),
           child: Column(

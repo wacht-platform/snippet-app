@@ -85,28 +85,23 @@ class _WebSearchScreenState extends State<WebSearchScreen> {
     await _save(key.trim(), 'Key saved');
   }
 
-  Widget _desktopKey(bool keySet) {
+  Widget _desktopKey() {
+    final empty = _keyField.text.trim().isEmpty;
     return Row(mainAxisSize: MainAxisSize.min, children: [
       SettingsField(
         controller: _keyField,
-        hint: keySet ? 'Paste a new key to replace' : 'Paste your API key',
-        width: 260,
+        hint: 'exa-…',
+        width: 240,
         mono: true,
         obscure: true,
         onChanged: (_) => setState(() {}),
         onSubmitted: (_) => _saveKeyInline(),
       ),
-      if (_keyField.text.trim().isNotEmpty) ...[
-        const SizedBox(width: 8),
-        Btn('Save', small: true, onTap: _busy ? null : _saveKeyInline),
-      ],
-      if (keySet) ...[
-        const SizedBox(width: 6),
-        Btn('Remove',
-            small: true,
-            variant: BtnVariant.secondary,
-            onTap: _busy ? null : () => _save('', 'Key removed')),
-      ],
+      const SizedBox(width: 8),
+      Btn('Save',
+          small: true,
+          disabled: empty || _busy,
+          onTap: empty || _busy ? null : _saveKeyInline),
     ]);
   }
 
@@ -118,13 +113,27 @@ class _WebSearchScreenState extends State<WebSearchScreen> {
             'sessions that start after the key is saved. The key stays on '
             'this machine.',
         children: [
-          if (!kMobile)
+          if (!kMobile) ...[
             SettingsRow(
-              label: 'Exa key',
-              sub: sub,
-              trailing: _desktopKey(keySet),
-            )
-          else
+              label: 'Exa search',
+              sub: 'Web search and page reading for agents',
+              trailing: Tag(keySet ? 'Active' : 'Not set',
+                  tone: keySet ? Tone.ok : Tone.neutral, dot: true),
+            ),
+            SettingsRow(
+              label: keySet ? 'Replace key' : 'API key',
+              sub: 'From dashboard.exa.ai',
+              trailing: _desktopKey(),
+            ),
+            if (keySet)
+              SettingsRow(
+                label: 'Remove key',
+                sub: 'Turns web search off for new sessions',
+                trailing: SettingsPill('Remove',
+                    danger: true,
+                    onTap: _busy ? null : () => _save('', 'Key removed')),
+              ),
+          ] else
             SettingsRow(
               label: 'Exa key',
               sub: sub,
