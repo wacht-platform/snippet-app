@@ -387,54 +387,22 @@ class _AmbientStageState extends State<AmbientStage> {
   }
 
   String _caption(AmbientStateEvent? event) {
-    if (kIsWeb) return 'Runs in the phone and desktop apps';
+    if (kIsWeb) return 'Unavailable in browser';
     if (_m.elsewhere) {
-      return 'Listening on ${_m.settings?.listeningDevice ?? 'another device'}';
+      return 'On ${_m.settings?.listeningDevice ?? 'another device'}';
     }
-    if (_m.status.displaced) return 'Another device took over';
-    if (_m.busy) return _live ? 'Stopping' : 'Starting';
-    if (!_live) return 'Not listening';
+    if (_m.status.displaced) return 'Paused here';
+    if (_m.busy) return _live ? 'Stopping…' : 'Starting…';
+    if (!_live) return 'Off';
     if (event != null) {
       if (event.sub == 'speaking') return 'Speaking';
       if (event.sub == 'thinking') return 'Thinking';
       if (event.mode == 'active') return 'In conversation';
-      if (event.mode == 'pinned') return 'Ready to talk';
     }
     if (_m.status.assistantSpeaking) return 'Speaking';
     if (_m.settings?.conversationOpen ?? false) return 'In conversation';
     if (_m.status.speaking) return 'Hearing you';
-    return _mode == 'active' ? 'Listening, ready to speak up' : 'Listening quietly';
-  }
-
-  (String, Color) _status() {
-    if (kIsWeb) return ('Unavailable', AppColors.fg4);
-    if (_m.on && (_m.error ?? _m.status.error) != null) {
-      return ('Error', AppColors.danger);
-    }
-    if (_m.elsewhere) return ('Elsewhere', AppColors.fg3);
-    if (_live) return ('Live', _modeColor(_mode));
-    return ('Off', AppColors.fg4);
-  }
-
-  Widget _pill() {
-    final (label, color) = _status();
-    return AnimatedContainer(
-      duration: Motion.fast,
-      height: 22,
-      padding: const EdgeInsets.symmetric(horizontal: 8),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.13),
-        borderRadius: BorderRadius.circular(R.pill),
-      ),
-      child: Row(mainAxisSize: MainAxisSize.min, children: [
-        Container(
-            width: 6,
-            height: 6,
-            decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
-        const SizedBox(width: 6),
-        Text(label, style: sans(12, weight: W.label, color: color)),
-      ]),
-    );
+    return 'Listening';
   }
 
   String _ago(DateTime t) {
@@ -445,71 +413,62 @@ class _AmbientStageState extends State<AmbientStage> {
     return '${d.inDays}d';
   }
 
-  Widget _surfaceCard({required List<Widget> children, EdgeInsets? padding}) =>
-      Container(
-        padding: padding ?? const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
-          color: AppColors.surface2,
-          borderRadius: BorderRadius.circular(R.md),
-          border: Border.all(color: AppColors.line),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          mainAxisSize: MainAxisSize.min,
-          children: children,
+  Widget _statusText({required double fontSize, TextAlign? align}) =>
+      ValueListenableBuilder<AmbientVoice?>(
+        valueListenable: AmbientController.instance.voice,
+        builder: (context, voice, _) =>
+            ValueListenableBuilder<AmbientStateEvent?>(
+          valueListenable: voice?.state ?? _emptyAmbientState,
+          builder: (context, event, _) => Text(
+            _caption(event),
+            textAlign: align,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: sans(fontSize,
+                weight: W.label, color: _live ? AppColors.fg1 : AppColors.fg3),
+          ),
         ),
       );
 
-  Widget _recentList() => Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(left: 2, bottom: 6),
-            child: Text('Recently heard',
-                style: sans(12, weight: W.label, color: AppColors.fg3)),
-          ),
-          _surfaceCard(
-            padding: EdgeInsets.zero,
-            children: [
-              for (var i = 0; i < _recent.length; i++) ...[
-                if (i > 0)
-                  Divider(height: 1, thickness: 1, color: AppColors.line),
-                Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Text(_recent[i].text.trim(),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style:
-                                sans(12.5, height: 1.4, color: AppColors.fg2)),
-                      ),
-                      const SizedBox(width: 10),
-                      Text(_ago(_recent[i].startedAt),
-                          style: mono(11, color: AppColors.fg4)),
-                    ],
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ],
-      );
+  Widget _toggleControl() => _m.elsewhere
+      ? Btn('Take over',
+          small: true,
+          variant: BtnVariant.secondary,
+          disabled: !_canToggle,
+          onTap: _canToggle ? _toggle : null)
+      : SettingsSwitch(
+          value: _live,
+          onChanged: _canToggle ? (_) => _toggle() : null,
+        );
 
   Widget _panel(bool wide, double orb) {
     final err = _m.error ?? _m.status.error;
     final color = _stateColor(_m.settings, _m.status);
     final popover = wide && widget.anchor != null;
+    final orbWidget = Semantics(
+      button: true,
+      label: _live ? 'Stop listening' : 'Start listening',
+      child: GestureDetector(
+        onTap: _canToggle ? _toggle : null,
+        onLongPress: _canToggle ? _toggle : null,
+        child: _Orb(
+          size: orb,
+          color: color,
+          alive: _live,
+          level: _live && (_m.status.speaking || _m.status.assistantSpeaking)
+              ? 1
+              : 0,
+        ),
+      ),
+    );
     return Container(
-      width: popover ? 336 : (wide ? 360 : double.infinity),
-      padding: EdgeInsets.fromLTRB(16, wide ? 16 : 10, 16, 16),
+      width: popover ? 296 : (wide ? 312 : double.infinity),
+      padding: wide
+          ? const EdgeInsets.fromLTRB(14, 12, 14, 12)
+          : const EdgeInsets.fromLTRB(20, 10, 20, 22),
       decoration: BoxDecoration(
         color: AppColors.surface1,
-        borderRadius: BorderRadius.circular(wide ? R.lg : 20),
+        borderRadius: BorderRadius.circular(wide ? R.lg : 22),
         border: Border.all(color: AppColors.border),
         boxShadow: overlayShadow,
       ),
@@ -517,150 +476,92 @@ class _AmbientStageState extends State<AmbientStage> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (!wide)
+          if (wide) ...[
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                orbWidget,
+                const SizedBox(width: 10),
+                Expanded(child: _statusText(fontSize: 13)),
+                const SizedBox(width: 8),
+                _toggleControl(),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Text('Mode', style: sans(12, color: AppColors.fg3)),
+                const Spacer(),
+                Pills<String>(
+                  items: const [
+                    ('passive', 'Passive'),
+                    ('active', 'Active'),
+                  ],
+                  selected: _mode,
+                  onSelect: _setMode,
+                ),
+              ],
+            ),
+          ] else ...[
             Center(
               child: Container(
                 width: 36,
                 height: 4,
-                margin: const EdgeInsets.only(bottom: 10),
+                margin: const EdgeInsets.only(bottom: 18),
                 decoration: BoxDecoration(
                   color: AppColors.border2,
                   borderRadius: BorderRadius.circular(R.pill),
                 ),
               ),
             ),
-          _surfaceCard(
-            padding: const EdgeInsets.all(12),
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Semantics(
-                    button: true,
-                    label: _live ? 'Stop listening' : 'Start listening',
-                    child: GestureDetector(
-                      onTap: _canToggle ? _toggle : null,
-                      onLongPress: _canToggle ? _toggle : null,
-                      child: _Orb(
-                        size: orb,
-                        color: color,
-                        alive: _live,
-                        level: _live &&
-                                (_m.status.speaking ||
-                                    _m.status.assistantSpeaking)
-                            ? 1
-                            : 0,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ValueListenableBuilder<AmbientVoice?>(
-                      valueListenable: AmbientController.instance.voice,
-                      builder: (context, voice, _) =>
-                          ValueListenableBuilder<AmbientStateEvent?>(
-                        valueListenable: voice?.state ?? _emptyAmbientState,
-                        builder: (context, event, _) {
-                          final caption = _caption(event);
-                          final why = event?.reason
-                                      ?.startsWith('mission_control:') ==
-                                  true
-                              ? event!.reason!
-                                  .substring('mission_control:'.length)
-                                  .trim()
-                              : null;
-                          return Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Row(children: [
-                                Text('Ambient',
-                                    style: sans(14,
-                                        weight: W.strong,
-                                        color: AppColors.fg1)),
-                                const SizedBox(width: 8),
-                                _pill(),
-                              ]),
-                              const SizedBox(height: 3),
-                              Text(caption,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: sans(12.5, color: AppColors.fg3)),
-                              if (why != null && why.isNotEmpty)
-                                Padding(
-                                  padding: const EdgeInsets.only(top: 2),
-                                  child: Text(why,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: sans(11.5, color: AppColors.fg4)),
-                                ),
-                            ],
-                          );
-                        },
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  if (_m.elsewhere)
-                    Btn('Take over',
-                        small: true,
-                        variant: BtnVariant.secondary,
-                        disabled: !_canToggle,
-                        onTap: _canToggle ? _toggle : null)
-                  else
-                    SettingsSwitch(
-                      value: _live,
-                      onChanged: _canToggle ? (_) => _toggle() : null,
-                    ),
-                ],
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          _surfaceCard(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text('Mode',
-                            style:
-                                sans(13, weight: W.label, color: AppColors.fg1)),
-                        const SizedBox(height: 2),
-                        Text(
-                          _mode == 'active'
-                              ? 'Speaks up when it matters'
-                              : 'Quiet notes in chat',
-                          style: sans(12, color: AppColors.fg3),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Pills<String>(
-                    items: const [
-                      ('passive', 'Passive'),
-                      ('active', 'Active'),
-                    ],
-                    selected: _mode,
-                    onSelect: _setMode,
-                  ),
-                ],
-              ),
-            ],
-          ),
+            Center(child: orbWidget),
+            const SizedBox(height: 12),
+            _statusText(fontSize: 15, align: TextAlign.center),
+            const SizedBox(height: 20),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Pills<String>(
+                  items: const [
+                    ('passive', 'Passive'),
+                    ('active', 'Active'),
+                  ],
+                  selected: _mode,
+                  onSelect: _setMode,
+                ),
+                const Spacer(),
+                _toggleControl(),
+              ],
+            ),
+          ],
           if (err != null && !kIsWeb) ...[
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
             NoteLine(err, error: true),
           ],
           if (_recent.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            _recentList(),
+            SizedBox(height: wide ? 10 : 14),
+            Divider(height: 1, thickness: 1, color: AppColors.line),
+            SizedBox(height: wide ? 6 : 8),
+            for (final e in _recent)
+              Padding(
+                padding: EdgeInsets.symmetric(vertical: wide ? 3.5 : 5),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Text(e.text.trim(),
+                          maxLines: wide ? 1 : 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: sans(wide ? 12 : 13,
+                              height: 1.35, color: AppColors.fg2)),
+                    ),
+                    const SizedBox(width: 10),
+                    Text(_ago(e.startedAt),
+                        style: mono(11, color: AppColors.fg4)),
+                  ],
+                ),
+              ),
           ],
         ],
       ),
@@ -673,18 +574,18 @@ class _AmbientStageState extends State<AmbientStage> {
     final wide = size.width >= 720;
     final anchor = wide ? widget.anchor : null;
     final still = reduceMotion(context);
-    final orb = wide ? 52.0 : 58.0;
+    final orb = wide ? 38.0 : 116.0;
     final panel = ConstrainedBox(
       constraints: BoxConstraints(
         maxHeight: anchor != null
-            ? (size.height - anchor.bottom - 24).clamp(280.0, size.height * 0.86)
+            ? (size.height - anchor.bottom - 24).clamp(260.0, size.height * 0.86)
             : size.height * 0.92,
       ),
       child: SingleChildScrollView(child: _panel(wide, orb)),
     );
     final Widget placed = anchor != null
         ? Builder(builder: (_) {
-            const width = 336.0;
+            const width = 296.0;
             final left =
                 (anchor.center.dx - width + 24).clamp(12.0, size.width - width - 12);
             final top = (anchor.bottom + 8).clamp(12.0, size.height - 320.0);
