@@ -211,14 +211,14 @@ class _VoiceScreenState extends State<VoiceScreen> {
                   (k) => _saveAmbient(
                       deepgramKey: k, done: 'Deepgram key saved'))),
           _keyRow(
-              'Classifier key (Typesafe)',
+              'Typesafe key',
               a.watcherKeySet,
               () => _editKey(
                   'Typesafe',
                   a.watcherKeySet,
                   'Paste your Typesafe API key',
                   (k) => _saveAmbient(
-                      typesafeKey: k, done: 'Classifier key saved'))),
+                      typesafeKey: k, done: 'Typesafe key saved'))),
           SettingsRow(
             label: 'Deepgram region',
             trailing: SettingsPopup<String>(
