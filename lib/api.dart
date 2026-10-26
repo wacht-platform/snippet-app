@@ -1597,17 +1597,30 @@ class DaemonClient {
   Future<List<TaskItem>> tasks({
     String? status,
     String? agentId,
-    int limit = 200,
+    int? limit,
   }) async {
-    final query = <String, String>{'limit': '$limit', 'view': 'summary'};
-    if (status != null && status.isNotEmpty) query['status'] = status;
-    if (agentId != null && agentId.isNotEmpty) query['agent_id'] = agentId;
-    final r = await http.get(_uri('/coordination/tasks', query));
-    if (r.statusCode != 200) throw _err('list tasks', r);
-    final list = jsonDecode(r.body) as List;
-    return list
-        .map((e) => TaskItem.fromJson(e as Map<String, dynamic>))
-        .toList();
+    const page = 500;
+    final out = <TaskItem>[];
+    while (true) {
+      final size = limit == null ? page : (limit - out.length).clamp(1, page);
+      final query = <String, String>{'limit': '$size', 'view': 'summary'};
+      if (status != null && status.isNotEmpty) query['status'] = status;
+      if (agentId != null && agentId.isNotEmpty) query['agent_id'] = agentId;
+      if (out.isNotEmpty) {
+        query['after_priority'] = '${out.last.priority}';
+        query['after_created'] = out.last.createdAt;
+        query['after_id'] = out.last.id;
+      }
+      final r = await http.get(_uri('/coordination/tasks', query));
+      if (r.statusCode != 200) throw _err('list tasks', r);
+      final list = (jsonDecode(r.body) as List)
+          .map((e) => TaskItem.fromJson(e as Map<String, dynamic>))
+          .toList();
+      out.addAll(list);
+      if (list.length < size || (limit != null && out.length >= limit)) {
+        return out;
+      }
+    }
   }
 
   /// POST /coordination/tasks.
