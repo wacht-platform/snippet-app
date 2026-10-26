@@ -1460,7 +1460,9 @@ class NoteLine extends StatelessWidget {
 
   /// What went wrong, as the card's header (errors only).
   final String? label;
-  const NoteLine(this.text, {super.key, this.error = false, this.label});
+  final int count;
+  const NoteLine(this.text,
+      {super.key, this.error = false, this.label, this.count = 1});
   @override
   Widget build(BuildContext context) {
     Theme.of(context); // Rebuild on theme change
@@ -1473,32 +1475,53 @@ class NoteLine extends StatelessWidget {
             style: sans(kMobile ? 13 : 12.5, height: 1.4, color: AppColors.fg3)),
       );
     }
+    final limit = text.toLowerCase().contains('session limit') ||
+        text.toLowerCase().contains('usage limit') ||
+        text.toLowerCase().contains('rate limit');
+    final tone = limit ? AppColors.warn : AppColors.danger;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.fromLTRB(14, 11, 14, 12),
-        decoration: BoxDecoration(
-          color: Color.lerp(AppColors.surface1, AppColors.danger, 0.08),
-          borderRadius: BorderRadius.circular(R.lg - 2),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(children: [
-              AppIcon('alert-triangle', size: 14, color: AppColors.danger),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(label ?? 'Error',
-                    style: sans(13, weight: W.label, color: AppColors.danger)),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: Color.lerp(AppColors.surface1, tone, 0.06),
+            borderRadius: BorderRadius.circular(R.md),
+            border: Border.all(color: tone.withValues(alpha: 0.22)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: AppIcon(limit ? 'clock' : 'alert-triangle',
+                    size: 13, color: tone),
               ),
-            ]),
-            const SizedBox(height: 4),
-            SelectableText(text,
-                minLines: 1,
-                maxLines: 6,
-                style: sans(13.5, height: 1.45, color: AppColors.fg2)),
-          ],
+              const SizedBox(width: 8),
+              Flexible(
+                child: SelectableText(text,
+                    minLines: 1,
+                    maxLines: 5,
+                    style: sans(kMobile ? 13 : 12.5,
+                        height: 1.4, color: AppColors.fg2)),
+              ),
+              if (count > 1) ...[
+                const SizedBox(width: 8),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: tone.withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(R.pill),
+                  ),
+                  child: Text('×$count',
+                      style: mono(11, weight: W.label, color: tone)),
+                ),
+              ],
+            ],
+          ),
         ),
       ),
     );

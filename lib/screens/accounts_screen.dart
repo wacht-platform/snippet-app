@@ -681,7 +681,37 @@ class _AccountsScreenState extends State<AccountsScreen> {
   @override
   Widget build(BuildContext context) {
     final Widget body;
-    if (_loading) {
+    if (!kMobile) {
+      if (_loading && _accounts.isEmpty) {
+        body = const SettingsColumn(children: [
+          SettingsHeader(
+            title: 'Accounts',
+            subtitle: 'Signed-in providers and their usage limits.',
+          ),
+          SizedBox(height: S.s8),
+          SettingsGroup(children: [SettingsRow(label: 'Loading accounts…')]),
+        ]);
+      } else if (_error != null && _accounts.isEmpty) {
+        body = SettingsColumn(children: [
+          const SettingsHeader(
+            title: 'Accounts',
+            subtitle: 'Signed-in providers and their usage limits.',
+          ),
+          const SizedBox(height: S.s8),
+          SettingsGroup(children: [
+            SettingsRow(
+              label: "Couldn't load accounts",
+              sub: '$_error',
+              danger: true,
+              trailing: Btn('Retry',
+                  small: true, variant: BtnVariant.secondary, onTap: _load),
+            ),
+          ]),
+        ]);
+      } else {
+        body = _desktop();
+      }
+    } else if (_loading) {
       body = const ListSkeleton();
     } else if (_error != null && _accounts.isEmpty) {
       body = EmptyState(
@@ -690,13 +720,11 @@ class _AccountsScreenState extends State<AccountsScreen> {
         body: '$_error',
         action: Btn('Retry', small: true, onTap: _load),
       );
-    } else if (kMobile) {
+    } else {
       body = ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 40),
         children: _groups(),
       );
-    } else {
-      body = _desktop();
     }
     if (widget.embedded && widget.onBack != null) {
       return Column(

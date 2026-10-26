@@ -235,7 +235,9 @@ class VaultScreenState extends State<VaultScreen> {
     final names = _names ?? const <String>[];
     final Widget content;
     if (_loading && _names == null) {
-      content = const ListSkeleton(subtitle: false);
+      content = const SettingsGroup(
+        children: [SettingsRow(label: 'Loading secrets…')],
+      );
     } else if (_error != null && _names == null) {
       content = SettingsGroup(children: [
         SettingsRow(

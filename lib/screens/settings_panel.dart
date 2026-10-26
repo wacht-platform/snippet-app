@@ -506,20 +506,7 @@ class SettingsPanelState extends State<SettingsPanel> {
                       ],
                     ),
                   ),
-                  Expanded(
-                    child: Stack(children: [
-                      Positioned.fill(child: _desktopContent()),
-                      Positioned(
-                        top: 12,
-                        right: 12,
-                        child: IconBtn('x',
-                            size: 30,
-                            iconSize: 14,
-                            tooltip: 'Close',
-                            onTap: widget.onClose),
-                      ),
-                    ]),
-                  ),
+                  Expanded(child: _desktopContent()),
                 ],
               );
             }
@@ -533,12 +520,6 @@ class SettingsPanelState extends State<SettingsPanel> {
                 ),
                 child: Row(children: [
                   Text('Settings', style: TS.label(AppColors.fg1)),
-                  const Spacer(),
-                  IconBtn('x',
-                      size: 26,
-                      iconSize: 13,
-                      tooltip: 'Close',
-                      onTap: widget.onClose),
                 ]),
               ),
               SizedBox(height: 44, child: _navChips()),

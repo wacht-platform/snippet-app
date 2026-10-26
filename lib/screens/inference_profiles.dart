@@ -334,7 +334,14 @@ class InferenceProfilesScreenState extends State<InferenceProfilesScreen>
       future: _future,
       builder: (context, snap) {
         if (snap.connectionState == ConnectionState.waiting && !snap.hasData) {
-          return const ListSkeleton();
+          return const SettingsColumn(children: [
+            SettingsHeader(
+              title: 'Profiles',
+              subtitle: 'Models and credentials for chats and background work.',
+            ),
+            SizedBox(height: S.s8),
+            SettingsGroup(children: [SettingsRow(label: 'Loading profiles…')]),
+          ]);
         }
         final cfg = snap.data;
         final profiles = _withSaving(cfg?.profiles ?? const []);

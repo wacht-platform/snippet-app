@@ -320,6 +320,11 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
         case 'assistant_text':
           endTools(key);
           final reply = _s(e['text']);
+          if (idx + 1 < events.length &&
+              events[idx + 1]['kind'] == 'model_error' &&
+              _s(events[idx + 1]['message']).trim() == reply.trim()) {
+            break;
+          }
           addEvent(
               key,
               Padding(
@@ -344,8 +349,29 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
               ));
         case 'model_error':
           endTools(key);
-          addEvent(key,
-              NoteLine(_s(e['message']), error: true, label: 'Model error'));
+          final msg = _s(e['message']).trim();
+          var count = 1;
+          var look = idx + 1;
+          while (look < events.length) {
+            final nk = events[look]['kind'] as String? ?? '';
+            if (nk == 'assistant_text' &&
+                _s(events[look]['text']).trim() == msg) {
+              look++;
+              continue;
+            }
+            if (nk == 'model_error' &&
+                _s(events[look]['message']).trim() == msg) {
+              count++;
+              idx = look;
+              look++;
+              continue;
+            }
+            break;
+          }
+          addEvent(
+              key,
+              NoteLine(msg,
+                  error: true, label: 'Model error', count: count));
         case 'profile_switched':
           endTools(key);
           addEvent(

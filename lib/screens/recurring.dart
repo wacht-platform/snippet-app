@@ -154,7 +154,10 @@ class RecurringScreenState extends State<RecurringScreen>
   }
 
   void _refresh() {
-    if (mounted) setState(() => _future = widget.client.recurringJobs());
+    if (!mounted) return;
+    setState(() {
+      _future = widget.client.recurringJobs();
+    });
   }
 
   void add() => _add();
@@ -881,7 +884,15 @@ class RecurringScreenState extends State<RecurringScreen>
       future: _future,
       builder: (context, snap) {
         if (snap.connectionState == ConnectionState.waiting && !snap.hasData) {
-          return const ListSkeleton();
+          return const SettingsColumn(children: [
+            SettingsHeader(
+              title: 'Scheduled',
+              subtitle: 'Goals and messages that run on a schedule.',
+            ),
+            SizedBox(height: S.s8),
+            SettingsGroup(
+                children: [SettingsRow(label: 'Loading scheduled jobs…')]),
+          ]);
         }
         if (snap.hasError) {
           return SettingsColumn(children: [
