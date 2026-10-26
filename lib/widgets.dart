@@ -1478,7 +1478,7 @@ class NoteLine extends StatelessWidget {
     final limit = text.toLowerCase().contains('session limit') ||
         text.toLowerCase().contains('usage limit') ||
         text.toLowerCase().contains('rate limit');
-    final tone = limit ? AppColors.warn : AppColors.danger;
+    final tone = limit ? AppColors.run : AppColors.danger;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Align(
