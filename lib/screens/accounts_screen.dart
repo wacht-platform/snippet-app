@@ -260,20 +260,7 @@ class _AccountsScreenState extends State<AccountsScreen> {
           ),
       ];
 
-  ({String provider, List<Account> list, int index})? _selectedAccount() {
-    final all = [
-      for (final p in _providers)
-        for (var i = 0; i < (_accounts[p] ?? const <Account>[]).length; i++)
-          (provider: p, list: _accounts[p]!, index: i),
-    ];
-    if (all.isEmpty) return null;
-    return all
-            .where((e) => '${e.provider}/${e.list[e.index].id}' == _selectedKey)
-            .firstOrNull ??
-        all.first;
-  }
-
-  void _selectKey(String key) {
+  void _selectKey(String? key) {
     setState(() {
       _selectedKey = key;
       _renaming = false;
@@ -344,238 +331,238 @@ class _AccountsScreenState extends State<AccountsScreen> {
   }
 
   Widget _desktop() {
-    final sel = _selectedAccount();
-    final currentKey = sel == null ? null : '${sel.provider}/${sel.list[sel.index].id}';
-    return MasterDetail(
-      master: MasterPane(
+    if (_addProvider != null) return _addPage(_addProvider!);
+    final pending = _pendingSignIn;
+    if (pending != null) return _signInPage(pending);
+    final key = _selectedKey;
+    if (key != null) {
+      for (final p in _providers) {
+        final list = _accounts[p] ?? const <Account>[];
+        for (var i = 0; i < list.length; i++) {
+          if ('$p/${list[i].id}' == key) return _accountPage(p, list, i);
+        }
+      }
+    }
+    return SettingsColumn(children: [
+      const SettingsHeader(
         title: 'Accounts',
-        children: [
-          for (final provider in _providers) ...[
-            Padding(
-              padding: const EdgeInsets.fromLTRB(S.s12, S.s16, S.s12, S.s4),
-              child: Text(_title(provider),
-                  style: sans(12, weight: W.label, color: AppColors.fg3)),
-            ),
+        subtitle: 'Signed-in providers and their usage limits.',
+      ),
+      const SizedBox(height: S.s8),
+      for (final provider in _providers)
+        SettingsGroup(
+          header: _title(provider),
+          children: [
             for (final account in _accounts[provider] ?? const <Account>[])
-              ListRow(
-                title: account.label.isEmpty ? account.id : account.label,
-                subtitle: account.active ? 'In use' : null,
-                selected: '$provider/${account.id}' == currentKey,
-                onTap: () => _selectKey('$provider/${account.id}'),
-                trailing: account.limitedUntil == null
-                    ? null
-                    : const Tag('Limit reached', tone: Tone.danger),
-              ),
-            ListRow(
-              title: 'Add account',
-              leading: AppIcon('plus', size: 16, color: AppColors.fg3),
+              _listRow(provider, account),
+            SettingsRow(
+              label: 'Add account',
+              leading: AppIcon('plus', size: 14, color: AppColors.fg3),
               onTap: _busy ? null : () => _startAdd(provider),
             ),
           ],
+        ),
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+        child: Text(
+            'When an account reaches its 5-hour or weekly limit, Snippet moves to the next one in this order.',
+            style: sans(12, height: 1.5, color: AppColors.fg4)),
+      ),
+    ]);
+  }
+
+  Widget _listRow(String provider, Account account) {
+    final name = account.label.isEmpty ? account.id : account.label;
+    final usage = account.usage;
+    final parts = <String>[
+      if (usage?.primary != null)
+        '${limitWindowLabel(usage!.primary!)} ${usage.primary!.usedPercent.clamp(0, 100).round()}%',
+      if (usage?.secondary != null)
+        '${limitWindowLabel(usage!.secondary!)} ${usage.secondary!.usedPercent.clamp(0, 100).round()}%',
+    ];
+    return SettingsRow(
+      label: name,
+      sub: parts.isEmpty ? null : parts.join('  ·  '),
+      trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+        if (account.limitedUntil != null) ...[
+          const Tag('Limit reached', tone: Tone.danger),
+          const SizedBox(width: S.s8),
+        ],
+        if (account.active) const Tag('In use', tone: Tone.accent),
+      ]),
+      chevron: true,
+      onTap: () => _selectKey('$provider/${account.id}'),
+    );
+  }
+
+  Widget _backTo(String label, VoidCallback onTap) =>
+      SettingsBack(label, onTap: onTap);
+
+  Widget _addPage(String provider) {
+    final claude = provider == 'claude-code';
+    return SettingsColumn(children: [
+      SettingsHeader(
+        back: _backTo('Accounts', _cancelAdd),
+        title: 'Add ${_title(provider)} account',
+        subtitle: _footer(provider),
+        actions: [
+          Btn(
+              claude
+                  ? (_busy ? 'Adding…' : 'Add account')
+                  : (_busy ? 'Starting…' : 'Sign in'),
+              small: true,
+              disabled: _busy,
+              onTap: _submitAdd),
         ],
       ),
-      detail: _desktopDetail(sel),
-    );
-  }
-
-  Widget _desktopDetail(({String provider, List<Account> list, int index})? sel) {
-    final addProvider = _addProvider;
-    if (addProvider != null) return _addDetail(addProvider);
-    final pending = _pendingSignIn;
-    if (pending != null) return _signInDetail(pending);
-    if (sel == null) return const DetailEmpty('No accounts yet.');
-    return _accountDetail(sel.provider, sel.list, sel.index);
-  }
-
-  Widget _addDetail(String provider) {
-    final claude = provider == 'claude-code';
-    return DetailPane(
-      key: ValueKey('add-$provider'),
-      title: 'Add ${_title(provider)} account',
-      subtitle: _footer(provider),
-      actions: [
-        Btn('Cancel',
-            variant: BtnVariant.surface,
-            small: true,
-            disabled: _busy,
-            onTap: _cancelAdd),
-        Btn(claude ? (_busy ? 'Adding…' : 'Add account') : (_busy ? 'Starting…' : 'Sign in'),
-            small: true,
-            disabled: _busy,
-            onTap: _submitAdd),
-      ],
-      child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (claude)
-              DesktopFormRow(
-                label: 'Token',
-                description: 'Paste the token from claude setup-token.',
-                control: SettingsField(
-                    controller: _token,
-                    hint: 'sk-ant-…',
-                    mono: true,
-                    obscure: true,
-                    width: 260),
-              ),
-            DesktopFormRow(
-              label: 'Name',
-              description: 'Optional. Shown in the account list.',
-              divider: _addError != null,
-              control: SettingsField(
-                  controller: _label, hint: 'Work, Personal…', width: 260),
+      const SizedBox(height: S.s8),
+      SettingsGroup(
+        footer: _addError,
+        children: [
+          if (claude)
+            SettingsRow(
+              label: 'Token',
+              sub: 'Paste the token from claude setup-token.',
+              trailing: SettingsField(
+                  controller: _token,
+                  hint: 'sk-ant-…',
+                  mono: true,
+                  obscure: true,
+                  width: 260),
             ),
-            if (_addError != null)
-              Padding(
-                padding: const EdgeInsets.only(top: S.s12),
-                child: Text(_addError!,
-                    style: sans(12.5, color: AppColors.danger)),
-              ),
-          ]),
-    );
+          SettingsRow(
+            label: 'Name',
+            sub: 'Optional. Shown in the account list.',
+            trailing: SettingsField(
+                controller: _label, hint: 'Work, Personal…', width: 260),
+          ),
+        ],
+      ),
+    ]);
   }
 
-  Widget _signInDetail(
+  Widget _signInPage(
       ({String provider, String id, Map<String, dynamic> result}) pending) {
     final uri = Uri.tryParse('${pending.result['verification_uri'] ?? ''}');
-    return DetailPane(
-      key: ValueKey('sign-in-${pending.id}'),
-      title: 'Finish sign-in',
-      subtitle: '${_title(pending.provider)} · waiting for the sign-in page',
-      actions: [
-        Btn('Done',
-            variant: BtnVariant.surface,
-            small: true,
-            onTap: () => setState(() => _pendingSignIn = null)),
-      ],
-      child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            DesktopFormRow(
-              label: 'Code',
-              description: 'Enter this code on the sign-in page.',
-              control: SelectableText('${pending.result['user_code'] ?? ''}',
-                  style: mono(16, color: AppColors.fg1)),
-            ),
-            DesktopFormRow(
-              label: 'Sign-in page',
-              description: 'Snippet picks the account up once you finish.',
-              divider: false,
-              control: uri == null
-                  ? Text('Not available',
-                      style: sans(13, color: AppColors.fg3))
-                  : Btn('Open sign-in page',
-                      small: true,
-                      onTap: () => launchUrl(uri,
-                          mode: LaunchMode.externalApplication)),
-            ),
-          ]),
-    );
+    return SettingsColumn(children: [
+      SettingsHeader(
+        back: _backTo('Accounts', () => setState(() => _pendingSignIn = null)),
+        title: 'Finish sign-in',
+        subtitle: '${_title(pending.provider)} · waiting for the sign-in page',
+        actions: [
+          if (uri != null)
+            Btn('Open sign-in page',
+                small: true,
+                onTap: () =>
+                    launchUrl(uri, mode: LaunchMode.externalApplication)),
+        ],
+      ),
+      const SizedBox(height: S.s8),
+      SettingsGroup(
+        footer: 'Snippet picks the account up once you finish.',
+        children: [
+          SettingsRow(
+            label: 'Code',
+            sub: 'Enter this code on the sign-in page.',
+            trailing: SelectableText('${pending.result['user_code'] ?? ''}',
+                style: mono(16, color: AppColors.fg1)),
+          ),
+        ],
+      ),
+    ]);
   }
 
-  Widget _accountDetail(String provider, List<Account> accounts, int index) {
+  Widget _accountPage(String provider, List<Account> accounts, int index) {
     final account = accounts[index];
     final name = account.label.isEmpty ? account.id : account.label;
     final canRemove = !(provider == 'claude-code' && account.id == 'main');
     final limited = account.limitedUntil;
     final limitedLabel = limited == null ? null : rateResetLabel(limited);
     final usage = account.usage;
-    return DetailPane(
-      key: ValueKey('account-$provider/${account.id}'),
-      title: name,
-      subtitle: _title(provider),
-      actions: [
-        if (index > 0)
-          IconBtn('chevron-up',
-              size: 32,
-              iconSize: 16,
-              tooltip: 'Move up',
-              onTap: _busy
-                  ? null
-                  : () => _move(provider, accounts, index, -1)),
-        if (index < accounts.length - 1)
-          IconBtn('chevron-down',
-              size: 32,
-              iconSize: 16,
-              tooltip: 'Move down',
-              onTap: _busy
-                  ? null
-                  : () => _move(provider, accounts, index, 1)),
-        if (!_renaming)
-          IconBtn('edit',
-              size: 32,
-              iconSize: 16,
-              tooltip: 'Rename',
-              onTap: _busy
-                  ? null
-                  : () => setState(() {
-                        _nameField.text = account.label;
-                        _renaming = true;
-                      })),
-        if (canRemove)
-          Btn('Remove',
-              variant: BtnVariant.danger,
-              small: true,
-              icon: 'trash',
-              disabled: _busy,
-              onTap: () => _remove(provider, account)),
-      ],
-      child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            DesktopFormRow(
-              label: 'Name',
-              control: _renaming
-                  ? Row(mainAxisSize: MainAxisSize.min, children: [
-                      SettingsField(
-                          controller: _nameField, width: 220),
-                      const SizedBox(width: S.s8),
-                      Btn('Save',
-                          small: true,
-                          disabled: _busy,
-                          onTap: () => _saveName(provider, account)),
-                      const SizedBox(width: S.s8),
-                      Btn('Cancel',
-                          variant: BtnVariant.surface,
-                          small: true,
-                          onTap: () => setState(() => _renaming = false)),
-                    ])
-                  : Text(name, style: sans(13, color: AppColors.fg1)),
-            ),
-            DesktopFormRow(
-              label: 'Status',
-              control: Row(mainAxisSize: MainAxisSize.min, children: [
-                Tag(account.active ? 'In use' : 'Standby',
-                    tone: account.active ? Tone.accent : Tone.neutral),
-                if (limitedLabel != null) ...[
+    return SettingsColumn(children: [
+      SettingsHeader(
+        back: _backTo('Accounts', () => _selectKey(null)),
+        title: name,
+        subtitle: _title(provider),
+        actions: [
+          if (index > 0)
+            IconBtn('chevron-up',
+                size: 28,
+                iconSize: 15,
+                tooltip: 'Move up',
+                onTap: _busy ? null : () => _move(provider, accounts, index, -1)),
+          if (index < accounts.length - 1)
+            IconBtn('chevron-down',
+                size: 28,
+                iconSize: 15,
+                tooltip: 'Move down',
+                onTap: _busy ? null : () => _move(provider, accounts, index, 1)),
+        ],
+      ),
+      const SizedBox(height: S.s8),
+      SettingsGroup(children: [
+        SettingsRow(
+          label: 'Name',
+          trailing: _renaming
+              ? Row(mainAxisSize: MainAxisSize.min, children: [
+                  SettingsField(controller: _nameField, width: 200),
                   const SizedBox(width: S.s8),
-                  Text('Limit reached, resets $limitedLabel',
-                      style: sans(12.5, color: AppColors.danger)),
-                ],
-              ]),
-            ),
-            if (usage?.primary != null || usage?.secondary != null)
-              DesktopFormRow(
-                label: 'Usage',
-                control: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (usage?.primary != null)
-                        _meter(limitWindowLabel(usage!.primary!), usage.primary!),
-                      if (usage?.secondary != null)
-                        _meter(limitWindowLabel(usage!.secondary!),
-                            usage.secondary!),
-                    ]),
-              ),
-            DesktopFormRow(
-              label: 'Identifier',
-              divider: false,
-              control: Text(account.id,
-                  style: mono(12.5, color: AppColors.fg2)),
-            ),
-          ]),
-    );
+                  Btn('Save',
+                      small: true,
+                      disabled: _busy,
+                      onTap: () => _saveName(provider, account)),
+                  const SizedBox(width: S.s8),
+                  Btn('Cancel',
+                      variant: BtnVariant.surface,
+                      small: true,
+                      onTap: () => setState(() => _renaming = false)),
+                ])
+              : Row(mainAxisSize: MainAxisSize.min, children: [
+                  Text(name, style: sans(13, color: AppColors.fg2)),
+                  const SizedBox(width: S.s12),
+                  Btn('Rename',
+                      variant: BtnVariant.surface,
+                      small: true,
+                      onTap: () {
+                        _nameField.text = account.label;
+                        setState(() => _renaming = true);
+                      }),
+                ]),
+        ),
+        SettingsRow(
+          label: 'Status',
+          sub: limitedLabel == null ? null : 'Limit reached, $limitedLabel',
+          trailing: Tag(account.active ? 'In use' : 'Standby',
+              tone: account.active ? Tone.accent : Tone.neutral),
+        ),
+        if (usage?.primary != null || usage?.secondary != null)
+          SettingsRow(
+            label: 'Usage',
+            labelWidget: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('Usage', style: sans(13, color: AppColors.fg1)),
+                  if (usage?.primary != null)
+                    _meter(limitWindowLabel(usage!.primary!), usage.primary!),
+                  if (usage?.secondary != null)
+                    _meter(limitWindowLabel(usage!.secondary!), usage.secondary!),
+                ]),
+          ),
+        SettingsRow(
+          label: 'Identifier',
+          trailing: Text(account.id, style: mono(12.5, color: AppColors.fg2)),
+        ),
+      ]),
+      if (canRemove)
+        SettingsGroup(children: [
+          SettingsRow(
+            label: 'Remove account',
+            danger: true,
+            onTap: _busy ? null : () => _remove(provider, account),
+          ),
+        ]),
+    ]);
   }
 
   Widget _row(String provider, List<Account> accounts, int index) {
@@ -604,7 +591,7 @@ class _AccountsScreenState extends State<AccountsScreen> {
             if (limitedLabel != null)
               Padding(
                   padding: const EdgeInsets.only(top: 2),
-                  child: Text('Limit reached, resets $limitedLabel',
+                  child: Text('Limit reached, $limitedLabel',
                       style: sans(12.5, color: AppColors.danger))),
             if (usage?.primary != null) _meter(limitWindowLabel(usage!.primary!), usage.primary!),
             if (usage?.secondary != null) _meter(limitWindowLabel(usage!.secondary!), usage.secondary!),

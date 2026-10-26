@@ -110,29 +110,48 @@ class _UsageScreenState extends State<UsageScreen> {
     final data = _usage.data;
     final Widget content;
     if (data == null && _usage.error == null) {
-      content = const Padding(
-        padding: EdgeInsets.symmetric(vertical: 48),
-        child: Center(child: Spinner(size: 18)),
-      );
+      content = kMobile
+          ? const Padding(
+              padding: EdgeInsets.symmetric(vertical: 48),
+              child: Center(child: Spinner(size: 18)),
+            )
+          : const SettingsGroup(children: [SettingsRow(label: 'Loading usage…')]);
     } else if (data == null) {
-      content = Padding(
-        padding: const EdgeInsets.symmetric(vertical: S.s24),
-        child: Column(children: [
-          Text('Unable to load usage', style: sans(13, color: AppColors.fg1)),
-          const SizedBox(height: 6),
-          Text('${_usage.error}',
-              textAlign: TextAlign.center,
-              style: mono(11, color: AppColors.fg3)),
-          const SizedBox(height: 10),
-          Btn('Retry', small: true, onTap: _refresh),
-        ]),
-      );
+      content = kMobile
+          ? Padding(
+              padding: const EdgeInsets.symmetric(vertical: S.s24),
+              child: Column(children: [
+                Text('Unable to load usage',
+                    style: sans(13, color: AppColors.fg1)),
+                const SizedBox(height: 6),
+                Text('${_usage.error}',
+                    textAlign: TextAlign.center,
+                    style: mono(11, color: AppColors.fg3)),
+                const SizedBox(height: 10),
+                Btn('Retry', small: true, onTap: _refresh),
+              ]),
+            )
+          : SettingsGroup(children: [
+              SettingsRow(
+                label: 'Unable to load usage',
+                sub: '${_usage.error}',
+                danger: true,
+                trailing: Btn('Retry',
+                    small: true,
+                    variant: BtnVariant.secondary,
+                    onTap: _refresh),
+              ),
+            ]);
     } else if (data.providers.isEmpty) {
-      content = Padding(
-        padding: const EdgeInsets.symmetric(vertical: S.s32),
-        child: Text('No model calls in this period.',
-            textAlign: TextAlign.center, style: TS.meta()),
-      );
+      content = kMobile
+          ? Padding(
+              padding: const EdgeInsets.symmetric(vertical: S.s32),
+              child: Text('No model calls in this period.',
+                  textAlign: TextAlign.center, style: TS.meta()),
+            )
+          : const SettingsGroup(children: [
+              SettingsRow(label: 'No model calls in this period.')
+            ]);
     } else {
       content = Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -168,16 +187,14 @@ class _UsageScreenState extends State<UsageScreen> {
         ],
       );
     } else {
-      body = ListView(
-        padding: widget.embedded
-            ? EdgeInsets.zero
-            : const EdgeInsets.fromLTRB(S.s16, S.s4, S.s16, S.s40),
+      final column = Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Align(
             alignment: Alignment.centerLeft,
             child: _PeriodTabs(value: _period, onChanged: _setPeriod),
           ),
-          const SizedBox(height: S.s20),
+          const SizedBox(height: S.s16),
           AnimatedSwitcher(
             duration: Motion.quick,
             child: KeyedSubtree(
@@ -188,7 +205,7 @@ class _UsageScreenState extends State<UsageScreen> {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.only(top: 2),
+            padding: const EdgeInsets.fromLTRB(4, 0, 4, 0),
             child: Text(
               'Every model call is recorded against the provider and model that served it. Input includes cached tokens; rate limits come from each provider\'s own reports.',
               style: sans(12.5, height: 1.5, color: AppColors.fg4),
@@ -196,6 +213,11 @@ class _UsageScreenState extends State<UsageScreen> {
           ),
         ],
       );
+      body = widget.embedded
+          ? column
+          : SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(S.s16, S.s4, S.s16, S.s40),
+              child: column);
     }
 
     if (widget.embedded) {

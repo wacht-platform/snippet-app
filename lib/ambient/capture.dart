@@ -242,6 +242,17 @@ class AmbientCapture {
           _error!.startsWith('The microphone is only sending silence')) {
         _error = null;
       }
+      final selfPlaying = defaultTargetPlatform != TargetPlatform.android &&
+          (_playOn ||
+              (_playEndedAt != null &&
+                  DateTime.now().difference(_playEndedAt!) <
+                      const Duration(milliseconds: 300)));
+      if (selfPlaying) {
+        _probability = 0;
+        segmenter.addFrame(Uint8List(chunkBytes), 0);
+        offset += chunkBytes;
+        continue;
+      }
       if (energy / samples.length > 0.0004 && _probability < 0.3) _loudQuiet++;
       segmenter.addFrame(frame, _probability);
       _duckCheck(_probability >= threshold);
@@ -282,10 +293,13 @@ class AmbientCapture {
     unawaited(_voice?.duck(false));
   }
 
+  DateTime? _playEndedAt;
+
   void _onSpeaking() {
     final on = _voice?.speaking.value ?? false;
     if (!on) _restoreVolume();
     if (on == _playOn) return;
+    if (_playOn && !on) _playEndedAt = DateTime.now();
     _playOn = on;
     uploader.flag('play', on);
   }

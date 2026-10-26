@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../api.dart';
-import '../desktop_layout.dart';
 import '../platform.dart';
 import '../settings_form.dart';
 import '../theme.dart';
@@ -149,6 +148,25 @@ class _WebSearchScreenState extends State<WebSearchScreen> {
   @override
   Widget build(BuildContext context) {
     final keySet = _keySet;
+    if (!kMobile && widget.embedded && widget.onBack == null) {
+      if (keySet == null) {
+        return SettingsGroup(children: [
+          _error == null
+              ? const SettingsRow(label: 'Loading web search settings…')
+              : SettingsRow(
+                  label: "Couldn't load web search settings",
+                  sub: '$_error',
+                  danger: true,
+                  trailing: Btn('Retry',
+                      small: true, variant: BtnVariant.secondary, onTap: _load),
+                ),
+        ]);
+      }
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: _groups(keySet),
+      );
+    }
     final Widget body;
     if (keySet == null) {
       body = _error == null
@@ -159,37 +177,12 @@ class _WebSearchScreenState extends State<WebSearchScreen> {
               body: '$_error',
               action: Btn('Retry', small: true, onTap: _load),
             );
-    } else if (kMobile) {
-      body = ListView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 40),
-        children: _groups(keySet),
-      );
     } else {
       body = ListView(
-        padding: widget.embedded
-            ? EdgeInsets.zero
+        padding: kMobile
+            ? const EdgeInsets.fromLTRB(16, 8, 16, 40)
             : const EdgeInsets.fromLTRB(S.s16, S.s4, S.s16, S.s40),
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(bottom: S.s4),
-            child: Text('Exa',
-                style: sans(13, weight: W.label, color: AppColors.fg3)),
-          ),
-          DesktopFormRow(
-            label: 'Exa key',
-            description: keySet
-                ? 'On for new sessions'
-                : 'Off until a key is saved',
-            divider: false,
-            control: _desktopKey(keySet),
-          ),
-          Padding(
-            padding: const EdgeInsets.only(top: S.s8),
-            child: Text(
-                'Agents get web_search and web_read, powered by Exa, in sessions that start after the key is saved. The key stays on this machine.',
-                style: sans(12.5, height: 1.5, color: AppColors.fg4)),
-          ),
-        ],
+        children: _groups(keySet),
       );
     }
     if (widget.embedded && widget.onBack != null) {

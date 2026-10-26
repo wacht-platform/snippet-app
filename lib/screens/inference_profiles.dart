@@ -42,31 +42,7 @@ class InferenceProfilesScreenState extends State<InferenceProfilesScreen>
   bool _inEditor = false;
   InferenceProfile? _editProfile;
   bool? _keepTaskProfile;
-  String? _selected;
-  bool _creating = false;
-  GlobalKey<InferenceProfileEditorState> _editorKey =
-      GlobalKey<InferenceProfileEditorState>();
-
-  bool get _split => !kMobile && widget.embedded;
-
-  Future<bool> _canLeave() async {
-    final editor = _editorKey.currentState;
-    if (editor == null || !editor.dirty) return true;
-    return confirmAction(context,
-        title: 'Discard changes?',
-        body: 'Your edits to this profile have not been saved.',
-        confirmLabel: 'Discard');
-  }
-
-  Future<void> _choose(String? name, {bool creating = false}) async {
-    if (!creating && name == _selected && !_creating) return;
-    if (!await _canLeave() || !mounted) return;
-    setState(() {
-      _editorKey = GlobalKey<InferenceProfileEditorState>();
-      _selected = name;
-      _creating = creating;
-    });
-  }
+  bool get _desk => !kMobile && widget.embedded && widget.onBack == null;
 
   Future<void> _setKeepTaskProfile(bool on) async {
     setState(() => _keepTaskProfile = on);
@@ -87,11 +63,6 @@ class InferenceProfilesScreenState extends State<InferenceProfilesScreen>
   void _submitted(InferenceProfile draft, Future<void> save) {
     setState(() {
       _saving[draft.name] = draft;
-      if (_split && _creating) {
-        _editorKey = GlobalKey<InferenceProfileEditorState>();
-        _creating = false;
-        _selected = draft.name;
-      }
     });
     save.then((_) {
       if (!mounted) return;
@@ -170,20 +141,7 @@ class InferenceProfilesScreenState extends State<InferenceProfilesScreen>
     });
   }
 
-  Future<void> _run(Future<void> Function() op, String onError) async {
-    try {
-      await op();
-      _refresh();
-    } catch (e) {
-      if (mounted) toast(context, '$onError: $e', danger: true);
-    }
-  }
-
   Future<void> _edit(InferenceProfile? p) async {
-    if (_split) {
-      await _choose(p?.name, creating: p == null);
-      return;
-    }
     if (kMobile && widget.embedded) {
       final saved = await Navigator.of(context).push<bool>(
         MaterialPageRoute(
@@ -227,7 +185,7 @@ class InferenceProfilesScreenState extends State<InferenceProfilesScreen>
   Widget build(BuildContext context) {
     super.build(context);
     Theme.of(context); // Rebuild on theme change
-    if (_split) return _splitView();
+    if (_desk) return _deskView();
     if (_inEditor) {
       final editing = _editProfile;
       final editor = InferenceProfileEditor(
@@ -355,7 +313,23 @@ class InferenceProfilesScreenState extends State<InferenceProfilesScreen>
     );
   }
 
-  Widget _splitView() {
+  Widget _deskView() {
+    if (_inEditor) {
+      final editing = _editProfile;
+      return InferenceProfileEditor(
+        client: widget.client,
+        existing: editing,
+        embedded: true,
+        onDelete: editing == null
+            ? null
+            : () async {
+                if (await _confirmDelete(editing)) _closeEditor();
+              },
+        onClose: _closeEditor,
+        onSaved: () => _closeEditor(saved: true),
+        onSubmit: _submitted,
+      );
+    }
     return FutureBuilder<ServerConfig>(
       future: _future,
       builder: (context, snap) {
@@ -364,93 +338,60 @@ class InferenceProfilesScreenState extends State<InferenceProfilesScreen>
         }
         final cfg = snap.data;
         final profiles = _withSaving(cfg?.profiles ?? const []);
-        final creating = _creating || profiles.isEmpty;
-        final current = creating
-            ? null
-            : profiles.where((p) => p.name == _selected).firstOrNull ??
-                profiles.where((p) => p.active).firstOrNull ??
-                profiles.first;
         final keep = _keepTaskProfile ?? cfg?.keepTaskProfile ?? true;
-        final master = MasterPane(
-          title: 'Profiles',
-          actions: [
-            IconBtn('plus',
-                size: 28,
-                iconSize: 14,
-                tooltip: 'Add profile',
-                onTap: () => _choose(null, creating: true)),
-          ],
-          children: [
-            if (creating)
-              ListRow(
-                title: 'New profile',
-                subtitle: 'Not saved yet',
-                leading: AppIcon('plus', size: 16, color: AppColors.fg3),
-                selected: true,
+        return SettingsColumn(children: [
+          SettingsHeader(
+            title: 'Profiles',
+            subtitle: 'Models and credentials for chats and background work.',
+            actions: [
+              Btn('Add profile',
+                  icon: 'plus', small: true, onTap: () => _edit(null)),
+            ],
+          ),
+          const SizedBox(height: S.s8),
+          if (profiles.isEmpty)
+            SettingsGroup(children: [
+              SettingsRow(
+                label: 'No inference profiles yet',
+                sub: 'Add an API key or a local model provider to start sessions.',
+                trailing: Btn('Add profile',
+                    small: true,
+                    variant: BtnVariant.secondary,
+                    onTap: () => _edit(null)),
               ),
-            for (final p in profiles)
-              ListRow(
-                title: p.name,
-                subtitle: '${p.provider} · ${p.model}',
-                leading: ProviderLogo(p.provider, size: 16),
-                selected: !creating && p.name == current?.name,
-                onTap: () => _choose(p.name),
-                trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-                  if (!p.usable) const WarnChip(),
-                  if (p.active) ...[
-                    if (!p.usable) const SizedBox(width: S.s4),
-                    const Tag('Active', tone: Tone.ok, dot: true),
-                  ],
-                ]),
-              ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(S.s8, S.s24, S.s8, 0),
-              child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text("Keep a task's model",
-                          style: sans(13.5,
-                              weight: W.label, color: AppColors.fg1)),
-                      const SizedBox(height: 2),
-                      Text('Chats stay on the model a task used.',
-                          style:
-                              sans(12.5, height: 1.45, color: AppColors.fg3)),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: S.s12),
-                SettingsSwitch(value: keep, onChanged: _setKeepTaskProfile),
-              ]),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(S.s8, S.s12, S.s8, 0),
-              child: Text(
+            ])
+          else ...[
+            SettingsGroup(
+              footer:
                   'New chats use the active profile. Lanes and background work follow Routing.',
-                  style: sans(12.5, height: 1.45, color: AppColors.fg3)),
+              children: [
+                for (final p in profiles)
+                  SettingsRow(
+                    label: p.name,
+                    sub: '${p.provider} · ${p.model}',
+                    leading: ProviderLogo(p.provider, size: 16),
+                    onTap: () => _edit(p),
+                    chevron: true,
+                    trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                      if (!p.usable) const WarnChip(),
+                      if (p.active) ...[
+                        if (!p.usable) const SizedBox(width: S.s6),
+                        const Tag('Active', tone: Tone.ok, dot: true),
+                      ],
+                    ]),
+                  ),
+              ],
             ),
+            SettingsGroup(children: [
+              SettingsRow(
+                label: "Keep a task's model",
+                sub: 'Chats stay on the model a task used.',
+                trailing:
+                    SettingsSwitch(value: keep, onChanged: _setKeepTaskProfile),
+              ),
+            ]),
           ],
-        );
-        final detail = InferenceProfileEditor(
-            key: _editorKey,
-            client: widget.client,
-            existing: current,
-            detail: true,
-            embedded: true,
-            onDelete: current == null
-                ? null
-                : () async {
-                    if (await _confirmDelete(current) && mounted) {
-                      setState(() {
-                        _editorKey = GlobalKey<InferenceProfileEditorState>();
-                        _selected = null;
-                      });
-                    }
-                  },
-            onSubmit: _submitted,
-        );
-        return MasterDetail(master: master, detail: detail);
+        ]);
       },
     );
   }

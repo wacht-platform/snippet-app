@@ -290,19 +290,32 @@ class _AmbientHeaderOrbState extends State<AmbientHeaderOrb> {
 }
 
 Future<void> showAmbientStage(BuildContext context, DaemonClient client) {
+  Rect? anchor;
+  if (!kMobile) {
+    final ro = context.findRenderObject();
+    if (ro is RenderBox && ro.hasSize) {
+      anchor = ro.localToGlobal(Offset.zero) & ro.size;
+    }
+  }
   return Navigator.of(context, rootNavigator: true).push(PageRouteBuilder<void>(
     opaque: false,
     transitionDuration: Motion.open,
     reverseTransitionDuration: Motion.close,
     pageBuilder: (_, animation, __) =>
-        AmbientStage(client: client, animation: animation),
+        AmbientStage(client: client, animation: animation, anchor: anchor),
   ));
 }
 
 class AmbientStage extends StatefulWidget {
-  const AmbientStage({super.key, required this.client, required this.animation});
+  const AmbientStage({
+    super.key,
+    required this.client,
+    required this.animation,
+    this.anchor,
+  });
   final DaemonClient client;
   final Animation<double> animation;
+  final Rect? anchor;
 
   @override
   State<AmbientStage> createState() => _AmbientStageState();
@@ -595,13 +608,16 @@ class _AmbientStageState extends State<AmbientStage> {
   Widget _panel(bool wide, double orb) {
     final err = _m.error ?? _m.status.error;
     final color = _stateColor(_m.settings, _m.status);
-    return Container(
-      width: wide ? 400 : double.infinity,
-      padding: EdgeInsets.fromLTRB(20, wide ? 14 : 8, 14, 20),
+    final popover = wide && widget.anchor != null;
+    final card = Container(
+      width: popover ? 344 : (wide ? 400 : double.infinity),
+      padding: EdgeInsets.fromLTRB(20, wide ? 14 : 8, 14, 18),
       decoration: BoxDecoration(
-        color: AppColors.surface1.withValues(alpha: 0.97),
-        borderRadius: BorderRadius.circular(wide ? 20 : 24),
-        border: Border.all(color: AppColors.border),
+        color: AppColors.surface1.withValues(alpha: popover ? 0.92 : 0.97),
+        borderRadius: BorderRadius.circular(wide ? 18 : 24),
+        border: Border.all(
+          color: _live ? color.withValues(alpha: 0.32) : AppColors.border2,
+        ),
         boxShadow: overlayShadow,
       ),
       child: Padding(
@@ -713,30 +729,95 @@ class _AmbientStageState extends State<AmbientStage> {
         ]),
       ),
     );
+    if (!popover) return card;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(18),
+      child: BackdropFilter(
+        filter: ui.ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+        child: card,
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
     final wide = size.width >= 720;
+    final anchor = wide ? widget.anchor : null;
     final still = reduceMotion(context);
-    final orb = wide ? 160.0 : math.min(size.width * 0.4, 156.0);
+    final orb = anchor != null
+        ? 124.0
+        : (wide ? 160.0 : math.min(size.width * 0.4, 156.0));
     final panel = ConstrainedBox(
-      constraints: BoxConstraints(maxHeight: size.height * 0.92),
+      constraints: BoxConstraints(
+        maxHeight: anchor != null
+            ? (size.height - anchor.bottom - 24).clamp(320.0, size.height * 0.86)
+            : size.height * 0.92,
+      ),
       child: SingleChildScrollView(child: _panel(wide, orb)),
     );
-    final Widget placed = wide
-        ? Center(
-            child: FadeTransition(
-              opacity: _a,
-              child: still
-                  ? panel
-                  : ScaleTransition(
-                      scale: Tween(begin: 0.96, end: 1.0).animate(_a),
-                      child: panel),
-            ),
-          )
-        : Align(
+    final Widget placed = anchor != null
+        ? Builder(builder: (_) {
+            const width = 344.0;
+            final left =
+                (anchor.center.dx - width + 28).clamp(12.0, size.width - width - 12);
+            final top = (anchor.bottom + 10).clamp(12.0, size.height - 360.0);
+            final alignX =
+                (((anchor.center.dx - left) / width) * 2 - 1).clamp(-0.9, 0.9);
+            final color = _stateColor(_m.settings, _m.status);
+            return Stack(children: [
+              Positioned(
+                left: anchor.center.dx - 26,
+                top: anchor.center.dy - 26,
+                width: 52,
+                height: 52,
+                child: IgnorePointer(
+                  child: FadeTransition(
+                    opacity: _a,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                            color: color.withValues(alpha: 0.45), width: 1.5),
+                        boxShadow: [
+                          BoxShadow(
+                            color: color.withValues(alpha: 0.28),
+                            blurRadius: 18,
+                            spreadRadius: 2,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              Positioned(
+                left: left,
+                top: top,
+                child: FadeTransition(
+                  opacity: _a,
+                  child: still
+                      ? panel
+                      : ScaleTransition(
+                          alignment: Alignment(alignX, -1.0),
+                          scale: Tween(begin: 0.92, end: 1.0).animate(_a),
+                          child: panel),
+                ),
+              ),
+            ]);
+          })
+        : wide
+            ? Center(
+                child: FadeTransition(
+                  opacity: _a,
+                  child: still
+                      ? panel
+                      : ScaleTransition(
+                          scale: Tween(begin: 0.96, end: 1.0).animate(_a),
+                          child: panel),
+                ),
+              )
+            : Align(
             alignment: Alignment.bottomCenter,
             child: AnimatedBuilder(
               animation: _a,
@@ -787,6 +868,10 @@ class _AmbientStageState extends State<AmbientStage> {
                   animation: _a,
                   builder: (_, __) {
                     final v = _a.value.clamp(0.0, 1.0);
+                    if (anchor != null) {
+                      return ColoredBox(
+                          color: Colors.black.withValues(alpha: 0.14 * v));
+                    }
                     return BackdropFilter(
                       filter: ui.ImageFilter.blur(sigmaX: 14 * v, sigmaY: 14 * v),
                       child: ColoredBox(

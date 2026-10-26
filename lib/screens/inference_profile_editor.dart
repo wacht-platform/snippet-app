@@ -8,7 +8,7 @@ import '../models.dart';
 import '../platform.dart';
 import '../theme.dart';
 import '../settings_form.dart';
-import 'shell_nav.dart' show MobileBackLink;
+
 import '../widgets.dart';
 
 // (value sent to the daemon, label shown in the pill)
@@ -527,7 +527,7 @@ class InferenceProfileEditorState extends State<InferenceProfileEditor> {
     final pills = [..._providers];
     if (!pills.any((p) => p.$1 == _provider))
       pills.insert(0, (_provider, _provider));
-    if (widget.detail && !kMobile) return _detailBuild(pills);
+    if (!kMobile && widget.embedded) return _deskDialogBuild(pills);
     final title = _isEdit ? 'Edit profile' : 'Add profile';
     final footer = kMobile
         ? Padding(
@@ -606,12 +606,7 @@ class InferenceProfileEditorState extends State<InferenceProfileEditor> {
     return null;
   }
 
-  Future<void> _makeActive() async {
-    setState(() => _active = true);
-    await _save();
-  }
-
-  Widget _detailBuild(List<(String, String)> pills) {
+  Widget _deskDialogBuild(List<(String, String)> pills) {
     final modelName = _model.text.trim();
     final title = _isEdit
         ? widget.existing!.name
@@ -620,169 +615,30 @@ class InferenceProfileEditorState extends State<InferenceProfileEditor> {
         '${(_reasoning?['label'] as String?) ?? 'Reasoning'} effort';
     final compact = (int.tryParse(_compact.text.trim()) ?? 90).clamp(10, 100);
     final signIn = _subscriptionSignIn();
-    final canSave = !_busy && modelName.isNotEmpty && (!_isEdit || dirty);
-    final rows = <Widget>[
-      if (!_isEdit)
-        DesktopFormRow(
-          label: 'Name',
-          description: 'Defaults to the provider.',
-          control: SettingsField(
-              controller: _name,
-              width: 280,
-              hint: 'Defaults to the provider',
-              onChanged: (_) => setState(() {})),
-        ),
-      DesktopFormRow(
-        label: 'Provider',
-        control: _isEdit
-            ? Row(mainAxisSize: MainAxisSize.min, children: [
-                ProviderLogo(_provider, size: 14),
-                const SizedBox(width: 8),
-                Text(_providerLabel(_provider),
-                    style: sans(13, color: AppColors.fg2)),
-              ])
-            : SettingsPopup<String>(
-                label: _providerLabel(_provider),
-                leading: ProviderLogo(_provider, size: 12),
-                items: pills,
-                selected: _provider,
-                onSelected: (val) => setState(() {
-                  _provider = val;
-                  _images = _defaultImages(val);
-                  _catalogModels = null;
-                  _showModelBrowser = false;
-                  _modelSearch.clear();
-                  _scheduleReasoning();
-                }),
-              ),
-      ),
-      DesktopFormRow(
-        label: 'Model',
-        description: _modelHint,
-        divider: !(_showModelBrowser && _catalogModels != null),
-        control: SettingsField(
-          controller: _model,
-          width: 280,
-          mono: true,
-          onChanged: (_) {
-            setState(() {});
+    final canSave = !_busy && modelName.isNotEmpty;
+    Widget providerPicker() => SettingsPopup<String>(
+          label: _providerLabel(_provider),
+          leading: ProviderLogo(_provider, size: 12),
+          items: pills,
+          selected: _provider,
+          onSelected: (val) => setState(() {
+            _provider = val;
+            _images = _defaultImages(val);
+            _catalogModels = null;
+            _showModelBrowser = false;
+            _modelSearch.clear();
             _scheduleReasoning();
-          },
-          hint: _isChatgpt
-              ? 'gpt-5.1-codex'
-              : _isClaudeCode
-                  ? 'sonnet'
-                  : _isAntigravity
-                      ? 'gemini-3.8-flash-high'
-                      : 'claude-sonnet-4.5',
-          suffix: _loadingModels
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: Center(child: Spinner(size: 12)))
-              : GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: _busy ? null : _browseModels,
-                  child: Padding(
-                    padding: const EdgeInsets.only(left: 2),
-                    child: AppIcon(
-                      _showModelBrowser ? 'x' : 'chevrons-up-down',
-                      size: 13,
-                      color: AppColors.fg4,
-                    ),
-                  ),
-                ),
-        ),
-      ),
-      if (_showModelBrowser && _catalogModels != null)
-        Container(
-          padding: const EdgeInsets.only(bottom: S.s16),
-          decoration: BoxDecoration(
-              border: Border(bottom: BorderSide(color: AppColors.line))),
-          child: _inlineModelBrowser(),
-        ),
-      DesktopFormRow(
-        label: effortLabel,
-        control: _effortAdjustable
-            ? SettingsPopup<String>(
-                label: _effortItems
-                        .where((i) => i.$1 == _effort)
-                        .firstOrNull
-                        ?.$2 ??
-                    'Default',
-                items: _effortItems,
-                selected: _effort,
-                onSelected: (v) => setState(() => _effort = v),
-              )
-            : Text(
-                _reasoning?['control'] == 'model'
-                    ? 'Set by the model'
-                    : 'Not adjustable',
-                style: sans(13, color: AppColors.fg3)),
-      ),
-      DesktopFormRow(
-        label: 'Context window',
-        description: 'Tokens. Blank keeps the default.',
-        control: SettingsField(
-            controller: _ctx,
-            width: 160,
-            mono: true,
-            number: true,
-            hint: '200000'),
-      ),
-      DesktopFormRow(
-        label: 'Compact at',
-        description: 'History is summarised when the window is this full.',
-        control: Row(mainAxisSize: MainAxisSize.min, children: [
-          SizedBox(
-            width: 200,
-            child: SliderTheme(
-              data: SliderTheme.of(context).copyWith(
-                trackHeight: 3,
-                activeTrackColor: AppColors.accent,
-                inactiveTrackColor: AppColors.surface3,
-                thumbColor: AppColors.fg1,
-                overlayShape: SliderComponentShape.noOverlay,
-                thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
-              ),
-              child: Slider(
-                value: compact.toDouble(),
-                min: 10,
-                max: 100,
-                divisions: 18,
-                onChanged: (v) => setState(() => _compact.text = '${v.round()}'),
-              ),
-            ),
-          ),
-          SizedBox(
-            width: 44,
-            child: Text('$compact%',
-                textAlign: TextAlign.right,
-                style: sans(13, color: AppColors.fg2)),
-          ),
-        ]),
-      ),
-      if (_usesOpenAiAdapter(_provider))
-        DesktopFormRow(
-          label: 'Stream responses',
-          description: 'For models that return nothing otherwise.',
-          control: SettingsSwitch(
-              value: _stream, onChanged: (v) => setState(() => _stream = v)),
-        ),
+          }),
+        );
+    final connection = <Widget>[
       if (signIn != null)
-        DesktopFormRow(
-          label: 'Connection',
-          description: 'Keys stay on the machine running snippet.',
-          control: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 380), child: signIn),
-        )
+        Padding(padding: const EdgeInsets.all(12), child: signIn)
       else
-        DesktopFormRow(
+        SettingsRow(
           label: 'API key',
-          description: 'Keys stay on the machine running snippet.',
-          control: SettingsField(
+          trailing: SettingsField(
             controller: _key,
-            width: 280,
+            width: 240,
             mono: true,
             obscure: !_showKey,
             hint: _isEdit && widget.existing!.hasKey ? 'Saved' : 'sk-…',
@@ -795,66 +651,208 @@ class InferenceProfileEditorState extends State<InferenceProfileEditor> {
           ),
         ),
       if (_needsBaseUrl(_provider))
-        DesktopFormRow(
+        SettingsRow(
           label: 'Base URL',
-          control: SettingsField(
+          trailing: SettingsField(
               controller: _baseUrl,
-              width: 280,
+              width: 240,
               mono: true,
               onChanged: (_) => setState(() {}),
               hint: 'https://api.example.com/v1'),
         ),
-      DesktopFormRow(
-        label: 'Supports images',
-        description: 'Send screenshots and diagrams to this model.',
-        control: SettingsSwitch(
-            value: _images, onChanged: (v) => setState(() => _images = v)),
+    ];
+    return SettingsColumn(children: [
+      SettingsHeader(
+        back: SettingsBack('Profiles', onTap: _dismiss),
+        title: title,
+        subtitle: [
+          _providerLabel(_provider),
+          if (modelName.isNotEmpty) modelName,
+          if (_active) 'used for new sessions',
+        ].join(' · '),
+        actions: [
+          Btn(_busy ? 'Saving…' : (_isEdit ? 'Save' : 'Add profile'),
+              small: true, disabled: !canSave, onTap: _save),
+        ],
       ),
-      if (_isXai)
-        DesktopFormRow(
-          label: 'X search',
-          description: 'Let Grok search X with xAI’s server-side tool.',
-          control: SettingsSwitch(
-              value: _xSearch, onChanged: (v) => setState(() => _xSearch = v)),
+      const SizedBox(height: S.s8),
+      SettingsGroup(
+        header: 'Model',
+        footer: _modelHint,
+        children: [
+          if (!_isEdit)
+            SettingsRow(
+              label: 'Name',
+              trailing: SettingsField(
+                  controller: _name,
+                  width: 240,
+                  hint: 'Defaults to the provider',
+                  onChanged: (_) => setState(() {})),
+            ),
+          SettingsRow(
+            label: 'Provider',
+            trailing: _isEdit
+                ? Row(mainAxisSize: MainAxisSize.min, children: [
+                    ProviderLogo(_provider, size: 12),
+                    const SizedBox(width: 6),
+                    Text(_providerLabel(_provider),
+                        style: sans(12.5, color: AppColors.fg3)),
+                  ])
+                : providerPicker(),
+          ),
+          SettingsRow(
+            label: 'Model',
+            trailing: SettingsField(
+              controller: _model,
+              width: 240,
+              mono: true,
+              onChanged: (_) {
+                setState(() {});
+                _scheduleReasoning();
+              },
+              hint: _isChatgpt
+                  ? 'gpt-5.1-codex'
+                  : _isClaudeCode
+                      ? 'sonnet'
+                      : _isAntigravity
+                          ? 'gemini-3.8-flash-high'
+                          : 'claude-sonnet-4.5',
+              suffix: _loadingModels
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: Center(child: Spinner(size: 12)))
+                  : GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: _busy ? null : _browseModels,
+                      child: Padding(
+                        padding: const EdgeInsets.only(left: 2),
+                        child: AppIcon(
+                          _showModelBrowser ? 'x' : 'chevrons-up-down',
+                          size: 13,
+                          color: AppColors.fg4,
+                        ),
+                      ),
+                    ),
+            ),
+          ),
+          if (_showModelBrowser && _catalogModels != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+              child: _inlineModelBrowser(),
+            ),
+          SettingsRow(
+            label: effortLabel,
+            trailing: _effortAdjustable
+                ? SettingsPopup<String>(
+                    label: _effortItems
+                            .where((i) => i.$1 == _effort)
+                            .firstOrNull
+                            ?.$2 ??
+                        'Default',
+                    items: _effortItems,
+                    selected: _effort,
+                    onSelected: (v) => setState(() => _effort = v),
+                  )
+                : Text(
+                    _reasoning?['control'] == 'model'
+                        ? 'Set by the model'
+                        : 'Not adjustable',
+                    style: sans(12.5, color: AppColors.fg3)),
+          ),
+        ],
+      ),
+      SettingsGroup(header: 'Context', children: [
+        SettingsRow(
+          label: 'Context window',
+          sub: 'Tokens. Blank keeps the default.',
+          trailing: SettingsField(
+              controller: _ctx,
+              width: 150,
+              mono: true,
+              number: true,
+              hint: '200000'),
         ),
-      DesktopFormRow(
-        label: 'Use for new sessions',
-        description: 'Make this the active profile.',
-        divider: false,
-        control: SettingsSwitch(
-            value: _active, onChanged: (v) => setState(() => _active = v)),
+        SettingsRow(
+          label: 'Compact at',
+          sub: 'History is summarised when the window is this full.',
+          trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+            SizedBox(
+              width: 160,
+              child: SliderTheme(
+                data: SliderTheme.of(context).copyWith(
+                  trackHeight: 3,
+                  activeTrackColor: AppColors.accent,
+                  inactiveTrackColor: AppColors.surface3,
+                  thumbColor: AppColors.fg1,
+                  overlayShape: SliderComponentShape.noOverlay,
+                  thumbShape:
+                      const RoundSliderThumbShape(enabledThumbRadius: 7),
+                ),
+                child: Slider(
+                  value: compact.toDouble(),
+                  min: 10,
+                  max: 100,
+                  divisions: 18,
+                  onChanged: (v) =>
+                      setState(() => _compact.text = '${v.round()}'),
+                ),
+              ),
+            ),
+            SizedBox(
+              width: 40,
+              child: Text('$compact%',
+                  textAlign: TextAlign.right,
+                  style: sans(12.5, color: AppColors.fg2)),
+            ),
+          ]),
+        ),
+        if (_usesOpenAiAdapter(_provider))
+          SettingsRow(
+            label: 'Stream responses',
+            sub: 'For models that return nothing otherwise.',
+            trailing: SettingsSwitch(
+                value: _stream, onChanged: (v) => setState(() => _stream = v)),
+          ),
+      ]),
+      SettingsGroup(
+        header: 'Connection',
+        footer: 'Keys stay on the machine running snippet.',
+        children: connection,
       ),
+      SettingsGroup(header: 'Options', children: [
+        SettingsRow(
+          label: 'Supports images',
+          sub: 'Send screenshots and diagrams to this model.',
+          trailing: SettingsSwitch(
+              value: _images, onChanged: (v) => setState(() => _images = v)),
+        ),
+        if (_isXai)
+          SettingsRow(
+            label: 'X search',
+            sub: 'Let Grok search X with xAI’s server-side tool.',
+            trailing: SettingsSwitch(
+                value: _xSearch,
+                onChanged: (v) => setState(() => _xSearch = v)),
+          ),
+        SettingsRow(
+          label: 'Use for new sessions',
+          sub: 'Make this the active profile.',
+          trailing: SettingsSwitch(
+              value: _active, onChanged: (v) => setState(() => _active = v)),
+        ),
+      ]),
+      if (_isEdit && widget.onDelete != null)
+        SettingsGroup(children: [
+          SettingsRow(
+              label: 'Delete profile', danger: true, onTap: widget.onDelete),
+        ]),
       if (_error != null)
         Padding(
-          padding: const EdgeInsets.only(top: S.s12),
+          padding: const EdgeInsets.fromLTRB(4, 0, 4, 12),
           child: Text(_error!, style: sans(12, color: AppColors.danger)),
         ),
-    ];
-    return DetailPane(
-      title: title,
-      subtitle: [
-        _providerLabel(_provider),
-        if (modelName.isNotEmpty) modelName,
-        if (_active) 'used for new sessions',
-      ].join(' · '),
-      actions: [
-        if (_isEdit && !widget.existing!.active && !_active)
-          Btn('Make active',
-              variant: BtnVariant.secondary,
-              small: true,
-              disabled: _busy || modelName.isEmpty,
-              onTap: _makeActive),
-        if (_isEdit && widget.onDelete != null)
-          Btn('Delete',
-              variant: BtnVariant.danger, small: true, onTap: widget.onDelete),
-        Btn(_busy ? 'Saving…' : (_isEdit ? 'Save' : 'Add profile'),
-            small: true, disabled: !canSave, onTap: _save),
-      ],
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: rows,
-      ),
-    );
+    ]);
   }
 
   Widget _nativeForm(List<(String, String)> pills) {

@@ -5,6 +5,7 @@ import '../models.dart';
 import '../motion.dart';
 import '../platform.dart';
 import '../pull_refresh.dart';
+import '../settings_form.dart';
 import '../theme.dart';
 import '../desktop_layout.dart';
 import '../widgets.dart';
@@ -112,13 +113,7 @@ class _MemoryScreenState extends State<MemoryScreen> {
         widget.embedded &&
         widget.initialKey == null &&
         widget.onBack == null) {
-      return _DeskMemory(
-        client: widget.client,
-        scopes: _scopes,
-        error: _error,
-        allSessions: _allSessions,
-        onShowAll: () => setState(() => _allSessions = true),
-      );
+      return _deskDialog();
     }
     final open = _open;
     final scope = _openScope;
@@ -243,319 +238,116 @@ class _MemoryScreenState extends State<MemoryScreen> {
       ),
     );
   }
-}
 
-class _DeskMemory extends StatefulWidget {
-  const _DeskMemory({
-    required this.client,
-    required this.scopes,
-    required this.error,
-    required this.allSessions,
-    required this.onShowAll,
-  });
-
-  final DaemonClient client;
-  final List<MemoryScope>? scopes;
-  final String? error;
-  final bool allSessions;
-  final VoidCallback onShowAll;
-
-  @override
-  State<_DeskMemory> createState() => _DeskMemoryState();
-}
-
-class _DeskMemoryState extends State<_DeskMemory> {
-  String? _key;
-  String _path = 'MEMORY.md';
-  String? _content;
-  List<String> _files = const [];
-  String? _error;
-  bool _history = false;
-  List<MemoryCommit>? _commits;
-
-  @override
-  void initState() {
-    super.initState();
-    _autoSelect();
-  }
-
-  @override
-  void didUpdateWidget(covariant _DeskMemory old) {
-    super.didUpdateWidget(old);
-    _autoSelect();
-  }
-
-  void _autoSelect() {
-    final scopes = widget.scopes;
-    if (_key != null || scopes == null || scopes.isEmpty) return;
-    final first = scopes.where((s) => s.kind == 'global').firstOrNull ??
-        scopes.first;
-    _key = first.key;
-    _loadFile();
-  }
-
-  void _select(String key) {
-    if (key == _key) return;
-    setState(() {
-      _key = key;
-      _path = 'MEMORY.md';
-      _history = false;
-      _commits = null;
-      _files = const [];
-    });
-    _loadFile();
-  }
-
-  void _openPath(String path) {
-    final file = path.contains('.') ? path : '$path.md';
-    setState(() {
-      _path = file;
-      _history = false;
-    });
-    _loadFile();
-  }
-
-  Future<void> _loadFile() async {
-    final key = _key;
-    final path = _path;
-    if (key == null) return;
-    setState(() {
-      _content = null;
-      _error = null;
-    });
-    try {
-      final f = await widget.client.memoryFile(key, path: path);
-      if (!mounted || _key != key || _path != path) return;
-      setState(() {
-        _content = f.content;
-        _files = f.files;
-      });
-    } catch (e) {
-      if (mounted && _key == key && _path == path) {
-        setState(() => _error = '$e');
-      }
-    }
-  }
-
-  Future<void> _toggleHistory() async {
-    final key = _key;
-    if (key == null) return;
-    setState(() => _history = !_history);
-    if (!_history || _commits != null) return;
-    try {
-      final h = await widget.client.memoryHistory(key);
-      if (mounted && _key == key) setState(() => _commits = h);
-    } catch (e) {
-      if (mounted) setState(() => _error = '$e');
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final scopes = widget.scopes;
-    if (scopes == null) {
-      return Center(
-        child: widget.error == null
-            ? const Spinner(size: 20)
-            : Padding(
-                padding: const EdgeInsets.all(24),
-                child: Text(widget.error!,
-                    textAlign: TextAlign.center, style: TS.meta()),
-              ),
-      );
-    }
-    final scope = scopes.where((s) => s.key == _key).firstOrNull;
-    return Material(
-      color: Colors.transparent,
-      child: MasterDetail(
-        master: _master(scopes),
-        detail: scope == null
-            ? const DetailEmpty('Select a memory to read it.')
-            : _detail(scope),
-      ),
-    );
-  }
-
-  Widget _master(List<MemoryScope> scopes) {
-    List<MemoryScope> of(String kind) => scopes.where((s) => s.kind == kind).toList();
-    final projects = of('project')
-      ..sort((a, b) => (b.lastCommitAt ?? 0).compareTo(a.lastCommitAt ?? 0));
-    final agents = of('agent')..sort((a, b) => a.label.compareTo(b.label));
-    final sessions = of('session')
-      ..sort((a, b) => (b.lastCommitAt ?? 0).compareTo(a.lastCommitAt ?? 0));
-    final shown = widget.allSessions ? sessions : sessions.take(5).toList();
-
-    List<Widget> group(String label, List<MemoryScope> items) {
-      if (items.isEmpty) return const [];
-      return [
-        if (label.isNotEmpty)
-          SectionHeader(label,
-              padding: const EdgeInsets.fromLTRB(S.s12, S.s16, S.s12, S.s4)),
-        for (final s in items) ...[
-          ListRow(
-            title: scopeTitle(s, s.key),
-            subtitle: scopeStatus(s),
-            leading: IconTile(scopeIcon(s.kind)),
-            selected: s.key == _key && _path == 'MEMORY.md',
-            onTap: () {
-              _select(s.key);
-              if (_path != 'MEMORY.md') _openPath('MEMORY.md');
-            },
-          ),
-          if (s.key == _key)
-            for (final f in _files)
-              if (f != 'MEMORY.md')
-                Padding(
-                  padding: const EdgeInsets.only(left: S.s16),
-                  child: ListRow(
-                  title: f,
-                  titleWidget: Text(f,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: mono(12.5, color: AppColors.fg2)),
-                  selected: _path == f,
-                  onTap: () => _openPath(f),
-                  ),
-                ),
-        ],
-      ];
-    }
-
-    return MasterPane(
-      title: 'Memory',
-      empty: const EmptyState(
-        icon: 'brain',
-        title: 'Nothing remembered yet',
-        body: 'Memory fills in as agents work.',
-      ),
-      children: [
-        ...group('', of('global')),
-        ...group('Projects', projects),
-        ...group('Agents', agents),
-        ...group('Sessions', shown),
-        if (sessions.length > 5 && !widget.allSessions)
-          ListRow(
-            title: 'Show all ${sessions.length}',
-            titleWidget: Text('Show all ${sessions.length}',
-                style: sans(13, color: AppColors.accent)),
-            onTap: widget.onShowAll,
-          ),
-      ],
-    );
-  }
-
-  Widget _detail(MemoryScope scope) {
-    return DetailPane(
-      key: ValueKey('${scope.key}:$_path:$_history'),
-      title: scopeTitle(scope, scope.key),
-      subtitle: scopeStatus(scope),
-      actions: [
-        Btn(_history ? 'Memory' : 'History',
-            variant: BtnVariant.surface,
-            small: true,
-            icon: _history ? 'brain' : 'git-commit',
-            onTap: _toggleHistory),
-      ],
-      child: _history ? _historyBody() : _fileBody(scope),
-    );
-  }
-
-  Widget _fileBody(MemoryScope scope) {
-    final content = _content;
-    if (content == null) {
-      return SizedBox(
-        height: 240,
-        child: Center(
-          child: _error == null
-              ? const Spinner(size: 20)
-              : const EmptyState(
-                  icon: 'brain',
-                  title: 'Nothing remembered yet',
-                  body: 'This memory fills in as work happens here.',
-                ),
-        ),
-      );
-    }
-    final hasEntries = content
-        .split('\n')
-        .any((l) => l.trim().startsWith('- ') || l.contains('[['));
-    if (!hasEntries && _path == 'MEMORY.md') {
-      return SizedBox(
-        height: 280,
-        child: EmptyState(
-          icon: 'brain',
-          title: 'Nothing remembered yet',
-          body: _emptyBody(scope),
-        ),
-      );
-    }
-    return SelectionArea(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _deskDialog() {
+    final open = _open;
+    if (open != null) {
+      final scope = _openScope;
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (_path != 'MEMORY.md')
-            Padding(
-              padding: const EdgeInsets.only(bottom: S.s12),
-              child: Text(_path, style: mono(12.5, color: AppColors.fg3)),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(S.s32, S.s24, S.s32, 0),
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 680),
+                child: SettingsHeader(
+                  back: SettingsBack('Memory', onTap: _close),
+                  title: scopeTitle(scope, open),
+                  subtitle: scope == null ? null : scopeStatus(scope),
+                ),
+              ),
             ),
-          MarkdownBody(
-            data: memoryMarkdown(content),
-            selectable: false,
-            styleSheet: documentMarkdownStyle(context)
-                .copyWith(em: sans(12, color: AppColors.fg4)),
-            builders: {'pre': PreBlockBuilder()},
-            onTapLink: (_, href, __) {
-              if (href != null && href.startsWith('memory:')) {
-                _openPath(href.substring('memory:'.length));
-              } else {
-                openMarkdownLink(href, context);
-              }
-            },
+          ),
+          Expanded(
+            child: _ScopeView(
+              key: ValueKey(open),
+              client: widget.client,
+              scopeKey: open,
+              scope: scope,
+              hideSubtitle: true,
+            ),
           ),
         ],
-      ),
-    );
-  }
-
-  String _emptyBody(MemoryScope scope) {
-    if (scope.kind == 'agent') {
-      return 'Filled by sessions and tasks run as ${scope.label}. Lessons from your other sessions go to global and project memory.';
+      );
     }
-    if (scope.kind == 'project') {
-      return 'Filled by sessions working in this project.';
-    }
-    return 'Entries appear here as agents save what they learn.';
-  }
-
-  Widget _historyBody() {
-    final commits = _commits;
-    if (commits == null) {
-      return const SizedBox(height: 240, child: Center(child: Spinner(size: 20)));
-    }
-    return Column(children: [
-      for (final c in commits)
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: S.s8),
-          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Padding(
-              padding: const EdgeInsets.only(top: 2),
-              child: AppIcon(c.isConsolidation ? 'layers' : 'git-commit',
-                  size: 15,
-                  color: c.isConsolidation ? AppColors.accent : AppColors.fg4),
-            ),
-            const SizedBox(width: S.s12),
-            Expanded(
-              child: Text(
-                  c.isConsolidation
-                      ? c.subject.substring('Consolidate:'.length).trim()
-                      : c.subject,
-                  style: sans(14, height: 19 / 14, color: AppColors.fg1)),
-            ),
-            const SizedBox(width: S.s12),
-            Text(relativeTime(c.date),
-                style: sans(12, color: AppColors.fg4, tabular: true)),
-          ]),
+    final scopes = _scopes;
+    if (scopes == null) {
+      return SettingsColumn(children: [
+        const SettingsHeader(
+          title: 'Memory',
+          subtitle:
+              'What your agents remember, kept as files in git and consolidated in the background.',
         ),
+        const SizedBox(height: S.s8),
+        SettingsGroup(children: [
+          _error == null
+              ? const SettingsRow(label: 'Loading memory…')
+              : SettingsRow(
+                  label: "Couldn't load memory",
+                  sub: _error,
+                  danger: true,
+                  trailing: Btn('Retry',
+                      small: true, variant: BtnVariant.secondary, onTap: _load),
+                ),
+        ]),
+      ]);
+    }
+    final global = scopes.where((s) => s.kind == 'global').toList();
+    final projects = scopes.where((s) => s.kind == 'project').toList()
+      ..sort((a, b) => (b.lastCommitAt ?? 0).compareTo(a.lastCommitAt ?? 0));
+    final agents = scopes.where((s) => s.kind == 'agent').toList()
+      ..sort((a, b) => a.label.compareTo(b.label));
+    final sessions = scopes.where((s) => s.kind == 'session').toList()
+      ..sort((a, b) => (b.lastCommitAt ?? 0).compareTo(a.lastCommitAt ?? 0));
+    final shownSessions = _allSessions ? sessions : sessions.take(5).toList();
+    Widget group(String label, List<MemoryScope> items, {Widget? extra}) {
+      if (items.isEmpty) return const SizedBox.shrink();
+      return SettingsGroup(
+        header: label.isEmpty ? null : label,
+        children: [
+          for (final s in items)
+            SettingsRow(
+              label: scopeTitle(s, s.key),
+              sub: scopeStatus(s),
+              leading: IconTile(scopeIcon(s.kind)),
+              chevron: true,
+              onTap: () => _openScopeKey(s.key),
+            ),
+          if (extra != null) extra,
+        ],
+      );
+    }
+
+    return SettingsColumn(children: [
+      const SettingsHeader(
+        title: 'Memory',
+        subtitle:
+            'What your agents remember, kept as files in git and consolidated in the background.',
+      ),
+      const SizedBox(height: S.s8),
+      if (scopes.isEmpty)
+        const SettingsGroup(children: [
+          SettingsRow(
+              label: 'Nothing remembered yet',
+              sub: 'Memory fills in as agents work.'),
+        ])
+      else ...[
+        group('', global),
+        group('Projects', projects),
+        group('Agents', agents),
+        group(
+          'Sessions',
+          shownSessions,
+          extra: sessions.length > 5 && !_allSessions
+              ? SettingsRow(
+                  label: 'Show all ${sessions.length} sessions',
+                  onTap: () => setState(() => _allSessions = true),
+                )
+              : null,
+        ),
+      ],
     ]);
   }
 }
@@ -608,11 +400,13 @@ class _ScopeView extends StatefulWidget {
   final DaemonClient client;
   final String scopeKey;
   final MemoryScope? scope;
+  final bool hideSubtitle;
   const _ScopeView({
     super.key,
     required this.client,
     required this.scopeKey,
     required this.scope,
+    this.hideSubtitle = false,
   });
 
   @override
@@ -691,7 +485,7 @@ class _ScopeViewState extends State<_ScopeView> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (s != null)
+          if (s != null && !widget.hideSubtitle)
             Padding(
               padding: EdgeInsets.fromLTRB(side + 4, 0, side, 8),
               child: Text(scopeStatus(s),
@@ -731,9 +525,10 @@ class _ScopeViewState extends State<_ScopeView> {
       ),
     );
     if (kMobile) return page;
-    return Center(
+    return Align(
+      alignment: Alignment.topCenter,
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 768),
+        constraints: const BoxConstraints(maxWidth: 680 + 48),
         child: page,
       ),
     );
