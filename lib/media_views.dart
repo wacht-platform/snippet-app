@@ -238,7 +238,9 @@ class ImageThumb extends StatelessWidget {
                   AppIcon('image', size: 18, color: AppColors.fg4),
                   if (height >= 72) ...[
                     const SizedBox(height: 4),
-                    Text('Unavailable', style: sans(11, color: AppColors.fg4)),
+                    Text('Image no longer on the machine',
+                        textAlign: TextAlign.center,
+                        style: sans(11, color: AppColors.fg4)),
                   ],
                 ]),
               ),
@@ -776,9 +778,9 @@ class _LiveRecordingWaveState extends State<LiveRecordingWave>
       _seen = total;
       _stamp = elapsed;
     }
-    _phase.value = ((elapsed - _stamp).inMicroseconds /
-            widget.interval.inMicroseconds)
-        .clamp(0.0, 1.0);
+    _phase.value =
+        ((elapsed - _stamp).inMicroseconds / widget.interval.inMicroseconds)
+            .clamp(0.0, 1.0);
   }
 
   @override

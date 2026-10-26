@@ -157,6 +157,28 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
         if (e['kind'] == 'user_input' || e['kind'] == 'steer') _s(e['text']),
     ]);
 
+    final resultOf = <int, int>{};
+    final pairedResults = <int>{};
+    {
+      final open = <String, List<int>>{};
+      for (var i = 0; i < events.length; i++) {
+        final kind = events[i]['kind'];
+        final name = _s(events[i]['tool_name']);
+        if (kind == 'tool_call') {
+          (open[name] ??= []).add(i);
+        } else if (kind == 'tool_result') {
+          final waiting = open[name];
+          if (waiting != null && waiting.isNotEmpty) {
+            final call = waiting.removeAt(0);
+            if (i > call + 1) {
+              resultOf[call] = i;
+              pairedResults.add(i);
+            }
+          }
+        }
+      }
+    }
+
     for (var idx = 0; idx < events.length; idx++) {
       final e = events[idx];
       final key = eventKey(e);
@@ -173,14 +195,32 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
             final args = e['arguments'];
             final spoken = args is Map ? _s(args['text']).trim() : '';
             if (spoken.isNotEmpty) {
-              addEvent(key, SpeakCard(text: spoken, expecting: args is Map ? _s(args['expecting']) : ''));
+              addEvent(
+                  key,
+                  SpeakCard(
+                      text: spoken,
+                      expecting: args is Map ? _s(args['expecting']) : ''));
             }
             break;
           }
           if (_isMetaTool(_s(e['tool_name']))) break;
+          final paired = resultOf[idx];
+          if (paired != null) {
+            final r = events[paired];
+            addToolRow(
+                toolRow(abs,
+                    tool: _s(e['tool_name']),
+                    args: e['arguments'],
+                    result: r['result'],
+                    resultAt: _transcriptStart + paired,
+                    clipped: r['result_clipped'] == true),
+                abs);
+            break;
+          }
           pending = e;
           pendingKey = abs;
         case 'tool_result':
+          if (pairedResults.contains(idx)) break;
           {
             final p = pending;
             if (p != null) {
@@ -255,7 +295,8 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
           }
           final ambient = parseAmbientTurn(text);
           if (ambient != null) {
-            if (ambient.ids.isNotEmpty && ambient.ids.every(superseded.contains)) break;
+            if (ambient.ids.isNotEmpty &&
+                ambient.ids.every(superseded.contains)) break;
             addEvent(
                 key,
                 Padding(
@@ -286,7 +327,9 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
                   child: Bubble(mine: false, text: reply)));
         case 'agent_message':
           endTools(key);
-          final voiceNote = e['outbound'] == true ? null : voiceClassifierNote(_s(e['agent_id']), _s(e['body']));
+          final voiceNote = e['outbound'] == true
+              ? null
+              : voiceClassifierNote(_s(e['agent_id']), _s(e['body']));
           if (voiceNote != null) {
             addEvent(key, NoteLine(voiceNote));
             break;
@@ -336,7 +379,8 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
                 options: [
                   for (final o in (e['options'] as List? ?? const [])) '$o'
                 ],
-                settled: events.skip(idx + 1).any((x) => later.contains(x['kind'])),
+                settled:
+                    events.skip(idx + 1).any((x) => later.contains(x['kind'])),
               ));
         case 'invalid_tool_call':
           endTools(key);
@@ -386,7 +430,8 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
               artifactVersion == newestArtifact[artifactId] &&
                       artifactShowsInline(artifactKind, display)
                   ? ArtifactInline(
-                      key: ValueKey('artifact-inline-$artifactId-$artifactVersion'),
+                      key: ValueKey(
+                          'artifact-inline-$artifactId-$artifactVersion'),
                       client: widget.client,
                       session: widget.sessionId,
                       id: artifactId,
@@ -741,7 +786,8 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
                       'No checkpoints yet — you can still fork the full history.',
                       style: TS.meta()),
                   const SizedBox(height: 12),
-                  Btn('Fork full history', onTap: () => _confirmFork(null, sheet: true)),
+                  Btn('Fork full history',
+                      onTap: () => _confirmFork(null, sheet: true)),
                 ],
               ),
             )
