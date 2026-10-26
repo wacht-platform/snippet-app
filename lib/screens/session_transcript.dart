@@ -293,6 +293,15 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
             addEvent(key, const NoteLine('Resumed after background noise'));
             break;
           }
+          if (text.trimLeft().startsWith('<ambient_context_alert')) {
+            addEvent(
+                key, const NoteLine('Voice classifier flagged out-of-context speech'));
+            break;
+          }
+          if (text.trimLeft().startsWith('<ambient_check_in')) {
+            addEvent(key, const NoteLine('Checked recent microphone activity'));
+            break;
+          }
           final ambient = parseAmbientTurn(text);
           if (ambient != null) {
             if (ambient.ids.isNotEmpty &&
