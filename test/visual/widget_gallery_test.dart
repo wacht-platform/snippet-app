@@ -280,8 +280,14 @@ void main() {
     });
 
     testWidgets('desktop keeps the requested size', (tester) async {
-      final box = await inkBox(tester, TargetPlatform.macOS,
-          IconBtn('x', size: 22, iconSize: 12, onTap: () {}));
+      debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+      await tester.pumpWidget(MaterialApp(
+          home: Scaffold(
+              body: Center(
+                  child: IconBtn('x', size: 22, iconSize: 12, onTap: () {})))));
+      final box = tester.getSize(find.descendant(
+          of: find.byType(IconBtn), matching: find.byType(SizedBox)).first);
+      debugDefaultTargetPlatformOverride = null;
       expect(box.width, 22);
     });
 
