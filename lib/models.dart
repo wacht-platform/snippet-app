@@ -1679,6 +1679,7 @@ class AmbientSettings {
   final String deepgramHost;
   final List<(String, String)> deepgramHosts;
   final String ttsVoice;
+  final int ttsSpeed;
   final List<TtsVoice> ttsVoices;
   final String stt;
 
@@ -1701,6 +1702,7 @@ class AmbientSettings {
       this.deepgramHost = 'api.deepgram.com',
       this.deepgramHosts = const [],
       this.ttsVoice = '',
+      this.ttsSpeed = 115,
       this.ttsVoices = const [],
       this.stt = 'assemblyai'});
 
@@ -1726,6 +1728,7 @@ class AmbientSettings {
       deepgramHost: deepgramHost,
       deepgramHosts: deepgramHosts,
       ttsVoice: ttsVoice,
+      ttsSpeed: ttsSpeed,
       ttsVoices: ttsVoices,
       stt: stt);
 
@@ -1750,6 +1753,7 @@ class AmbientSettings {
             ((h as Map)['host'] as String? ?? '', h['label'] as String? ?? '')
         ],
         ttsVoice = j['tts_voice'] as String? ?? '',
+        ttsSpeed = (j['tts_speed'] as num?)?.toInt() ?? 115,
         stt = j['stt'] as String? ?? 'assemblyai',
         ttsVoices = [
           for (final v in (j['tts_voices'] as List? ?? const []))

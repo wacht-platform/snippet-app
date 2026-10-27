@@ -98,6 +98,7 @@ class _VoiceScreenState extends State<VoiceScreen> {
     String? typesafeKey,
     String? deepgramHost,
     String? ttsVoice,
+    int? ttsSpeed,
     String? stt,
     String? done,
   }) async {
@@ -112,6 +113,7 @@ class _VoiceScreenState extends State<VoiceScreen> {
           typesafeKey: typesafeKey,
           deepgramHost: deepgramHost,
           ttsVoice: ttsVoice,
+          ttsSpeed: ttsSpeed,
           stt: stt);
       if (!mounted) return;
       setState(() => _ambient = next);
@@ -163,7 +165,12 @@ class _VoiceScreenState extends State<VoiceScreen> {
   String _voiceLabel(TtsVoice v) =>
       '${v.name} · ${v.accent} ${v.gender.toLowerCase()}';
 
+  String _speedLabel(int pct) =>
+      '${(pct / 100).toStringAsFixed(pct % 10 == 0 ? 1 : 2)}×';
+
   List<Widget> _ambientGroups(AmbientSettings a) {
+    final speeds = <int>{90, 100, 110, 115, 125, 135, 150, a.ttsSpeed}.toList()
+      ..sort();
     final timeouts =
         <int>{30, 60, 90, 180, 300, a.conversationTimeoutSecs}.toList()..sort();
     final hosts = a.deepgramHosts.isEmpty
@@ -241,6 +248,16 @@ class _VoiceScreenState extends State<VoiceScreen> {
                     _saveAmbient(ttsVoice: m, done: 'Voice saved'),
               ),
             ),
+          SettingsRow(
+            label: 'Speech speed',
+            trailing: SettingsPopup<int>(
+              label: _speedLabel(a.ttsSpeed),
+              selected: a.ttsSpeed,
+              items: [for (final s in speeds) (s, _speedLabel(s))],
+              onSelected: (s) =>
+                  _saveAmbient(ttsSpeed: s, done: 'Speech speed saved'),
+            ),
+          ),
         ],
       ),
       SettingsGroup(

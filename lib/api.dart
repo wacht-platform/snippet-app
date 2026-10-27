@@ -496,6 +496,7 @@ class DaemonClient {
     String? deepgramKey,
     String? deepgramHost,
     String? ttsVoice,
+    int? ttsSpeed,
     String? stt,
   }) async {
     final r = await http.post(_uri('/ambient/settings'),
@@ -513,6 +514,7 @@ class DaemonClient {
           if (deepgramKey != null) 'deepgram_api_key': deepgramKey,
           if (deepgramHost != null) 'deepgram_host': deepgramHost,
           if (ttsVoice != null) 'tts_voice': ttsVoice,
+          if (ttsSpeed != null) 'tts_speed': ttsSpeed,
           if (stt != null) 'stt': stt,
         }));
     if (r.statusCode != 200) {
