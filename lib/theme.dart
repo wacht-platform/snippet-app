@@ -154,7 +154,7 @@ ThemePreset _dark({
   );
 }
 
-// The only client theme. Values and rationale: docs/design-language.md.
+// The only client theme.
 final _amoled = _dark(
   name: 'amoled',
   label: 'Graphite',
@@ -589,7 +589,7 @@ const kMonoFamily = 'JetBrainsMono';
 
 String get monoFamily => kMonoFamily;
 
-/// Type roles from docs/design-language.md. Screens use these, not raw sizes.
+/// Type roles. Screens use these, not raw sizes.
 class TS {
   static TextStyle pageTitle([Color? c]) => kMobile
       ? sans(28,

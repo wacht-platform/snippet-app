@@ -12,8 +12,8 @@ The Android, macOS, Linux and Windows client for [snippet](https://github.com/wa
 </div>
 
 <p align="center">
-  <img src="docs/screenshots/desktop.png" alt="Desktop app: a session transcript beside the file tree" width="73%" valign="middle" />
-  <img src="docs/screenshots/mobile.png" alt="Phone app: a voice conversation with Mission Control" width="23.7%" valign="middle" />
+  <img src="assets/screenshots/desktop.png" alt="Desktop app: a session transcript beside the file tree" width="73%" valign="middle" />
+  <img src="assets/screenshots/mobile.png" alt="Phone app: a voice conversation with Mission Control" width="23.7%" valign="middle" />
 </p>
 
 The app connects to a `snippet serve` daemon running on your own machine. The code, the shell and the model keys stay on that machine; the app only attaches to its sessions over an authenticated WebSocket.
@@ -38,7 +38,7 @@ Every push to `main` updates the rolling [latest release](https://github.com/wac
 | Windows 10+ (x86_64) | `snippet-windows.zip` |
 | Linux (x86_64, GTK 3) | `snippet-linux-x64.tar.gz` |
 
-The Android build is self-signed, so remove an older install before updating if the update is refused. Linux notes are in [docs/linux-desktop.md](docs/linux-desktop.md).
+The Android build is self-signed, so remove an older install before updating if the update is refused.
 
 ## Connect
 
