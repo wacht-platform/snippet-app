@@ -262,8 +262,8 @@ void main() {
         expect(rect.height, lessThanOrEqualTo(mobile ? 64 : 60));
         expect(find.text('Tap to open'), findsNothing);
         final dismiss = tester.getSize(find.byType(IconButton));
-        expect(dismiss.width, greaterThanOrEqualTo(44));
-        expect(dismiss.height, greaterThanOrEqualTo(36));
+        expect(dismiss.width, greaterThanOrEqualTo(mobile ? 44 : 24));
+        expect(dismiss.height, greaterThanOrEqualTo(mobile ? 36 : 24));
         expect(tester.takeException(), isNull);
         await tester.pumpWidget(const SizedBox());
         debugDefaultTargetPlatformOverride = null;

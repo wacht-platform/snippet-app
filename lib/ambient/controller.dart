@@ -98,7 +98,13 @@ class AmbientController extends ChangeNotifier {
 
   ValueListenable<AmbientVoice?> get voice => _local?.voiceListenable ?? _emptyVoice;
 
-  Future<String> get deviceId async => (await _identity).$1;
+  Future<String> get deviceId async {
+    try {
+      return (await _identity).$1;
+    } catch (_) {
+      return '';
+    }
+  }
 
   Future<(String, String)> get _identity async =>
       kIsWeb ? ('web', 'Browser') : await ambientDeviceIdentity();
