@@ -12,8 +12,8 @@ The Android, macOS, Linux and Windows client for [snippet](https://github.com/wa
 </div>
 
 <p align="center">
-  <img src="docs/screenshots/desktop.png" alt="Desktop app: a session transcript beside the file tree" width="68%" />
-  <img src="docs/screenshots/mobile.png" alt="Phone app: a voice conversation with Mission Control" width="28%" />
+  <img src="docs/screenshots/desktop.png" alt="Desktop app: a session transcript beside the file tree" width="73%" valign="middle" />
+  <img src="docs/screenshots/mobile.png" alt="Phone app: a voice conversation with Mission Control" width="23.7%" valign="middle" />
 </p>
 
 The app connects to a `snippet serve` daemon running on your own machine. The code, the shell and the model keys stay on that machine; the app only attaches to its sessions over an authenticated WebSocket.
