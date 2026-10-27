@@ -14,6 +14,7 @@ sudo apt update && sudo apt install -y \
   libgtk-3-dev \
   libgstreamer1.0-dev \
   libgstreamer-plugins-base1.0-dev \
+  libasound2-dev \
   libegl1 \
   libgl1-mesa-dri
 ```
