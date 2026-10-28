@@ -171,9 +171,9 @@ List<Widget> buildShellRailTools({
                 alignment: Alignment.centerLeft,
                 child: Material(
                   color: AppColors.surface3,
-                  shape: const StadiumBorder(),
+                  borderRadius: BorderRadius.circular(R.sm),
                   child: InkWell(
-                    customBorder: const StadiumBorder(),
+                    borderRadius: BorderRadius.circular(R.sm),
                     onTap: () => Navigator.of(ctx).pop<VoidCallback>(
                         () => onSessionAction('compact')),
                     child: Container(

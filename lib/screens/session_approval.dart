@@ -779,7 +779,8 @@ class QuestionBarState extends State<QuestionBar> {
 
   Widget _chip(String label, bool sel, VoidCallback onTap) => Material(
         color: sel ? AppColors.accentBg : AppColors.hover,
-        shape: StadiumBorder(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(R.sm),
           side: BorderSide(
             color: sel ? AppColors.accent : Colors.transparent,
             width: 1.2,
@@ -787,7 +788,7 @@ class QuestionBarState extends State<QuestionBar> {
         ),
         child: InkWell(
           onTap: onTap,
-          customBorder: const StadiumBorder(),
+          borderRadius: BorderRadius.circular(R.sm),
           child: Padding(
             padding:
                 const EdgeInsets.symmetric(horizontal: S.s12, vertical: S.s6),
@@ -1226,7 +1227,8 @@ class _SendBtn extends StatelessWidget {
         : running
             ? (kMobile ? AppColors.bg : AppColors.fg1)
             : (kMobile ? AppColors.accentFg : AppColors.bg);
-    const ShapeBorder shape = CircleBorder();
+    final ShapeBorder shape =
+        RoundedRectangleBorder(borderRadius: BorderRadius.circular(R.sm));
     return Material(
       color: fill,
       shape: shape,

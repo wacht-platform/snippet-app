@@ -304,13 +304,14 @@ class SettingsPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Material(
         color: danger ? Colors.transparent : AppColors.surface2,
-        shape: StadiumBorder(
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(R.sm),
             side: BorderSide(
                 color: danger
                     ? AppColors.danger.withValues(alpha: 0.3)
                     : Colors.transparent)),
         child: InkWell(
-          customBorder: const StadiumBorder(),
+          borderRadius: BorderRadius.circular(R.sm),
           onTap: onTap,
           child: Container(
             height: 28,

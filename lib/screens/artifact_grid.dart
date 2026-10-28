@@ -54,10 +54,11 @@ class _ArtifactGridState extends State<ArtifactGrid> {
       padding: const EdgeInsets.only(right: 4),
       child: Material(
         color: on ? AppColors.surface2 : Colors.transparent,
-        shape: StadiumBorder(
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(R.sm),
             side: BorderSide(color: on ? Colors.transparent : AppColors.line)),
         child: InkWell(
-          customBorder: const StadiumBorder(),
+          borderRadius: BorderRadius.circular(R.sm),
           onTap: () => setState(() => _filter = label),
           child: Container(
             height: 24,

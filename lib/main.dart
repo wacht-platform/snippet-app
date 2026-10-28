@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'drafts.dart';
+import 'ambient/ambient_edge_glow.dart';
 import 'notifications.dart';
 import 'notification_popovers.dart';
 import 'android_reconciliation.dart';
@@ -107,8 +108,9 @@ class _SnippetAppState extends State<SnippetApp> with WidgetsBindingObserver {
       // back event entirely — so back from a session backgrounded the app
       // instead of returning to the chat list. The shell now owns back
       // explicitly and reproduces the minimize-at-root behaviour itself.
-      builder: (context, child) =>
-          NotificationPopovers(child: child ?? const SizedBox.shrink()),
+      builder: (context, child) => NotificationPopovers(
+        child: AmbientEdgeGlow(child: child ?? const SizedBox.shrink()),
+      ),
       home: const AdaptiveHome(),
     );
   }

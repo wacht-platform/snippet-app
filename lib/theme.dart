@@ -270,14 +270,18 @@ ThemePreset get currentTheme => ThemeManager.instance.current;
 
 class AppColors {
   // Surfaces
-  static Color get bg => currentTheme.bg;
-  static Color get canvas => currentTheme.canvas;
-  static Color get floor => currentTheme.floor;
+  static Color get bg =>
+      kMobile ? currentTheme.bg : currentTheme.bg.withValues(alpha: 0.90);
+  static Color get canvas => kMobile
+      ? currentTheme.canvas
+      : currentTheme.canvas.withValues(alpha: 0.88);
+  static Color get floor =>
+      kMobile ? currentTheme.floor : currentTheme.floor.withValues(alpha: 0.90);
   static Color get surface1 => currentTheme.surface1;
   static Color get surface2 => currentTheme.surface2;
   static Color get surface3 => currentTheme.surface3;
 
-  static Color get base => currentTheme.bg;
+  static Color get base => bg;
   static Color get raised => currentTheme.surface1;
   static Color get overlay => currentTheme.surface2;
   static Color get hover => currentTheme.surface3;
@@ -286,9 +290,12 @@ class AppColors {
 
   static const Color scrim = Color(0x99000000);
   static Color get windowBg =>
-      kMobile ? currentTheme.bg : const Color(0xFF0D0C0B);
-  static Color get sidebarPanel => const Color(0xFF171513);
-  static Color get glassSurface => currentTheme.surface2;
+      kMobile ? currentTheme.bg : const Color(0xD90D0C0B);
+  static Color get sidebarPanel =>
+      kMobile ? const Color(0xFF171513) : const Color(0xE0171513);
+  static Color get glassSurface => kMobile
+      ? currentTheme.surface2
+      : currentTheme.surface2.withValues(alpha: 0.86);
   static Color get glassBorder => currentTheme.border;
 
   // Foreground
@@ -338,10 +345,10 @@ class R {
   static const xs = 4.0;
   static const sm = 6.0;
   static const chip = 6.0;
-  static const md = 10.0;
+  static const md = 8.0;
   static const card = 10.0;
-  static const lg = 14.0;
-  static const sheetTop = 20.0;
+  static const lg = 12.0;
+  static const sheetTop = 16.0;
   static const pill = 999.0;
 }
 

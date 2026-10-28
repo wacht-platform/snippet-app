@@ -52,7 +52,7 @@ class RoundBtn extends StatelessWidget {
             child: Container(
               width: size,
               height: size,
-              decoration: _floating(size / 2),
+              decoration: _floating(R.md),
               alignment: Alignment.center,
               child: Stack(clipBehavior: Clip.none, children: [
                 child ?? AppIcon(icon!, size: iconSize, color: AppColors.fg2),
@@ -306,7 +306,7 @@ class FloatingSearch extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
         height: 50,
-        decoration: _floating(25),
+        decoration: _floating(R.md),
         padding: const EdgeInsets.only(left: 18, right: 8),
         child: Row(children: [
           AppIcon('search', size: 17, color: AppColors.fg4),
@@ -366,7 +366,9 @@ class AccentFab extends StatelessWidget {
               width: 50,
               height: 50,
               decoration: BoxDecoration(
-                  color: AppColors.accentFill, shape: BoxShape.circle),
+                color: AppColors.accentFill,
+                borderRadius: BorderRadius.circular(R.lg),
+              ),
               alignment: Alignment.center,
               child: AppIcon(icon, size: 21, color: AppColors.accentFg),
             ),

@@ -100,7 +100,7 @@ class _AutonomyChipState extends State<AutonomyChip> {
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           decoration: BoxDecoration(
             color: on ? AppColors.okBg : AppColors.surface2,
-            borderRadius: BorderRadius.circular(999),
+            borderRadius: BorderRadius.circular(R.sm),
           ),
           child: Row(mainAxisSize: MainAxisSize.min, children: [
             Container(

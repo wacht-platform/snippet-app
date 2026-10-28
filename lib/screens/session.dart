@@ -1209,7 +1209,8 @@ class _SessionScreenState extends State<SessionScreen>
       endDrawer: useDrawer ? _actionsDrawer(s) : null,
       // Tap-only: the default edge drag competes with transcript gestures.
       endDrawerEnableOpenDragGesture: false,
-      backgroundColor: readingBg,
+      backgroundColor:
+          widget.embedded && !kMobile ? Colors.transparent : readingBg,
       resizeToAvoidBottomInset: false,
       body: SafeArea(
         bottom: false,

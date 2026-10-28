@@ -173,11 +173,12 @@ class _DeskMemoryViewState extends State<DeskMemoryView> {
         padding: const EdgeInsets.only(right: 4),
         child: Material(
           color: on ? AppColors.surface2 : Colors.transparent,
-          shape: StadiumBorder(
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(R.sm),
               side:
                   BorderSide(color: on ? Colors.transparent : AppColors.line)),
           child: InkWell(
-            customBorder: const StadiumBorder(),
+            borderRadius: BorderRadius.circular(R.sm),
             onTap: tap,
             child: Container(
               height: 24,
@@ -303,13 +304,14 @@ class _DeskMemoryViewState extends State<DeskMemoryView> {
         padding: const EdgeInsets.only(left: 6),
         child: Material(
           color: danger ? Colors.transparent : AppColors.surface2,
-          shape: StadiumBorder(
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(R.sm),
               side: BorderSide(
                   color: danger
                       ? AppColors.danger.withValues(alpha: 0.3)
                       : Colors.transparent)),
           child: InkWell(
-            customBorder: const StadiumBorder(),
+            borderRadius: BorderRadius.circular(R.sm),
             onTap: onTap,
             child: Container(
               height: 28,

@@ -248,11 +248,12 @@ class _CheckpointTimelineState extends State<_CheckpointTimeline> {
         padding: const EdgeInsets.only(right: 4),
         child: Material(
           color: filled ? AppColors.surface2 : Colors.transparent,
-          shape: StadiumBorder(
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(R.sm),
               side: BorderSide(
                   color: filled ? Colors.transparent : AppColors.line)),
           child: InkWell(
-            customBorder: const StadiumBorder(),
+            borderRadius: BorderRadius.circular(R.sm),
             onTap: onTap,
             child: Container(
               height: 24,

@@ -12,11 +12,20 @@ class MainFlutterWindow: NSWindow {
     // Floor for resizing: sidebar, a readable chat column and the session's
     // file tree side by side. Below this the desktop layout clips.
     self.minSize = NSSize(width: 1100, height: 700)
-    let shellColor = NSColor(srgbRed: 0x15 / 255.0, green: 0x15 / 255.0, blue: 0x16 / 255.0, alpha: 1)
-    self.isOpaque = true
-    self.backgroundColor = shellColor
-    flutterViewController.backgroundColor = shellColor
+    self.isOpaque = false
+    self.backgroundColor = .clear
+    flutterViewController.backgroundColor = .clear
     self.appearance = NSAppearance(named: .darkAqua)
+
+    let blurView = NSVisualEffectView(frame: flutterViewController.view.bounds)
+    blurView.autoresizingMask = [.width, .height]
+    blurView.blendingMode = .behindWindow
+    blurView.material = .underWindowBackground
+    blurView.state = .active
+    blurView.appearance = NSAppearance(named: .darkAqua)
+    blurView.wantsLayer = true
+    blurView.layer?.zPosition = -1000
+    flutterViewController.view.addSubview(blurView, positioned: .below, relativeTo: nil)
 
     // Use the native traffic lights, but let Flutter paint a cohesive title
     // surface beneath them instead of leaving a separate blank title strip.

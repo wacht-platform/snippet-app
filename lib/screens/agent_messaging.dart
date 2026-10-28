@@ -1544,7 +1544,8 @@ class _SendBtn extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final size = kMobile ? 36.0 : 30.0;
-    const ShapeBorder shape = CircleBorder();
+    final ShapeBorder shape =
+        RoundedRectangleBorder(borderRadius: BorderRadius.circular(R.sm));
     return Material(
       color: enabled ? AppColors.accentFill : AppColors.hover,
       shape: shape,

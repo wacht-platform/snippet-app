@@ -89,7 +89,8 @@ class StripSendButton extends StatelessWidget {
         : stop
             ? (kMobile ? AppColors.bg : AppColors.fg1)
             : (kMobile ? AppColors.accentFg : AppColors.bg);
-    const ShapeBorder shape = CircleBorder();
+    final ShapeBorder shape =
+        RoundedRectangleBorder(borderRadius: BorderRadius.circular(R.sm));
     return Material(
       color: fill,
       shape: shape,
@@ -168,9 +169,9 @@ class DesktopRecorderStrip extends StatelessWidget {
         message: tip,
         child: Material(
           color: fill ?? Colors.transparent,
-          shape: const CircleBorder(),
+          borderRadius: BorderRadius.circular(R.sm),
           child: InkWell(
-            customBorder: const CircleBorder(),
+            borderRadius: BorderRadius.circular(R.sm),
             onTap: onTap,
             child: SizedBox.square(
               dimension: kMobile ? 40 : 32,
