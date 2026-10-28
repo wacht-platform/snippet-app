@@ -84,8 +84,30 @@ class MacosNotch {
           }
         case 'closeConversation':
           _closeActiveConversation();
+        case 'toggleAmbient':
+          await _toggleAmbient();
       }
     });
+  }
+
+  static Future<void> _toggleAmbient() async {
+    final client = await _resolveClient(const {});
+    if (client == null) return;
+    final ctrl = AmbientController.instance;
+    final nextOn = !ctrl.running;
+    final (_, err) = await ctrl.setEnabled(client, nextOn);
+    showNotification(
+      title: 'Ambient Voice',
+      subtitle: err != null
+          ? 'Error: $err'
+          : (nextOn ? 'Listening turned on (⌥⇧Space)' : 'Listening turned off'),
+      kind: 'ambient',
+      payload: {
+        'url': client.baseUrl,
+        'session': 'mission-control',
+        'title': 'Mission Control',
+      },
+    );
   }
 
   /// Binds the active daemon client so Mission Control chats are always watched

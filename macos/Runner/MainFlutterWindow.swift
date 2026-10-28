@@ -1,8 +1,22 @@
 import AVFoundation
+import Carbon.HIToolbox
 import Cocoa
 import CoreText
 import FlutterMacOS
 import QuartzCore
+
+private func snippetHotKeyCallback(
+  nextHandler: EventHandlerCallRef?,
+  theEvent: EventRef?,
+  userData: UnsafeMutableRawPointer?
+) -> OSStatus {
+  guard let userData = userData else { return noErr }
+  let window = Unmanaged<MainFlutterWindow>.fromOpaque(userData).takeUnretainedValue()
+  DispatchQueue.main.async {
+    window.triggerGlobalAmbientToggle()
+  }
+  return noErr
+}
 
 // MARK: - Snippet Theme & Bundled Font Loader (Geist + JetBrainsMono + Graphite Palette)
 
@@ -289,6 +303,8 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
   private var blurView: NSVisualEffectView?
   private var backdropTimer: Timer?
   private var menuMochiTimer: Timer?
+  private var hotKeyRef: EventHotKeyRef?
+  private var hotKeyHandlerRef: EventHandlerRef?
   private var isBackdropOpaque = false
   private var allowTerminate = false
 
@@ -437,6 +453,7 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
     aec.register(with: flutterViewController.engine.binaryMessenger)
 
     setupMenuBarItem()
+    registerGlobalAmbientHotKey()
 
     super.awakeFromNib()
 
@@ -498,10 +515,48 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
   }
 
   deinit {
+    if let hk = hotKeyRef {
+      UnregisterEventHotKey(hk)
+    }
+    if let hh = hotKeyHandlerRef {
+      RemoveEventHandler(hh)
+    }
     backdropTimer?.invalidate()
     menuMochiTimer?.invalidate()
     NSWorkspace.shared.notificationCenter.removeObserver(self)
     NotificationCenter.default.removeObserver(self)
+  }
+
+  /// Registers Option + Shift + Space (`⌥⇧Space`) as a system-wide global hotkey
+  /// that toggles Ambient Voice on/off even when Snippet is minimized or in the background.
+  private func registerGlobalAmbientHotKey() {
+    var eventType = EventTypeSpec(
+      eventClass: OSType(kEventClassKeyboard),
+      eventKind: UInt32(kEventHotKeyPressed)
+    )
+    let selfPtr = Unmanaged.passUnretained(self).toOpaque()
+    InstallEventHandler(
+      GetApplicationEventTarget(),
+      snippetHotKeyCallback,
+      1,
+      &eventType,
+      selfPtr,
+      &hotKeyHandlerRef
+    )
+    let hotKeyID = EventHotKeyID(signature: OSType(0x534E5054), id: 1) // 'SNPT'
+    let modifiers = UInt32(optionKey | shiftKey)
+    RegisterEventHotKey(
+      UInt32(kVK_Space),
+      modifiers,
+      hotKeyID,
+      GetApplicationEventTarget(),
+      0,
+      &hotKeyRef
+    )
+  }
+
+  func triggerGlobalAmbientToggle() {
+    notchChannel?.invokeMethod("toggleAmbient", arguments: nil)
   }
 
   @objc private func onWillTerminate() {
@@ -569,8 +624,13 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
 
     menu.addItem(NSMenuItem.separator())
 
-    let ambientItem = NSMenuItem(title: "Ambient Voice: Off", action: nil, keyEquivalent: "")
-    ambientItem.isEnabled = false
+    let ambientItem = NSMenuItem(
+      title: "Ambient Voice: Off (⌥⇧Space)",
+      action: #selector(onMenuToggleAmbient),
+      keyEquivalent: " "
+    )
+    ambientItem.keyEquivalentModifierMask = [.option, .shift]
+    ambientItem.target = self
     menu.addItem(ambientItem)
     self.ambientMenuItem = ambientItem
 
@@ -600,6 +660,10 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
     notchHUD?.openMissionControlConversation()
   }
 
+  @objc private func onMenuToggleAmbient() {
+    triggerGlobalAmbientToggle()
+  }
+
   @objc private func onMenuQuitSnippet() {
     allowTerminate = true
     NSApp.terminate(nil)
@@ -612,13 +676,13 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
     probability: Double
   ) {
     if !active {
-      ambientMenuItem?.title = "Ambient Voice: Off"
+      ambientMenuItem?.title = "Ambient Voice: Off (⌥⇧Space)"
     } else if assistantSpeaking {
-      ambientMenuItem?.title = "Ambient Voice: Speaking"
+      ambientMenuItem?.title = "Ambient Voice: Speaking (⌥⇧Space)"
     } else if userSpeaking {
-      ambientMenuItem?.title = "Ambient Voice: Hearing you"
+      ambientMenuItem?.title = "Ambient Voice: Hearing you (⌥⇧Space)"
     } else {
-      ambientMenuItem?.title = "Ambient Voice: Listening"
+      ambientMenuItem?.title = "Ambient Voice: Listening (⌥⇧Space)"
     }
     notchHUD?.updateAmbient(
       active: active,
