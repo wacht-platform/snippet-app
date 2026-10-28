@@ -858,6 +858,48 @@ enum NotchMarkdown {
     case code(language: String, code: String)
   }
 
+  /// Measures the exact tight width (longest laid-out line fragment) and height
+  /// of an `NSAttributedString` within `maxWidth` using `NSLayoutManager`.
+  static func measure(_ attr: NSAttributedString, maxWidth: CGFloat) -> NSSize {
+    guard attr.length > 0 && maxWidth > 10 else {
+      return NSSize(width: 0, height: 18)
+    }
+    let storage = NSTextStorage(attributedString: attr)
+    let layoutManager = NSLayoutManager()
+    let container = NSTextContainer(size: NSSize(width: maxWidth, height: .greatestFiniteMagnitude))
+    container.lineFragmentPadding = 0
+    layoutManager.addTextContainer(container)
+    storage.addLayoutManager(layoutManager)
+    layoutManager.ensureLayout(for: container)
+
+    let used = layoutManager.usedRect(for: container)
+    var maxLineW: CGFloat = 0
+    let glyphRange = layoutManager.glyphRange(for: container)
+    layoutManager.enumerateLineFragments(forGlyphRange: glyphRange) { _, usedRect, _, _, _ in
+      if usedRect.width > maxLineW {
+        maxLineW = usedRect.width
+      }
+    }
+    let tightW = maxLineW > 0 ? min(maxWidth, ceil(maxLineW) + 2) : min(maxWidth, ceil(used.width) + 2)
+    let tightH = max(18, ceil(used.height) + 2)
+    return NSSize(width: tightW, height: tightH)
+  }
+
+  static func makeWrappingLabel(_ attr: NSAttributedString) -> NSTextField {
+    let label = NSTextField(wrappingLabelWithString: "")
+    label.isEditable = false
+    label.isBordered = false
+    label.drawsBackground = false
+    label.isSelectable = true
+    label.allowsEditingTextAttributes = true
+    label.cell?.wraps = true
+    label.cell?.isScrollable = false
+    label.lineBreakMode = .byWordWrapping
+    label.maximumNumberOfLines = 0
+    label.attributedStringValue = attr
+    return label
+  }
+
   /// Strips raw Markdown tokens for a clean 1-line notification banner preview.
   static func plainPreview(_ raw: String) -> String {
     var s = raw
@@ -1637,17 +1679,16 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
 
         if isUser {
           let maxBubbleW = width * 0.82
+          let padX: CGFloat = 12
+          let padY: CGFloat = 7
           let attr = NotchMarkdown.parseBlocks(msg.text, isUser: true).compactMap { b -> NSAttributedString? in
             if case let .text(a) = b { return a }
             return nil
           }.first ?? NSAttributedString(string: msg.text)
 
-          let textBounds = attr.boundingRect(
-            with: NSSize(width: maxBubbleW - 24, height: 4000),
-            options: [.usesLineFragmentOrigin, .usesFontLeading]
-          )
-          let bubbleW = min(maxBubbleW, max(56, ceil(textBounds.width) + 24))
-          let bubbleH = max(30, ceil(textBounds.height) + 14)
+          let measured = NotchMarkdown.measure(attr, maxWidth: maxBubbleW - padX * 2)
+          let bubbleW = min(maxBubbleW, max(44, measured.width + padX * 2))
+          let bubbleH = max(30, measured.height + padY * 2)
           let bubbleX = width - bubbleW - 4
 
           let bubble = NSView(frame: NSRect(x: bubbleX, y: y, width: bubbleW, height: bubbleH))
@@ -1657,12 +1698,9 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
           bubble.layer?.borderWidth = 1
           bubble.layer?.borderColor = NSColor(srgbRed: 0.19, green: 0.19, blue: 0.22, alpha: 1.0).cgColor
 
-          let label = NSTextField(labelWithAttributedString: attr)
-          label.isSelectable = true
-          label.allowsEditingTextAttributes = false
-          label.lineBreakMode = .byWordWrapping
-          label.maximumNumberOfLines = 0
-          label.frame = NSRect(x: 12, y: 7, width: bubbleW - 24, height: bubbleH - 14)
+          let label = NotchMarkdown.makeWrappingLabel(attr)
+          label.preferredMaxLayoutWidth = bubbleW - padX * 2
+          label.frame = NSRect(x: padX, y: padY, width: bubbleW - padX * 2, height: bubbleH - padY * 2)
           bubble.addSubview(label)
           documentView.addSubview(bubble)
 
@@ -1694,17 +1732,12 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
           for block in blocks {
             switch block {
             case .text(let attr):
-              let bounds = attr.boundingRect(
-                with: NSSize(width: turnW - 10, height: 8000),
-                options: [.usesLineFragmentOrigin, .usesFontLeading]
-              )
-              let h = max(18, ceil(bounds.height) + 4)
-              let label = NSTextField(labelWithAttributedString: attr)
-              label.isSelectable = true
-              label.allowsEditingTextAttributes = false
-              label.lineBreakMode = .byWordWrapping
-              label.maximumNumberOfLines = 0
-              label.frame = NSRect(x: turnX + 8, y: y, width: turnW - 10, height: h)
+              let textW = turnW - 10
+              let measured = NotchMarkdown.measure(attr, maxWidth: textW)
+              let h = max(18, measured.height + 2)
+              let label = NotchMarkdown.makeWrappingLabel(attr)
+              label.preferredMaxLayoutWidth = textW
+              label.frame = NSRect(x: turnX + 8, y: y, width: textW, height: h)
               documentView.addSubview(label)
               y += h + 6
 
@@ -1718,12 +1751,10 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
                 .paragraphStyle: pStyle,
               ]
               let codeAttr = NSAttributedString(string: code, attributes: codeAttrs)
-              let bounds = codeAttr.boundingRect(
-                with: NSSize(width: turnW - 28, height: 6000),
-                options: [.usesLineFragmentOrigin, .usesFontLeading]
-              )
+              let codeTextW = turnW - 28
+              let measured = NotchMarkdown.measure(codeAttr, maxWidth: codeTextW)
               let headerH: CGFloat = lang.isEmpty ? 0 : 18
-              let boxH = max(30, ceil(bounds.height) + 16 + headerH)
+              let boxH = max(30, measured.height + 16 + headerH)
               let box = NSView(frame: NSRect(x: turnX + 6, y: y, width: turnW - 8, height: boxH))
               box.wantsLayer = true
               box.layer?.backgroundColor = NSColor(srgbRed: 0.06, green: 0.06, blue: 0.08, alpha: 1.0).cgColor
@@ -1735,15 +1766,13 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
                 let langLabel = NSTextField(labelWithString: lang.uppercased())
                 langLabel.font = NSFont.monospacedSystemFont(ofSize: 9.5, weight: .semibold)
                 langLabel.textColor = NSColor(srgbRed: 0.55, green: 0.56, blue: 0.65, alpha: 1.0)
-                langLabel.frame = NSRect(x: 10, y: 5, width: turnW - 28, height: 13)
+                langLabel.frame = NSRect(x: 10, y: 5, width: codeTextW, height: 13)
                 box.addSubview(langLabel)
               }
 
-              let codeField = NSTextField(labelWithAttributedString: codeAttr)
-              codeField.isSelectable = true
-              codeField.lineBreakMode = .byWordWrapping
-              codeField.maximumNumberOfLines = 0
-              codeField.frame = NSRect(x: 10, y: 8 + headerH, width: turnW - 28, height: max(16, boxH - 16 - headerH))
+              let codeField = NotchMarkdown.makeWrappingLabel(codeAttr)
+              codeField.preferredMaxLayoutWidth = codeTextW
+              codeField.frame = NSRect(x: 10, y: 8 + headerH, width: codeTextW, height: max(16, boxH - 16 - headerH))
               box.addSubview(codeField)
               documentView.addSubview(box)
               y += boxH + 8
