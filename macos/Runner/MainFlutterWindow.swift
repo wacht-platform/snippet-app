@@ -1560,16 +1560,15 @@ final class NotchHUDController {
     let targetHeight: CGFloat
 
     if conversationExpanded {
-      topCornerRadius = 15
-      bottomCornerRadius = 22
+      topCornerRadius = 14
+      bottomCornerRadius = 20
       targetWidth = max(hw.width + 292, 480) + topCornerRadius * 2
-      targetHeight = hw.height + 404
+      targetHeight = hw.height + 380
     } else if hasNotif {
-      topCornerRadius = 6
-      bottomCornerRadius = 14
-      // Expand horizontally along the notch itself (left & right wings) at exact notch height
-      targetWidth = hw.width + 310 + topCornerRadius * 2
-      targetHeight = hw.height
+      topCornerRadius = 10
+      bottomCornerRadius = 16
+      targetWidth = max(hw.width + 176, 360) + topCornerRadius * 2
+      targetHeight = hw.height + 34
     } else if assistantSpeaking || userSpeaking {
       topCornerRadius = 6
       bottomCornerRadius = 14
@@ -2066,6 +2065,16 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
     borderStroke.stroke()
     NSGraphicsContext.current?.restoreGraphicsState()
 
+    // Always render the Mochi + 5-bar listening/speaking indicator in the top notch wings
+    drawAmbientWings(
+      in: b,
+      periwinkle: periwinkle,
+      matcha: matcha,
+      ink: ink,
+      blush: blush,
+      now: now
+    )
+
     if conversationExpanded {
       let headerMochiRect = NSRect(
         x: topCornerRadius + 16,
@@ -2078,8 +2087,7 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
         bodyColor: periwinkle,
         leafColor: matcha,
         eyeColor: ink,
-        blushColor: blush,
-        playTime: now
+        blushColor: blush
       )
 
       let sepY = b.height - hwNotchHeight - 6 - 32
@@ -2100,22 +2108,14 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
         periwinkle: periwinkle,
         matcha: matcha,
         ink: ink,
-        blush: blush,
-        now: now
-      )
-    } else {
-      drawAmbientWingsAndChin(
-        in: b,
-        periwinkle: periwinkle,
-        matcha: matcha,
-        ink: ink,
-        blush: blush,
-        now: now
+        blush: blush
       )
     }
   }
 
-  private func drawAmbientWingsAndChin(
+  /// Renders the left wing (Mochi mascot + notification title when active) and
+  /// right wing (5-bar audio listening/speaking equalizer) inside the top `hwNotchHeight` band.
+  private func drawAmbientWings(
     in b: NSRect,
     periwinkle: NSColor,
     matcha: NSColor,
@@ -2128,78 +2128,84 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
     let cameraLeft = b.midX - hwNotchWidth / 2
     let cameraRight = b.midX + hwNotchWidth / 2
 
-    // Left Wing: Animated WorkingMochi character
     let leftWingX = b.minX + topCornerRadius
     let leftWingW = max(24, cameraLeft - leftWingX)
     let mochiSize: CGFloat = 18
-    let mochiRect = NSRect(
-      x: leftWingX + (leftWingW - mochiSize) / 2,
-      y: topBandMidY - mochiSize / 2,
-      width: mochiSize,
-      height: mochiSize
-    )
-    MochiRenderer.drawMochi(
-      in: mochiRect,
-      bodyColor: userSpeaking ? matcha : periwinkle,
-      leafColor: matcha,
-      eyeColor: ink,
-      blushColor: blush,
-      playTime: now
-    )
 
-    // Right Wing: Audio equalizer when ambient voice is active, or sleek "MC" pill when idle
-    let rightWingX = cameraRight
-    let rightWingW = max(24, (b.maxX - topCornerRadius) - rightWingX)
-
-    if ambientActive || assistantSpeaking || userSpeaking {
-      let barCount = 5
-      let barW: CGFloat = 2.5
-      let barGap: CGFloat = 2.6
-      let totalBarsW = CGFloat(barCount) * barW + CGFloat(barCount - 1) * barGap
-      let startX = rightWingX + (rightWingW - totalBarsW) / 2
-
-      let waveColor = userSpeaking ? SnippetTheme.ok : SnippetTheme.accent
-      for i in 0..<barCount {
-        let wave = sin(Double(phase) + Double(i) * 0.9)
-        let amp: CGFloat = assistantSpeaking
-          ? 1.0
-          : (userSpeaking ? max(CGFloat(probability), 0.6) : 0.22)
-        let barH = max(3.5, 3.5 + 11.5 * amp * CGFloat(0.5 + 0.5 * wave))
-        let bx = startX + CGFloat(i) * (barW + barGap)
-        let by = topBandMidY - barH / 2
-        let barRect = NSRect(x: bx, y: by, width: barW, height: barH)
-        waveColor.withAlphaComponent(assistantSpeaking || userSpeaking ? 0.95 : 0.70).setFill()
-        NSBezierPath(roundedRect: barRect, xRadius: 1.25, yRadius: 1.25).fill()
-      }
-    } else {
-      let pillW: CGFloat = 28
-      let pillH: CGFloat = 16
-      let pillRect = NSRect(
-        x: rightWingX + (rightWingW - pillW) / 2,
-        y: topBandMidY - pillH / 2,
-        width: pillW,
-        height: pillH
+    if let title = notifTitle, !conversationExpanded {
+      let mochiRect = NSRect(
+        x: leftWingX + 10,
+        y: topBandMidY - mochiSize / 2,
+        width: mochiSize,
+        height: mochiSize
       )
-      SnippetTheme.surface2.setFill()
-      let pillPath = NSBezierPath(roundedRect: pillRect, xRadius: 5, yRadius: 5)
-      pillPath.fill()
+      MochiRenderer.drawMochi(
+        in: mochiRect,
+        bodyColor: userSpeaking ? matcha : periwinkle,
+        leafColor: matcha,
+        eyeColor: ink,
+        blushColor: blush,
+        playTime: now
+      )
+      let titleX = mochiRect.maxX + 6
+      let titleW = max(20, cameraLeft - titleX - 6)
       let pStyle = NSMutableParagraphStyle()
-      pStyle.alignment = .center
-      let mcAttrs: [NSAttributedString.Key: Any] = [
-        .font: SnippetTheme.mono(9.5, weight: .semibold),
-        .foregroundColor: SnippetTheme.accent,
+      pStyle.lineBreakMode = .byTruncatingTail
+      let titleAttrs: [NSAttributedString.Key: Any] = [
+        .font: SnippetTheme.sans(11.5, weight: .medium),
+        .foregroundColor: SnippetTheme.fg1,
         .paragraphStyle: pStyle,
       ]
-      ("MC" as NSString).draw(
-        in: NSRect(x: pillRect.minX, y: pillRect.minY + 1.5, width: pillW, height: 13),
-        withAttributes: mcAttrs
+      (title as NSString).draw(
+        in: NSRect(x: titleX, y: topBandMidY - 7.5, width: titleW, height: 15),
+        withAttributes: titleAttrs
+      )
+    } else {
+      let mochiRect = NSRect(
+        x: leftWingX + (leftWingW - mochiSize) / 2,
+        y: topBandMidY - mochiSize / 2,
+        width: mochiSize,
+        height: mochiSize
+      )
+      MochiRenderer.drawMochi(
+        in: mochiRect,
+        bodyColor: userSpeaking ? matcha : periwinkle,
+        leafColor: matcha,
+        eyeColor: ink,
+        blushColor: blush,
+        playTime: now
       )
     }
 
+    // Right Wing: 5-bar Dynamic Island listening/speaking equalizer (always visible)
+    let rightWingX = cameraRight
+    let rightWingW = max(24, (b.maxX - topCornerRadius) - rightWingX)
+    let barCount = 5
+    let barW: CGFloat = 2.5
+    let barGap: CGFloat = 2.6
+    let totalBarsW = CGFloat(barCount) * barW + CGFloat(barCount - 1) * barGap
+    let startX = notifTitle != nil && !conversationExpanded
+      ? (b.maxX - topCornerRadius - 12 - totalBarsW)
+      : (rightWingX + (rightWingW - totalBarsW) / 2)
+
+    let waveColor = userSpeaking ? SnippetTheme.ok : SnippetTheme.accent
+    for i in 0..<barCount {
+      let wave = sin(Double(phase) + Double(i) * 0.9)
+      let amp: CGFloat = assistantSpeaking
+        ? 1.0
+        : (userSpeaking ? max(CGFloat(probability), 0.6) : 0.22)
+      let barH = max(3.5, 3.5 + 11.5 * amp * CGFloat(0.5 + 0.5 * wave))
+      let bx = startX + CGFloat(i) * (barW + barGap)
+      let by = topBandMidY - barH / 2
+      let barRect = NSRect(x: bx, y: by, width: barW, height: barH)
+      waveColor.withAlphaComponent(assistantSpeaking || userSpeaking ? 0.95 : 0.70).setFill()
+      NSBezierPath(roundedRect: barRect, xRadius: 1.25, yRadius: 1.25).fill()
+    }
   }
 
-  /// Renders the notification directly on the notch itself (left and right wings
-  /// flanking the hardware camera cutout at `hwNotchHeight`, with zero vertical drop).
+  /// Uses the top notch wing space for the Mochi + notification title and the right wing
+  /// for the 5-bar listening indicator, while rendering the message preview + Reply pill
+  /// in a tight 1-line row directly below.
   private func drawNotification(
     in b: NSRect,
     title: String,
@@ -2207,75 +2213,51 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
     periwinkle: NSColor,
     matcha: NSColor,
     ink: NSColor,
-    blush: NSColor,
-    now: Double
+    blush: NSColor
   ) {
-    let midY = b.midY
-    let cameraLeft = b.midX - hwNotchWidth / 2
-    let cameraRight = b.midX + hwNotchWidth / 2
-    let isWaiting = notifKind == "waiting"
-    let statusColor = isWaiting ? SnippetTheme.run : SnippetTheme.accent
-
-    // Left Wing (between left notch edge and camera cutout): Mochi icon + sender title
-    let leftStart = b.minX + topCornerRadius + 10
-    let mochiSize: CGFloat = 16
-    let mochiRect = NSRect(
-      x: leftStart,
-      y: midY - mochiSize / 2,
-      width: mochiSize,
-      height: mochiSize
-    )
-    MochiRenderer.drawMochi(
-      in: mochiRect,
-      bodyColor: periwinkle,
-      leafColor: matcha,
-      eyeColor: ink,
-      blushColor: blush,
-      playTime: now
+    let topBandMinY = b.maxY - hwNotchHeight
+    let rowRect = NSRect(
+      x: b.minX + topCornerRadius + 12,
+      y: 6,
+      width: b.width - (topCornerRadius + 12) * 2,
+      height: max(22, topBandMinY - 6)
     )
 
-    let titleX = mochiRect.maxX + 7
-    let titleMaxW = max(24, cameraLeft - titleX - 8)
-    let leftStyle = NSMutableParagraphStyle()
-    leftStyle.lineBreakMode = .byTruncatingTail
-    let shortTitle = (title == "Mission Control") ? "MC" : title
-    let titleAttrs: [NSAttributedString.Key: Any] = [
-      .font: SnippetTheme.sans(11.5, weight: .medium),
-      .foregroundColor: SnippetTheme.fg1,
-      .paragraphStyle: leftStyle,
+    let pillW: CGFloat = 46
+    let pillH: CGFloat = 20
+    let pillRect = NSRect(
+      x: rowRect.maxX - pillW,
+      y: rowRect.midY - pillH / 2,
+      width: pillW,
+      height: pillH
+    )
+    SnippetTheme.accentFill.setFill()
+    NSBezierPath(roundedRect: pillRect, xRadius: 6, yRadius: 6).fill()
+
+    let pillStyle = NSMutableParagraphStyle()
+    pillStyle.alignment = .center
+    let pillAttrs: [NSAttributedString.Key: Any] = [
+      .font: SnippetTheme.sans(10.5, weight: .medium),
+      .foregroundColor: NSColor.white,
+      .paragraphStyle: pillStyle,
     ]
-    (shortTitle as NSString).draw(
-      in: NSRect(x: titleX, y: midY - 7.5, width: titleMaxW, height: 15),
-      withAttributes: titleAttrs
+    ("Reply" as NSString).draw(
+      in: NSRect(x: pillRect.minX, y: pillRect.minY + 2.5, width: pillW, height: 15),
+      withAttributes: pillAttrs
     )
-
-    // Right Wing (between camera cutout and right notch edge): message preview + status dot
-    let rightEnd = b.maxX - topCornerRadius - 10
-    let dotSize: CGFloat = 6
-    let dotRect = NSRect(
-      x: rightEnd - dotSize,
-      y: midY - dotSize / 2,
-      width: dotSize,
-      height: dotSize
-    )
-    statusColor.withAlphaComponent(0.28).setFill()
-    NSBezierPath(ovalIn: dotRect.insetBy(dx: -2, dy: -2)).fill()
-    statusColor.setFill()
-    NSBezierPath(ovalIn: dotRect).fill()
 
     let cleanSub = NotchMarkdown.plainPreview(subtitle)
     let previewText = cleanSub.isEmpty ? title : cleanSub
-    let subX = cameraRight + 8
-    let subMaxW = max(28, dotRect.minX - subX - 7)
-    let subStyle = NSMutableParagraphStyle()
-    subStyle.lineBreakMode = .byTruncatingTail
+    let textW = max(40, pillRect.minX - rowRect.minX - 10)
+    let pStyle = NSMutableParagraphStyle()
+    pStyle.lineBreakMode = .byTruncatingTail
     let subAttrs: [NSAttributedString.Key: Any] = [
-      .font: SnippetTheme.sans(11.5, weight: .regular),
+      .font: SnippetTheme.sans(12.0, weight: .regular),
       .foregroundColor: SnippetTheme.fg2,
-      .paragraphStyle: subStyle,
+      .paragraphStyle: pStyle,
     ]
     (previewText as NSString).draw(
-      in: NSRect(x: subX, y: midY - 7.5, width: subMaxW, height: 15),
+      in: NSRect(x: rowRect.minX, y: rowRect.midY - 7.5, width: textW, height: 15),
       withAttributes: subAttrs
     )
   }
