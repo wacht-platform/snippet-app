@@ -804,10 +804,33 @@ List<FeedItem> feedItemsFromEvents(List<Map<String, dynamic>> events) {
         out.add(AgentTextItem(id: 'h-a-$i', timestamp: now, text: text));
       case 'tool_call':
         final tool = (e['tool_name'] ?? '').toString();
-        if (tool == 'speak' || tool == 'ambient_speak') {
+        if (tool == 'speak' ||
+            tool == 'ambient_speak' ||
+            tool.endsWith('__speak')) {
           final args = e['arguments'];
           final spoken = args is Map ? '${args['text'] ?? ''}'.trim() : '';
-          if (spoken.isNotEmpty) {
+          var turnHasAssistantText = false;
+          for (var j = i + 1; j < events.length; j++) {
+            final jk = events[j]['kind'] as String? ?? '';
+            if (jk == 'user_input' || jk == 'steer') break;
+            if (jk == 'assistant_text' &&
+                '${events[j]['text'] ?? ''}'.trim().isNotEmpty) {
+              turnHasAssistantText = true;
+              break;
+            }
+          }
+          if (!turnHasAssistantText) {
+            for (var j = i - 1; j >= 0; j--) {
+              final jk = events[j]['kind'] as String? ?? '';
+              if (jk == 'user_input' || jk == 'steer') break;
+              if (jk == 'assistant_text' &&
+                  '${events[j]['text'] ?? ''}'.trim().isNotEmpty) {
+                turnHasAssistantText = true;
+                break;
+              }
+            }
+          }
+          if (spoken.isNotEmpty && !turnHasAssistantText) {
             out.add(AgentTextItem(id: 'h-s-$i', timestamp: now, text: spoken));
           }
         }

@@ -184,7 +184,30 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
             endTools(key);
             final args = e['arguments'];
             final spoken = args is Map ? _s(args['text']).trim() : '';
-            if (spoken.isNotEmpty) {
+            // If this turn also emits an `assistant_text`, skip the SpeakCard
+            // so the same spoken reply is not rendered twice in the transcript.
+            var turnHasAssistantText = false;
+            for (var j = idx + 1; j < events.length; j++) {
+              final jk = events[j]['kind'] as String? ?? '';
+              if (jk == 'user_input' || jk == 'steer') break;
+              if (jk == 'assistant_text' &&
+                  _s(events[j]['text']).trim().isNotEmpty) {
+                turnHasAssistantText = true;
+                break;
+              }
+            }
+            if (!turnHasAssistantText) {
+              for (var j = idx - 1; j >= 0; j--) {
+                final jk = events[j]['kind'] as String? ?? '';
+                if (jk == 'user_input' || jk == 'steer') break;
+                if (jk == 'assistant_text' &&
+                    _s(events[j]['text']).trim().isNotEmpty) {
+                  turnHasAssistantText = true;
+                  break;
+                }
+              }
+            }
+            if (spoken.isNotEmpty && !turnHasAssistantText) {
               addEvent(
                   key,
                   SpeakCard(

@@ -1434,7 +1434,7 @@ final class NotchHUDController {
 
     notifDismissTimer?.invalidate()
     if !conversationExpanded {
-      notifDismissTimer = Timer.scheduledTimer(withTimeInterval: 7.0, repeats: false) { [weak self] _ in
+      notifDismissTimer = Timer.scheduledTimer(withTimeInterval: 3.5, repeats: false) { [weak self] _ in
         self?.clearNotification()
       }
     }
@@ -1564,10 +1564,10 @@ final class NotchHUDController {
       targetWidth = max(hw.width + 292, 480) + topCornerRadius * 2
       targetHeight = hw.height + 380
     } else if hasNotif {
-      topCornerRadius = 10
-      bottomCornerRadius = 16
-      targetWidth = max(hw.width + 176, 360) + topCornerRadius * 2
-      targetHeight = hw.height + 34
+      topCornerRadius = 8
+      bottomCornerRadius = 14
+      targetWidth = max(hw.width + 116, 296) + topCornerRadius * 2
+      targetHeight = hw.height + 26
     } else if assistantSpeaking || userSpeaking {
       topCornerRadius = 6
       bottomCornerRadius = 14
@@ -2218,14 +2218,14 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
   ) {
     let topBandMinY = b.maxY - hwNotchHeight
     let rowRect = NSRect(
-      x: b.minX + topCornerRadius + 12,
-      y: 6,
-      width: b.width - (topCornerRadius + 12) * 2,
-      height: max(22, topBandMinY - 6)
+      x: b.minX + topCornerRadius + 10,
+      y: 4,
+      width: b.width - (topCornerRadius + 10) * 2,
+      height: max(18, topBandMinY - 4)
     )
 
-    let pillW: CGFloat = 46
-    let pillH: CGFloat = 20
+    let pillW: CGFloat = 40
+    let pillH: CGFloat = 17
     let pillRect = NSRect(
       x: rowRect.maxX - pillW,
       y: rowRect.midY - pillH / 2,
@@ -2233,32 +2233,32 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
       height: pillH
     )
     SnippetTheme.accentFill.setFill()
-    NSBezierPath(roundedRect: pillRect, xRadius: 6, yRadius: 6).fill()
+    NSBezierPath(roundedRect: pillRect, xRadius: 5, yRadius: 5).fill()
 
     let pillStyle = NSMutableParagraphStyle()
     pillStyle.alignment = .center
     let pillAttrs: [NSAttributedString.Key: Any] = [
-      .font: SnippetTheme.sans(10.5, weight: .medium),
+      .font: SnippetTheme.sans(10.0, weight: .medium),
       .foregroundColor: NSColor.white,
       .paragraphStyle: pillStyle,
     ]
     ("Reply" as NSString).draw(
-      in: NSRect(x: pillRect.minX, y: pillRect.minY + 2.5, width: pillW, height: 15),
+      in: NSRect(x: pillRect.minX, y: pillRect.minY + 1.5, width: pillW, height: 14),
       withAttributes: pillAttrs
     )
 
     let cleanSub = NotchMarkdown.plainPreview(subtitle)
     let previewText = cleanSub.isEmpty ? title : cleanSub
-    let textW = max(40, pillRect.minX - rowRect.minX - 10)
+    let textW = max(36, pillRect.minX - rowRect.minX - 8)
     let pStyle = NSMutableParagraphStyle()
     pStyle.lineBreakMode = .byTruncatingTail
     let subAttrs: [NSAttributedString.Key: Any] = [
-      .font: SnippetTheme.sans(12.0, weight: .regular),
+      .font: SnippetTheme.sans(11.0, weight: .regular),
       .foregroundColor: SnippetTheme.fg2,
       .paragraphStyle: pStyle,
     ]
     (previewText as NSString).draw(
-      in: NSRect(x: rowRect.minX, y: rowRect.midY - 7.5, width: textW, height: 15),
+      in: NSRect(x: rowRect.minX, y: rowRect.midY - 7, width: textW, height: 14),
       withAttributes: subAttrs
     )
   }
