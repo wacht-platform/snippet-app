@@ -35,6 +35,7 @@ class MacosNotch {
   static WebSocketChannel? _mcSocket;
   static StreamSubscription<dynamic>? _mcSub;
   static HarnessState? _mcState;
+  static int _mcRevision = 0;
   static String _mcLiveStreamText = '';
   static String _lastNotifiedKey = '';
 
@@ -45,6 +46,7 @@ class MacosNotch {
   static String? _activePeerAgentId;
   static String _activeTitle = 'Mission Control';
   static HarnessState? _activeState;
+  static int _activeRevision = 0;
   static String _liveStreamText = '';
   static Timer? _pollTimer;
   static int _nonceCounter = 1;
@@ -135,6 +137,16 @@ class MacosNotch {
               return;
             }
             if (wire == 'snapshot' || wire == 'delta') {
+              final rev = j['revision'];
+              if (rev is int) {
+                if (wire == 'snapshot') {
+                  _mcRevision = rev;
+                } else if (_mcRevision != 0 && rev == _mcRevision) {
+                  return;
+                } else {
+                  _mcRevision = rev;
+                }
+              }
               final prev = _mcState;
               final next = (wire == 'delta' && prev != null)
                   ? prev.applyDelta(j)
@@ -204,6 +216,7 @@ class MacosNotch {
     _mcSocket?.sink.close();
     _mcSocket = null;
     _mcState = null;
+    _mcRevision = 0;
     _mcLiveStreamText = '';
   }
 
@@ -283,12 +296,14 @@ class MacosNotch {
     }
 
     _activeSessionId = sessionId;
-    if (sessionId == 'mission-control' &&
-        _mcState != null &&
-        _defaultClient?.baseUrl == client.baseUrl) {
-      _activeState = _mcState;
-      _liveStreamText = _mcLiveStreamText;
-      _emitSessionMessages();
+    if (sessionId == 'mission-control') {
+      bindClient(client);
+      if (_mcState != null) {
+        _activeState = _mcState;
+        _liveStreamText = _mcLiveStreamText;
+        _emitSessionMessages();
+      }
+      return;
     }
     _attachSession(client, sessionId);
   }
@@ -342,6 +357,16 @@ class MacosNotch {
             return;
           }
           if (wire == 'snapshot' || wire == 'delta') {
+            final rev = j['revision'];
+            if (rev is int) {
+              if (wire == 'snapshot') {
+                _activeRevision = rev;
+              } else if (_activeRevision != 0 && rev == _activeRevision) {
+                return;
+              } else {
+                _activeRevision = rev;
+              }
+            }
             final cur = _activeState;
             final next = (wire == 'delta' && cur != null)
                 ? cur.applyDelta(j)
@@ -487,11 +512,13 @@ class MacosNotch {
       return;
     }
 
-    final ch = _activeSocket;
+    final ch = _activeSessionId == 'mission-control' ? _mcSocket : _activeSocket;
     if (ch != null && _activeSessionId != null) {
       final nonce =
           'notch-${DateTime.now().millisecondsSinceEpoch}-${_nonceCounter++}';
-      final running = _activeState?.status == 'running';
+      final state =
+          _activeSessionId == 'mission-control' ? _mcState : _activeState;
+      final running = state?.status == 'running';
       if (running) {
         ch.sink.add(jsonEncode({
           'kind': 'queue',
@@ -519,6 +546,7 @@ class MacosNotch {
     _activeSessionId = null;
     _activePeerAgentId = null;
     _activeState = null;
+    _activeRevision = 0;
     _liveStreamText = '';
   }
 
