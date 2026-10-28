@@ -1565,19 +1565,19 @@ final class NotchHUDController {
       targetWidth = max(hw.width + 292, 480) + topCornerRadius * 2
       targetHeight = hw.height + 404
     } else if hasNotif {
-      topCornerRadius = 14
-      bottomCornerRadius = 22
-      targetWidth = max(hw.width + 236, 424) + topCornerRadius * 2
-      targetHeight = hw.height + 76
-    } else if assistantSpeaking || userSpeaking {
-      topCornerRadius = 8
+      topCornerRadius = 10
       bottomCornerRadius = 16
-      targetWidth = hw.width + 96 + topCornerRadius * 2
-      targetHeight = hw.height + 24
+      targetWidth = max(hw.width + 148, 336) + topCornerRadius * 2
+      targetHeight = hw.height + 44
+    } else if assistantSpeaking || userSpeaking {
+      topCornerRadius = 6
+      bottomCornerRadius = 14
+      targetWidth = hw.width + 92 + topCornerRadius * 2
+      targetHeight = hw.height
     } else {
       topCornerRadius = 6
       bottomCornerRadius = 14
-      targetWidth = hw.width + 88 + topCornerRadius * 2
+      targetWidth = hw.width + 84 + topCornerRadius * 2
       targetHeight = hw.height
     }
 
@@ -2195,31 +2195,9 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
       )
     }
 
-    if assistantSpeaking || userSpeaking {
-      let chinHeight = b.height - hwNotchHeight
-      if chinHeight >= 16 {
-        let label = assistantSpeaking ? "Snippet speaking…" : "Hearing you…"
-        let pStyle = NSMutableParagraphStyle()
-        pStyle.alignment = .center
-        let attrs: [NSAttributedString.Key: Any] = [
-          .font: SnippetTheme.sans(11.5, weight: .medium),
-          .foregroundColor: SnippetTheme.fg2,
-          .paragraphStyle: pStyle,
-        ]
-        let textRect = NSRect(
-          x: b.minX + topCornerRadius + 12,
-          y: 4,
-          width: b.width - (topCornerRadius + 12) * 2,
-          height: 15
-        )
-        (label as NSString).draw(in: textRect, withAttributes: attrs)
-      }
-    }
   }
 
-  /// Renders a slick Dynamic Island notification card below `hwNotchHeight`,
-  /// with top wing badges, a glowing status dot, animated Mochi avatar, Geist typography,
-  /// and an interactive "Reply ↵" pill.
+  /// Renders a compact, sleek Dynamic Island notification row below `hwNotchHeight`.
   private func drawNotification(
     in b: NSRect,
     title: String,
@@ -2235,72 +2213,67 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
     let cameraLeft = b.midX - hwNotchWidth / 2
     let cameraRight = b.midX + hwNotchWidth / 2
 
-    // Top-left wing: live pulsing status dot + category label
     let isWaiting = notifKind == "waiting"
     let statusColor = isWaiting ? SnippetTheme.run : SnippetTheme.accent
-    let dotX = b.minX + topCornerRadius + 14
-    let dotRect = NSRect(x: dotX, y: topBandMidY - 3.5, width: 7, height: 7)
+
+    // Top-left wing: subtle pulsing status dot + compact label
+    let dotX = b.minX + topCornerRadius + 10
+    let dotRect = NSRect(x: dotX, y: topBandMidY - 3, width: 6, height: 6)
     statusColor.withAlphaComponent(0.28).setFill()
-    NSBezierPath(ovalIn: dotRect.insetBy(dx: -2.5, dy: -2.5)).fill()
+    NSBezierPath(ovalIn: dotRect.insetBy(dx: -2, dy: -2)).fill()
     statusColor.setFill()
     NSBezierPath(ovalIn: dotRect).fill()
 
-    let wingLabel = isWaiting ? "NEEDS INPUT" : (title == "Mission Control" ? "MISSION CONTROL" : "SNIPPET")
+    let wingLabel = isWaiting ? "INPUT" : (title == "Mission Control" ? "MC" : "NEW")
     let wingAttrs: [NSAttributedString.Key: Any] = [
-      .font: SnippetTheme.mono(9.5, weight: .semibold),
+      .font: SnippetTheme.mono(9.0, weight: .semibold),
       .foregroundColor: SnippetTheme.fg3,
     ]
-    let wingMaxW = max(20, cameraLeft - (dotX + 13) - 6)
+    let wingMaxW = max(16, cameraLeft - (dotX + 10) - 4)
     (wingLabel as NSString).draw(
-      in: NSRect(x: dotX + 13, y: topBandMidY - 6.5, width: wingMaxW, height: 13),
+      in: NSRect(x: dotX + 10, y: topBandMidY - 6, width: wingMaxW, height: 12),
       withAttributes: wingAttrs
     )
 
-    // Top-right wing: "NOW" timestamp badge
-    let rightWingW = max(24, (b.maxX - topCornerRadius - 14) - cameraRight)
+    // Top-right wing: "NOW" badge
+    let rightWingW = max(20, (b.maxX - topCornerRadius - 10) - cameraRight)
     let rightStyle = NSMutableParagraphStyle()
     rightStyle.alignment = .right
     let nowAttrs: [NSAttributedString.Key: Any] = [
-      .font: SnippetTheme.mono(9.5, weight: .medium),
+      .font: SnippetTheme.mono(9.0, weight: .medium),
       .foregroundColor: SnippetTheme.fg4,
       .paragraphStyle: rightStyle,
     ]
     ("NOW" as NSString).draw(
-      in: NSRect(x: cameraRight + 4, y: topBandMidY - 6.5, width: rightWingW - 4, height: 13),
+      in: NSRect(x: cameraRight + 4, y: topBandMidY - 6, width: rightWingW - 4, height: 12),
       withAttributes: nowAttrs
     )
 
-    // Lower card container in Snippet surface1 (#17171A) with 1px border2 (#323238)
-    let cardRect = NSRect(
+    // Compact row below camera cutout (height ~36pt)
+    let rowRect = NSRect(
       x: b.minX + topCornerRadius + 12,
-      y: 10,
+      y: 6,
       width: b.width - (topCornerRadius + 12) * 2,
-      height: max(48, topBandMinY - 12)
+      height: max(30, topBandMinY - 8)
     )
-    let cardPath = NSBezierPath(roundedRect: cardRect, xRadius: 14, yRadius: 14)
-    SnippetTheme.surface1.setFill()
-    cardPath.fill()
-    SnippetTheme.border2.setStroke()
-    cardPath.lineWidth = 1.0
-    cardPath.stroke()
 
-    // Left Mochi avatar in an accent-tinted squircle
-    let avatarSize: CGFloat = 34
+    // Compact 22x22 Mochi avatar on the left
+    let avatarSize: CGFloat = 22
     let avatarRect = NSRect(
-      x: cardRect.minX + 10,
-      y: cardRect.midY - avatarSize / 2,
+      x: rowRect.minX,
+      y: rowRect.midY - avatarSize / 2,
       width: avatarSize,
       height: avatarSize
     )
     SnippetTheme.surface2.setFill()
-    let avatarPath = NSBezierPath(roundedRect: avatarRect, xRadius: 10, yRadius: 10)
+    let avatarPath = NSBezierPath(roundedRect: avatarRect, xRadius: 6.5, yRadius: 6.5)
     avatarPath.fill()
-    statusColor.withAlphaComponent(0.35).setStroke()
+    statusColor.withAlphaComponent(0.32).setStroke()
     avatarPath.lineWidth = 1.0
     avatarPath.stroke()
 
     MochiRenderer.drawMochi(
-      in: avatarRect.insetBy(dx: 5, dy: 5),
+      in: avatarRect.insetBy(dx: 3, dy: 3),
       bodyColor: periwinkle,
       leafColor: matcha,
       eyeColor: ink,
@@ -2308,43 +2281,43 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
       playTime: now
     )
 
-    // Right "Reply ↵" action pill in Snippet accentFill (#5E6AD2)
-    let pillW: CGFloat = 68
-    let pillH: CGFloat = 26
+    // Compact "Reply" pill on the right (48x20)
+    let pillW: CGFloat = 48
+    let pillH: CGFloat = 20
     let pillRect = NSRect(
-      x: cardRect.maxX - pillW - 10,
-      y: cardRect.midY - pillH / 2,
+      x: rowRect.maxX - pillW,
+      y: rowRect.midY - pillH / 2,
       width: pillW,
       height: pillH
     )
     SnippetTheme.accentFill.setFill()
-    NSBezierPath(roundedRect: pillRect, xRadius: 8, yRadius: 8).fill()
+    NSBezierPath(roundedRect: pillRect, xRadius: 6, yRadius: 6).fill()
 
     let pillStyle = NSMutableParagraphStyle()
     pillStyle.alignment = .center
     let pillAttrs: [NSAttributedString.Key: Any] = [
-      .font: SnippetTheme.sans(11.5, weight: .medium),
+      .font: SnippetTheme.sans(10.5, weight: .medium),
       .foregroundColor: NSColor.white,
       .paragraphStyle: pillStyle,
     ]
-    ("Reply ↵" as NSString).draw(
-      in: NSRect(x: pillRect.minX, y: pillRect.minY + 4.5, width: pillW, height: 17),
+    ("Reply" as NSString).draw(
+      in: NSRect(x: pillRect.minX, y: pillRect.minY + 2.5, width: pillW, height: 15),
       withAttributes: pillAttrs
     )
 
-    // Center Title & Subtitle in Geist
-    let textX = avatarRect.maxX + 11
-    let textW = max(40, pillRect.minX - textX - 10)
+    // Center Title & Subtitle in compact Geist
+    let textX = avatarRect.maxX + 9
+    let textW = max(40, pillRect.minX - textX - 8)
     let pStyle = NSMutableParagraphStyle()
     pStyle.lineBreakMode = .byTruncatingTail
 
     let titleAttrs: [NSAttributedString.Key: Any] = [
-      .font: SnippetTheme.sans(13.0, weight: .medium),
+      .font: SnippetTheme.sans(12.0, weight: .medium),
       .foregroundColor: SnippetTheme.fg1,
       .paragraphStyle: pStyle,
     ]
     let subAttrs: [NSAttributedString.Key: Any] = [
-      .font: SnippetTheme.sans(12.0, weight: .regular),
+      .font: SnippetTheme.sans(11.0, weight: .regular),
       .foregroundColor: SnippetTheme.fg2,
       .paragraphStyle: pStyle,
     ]
@@ -2352,16 +2325,16 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
     let cleanSub = NotchMarkdown.plainPreview(subtitle)
     if cleanSub.isEmpty {
       (title as NSString).draw(
-        in: NSRect(x: textX, y: cardRect.midY - 8, width: textW, height: 18),
+        in: NSRect(x: textX, y: rowRect.midY - 7, width: textW, height: 15),
         withAttributes: titleAttrs
       )
     } else {
       (title as NSString).draw(
-        in: NSRect(x: textX, y: cardRect.midY + 1, width: textW, height: 18),
+        in: NSRect(x: textX, y: rowRect.midY + 0.5, width: textW, height: 15),
         withAttributes: titleAttrs
       )
       (cleanSub as NSString).draw(
-        in: NSRect(x: textX, y: cardRect.midY - 16, width: textW, height: 16),
+        in: NSRect(x: textX, y: rowRect.midY - 13.5, width: textW, height: 14),
         withAttributes: subAttrs
       )
     }
