@@ -1660,6 +1660,18 @@ class TtsVoice {
   }
 }
 
+class VoiceprintInfo {
+  final String id;
+  final String label;
+  final DateTime createdAt;
+
+  VoiceprintInfo.fromJson(Map<String, dynamic> j)
+      : id = j['id'] as String? ?? '',
+        label = j['label'] as String? ?? 'Voice sample',
+        createdAt = DateTime.fromMillisecondsSinceEpoch(
+            ((j['created_at'] as num?)?.toInt() ?? 0) * 1000);
+}
+
 class AmbientSettings {
   final bool enabled;
   final String mode;
@@ -1682,6 +1694,7 @@ class AmbientSettings {
   final int ttsSpeed;
   final List<TtsVoice> ttsVoices;
   final String stt;
+  final List<VoiceprintInfo> voiceprints;
 
   const AmbientSettings(
       {this.enabled = false,
@@ -1704,7 +1717,8 @@ class AmbientSettings {
       this.ttsVoice = '',
       this.ttsSpeed = 115,
       this.ttsVoices = const [],
-      this.stt = 'assemblyai'});
+      this.stt = 'assemblyai',
+      this.voiceprints = const []});
 
   String get shownMode =>
       (enabled && effectiveMode.isNotEmpty) ? effectiveMode : mode;
@@ -1730,7 +1744,8 @@ class AmbientSettings {
       ttsVoice: ttsVoice,
       ttsSpeed: ttsSpeed,
       ttsVoices: ttsVoices,
-      stt: stt);
+      stt: stt,
+      voiceprints: voiceprints);
 
   AmbientSettings.fromJson(Map<String, dynamic> j)
       : enabled = j['enabled'] == true,
@@ -1762,5 +1777,9 @@ class AmbientSettings {
         devices = [
           for (final d in (j['devices'] as List? ?? const []))
             AmbientDevice.fromJson((d as Map).cast<String, dynamic>())
+        ],
+        voiceprints = [
+          for (final vp in (j['voiceprints'] as List? ?? const []))
+            VoiceprintInfo.fromJson((vp as Map).cast<String, dynamic>())
         ];
 }

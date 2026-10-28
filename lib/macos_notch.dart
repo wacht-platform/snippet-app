@@ -418,6 +418,8 @@ class MacosNotch {
       if (time.isNotEmpty) time,
       if (turn.mode == 'passive') 'passive',
       if (turn.wake) 'wake word',
+      if (turn.userVoice != null)
+        'voice ${(turn.userVoice! * 100).round()}%',
       if (turn.interruptedReply.isNotEmpty) 'interrupted a reply',
     ].join(' · ');
   }

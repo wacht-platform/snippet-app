@@ -390,7 +390,8 @@ class _AmbientTurnCardState extends State<AmbientTurnCard> {
       turn.context.isNotEmpty ||
       turn.interruptedReply.isNotEmpty ||
       turn.judged.isNotEmpty ||
-      turn.addressed != null;
+      turn.addressed != null ||
+      turn.userVoice != null;
 
   @override
   Widget build(BuildContext context) {
@@ -403,6 +404,8 @@ class _AmbientTurnCardState extends State<AmbientTurnCard> {
       if (time.isNotEmpty) time,
       if (turn.mode == 'passive') 'passive',
       if (turn.wake) 'wake word',
+      if (turn.userVoice != null)
+        'voice ${(turn.userVoice! * 100).round()}%',
       if (turn.continuation) 'continuation',
       if (turn.interruptedReply.isNotEmpty) 'interrupted a reply',
       if (turn.context.isNotEmpty)
@@ -456,10 +459,14 @@ class _AmbientTurnCardState extends State<AmbientTurnCard> {
             ),
             if (_open) ...[
               const SizedBox(height: S.s6),
-              if (turn.judged.isNotEmpty || turn.addressed != null)
+              if (turn.judged.isNotEmpty ||
+                  turn.addressed != null ||
+                  turn.userVoice != null)
                 Text(
                     [
                       if (turn.judged.isNotEmpty) 'Judged ${turn.judged}',
+                      if (turn.userVoice != null)
+                        'voice match ${(turn.userVoice! * 100).round()}%',
                       if (turn.addressed != null)
                         'reply expected ${(turn.addressed! * 100).round()}%',
                       if (turn.expects.isNotEmpty)

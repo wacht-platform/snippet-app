@@ -484,6 +484,32 @@ class DaemonClient {
     return AmbientSettings.fromJson(jsonDecode(r.body) as Map<String, dynamic>);
   }
 
+  Future<AmbientSettings> enrollVoiceprint({
+    Uint8List? audioBytes,
+    String? label,
+    bool fromRecent = false,
+  }) async {
+    final r = await http.post(
+      _uri('/ambient/voiceprints'),
+      headers: _json,
+      body: jsonEncode({
+        if (audioBytes != null) 'audio_base64': base64Encode(audioBytes),
+        if (label != null && label.trim().isNotEmpty) 'label': label.trim(),
+        if (fromRecent) 'from_recent': true,
+      }),
+    );
+    if (r.statusCode != 200) throw _err('enroll voiceprint', r);
+    return AmbientSettings.fromJson(jsonDecode(r.body) as Map<String, dynamic>);
+  }
+
+  Future<AmbientSettings> deleteVoiceprint({String? id}) async {
+    final r = await http.delete(_uri('/ambient/voiceprints', {
+      if (id != null && id.trim().isNotEmpty) 'id': id.trim(),
+    }));
+    if (r.statusCode != 200) throw _err('delete voiceprint', r);
+    return AmbientSettings.fromJson(jsonDecode(r.body) as Map<String, dynamic>);
+  }
+
   Future<AmbientSettings> setAmbientSettings({
     bool? enabled,
     String? mode,

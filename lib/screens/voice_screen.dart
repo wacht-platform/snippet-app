@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:record/record.dart';
 import '../api.dart';
 import '../models.dart';
 import '../platform.dart';
@@ -32,10 +34,96 @@ class _VoiceScreenState extends State<VoiceScreen> {
   VoiceSettings? _voice;
   Object? _error;
   bool _busy = false;
+  bool _recordingSample = false;
+  AudioRecorder? _sampleRecorder;
 
   @override
   void dispose() {
+    _sampleRecorder?.dispose();
     super.dispose();
+  }
+
+  Future<void> _recordVoiceprintSample(AmbientSettings a) async {
+    if (_busy || _recordingSample) return;
+    final rec = AudioRecorder();
+    _sampleRecorder = rec;
+    try {
+      if (!await rec.hasPermission()) {
+        if (mounted) toast(context, 'Microphone permission denied', danger: true);
+        await rec.dispose();
+        _sampleRecorder = null;
+        return;
+      }
+      setState(() => _recordingSample = true);
+      final chunks = <int>[];
+      final stream = await rec.startStream(const RecordConfig(
+        encoder: AudioEncoder.pcm16bits,
+        sampleRate: 16000,
+        numChannels: 1,
+      ));
+      final sub = stream.listen((data) => chunks.addAll(data));
+      await Future<void>.delayed(const Duration(seconds: 3));
+      await sub.cancel();
+      await rec.stop();
+      await rec.dispose();
+      _sampleRecorder = null;
+      if (!mounted) return;
+      setState(() {
+        _recordingSample = false;
+        _busy = true;
+      });
+      final next = await widget.client.enrollVoiceprint(
+        audioBytes: Uint8List.fromList(chunks),
+        label: 'Sample ${a.voiceprints.length + 1}',
+      );
+      if (!mounted) return;
+      setState(() => _ambient = next);
+      toast(context, 'Voice sample ${next.voiceprints.length} saved');
+    } catch (e) {
+      if (mounted) {
+        toast(context, "Couldn't enroll voice sample: $e", danger: true);
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _recordingSample = false;
+          _busy = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _enrollFromRecent() async {
+    if (_busy || _recordingSample) return;
+    setState(() => _busy = true);
+    try {
+      final next = await widget.client.enrollVoiceprint(
+        fromRecent: true,
+        label: 'Sample ${(_ambient?.voiceprints.length ?? 0) + 1}',
+      );
+      if (!mounted) return;
+      setState(() => _ambient = next);
+      toast(context, 'Enrolled from recent voice turn');
+    } catch (e) {
+      if (mounted) toast(context, '$e', danger: true);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _deleteVoiceprint(String? id) async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      final next = await widget.client.deleteVoiceprint(id: id);
+      if (!mounted) return;
+      setState(() => _ambient = next);
+      toast(context, id == null ? 'Cleared voice samples' : 'Removed sample');
+    } catch (e) {
+      if (mounted) toast(context, "Couldn't remove sample: $e", danger: true);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   @override
@@ -279,6 +367,55 @@ class _VoiceScreenState extends State<VoiceScreen> {
               onSelected: (s) => _saveAmbient(timeout: s),
             ),
           ),
+        ],
+      ),
+      SettingsGroup(
+        header: 'Voiceprint recognition',
+        footer:
+            'Record 2–4 short samples of your voice so Snippet scores your voice in parallel during live transcription and passes the match likelihood to the agent.',
+        children: [
+          SettingsRow(
+            label: _recordingSample
+                ? 'Listening for 3 seconds — speak naturally…'
+                : 'Enrolled samples (${a.voiceprints.length})',
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Btn(
+                  _recordingSample ? 'Recording…' : 'Record 3s sample',
+                  small: true,
+                  variant: BtnVariant.primary,
+                  disabled: _busy || _recordingSample,
+                  onTap: () => _recordVoiceprintSample(a),
+                ),
+                const SizedBox(width: S.s8),
+                Btn(
+                  'Use last turn',
+                  small: true,
+                  variant: BtnVariant.secondary,
+                  disabled: _busy || _recordingSample,
+                  onTap: _enrollFromRecent,
+                ),
+              ],
+            ),
+          ),
+          for (final vp in a.voiceprints)
+            SettingsRow(
+              label: vp.label,
+              trailing: Btn(
+                'Remove',
+                small: true,
+                variant: BtnVariant.secondary,
+                disabled: _busy || _recordingSample,
+                onTap: () => _deleteVoiceprint(vp.id),
+              ),
+            ),
+          if (a.voiceprints.length > 1)
+            SettingsRow(
+              label: 'Clear all voiceprints',
+              danger: true,
+              onTap: _busy ? null : () => _deleteVoiceprint(null),
+            ),
         ],
       ),
     ];
