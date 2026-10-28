@@ -186,13 +186,6 @@ class MacosNotch {
                   var msgText = '';
                   if (kind == 'assistant_text' || kind == 'assistant') {
                     msgText = ((e['text'] as String?) ?? '').trim();
-                  } else if (kind == 'tool_call') {
-                    final tool = (e['tool_name'] as String?) ?? '';
-                    if (tool == 'speak' || tool == 'ambient_speak') {
-                      final args = e['arguments'];
-                      msgText =
-                          args is Map ? '${args['text'] ?? ''}'.trim() : '';
-                    }
                   } else if (kind == 'user_question') {
                     msgText = 'Needs your input';
                   }

@@ -1495,6 +1495,13 @@ final class NotchHUDController {
     self.userSpeaking = userSpeaking
     self.assistantSpeaking = assistantSpeaking
     self.speechProbability = probability
+    if assistantSpeaking && notifTitle != nil {
+      notifDismissTimer?.invalidate()
+      notifTitle = nil
+      notifSubtitle = nil
+      notifKind = nil
+      notifPayload = nil
+    }
     refreshHUD(animated: true)
   }
 
@@ -1504,6 +1511,10 @@ final class NotchHUDController {
     kind: String,
     payload: String
   ) {
+    // Do not show a notification banner while Snippet is speaking aloud
+    if assistantSpeaking {
+      return
+    }
     notifTitle = title
     notifSubtitle = subtitle
     notifKind = kind
@@ -2220,52 +2231,26 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
     let cameraLeft = b.midX - hwNotchWidth / 2
     let cameraRight = b.midX + hwNotchWidth / 2
 
+    // Left Wing: Mochi icon only (never draw chat title text here since it crops)
     let leftWingX = b.minX + topCornerRadius
     let leftWingW = max(24, cameraLeft - leftWingX)
     let mochiSize: CGFloat = 18
-
-    if let title = notifTitle, !conversationExpanded {
-      let mochiRect = NSRect(
-        x: leftWingX + 10,
-        y: topBandMidY - mochiSize / 2,
-        width: mochiSize,
-        height: mochiSize
-      )
-      MochiRenderer.drawMochi(
-        in: mochiRect,
-        bodyColor: userSpeaking ? matcha : periwinkle,
-        leafColor: matcha,
-        eyeColor: ink,
-        blushColor: blush
-      )
-      let titleX = mochiRect.maxX + 6
-      let titleW = max(20, cameraLeft - titleX - 6)
-      let pStyle = NSMutableParagraphStyle()
-      pStyle.lineBreakMode = .byTruncatingTail
-      let titleAttrs: [NSAttributedString.Key: Any] = [
-        .font: SnippetTheme.sans(11.5, weight: .medium),
-        .foregroundColor: SnippetTheme.fg1,
-        .paragraphStyle: pStyle,
-      ]
-      (title as NSString).draw(
-        in: NSRect(x: titleX, y: topBandMidY - 7.5, width: titleW, height: 15),
-        withAttributes: titleAttrs
-      )
-    } else {
-      let mochiRect = NSRect(
-        x: leftWingX + (leftWingW - mochiSize) / 2,
-        y: topBandMidY - mochiSize / 2,
-        width: mochiSize,
-        height: mochiSize
-      )
-      MochiRenderer.drawMochi(
-        in: mochiRect,
-        bodyColor: userSpeaking ? matcha : periwinkle,
-        leafColor: matcha,
-        eyeColor: ink,
-        blushColor: blush
-      )
-    }
+    let mochiX = (notifTitle != nil && !conversationExpanded)
+      ? (leftWingX + 12)
+      : (leftWingX + (leftWingW - mochiSize) / 2)
+    let mochiRect = NSRect(
+      x: mochiX,
+      y: topBandMidY - mochiSize / 2,
+      width: mochiSize,
+      height: mochiSize
+    )
+    MochiRenderer.drawMochi(
+      in: mochiRect,
+      bodyColor: userSpeaking ? matcha : periwinkle,
+      leafColor: matcha,
+      eyeColor: ink,
+      blushColor: blush
+    )
 
     // Right Wing: 5-bar listening/speaking equalizer ONLY when listening/speaking is actually active
     if ambientActive || assistantSpeaking || userSpeaking {
