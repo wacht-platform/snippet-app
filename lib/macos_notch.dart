@@ -64,7 +64,7 @@ class MacosNotch {
     final url = '${payload['url'] ?? ''}';
     final name = '${payload['name'] ?? ''}';
     final instances = await InstanceStore().load();
-    if (instances.isEmpty) return DaemonScope.current;
+    if (instances.isEmpty) return null;
     final resolved = instances.where((i) => i.url == url).firstOrNull ??
         instances.where((i) => name.isNotEmpty && i.label == name).firstOrNull ??
         instances.first;
@@ -191,7 +191,7 @@ class MacosNotch {
         } catch (_) {}
       },
       onError: (_) {},
-      onDone: (_) {},
+      onDone: () {},
     );
   }
 
