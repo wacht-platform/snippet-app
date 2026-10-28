@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'dart:collection';
+import 'dart:io' show Platform;
 import 'dart:typed_data';
 
+import 'package:flutter/services.dart';
 import 'package:flutter_soloud/flutter_soloud.dart';
 
 import 'sink.dart';
@@ -16,6 +18,58 @@ abstract class PcmOut {
   int head();
   void volume(double v);
   void close();
+}
+
+/// macOS hardware-AEC playback output (`AVAudioPlayerNode` on the shared
+/// `AVAudioEngine` with `setVoiceProcessingEnabled(true)`), so macOS cancels
+/// speaker output from the microphone at the OS audio-unit level.
+class MacosAecOut implements PcmOut {
+  MacosAecOut(this._volume) {
+    _c.invokeMethod<void>('resetPlayer', {'volume': _volume}).catchError((_) {});
+  }
+
+  static const MethodChannel _c = MethodChannel('snippet/macos_aec');
+  double _volume;
+  int _writtenFrames = 0;
+  int _playedFrames = 0;
+  DateTime? _lastSyncAt;
+  bool _closed = false;
+
+  @override
+  void write(Uint8List pcm) {
+    if (_closed || pcm.isEmpty) return;
+    final frames = pcm.length ~/ 2;
+    _writtenFrames += frames;
+    _lastSyncAt ??= DateTime.now();
+    _c.invokeMethod<int>('writeTts', {'pcm': pcm, 'volume': _volume}).then((nativeHead) {
+      if (_closed || nativeHead == null) return;
+      _playedFrames = nativeHead;
+      _lastSyncAt = DateTime.now();
+    }).catchError((_) {});
+  }
+
+  @override
+  int head() {
+    if (_closed) return _playedFrames;
+    final syncAt = _lastSyncAt;
+    if (syncAt == null) return _playedFrames;
+    final elapsedUs = DateTime.now().difference(syncAt).inMicroseconds;
+    final est = _playedFrames + (elapsedUs * _rate ~/ 1000000);
+    return est.clamp(0, _writtenFrames);
+  }
+
+  @override
+  void volume(double v) {
+    _volume = v;
+    _c.invokeMethod<void>('setVolume', {'volume': v}).catchError((_) {});
+  }
+
+  @override
+  void close() {
+    if (_closed) return;
+    _closed = true;
+    _c.invokeMethod<void>('stopTts').catchError((_) {});
+  }
 }
 
 class SoloudOut implements PcmOut {
@@ -119,6 +173,8 @@ class DesktopSink implements AmbientSink {
     PcmOut out;
     if (open != null) {
       out = open(_volume);
+    } else if (Platform.isMacOS) {
+      out = MacosAecOut(_volume);
     } else {
       if (!SoLoud.instance.isInitialized) await SoLoud.instance.init();
       out = SoloudOut(_volume);

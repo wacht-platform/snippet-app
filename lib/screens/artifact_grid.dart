@@ -3,6 +3,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 
 import '../api.dart';
 import '../models.dart';
+import '../platform.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'artifact_viewer.dart';
@@ -55,10 +56,10 @@ class _ArtifactGridState extends State<ArtifactGrid> {
       child: Material(
         color: on ? AppColors.surface2 : Colors.transparent,
         shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(R.sm),
+            borderRadius: BorderRadius.circular(kMobile ? R.pill : R.sm),
             side: BorderSide(color: on ? Colors.transparent : AppColors.line)),
         child: InkWell(
-          borderRadius: BorderRadius.circular(R.sm),
+          borderRadius: BorderRadius.circular(kMobile ? R.pill : R.sm),
           onTap: () => setState(() => _filter = label),
           child: Container(
             height: 24,

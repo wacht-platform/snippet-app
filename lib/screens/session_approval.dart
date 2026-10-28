@@ -780,7 +780,7 @@ class QuestionBarState extends State<QuestionBar> {
   Widget _chip(String label, bool sel, VoidCallback onTap) => Material(
         color: sel ? AppColors.accentBg : AppColors.hover,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(R.sm),
+          borderRadius: BorderRadius.circular(kMobile ? R.pill : R.sm),
           side: BorderSide(
             color: sel ? AppColors.accent : Colors.transparent,
             width: 1.2,
@@ -788,7 +788,7 @@ class QuestionBarState extends State<QuestionBar> {
         ),
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(R.sm),
+          borderRadius: BorderRadius.circular(kMobile ? R.pill : R.sm),
           child: Padding(
             padding:
                 const EdgeInsets.symmetric(horizontal: S.s12, vertical: S.s6),

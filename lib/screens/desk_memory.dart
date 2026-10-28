@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../api.dart';
 import '../models.dart';
+import '../platform.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'memory_screen.dart' show memoryMarkdown;
@@ -174,11 +175,11 @@ class _DeskMemoryViewState extends State<DeskMemoryView> {
         child: Material(
           color: on ? AppColors.surface2 : Colors.transparent,
           shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(R.sm),
+              borderRadius: BorderRadius.circular(kMobile ? R.pill : R.sm),
               side:
                   BorderSide(color: on ? Colors.transparent : AppColors.line)),
           child: InkWell(
-            borderRadius: BorderRadius.circular(R.sm),
+            borderRadius: BorderRadius.circular(kMobile ? R.pill : R.sm),
             onTap: tap,
             child: Container(
               height: 24,
@@ -305,13 +306,13 @@ class _DeskMemoryViewState extends State<DeskMemoryView> {
         child: Material(
           color: danger ? Colors.transparent : AppColors.surface2,
           shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(R.sm),
+              borderRadius: BorderRadius.circular(kMobile ? R.pill : R.sm),
               side: BorderSide(
                   color: danger
                       ? AppColors.danger.withValues(alpha: 0.3)
                       : Colors.transparent)),
           child: InkWell(
-            borderRadius: BorderRadius.circular(R.sm),
+            borderRadius: BorderRadius.circular(kMobile ? R.pill : R.sm),
             onTap: onTap,
             child: Container(
               height: 28,

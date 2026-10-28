@@ -1,3 +1,4 @@
+import AVFoundation
 import Cocoa
 import FlutterMacOS
 import QuartzCore
@@ -152,6 +153,7 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
   private var ambientMenuItem: NSMenuItem?
   private var notchHUD: NotchHUDController?
   private var notchChannel: FlutterMethodChannel?
+  private var aecEngine: MacosVoiceProcessingEngine?
   private var allowTerminate = false
 
   override func awakeFromNib() {
@@ -291,6 +293,10 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
         result(FlutterMethodNotImplemented)
       }
     }
+
+    let aec = MacosVoiceProcessingEngine()
+    self.aecEngine = aec
+    aec.register(with: flutterViewController.engine.binaryMessenger)
 
     setupMenuBarItem()
 
@@ -461,6 +467,280 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
       frame.origin.y += delta
       button.frame = frame
     }
+  }
+}
+
+// MARK: - macOS Hardware Acoustic Echo Cancellation (VoiceProcessingIO) Engine
+//
+// Runs both 24kHz TTS playback (`AVAudioPlayerNode`) and 16kHz microphone
+// capture (`inputNode`) on a single shared `AVAudioEngine` with
+// `setVoiceProcessingEnabled(true)`. Apple's `VoiceProcessingIO` audio unit uses
+// the engine's output bus as its reference signal and subtracts Snippet's spoken
+// output from the microphone stream in hardware/kernel DSP before samples reach
+// Flutter or Silero VAD.
+
+final class MacosVoiceProcessingEngine: NSObject, FlutterStreamHandler {
+  private let engine = AVAudioEngine()
+  private let playerNode = AVAudioPlayerNode()
+  private let ttsFormat = AVAudioFormat(standardFormatWithSampleRate: 24000, channels: 1)!
+  private let lock = NSLock()
+
+  private var configured = false
+  private var micTapInstalled = false
+  private var eventSink: FlutterEventSink?
+  private var resamplePos: Double = 0.0
+  private var scheduledFrames: Int = 0
+  private var completedFrames: Int = 0
+
+  func register(with messenger: FlutterBinaryMessenger) {
+    let methodChannel = FlutterMethodChannel(
+      name: "snippet/macos_aec",
+      binaryMessenger: messenger
+    )
+    methodChannel.setMethodCallHandler { [weak self] call, result in
+      guard let self = self else {
+        result(nil)
+        return
+      }
+      switch call.method {
+      case "resetPlayer":
+        if let args = call.arguments as? [String: Any],
+           let vol = args["volume"] as? Double {
+          self.setVolume(vol)
+        }
+        self.resetPlayer()
+        result(nil)
+      case "writeTts":
+        if let args = call.arguments as? [String: Any],
+           let typed = args["pcm"] as? FlutterStandardTypedData {
+          if let vol = args["volume"] as? Double {
+            self.setVolume(vol)
+          }
+          let head = self.writeTts(pcmData: typed.data)
+          result(head)
+        } else {
+          result(self.currentHead())
+        }
+      case "setVolume":
+        if let args = call.arguments as? [String: Any],
+           let vol = args["volume"] as? Double {
+          self.setVolume(vol)
+        }
+        result(nil)
+      case "stopTts":
+        self.stopTts()
+        result(nil)
+      default:
+        result(FlutterMethodNotImplemented)
+      }
+    }
+
+    let eventChannel = FlutterEventChannel(
+      name: "snippet/macos_aec_mic",
+      binaryMessenger: messenger
+    )
+    eventChannel.setStreamHandler(self)
+  }
+
+  private func ensureEngineRunning() throws {
+    if !configured {
+      engine.attach(playerNode)
+      engine.connect(playerNode, to: engine.mainMixerNode, format: ttsFormat)
+
+      // Enable Apple's hardware Acoustic Echo Canceller (VoiceProcessingIO) on
+      // the shared engine so speaker output from `playerNode` is cancelled from
+      // `inputNode` in real time.
+      do {
+        try engine.inputNode.setVoiceProcessingEnabled(true)
+        engine.inputNode.isVoiceProcessingAGCEnabled = true
+        if #available(macOS 14.0, *) {
+          let duck = AVAudioVoiceProcessingOtherAudioDuckingConfiguration(
+            enableAdvancedDucking: false,
+            duckingLevel: .min
+          )
+          engine.inputNode.voiceProcessingOtherAudioDuckingConfiguration = duck
+        }
+      } catch {
+        // External audio interfaces that do not support VoiceProcessingIO fall back cleanly.
+      }
+      configured = true
+    }
+    if !engine.isRunning {
+      engine.prepare()
+      try engine.start()
+    }
+  }
+
+  func onListen(withArguments arguments: Any?, eventSink events: @escaping FlutterEventSink) -> FlutterError? {
+    self.eventSink = events
+    do {
+      try ensureEngineRunning()
+      installMicTapIfNeeded()
+      return nil
+    } catch {
+      return FlutterError(
+        code: "AEC_ENGINE_ERROR",
+        message: "Failed to start macOS voice processing audio engine: \(error.localizedDescription)",
+        details: nil
+      )
+    }
+  }
+
+  func onCancel(withArguments arguments: Any?) -> FlutterError? {
+    self.eventSink = nil
+    removeMicTap()
+    return nil
+  }
+
+  private func installMicTapIfNeeded() {
+    guard !micTapInstalled else { return }
+    let input = engine.inputNode
+    input.removeTap(onBus: 0)
+    resamplePos = 0.0
+    // Passing `format: nil` uses `input.outputFormat(forBus: 0)` (the post-AEC
+    // output bus of VoiceProcessingIO), avoiding multi-channel input format mismatches.
+    input.installTap(onBus: 0, bufferSize: 1024, format: nil) { [weak self] buffer, _ in
+      self?.handleMicBuffer(buffer)
+    }
+    micTapInstalled = true
+  }
+
+  private func removeMicTap() {
+    guard micTapInstalled else { return }
+    engine.inputNode.removeTap(onBus: 0)
+    micTapInstalled = false
+  }
+
+  private func handleMicBuffer(_ buffer: AVAudioPCMBuffer) {
+    guard eventSink != nil else { return }
+    let frameLen = Int(buffer.frameLength)
+    guard frameLen > 0 else { return }
+    let inRate = buffer.format.sampleRate
+    guard inRate > 0 else { return }
+
+    // Extract channel 0 (the primary beamformed, echo-cancelled voice channel) as Float32
+    var mono = [Float](repeating: 0, count: frameLen)
+    if let floatData = buffer.floatChannelData {
+      let ch0 = floatData[0]
+      for i in 0..<frameLen {
+        mono[i] = ch0[i]
+      }
+    } else if let int16Data = buffer.int16ChannelData {
+      let ch0 = int16Data[0]
+      for i in 0..<frameLen {
+        mono[i] = Float(ch0[i]) / 32768.0
+      }
+    } else {
+      return
+    }
+
+    // Resample from `inRate` (e.g. 48000 / 44100 Hz) to 16000 Hz s16le PCM
+    let step = inRate / 16000.0
+    var outBytes = Data()
+    outBytes.reserveCapacity(Int(Double(frameLen) / step + 2) * 2)
+
+    var pos = resamplePos
+    while Int(pos) < frameLen {
+      let idx = Int(pos)
+      let frac = Float(pos - Double(idx))
+      let s0 = mono[idx]
+      let s1 = (idx + 1 < frameLen) ? mono[idx + 1] : s0
+      let sample = s0 + (s1 - s0) * frac
+      let clamped = max(-1.0, min(1.0, sample))
+      let pcm16 = Int16(clamped * 32767.0)
+      var le = pcm16.littleEndian
+      withUnsafeBytes(of: &le) { ptr in
+        outBytes.append(contentsOf: ptr)
+      }
+      pos += step
+    }
+    resamplePos = pos - Double(frameLen)
+
+    if !outBytes.isEmpty {
+      DispatchQueue.main.async { [weak self] in
+        self?.eventSink?(FlutterStandardTypedData(bytes: outBytes))
+      }
+    }
+  }
+
+  private func resetPlayer() {
+    lock.lock()
+    scheduledFrames = 0
+    completedFrames = 0
+    lock.unlock()
+    if playerNode.isPlaying {
+      playerNode.stop()
+    }
+  }
+
+  private func writeTts(pcmData: Data) -> Int {
+    let sampleCount = pcmData.count / 2
+    guard sampleCount > 0 else { return currentHead() }
+    do {
+      try ensureEngineRunning()
+    } catch {
+      return currentHead()
+    }
+
+    guard let pcmBuffer = AVAudioPCMBuffer(
+      pcmFormat: ttsFormat,
+      frameCapacity: AVAudioFrameCount(sampleCount)
+    ), let dst = pcmBuffer.floatChannelData?[0] else {
+      return currentHead()
+    }
+    pcmBuffer.frameLength = AVAudioFrameCount(sampleCount)
+
+    pcmData.withUnsafeBytes { rawPtr in
+      guard let base = rawPtr.baseAddress?.assumingMemoryBound(to: Int16.self) else { return }
+      for i in 0..<sampleCount {
+        let s = Int16(littleEndian: base[i])
+        dst[i] = Float(s) / 32768.0
+      }
+    }
+
+    lock.lock()
+    scheduledFrames += sampleCount
+    lock.unlock()
+
+    playerNode.scheduleBuffer(pcmBuffer) { [weak self] in
+      guard let self = self else { return }
+      self.lock.lock()
+      self.completedFrames += sampleCount
+      self.lock.unlock()
+    }
+    if !playerNode.isPlaying {
+      playerNode.play()
+    }
+    return currentHead()
+  }
+
+  private func currentHead() -> Int {
+    lock.lock()
+    let done = completedFrames
+    let total = scheduledFrames
+    lock.unlock()
+    if playerNode.isPlaying,
+       let nodeTime = playerNode.lastRenderTime,
+       let playerTime = playerNode.playerTime(forNodeTime: nodeTime) {
+      let hwSample = Int(playerTime.sampleTime)
+      if hwSample > 0 {
+        return min(total, max(done, hwSample))
+      }
+    }
+    return min(total, done)
+  }
+
+  private func setVolume(_ vol: Double) {
+    playerNode.volume = Float(max(0.0, min(1.0, vol)))
+  }
+
+  private func stopTts() {
+    if playerNode.isPlaying {
+      playerNode.stop()
+    }
+    lock.lock()
+    completedFrames = scheduledFrames
+    lock.unlock()
   }
 }
 

@@ -62,7 +62,7 @@ class Pills<T> extends StatelessWidget {
         padding: const EdgeInsets.all(4),
         decoration: BoxDecoration(
           color: AppColors.surface1,
-          borderRadius: BorderRadius.circular(R.md),
+          borderRadius: BorderRadius.circular(22),
           boxShadow: [
             BoxShadow(
                 color: AppColors.fg1.withValues(alpha: 0.08), spreadRadius: 1),
@@ -87,7 +87,7 @@ class Pills<T> extends StatelessWidget {
                     color: selected == val
                         ? AppColors.surface3
                         : Colors.transparent,
-                    borderRadius: BorderRadius.circular(R.sm),
+                    borderRadius: BorderRadius.circular(18),
                   ),
                   child: _label(
                       val,
@@ -621,7 +621,7 @@ class Btn extends StatelessWidget {
     // composer and every dialog footer. Desktop keeps the compact 28/34 so a
     // mouse-sized toolbar does not grow.
     final h = small ? (kMobile ? 36.0 : 28.0) : (kMobile ? 46.0 : 34.0);
-    final radius = small ? R.sm : R.md;
+    final radius = kMobile ? R.pill : (small ? R.sm : R.md);
     final child = Row(
       mainAxisSize: full ? MainAxisSize.max : MainAxisSize.min,
       mainAxisAlignment: MainAxisAlignment.center,
@@ -692,10 +692,10 @@ class PillBtn extends StatelessWidget {
         enabled: onTap != null,
         child: Material(
           color: AppColors.accentFill,
-          borderRadius: BorderRadius.circular(R.md),
+          borderRadius: BorderRadius.circular(kMobile ? R.pill : R.md),
           child: InkWell(
             onTap: onTap,
-            borderRadius: BorderRadius.circular(R.md),
+            borderRadius: BorderRadius.circular(kMobile ? R.pill : R.md),
             child: Container(
               height: kMobile ? 48 : 36,
               padding: EdgeInsets.symmetric(horizontal: kMobile ? 20 : 16),

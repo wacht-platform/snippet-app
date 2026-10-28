@@ -249,11 +249,11 @@ class _CheckpointTimelineState extends State<_CheckpointTimeline> {
         child: Material(
           color: filled ? AppColors.surface2 : Colors.transparent,
           shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(R.sm),
+              borderRadius: BorderRadius.circular(kMobile ? R.pill : R.sm),
               side: BorderSide(
                   color: filled ? Colors.transparent : AppColors.line)),
           child: InkWell(
-            borderRadius: BorderRadius.circular(R.sm),
+            borderRadius: BorderRadius.circular(kMobile ? R.pill : R.sm),
             onTap: onTap,
             child: Container(
               height: 24,

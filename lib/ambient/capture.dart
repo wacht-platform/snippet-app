@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:record/record.dart';
 import 'package:silero_vad/silero_vad.dart';
 
@@ -89,7 +90,10 @@ class AmbientCapture {
 
   AmbientStatus get current => AmbientStatus(
         running: _running,
-        speaking: _gate?.speaking ?? false,
+        speaking: (defaultTargetPlatform == TargetPlatform.android ||
+                defaultTargetPlatform == TargetPlatform.macOS)
+            ? (_gate?.speaking ?? false)
+            : (_playOn ? _ducked : (_gate?.speaking ?? false)),
         probability: _probability,
         segments: _segments,
         pending: uploader.pending.value,
@@ -120,15 +124,23 @@ class AmbientCapture {
       onFrame: uploader.gateFrame,
       onClose: uploader.gateClose,
     );
-    final stream = await _recorder.startStream(RecordConfig(
-        encoder: AudioEncoder.pcm16bits,
-        sampleRate: 16000,
-        numChannels: 1,
-        audioInterruption: AudioInterruptionMode.none,
-        echoCancel: !kMacOS,
-        noiseSuppress: !kMacOS,
-        androidConfig: const AndroidRecordConfig(
-            audioSource: AndroidAudioSource.voiceCommunication)));
+    Stream<Uint8List> stream;
+    if (kMacOS) {
+      stream = const EventChannel('snippet/macos_aec_mic')
+          .receiveBroadcastStream()
+          .where((event) => event is Uint8List)
+          .cast<Uint8List>();
+    } else {
+      stream = await _recorder.startStream(RecordConfig(
+          encoder: AudioEncoder.pcm16bits,
+          sampleRate: 16000,
+          numChannels: 1,
+          audioInterruption: AudioInterruptionMode.none,
+          echoCancel: true,
+          noiseSuppress: true,
+          androidConfig: const AndroidRecordConfig(
+              audioSource: AndroidAudioSource.voiceCommunication)));
+    }
     _running = true;
     _error = null;
     _sub = stream.listen(_onAudio, onError: (Object e) {
@@ -249,15 +261,16 @@ class AmbientCapture {
       if (rms > 0.0004 && _probability < 0.3) _loudQuiet++;
       gate.addFrame(frame, _probability);
       final voiced = _probability >= threshold;
-      if (defaultTargetPlatform == TargetPlatform.android) {
+      if (defaultTargetPlatform == TargetPlatform.android ||
+          defaultTargetPlatform == TargetPlatform.macOS) {
         _duckCheck(voiced);
       } else if (_playOn) {
         if (_echoRms == 0) {
-          _echoRms = rms > 0.0001 ? rms : 0.0005;
-        } else if (!voiced || rms <= _echoRms * 2.0) {
-          _echoRms = _echoRms * 0.92 + rms * 0.08;
+          _echoRms = rms > 0.0002 ? rms : 0.0008;
+        } else if (!voiced || rms <= _echoRms * 2.2) {
+          _echoRms = _echoRms * 0.90 + rms * 0.10;
         }
-        final bargeVoiced = voiced && rms > _echoRms * 2.4 && rms > 0.0015;
+        final bargeVoiced = voiced && rms > _echoRms * 2.8 && rms > 0.003;
         _duckCheck(bargeVoiced);
       } else {
         _echoRms = 0;
@@ -321,7 +334,9 @@ class AmbientCapture {
     _callOn = false;
     _statTimer?.cancel();
     await _sub?.cancel();
-    await _recorder.stop();
+    if (!kMacOS) {
+      await _recorder.stop();
+    }
     _gate?.close();
     unawaited(_audio.leave().catchError((_) {}));
     _vad?.close();

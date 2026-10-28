@@ -305,13 +305,13 @@ class SettingsPill extends StatelessWidget {
   Widget build(BuildContext context) => Material(
         color: danger ? Colors.transparent : AppColors.surface2,
         shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(R.sm),
+            borderRadius: BorderRadius.circular(kMobile ? R.pill : R.sm),
             side: BorderSide(
                 color: danger
                     ? AppColors.danger.withValues(alpha: 0.3)
                     : Colors.transparent)),
         child: InkWell(
-          borderRadius: BorderRadius.circular(R.sm),
+          borderRadius: BorderRadius.circular(kMobile ? R.pill : R.sm),
           onTap: onTap,
           child: Container(
             height: 28,
