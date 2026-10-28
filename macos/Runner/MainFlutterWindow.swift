@@ -263,7 +263,7 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
           let subtitle = args["subtitle"] as? String ?? ""
           let kind = args["kind"] as? String ?? ""
           let payload = args["payload"] as? String ?? ""
-          let isMinimizedOrHidden = !self.isVisible || self.isMiniaturized || !NSApp.isActive
+          let isMinimizedOrHidden = !self.isVisible || self.isMiniaturized
           if isMinimizedOrHidden {
             self.notchHUD?.presentNotification(
               title: title,
@@ -574,9 +574,16 @@ final class NotchHUDController {
 
   func setWindowHidden(_ hidden: Bool) {
     windowHidden = hidden
-    if !hidden && conversationExpanded {
-      collapseConversation()
-      return
+    if !hidden {
+      notifDismissTimer?.invalidate()
+      notifTitle = nil
+      notifSubtitle = nil
+      notifKind = nil
+      notifPayload = nil
+      if conversationExpanded {
+        collapseConversation()
+        return
+      }
     }
     refreshHUD(animated: true)
   }
@@ -691,8 +698,8 @@ final class NotchHUDController {
 
   private func refreshHUD(animated: Bool) {
     let hasNotif = notifTitle != nil
-    let showAmbient = ambientActive && (windowHidden || assistantSpeaking || userSpeaking)
-    let shouldShow = conversationExpanded || hasNotif || showAmbient
+    let showAmbient = windowHidden && ambientActive
+    let shouldShow = windowHidden && (conversationExpanded || hasNotif || showAmbient)
 
     if !shouldShow {
       waveTimer?.invalidate()
