@@ -16,7 +16,7 @@ extension _DesktopShellPanesExt on _DesktopShellState {
       final origin = t.readoutOrigin;
       return Container(
         key: ValueKey('body-${t.key}'),
-        color: AppColors.bg,
+        color: kMobile ? AppColors.bg : Colors.transparent,
         child: _rightTabBody(
             t.readout!,
             origin == null ? null : _macSessionStatuses[origin]?.state,

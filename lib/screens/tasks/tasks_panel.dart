@@ -408,7 +408,7 @@ class TasksPanelState extends State<TasksPanel> {
       );
     }
     return ColoredBox(
-      color: kMobile ? AppColors.bg : AppColors.windowBg,
+      color: kMobile ? AppColors.bg : Colors.transparent,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [

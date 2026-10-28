@@ -321,7 +321,7 @@ class _PullRequestsScreenState extends State<PullRequestsScreen> {
     }
     final prs = _prs;
     return Material(
-      color: AppColors.bg,
+      color: kMobile ? AppColors.bg : Colors.transparent,
       child: SafeArea(
         bottom: false,
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [

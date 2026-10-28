@@ -69,7 +69,7 @@ class _DesktopMissionControlState extends State<DesktopMissionControl> {
   Widget build(BuildContext context) {
     final state = ChangeNotifierProvider.of<MissionControlState>(context);
     return Scaffold(
-      backgroundColor: readingBg,
+      backgroundColor: Colors.transparent,
       body: SafeArea(
         child: Column(
           children: [

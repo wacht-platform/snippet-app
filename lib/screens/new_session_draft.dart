@@ -225,7 +225,7 @@ class _NewSessionDraftState extends State<NewSessionDraft> {
     final current = _profiles.where((p) => p.name == _profile).firstOrNull;
     final canSend = !_starting && _input.text.trim().isNotEmpty;
     return Container(
-      color: AppColors.bg,
+      color: kMobile ? AppColors.bg : Colors.transparent,
       child: LayoutBuilder(
         builder: (context, box) => SingleChildScrollView(
           child: ConstrainedBox(

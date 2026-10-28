@@ -45,7 +45,7 @@ class MissionControlHeader extends StatelessWidget {
     return Container(
       padding: EdgeInsets.fromLTRB(_compact ? 12 : 16, 10, 8, 10),
       decoration: BoxDecoration(
-        color: readingBg,
+        color: kMobile ? readingBg : Colors.transparent,
         border: Border(bottom: BorderSide(color: AppColors.border)),
       ),
       child: Row(children: [

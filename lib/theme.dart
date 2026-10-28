@@ -271,31 +271,35 @@ ThemePreset get currentTheme => ThemeManager.instance.current;
 class AppColors {
   // Surfaces
   static Color get bg =>
-      kMobile ? currentTheme.bg : currentTheme.bg.withValues(alpha: 0.90);
+      kMobile ? currentTheme.bg : currentTheme.bg.withValues(alpha: 0.62);
   static Color get canvas => kMobile
       ? currentTheme.canvas
-      : currentTheme.canvas.withValues(alpha: 0.88);
+      : currentTheme.canvas.withValues(alpha: 0.66);
   static Color get floor =>
-      kMobile ? currentTheme.floor : currentTheme.floor.withValues(alpha: 0.90);
-  static Color get surface1 => currentTheme.surface1;
-  static Color get surface2 => currentTheme.surface2;
+      kMobile ? currentTheme.floor : currentTheme.floor.withValues(alpha: 0.62);
+  static Color get surface1 => kMobile
+      ? currentTheme.surface1
+      : currentTheme.surface1.withValues(alpha: 0.76);
+  static Color get surface2 => kMobile
+      ? currentTheme.surface2
+      : currentTheme.surface2.withValues(alpha: 0.80);
   static Color get surface3 => currentTheme.surface3;
 
   static Color get base => bg;
-  static Color get raised => currentTheme.surface1;
-  static Color get overlay => currentTheme.surface2;
+  static Color get raised => surface1;
+  static Color get overlay => surface2;
   static Color get hover => currentTheme.surface3;
   static Color get line => currentTheme.border;
   static Color get lineStrong => currentTheme.border2;
 
   static const Color scrim = Color(0x99000000);
   static Color get windowBg =>
-      kMobile ? currentTheme.bg : const Color(0xD90D0C0B);
+      kMobile ? currentTheme.bg : const Color(0x8A0D0C0B);
   static Color get sidebarPanel =>
-      kMobile ? const Color(0xFF171513) : const Color(0xE0171513);
+      kMobile ? const Color(0xFF171513) : const Color(0x99171513);
   static Color get glassSurface => kMobile
       ? currentTheme.surface2
-      : currentTheme.surface2.withValues(alpha: 0.86);
+      : currentTheme.surface2.withValues(alpha: 0.74);
   static Color get glassBorder => currentTheme.border;
 
   // Foreground

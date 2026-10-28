@@ -1234,7 +1234,7 @@ class _GitFileDiffViewState extends State<GitFileDiffView> {
     ]);
 
     if (widget.embedded) {
-      return ColoredBox(color: readingBg, child: body);
+      return kMobile ? ColoredBox(color: readingBg, child: body) : body;
     }
     return Scaffold(
       backgroundColor: readingBg,

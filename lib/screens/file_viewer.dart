@@ -296,7 +296,8 @@ class _FileViewerState extends State<FileViewer> {
       ],
     ];
     return Scaffold(
-      backgroundColor: readingBg,
+      backgroundColor:
+          widget.embedded && !kMobile ? Colors.transparent : readingBg,
       body: SafeArea(
         bottom: false,
         child: Column(children: [

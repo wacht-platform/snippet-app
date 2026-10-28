@@ -430,7 +430,7 @@ class PaneStrip extends StatelessWidget {
     final compact = !kMobile;
     return Container(
       height: compact ? 38 : 46,
-      color: readingBg,
+      color: kMobile ? readingBg : Colors.transparent,
       child: Stack(fit: StackFit.expand, children: [
         LayoutBuilder(builder: (context, c) {
           final fit = kPaneTabWidth(c.maxWidth - 12, count);

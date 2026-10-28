@@ -8,24 +8,29 @@ class MainFlutterWindow: NSWindow {
 
   override func awakeFromNib() {
     let flutterViewController = FlutterViewController()
+    flutterViewController.backgroundColor = .clear
     self.contentViewController = flutterViewController
     // Floor for resizing: sidebar, a readable chat column and the session's
     // file tree side by side. Below this the desktop layout clips.
     self.minSize = NSSize(width: 1100, height: 700)
     self.isOpaque = false
     self.backgroundColor = .clear
-    flutterViewController.backgroundColor = .clear
     self.appearance = NSAppearance(named: .darkAqua)
 
-    let blurView = NSVisualEffectView(frame: flutterViewController.view.bounds)
-    blurView.autoresizingMask = [.width, .height]
+    let wrapper = flutterViewController.view
+    let blurView = NSVisualEffectView()
+    blurView.translatesAutoresizingMaskIntoConstraints = false
     blurView.blendingMode = .behindWindow
-    blurView.material = .underWindowBackground
+    blurView.material = .hudWindow
     blurView.state = .active
     blurView.appearance = NSAppearance(named: .darkAqua)
-    blurView.wantsLayer = true
-    blurView.layer?.zPosition = -1000
-    flutterViewController.view.addSubview(blurView, positioned: .below, relativeTo: nil)
+    wrapper.addSubview(blurView, positioned: .below, relativeTo: nil)
+    NSLayoutConstraint.activate([
+      blurView.leadingAnchor.constraint(equalTo: wrapper.leadingAnchor),
+      blurView.trailingAnchor.constraint(equalTo: wrapper.trailingAnchor),
+      blurView.topAnchor.constraint(equalTo: wrapper.topAnchor),
+      blurView.bottomAnchor.constraint(equalTo: wrapper.bottomAnchor),
+    ])
 
     // Use the native traffic lights, but let Flutter paint a cohesive title
     // surface beneath them instead of leaving a separate blank title strip.
@@ -59,6 +64,7 @@ class MainFlutterWindow: NSWindow {
 
     self.isOpaque = false
     self.backgroundColor = .clear
+    flutterViewController.backgroundColor = .clear
     self.appearance = NSAppearance(named: .darkAqua)
 
     // AppKit sizes the native titlebar for a ~28pt band and centres the traffic
