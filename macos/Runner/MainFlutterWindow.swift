@@ -243,23 +243,36 @@ enum MochiRenderer {
     ctx.restoreGState()
   }
 
-  /// Creates the animated Snippet Mochi icon frame for the macOS menu bar.
-  static func makeMenuBarIcon(playTime: Double) -> NSImage {
+  /// Pre-rendered 60fps frame table (84 frames = 1.4s loop at 60fps) so the menu bar
+  /// animates at a locked 60fps with zero per-frame CGPath/NSImage allocation.
+  private static let menuBarFrames: [NSImage] = {
+    let count = 84
+    let period = 1.4
     let size = NSSize(width: 20, height: 20)
-    let image = NSImage(size: size, flipped: false) { rect in
+    return (0..<count).map { i in
+      let t = (Double(i) / Double(count)) * period
+      let img = NSImage(size: size)
+      img.lockFocus()
       drawMochi(
-        in: rect.insetBy(dx: 1.0, dy: 1.0),
+        in: NSRect(origin: .zero, size: size).insetBy(dx: 1.0, dy: 1.0),
         bodyColor: NSColor(srgbRed: 0.725, green: 0.776, blue: 1.0, alpha: 1.0),
         leafColor: NSColor(srgbRed: 0.498, green: 0.820, blue: 0.651, alpha: 1.0),
         eyeColor: NSColor(srgbRed: 0.082, green: 0.086, blue: 0.110, alpha: 1.0),
         blushColor: NSColor(srgbRed: 0.949, green: 0.655, blue: 0.627, alpha: 0.90),
         cutoutEyes: false,
-        playTime: playTime
+        playTime: t
       )
-      return true
+      img.unlockFocus()
+      img.isTemplate = false
+      return img
     }
-    image.isTemplate = false
-    return image
+  }()
+
+  static func makeMenuBarIcon(playTime: Double) -> NSImage {
+    let period = 1.4
+    let norm = (playTime.truncatingRemainder(dividingBy: period)) / period
+    let idx = max(0, min(menuBarFrames.count - 1, Int(norm * Double(menuBarFrames.count))))
+    return menuBarFrames[idx]
   }
 }
 
@@ -473,7 +486,7 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
     backdropTimer = Timer.scheduledTimer(withTimeInterval: 0.75, repeats: true) { [weak self] _ in
       self?.updateBackdropTransparency()
     }
-    menuMochiTimer = Timer.scheduledTimer(withTimeInterval: 0.06, repeats: true) { [weak self] _ in
+    menuMochiTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { [weak self] _ in
       guard let self = self else { return }
       self.statusItem?.button?.image = MochiRenderer.makeMenuBarIcon(
         playTime: CACurrentMediaTime()
@@ -1620,12 +1633,18 @@ final class NotchHUDController {
       panel.setFrame(targetFrame, display: true)
     }
 
-    if waveTimer == nil {
-      let timer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] _ in
-        self?.hudView.stepAnimation()
+    let needsWaveTimer = !conversationExpanded && (ambientActive || assistantSpeaking || userSpeaking)
+    if needsWaveTimer {
+      if waveTimer == nil {
+        let timer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { [weak self] _ in
+          self?.hudView.stepAnimation()
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        waveTimer = timer
       }
-      RunLoop.main.add(timer, forMode: .common)
-      waveTimer = timer
+    } else {
+      waveTimer?.invalidate()
+      waveTimer = nil
     }
   }
 }
@@ -2010,10 +2029,20 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
   }
 
   func stepAnimation() {
-    phase += 0.22
-    if !conversationExpanded {
-      needsDisplay = true
+    phase += 0.08
+    guard !conversationExpanded && (ambientActive || assistantSpeaking || userSpeaking) else {
+      return
     }
+    // Invalidate only the right-wing waveform rect instead of repainting the entire Notch
+    let b = bounds
+    let cameraRight = b.midX + hwNotchWidth / 2
+    let waveRect = NSRect(
+      x: cameraRight,
+      y: b.maxY - hwNotchHeight,
+      width: max(24, b.maxX - cameraRight),
+      height: hwNotchHeight
+    )
+    setNeedsDisplay(waveRect)
   }
 
   override func mouseDown(with event: NSEvent) {
@@ -2143,8 +2172,7 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
         bodyColor: userSpeaking ? matcha : periwinkle,
         leafColor: matcha,
         eyeColor: ink,
-        blushColor: blush,
-        playTime: now
+        blushColor: blush
       )
       let titleX = mochiRect.maxX + 6
       let titleW = max(20, cameraLeft - titleX - 6)
@@ -2171,8 +2199,7 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
         bodyColor: userSpeaking ? matcha : periwinkle,
         leafColor: matcha,
         eyeColor: ink,
-        blushColor: blush,
-        playTime: now
+        blushColor: blush
       )
     }
 
