@@ -469,7 +469,32 @@ class MacosNotch {
         }
         messages.add({'role': 'user', 'text': text});
       } else if (kind == 'assistant_text' || kind == 'assistant') {
-        final text = ((e['text'] as String?) ?? '').trim();
+        var text = ((e['text'] as String?) ?? '').trim();
+        final idx = state.events.indexOf(e);
+        if (idx > 0) {
+          for (var j = idx - 1; j >= 0; j--) {
+            final jk = state.events[j]['kind'] as String? ?? '';
+            if (jk == 'user_input' || jk == 'steer') break;
+            if (jk == 'tool_call') {
+              final tool = (state.events[j]['tool_name'] as String?) ?? '';
+              if (tool == 'speak' ||
+                  tool == 'ambient_speak' ||
+                  tool.endsWith('__speak')) {
+                final args = state.events[j]['arguments'];
+                final spoken =
+                    args is Map ? '${args['text'] ?? ''}'.trim() : '';
+                if (spoken.isNotEmpty) {
+                  if (text == spoken) {
+                    text = '';
+                    break;
+                  } else if (text.startsWith(spoken)) {
+                    text = text.substring(spoken.length).trimLeft();
+                  }
+                }
+              }
+            }
+          }
+        }
         if (text.isNotEmpty) {
           messages.add({'role': 'assistant', 'text': text});
         }
@@ -480,34 +505,11 @@ class MacosNotch {
             tool.endsWith('__speak')) {
           final args = e['arguments'];
           final spoken = args is Map ? '${args['text'] ?? ''}'.trim() : '';
-          final idx = state.events.indexOf(e);
-          var turnHasAssistantText = false;
-          if (idx >= 0) {
-            for (var j = idx + 1; j < state.events.length; j++) {
-              final jk = state.events[j]['kind'] as String? ?? '';
-              if (jk == 'user_input' || jk == 'steer') break;
-              if ((jk == 'assistant_text' || jk == 'assistant') &&
-                  '${state.events[j]['text'] ?? ''}'.trim().isNotEmpty) {
-                turnHasAssistantText = true;
-                break;
-              }
-            }
-            if (!turnHasAssistantText) {
-              for (var j = idx - 1; j >= 0; j--) {
-                final jk = state.events[j]['kind'] as String? ?? '';
-                if (jk == 'user_input' || jk == 'steer') break;
-                if ((jk == 'assistant_text' || jk == 'assistant') &&
-                    '${state.events[j]['text'] ?? ''}'.trim().isNotEmpty) {
-                  turnHasAssistantText = true;
-                  break;
-                }
-              }
-            }
-          }
-          if (spoken.isNotEmpty && !turnHasAssistantText) {
+          if (spoken.isNotEmpty) {
             messages.add({
               'role': 'assistant',
               'text': spoken,
+              'meta': 'Said aloud',
             });
           }
         }

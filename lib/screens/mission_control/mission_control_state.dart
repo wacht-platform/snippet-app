@@ -802,7 +802,28 @@ List<FeedItem> feedItemsFromEvents(List<Map<String, dynamic>> events) {
         }
         out.add(UserMessageItem(id: 'h-u-$i', timestamp: now, text: text));
       case 'assistant_text':
-        final text = (e['text'] ?? '').toString().trim();
+        var text = (e['text'] ?? '').toString().trim();
+        for (var j = i - 1; j >= 0; j--) {
+          final jk = events[j]['kind'] as String? ?? '';
+          if (jk == 'user_input' || jk == 'steer') break;
+          if (jk == 'tool_call') {
+            final tool = (events[j]['tool_name'] ?? '').toString();
+            if (tool == 'speak' ||
+                tool == 'ambient_speak' ||
+                tool.endsWith('__speak')) {
+              final args = events[j]['arguments'];
+              final spoken = args is Map ? '${args['text'] ?? ''}'.trim() : '';
+              if (spoken.isNotEmpty) {
+                if (text == spoken) {
+                  text = '';
+                  break;
+                } else if (text.startsWith(spoken)) {
+                  text = text.substring(spoken.length).trimLeft();
+                }
+              }
+            }
+          }
+        }
         if (text.isEmpty) break;
         out.add(AgentTextItem(id: 'h-a-$i', timestamp: now, text: text));
       case 'tool_call':
@@ -812,28 +833,7 @@ List<FeedItem> feedItemsFromEvents(List<Map<String, dynamic>> events) {
             tool.endsWith('__speak')) {
           final args = e['arguments'];
           final spoken = args is Map ? '${args['text'] ?? ''}'.trim() : '';
-          var turnHasAssistantText = false;
-          for (var j = i + 1; j < events.length; j++) {
-            final jk = events[j]['kind'] as String? ?? '';
-            if (jk == 'user_input' || jk == 'steer') break;
-            if (jk == 'assistant_text' &&
-                '${events[j]['text'] ?? ''}'.trim().isNotEmpty) {
-              turnHasAssistantText = true;
-              break;
-            }
-          }
-          if (!turnHasAssistantText) {
-            for (var j = i - 1; j >= 0; j--) {
-              final jk = events[j]['kind'] as String? ?? '';
-              if (jk == 'user_input' || jk == 'steer') break;
-              if (jk == 'assistant_text' &&
-                  '${events[j]['text'] ?? ''}'.trim().isNotEmpty) {
-                turnHasAssistantText = true;
-                break;
-              }
-            }
-          }
-          if (spoken.isNotEmpty && !turnHasAssistantText) {
+          if (spoken.isNotEmpty) {
             out.add(AgentTextItem(id: 'h-s-$i', timestamp: now, text: spoken));
           }
         }

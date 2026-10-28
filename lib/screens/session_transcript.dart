@@ -184,30 +184,7 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
             endTools(key);
             final args = e['arguments'];
             final spoken = args is Map ? _s(args['text']).trim() : '';
-            // If this turn also emits an `assistant_text`, skip the SpeakCard
-            // so the same spoken reply is not rendered twice in the transcript.
-            var turnHasAssistantText = false;
-            for (var j = idx + 1; j < events.length; j++) {
-              final jk = events[j]['kind'] as String? ?? '';
-              if (jk == 'user_input' || jk == 'steer') break;
-              if (jk == 'assistant_text' &&
-                  _s(events[j]['text']).trim().isNotEmpty) {
-                turnHasAssistantText = true;
-                break;
-              }
-            }
-            if (!turnHasAssistantText) {
-              for (var j = idx - 1; j >= 0; j--) {
-                final jk = events[j]['kind'] as String? ?? '';
-                if (jk == 'user_input' || jk == 'steer') break;
-                if (jk == 'assistant_text' &&
-                    _s(events[j]['text']).trim().isNotEmpty) {
-                  turnHasAssistantText = true;
-                  break;
-                }
-              }
-            }
-            if (spoken.isNotEmpty && !turnHasAssistantText) {
+            if (spoken.isNotEmpty) {
               addEvent(
                   key,
                   SpeakCard(
@@ -341,12 +318,32 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
               ));
         case 'assistant_text':
           endTools(key);
-          final reply = _s(e['text']);
+          var reply = _s(e['text']).trim();
           if (idx + 1 < events.length &&
               events[idx + 1]['kind'] == 'model_error' &&
-              _s(events[idx + 1]['message']).trim() == reply.trim()) {
+              _s(events[idx + 1]['message']).trim() == reply) {
             break;
           }
+          // Always keep SpeakCard ("Said aloud" voice bubble) visible; if this
+          // assistant_text merely repeats what a SpeakCard in the same turn
+          // already spoke, strip or skip the duplicate text on assistant_text.
+          for (var j = idx - 1; j >= 0; j--) {
+            final jk = events[j]['kind'] as String? ?? '';
+            if (jk == 'user_input' || jk == 'steer') break;
+            if (jk == 'tool_call' && _isSpeakTool(_s(events[j]['tool_name']))) {
+              final args = events[j]['arguments'];
+              final spoken = args is Map ? _s(args['text']).trim() : '';
+              if (spoken.isNotEmpty) {
+                if (reply == spoken) {
+                  reply = '';
+                  break;
+                } else if (reply.startsWith(spoken)) {
+                  reply = reply.substring(spoken.length).trimLeft();
+                }
+              }
+            }
+          }
+          if (reply.isEmpty) break;
           addEvent(
               key,
               Padding(
