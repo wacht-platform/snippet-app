@@ -154,6 +154,9 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
   private var notchHUD: NotchHUDController?
   private var notchChannel: FlutterMethodChannel?
   private var aecEngine: MacosVoiceProcessingEngine?
+  private var blurView: NSVisualEffectView?
+  private var backdropTimer: Timer?
+  private var isBackdropOpaque = false
   private var allowTerminate = false
 
   override func awakeFromNib() {
@@ -169,19 +172,20 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
     self.delegate = self
 
     let wrapper = flutterViewController.view
-    let blurView = NSVisualEffectView()
-    blurView.translatesAutoresizingMaskIntoConstraints = false
-    blurView.blendingMode = .behindWindow
-    blurView.material = .hudWindow
-    blurView.state = .active
-    blurView.appearance = NSAppearance(named: .darkAqua)
-    wrapper.addSubview(blurView, positioned: .below, relativeTo: nil)
+    let blur = NSVisualEffectView()
+    blur.translatesAutoresizingMaskIntoConstraints = false
+    blur.blendingMode = .behindWindow
+    blur.material = .hudWindow
+    blur.state = .active
+    blur.appearance = NSAppearance(named: .darkAqua)
+    wrapper.addSubview(blur, positioned: .below, relativeTo: nil)
     NSLayoutConstraint.activate([
-      blurView.leadingAnchor.constraint(equalTo: wrapper.leadingAnchor),
-      blurView.trailingAnchor.constraint(equalTo: wrapper.trailingAnchor),
-      blurView.topAnchor.constraint(equalTo: wrapper.topAnchor),
-      blurView.bottomAnchor.constraint(equalTo: wrapper.bottomAnchor),
+      blur.leadingAnchor.constraint(equalTo: wrapper.leadingAnchor),
+      blur.trailingAnchor.constraint(equalTo: wrapper.trailingAnchor),
+      blur.topAnchor.constraint(equalTo: wrapper.topAnchor),
+      blur.bottomAnchor.constraint(equalTo: wrapper.bottomAnchor),
     ])
+    self.blurView = blur
 
     // Use the native traffic lights, but let Flutter paint a cohesive title
     // surface beneath them instead of leaving a separate blank title strip.
@@ -311,6 +315,9 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
     centreTrafficLights()
     let events: [Notification.Name] = [
       NSWindow.didResizeNotification,
+      NSWindow.didMoveNotification,
+      NSWindow.didBecomeKeyNotification,
+      NSWindow.didResignKeyNotification,
       NSWindow.didEnterFullScreenNotification,
       NSWindow.didExitFullScreenNotification,
     ]
@@ -322,14 +329,34 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
         object: self)
     }
 
+    NSWorkspace.shared.notificationCenter.addObserver(
+      self,
+      selector: #selector(onWindowLayoutChanged),
+      name: NSWorkspace.didActivateApplicationNotification,
+      object: nil
+    )
+    NSWorkspace.shared.notificationCenter.addObserver(
+      self,
+      selector: #selector(onWindowLayoutChanged),
+      name: NSWorkspace.activeSpaceDidChangeNotification,
+      object: nil
+    )
+
     NotificationCenter.default.addObserver(
       self,
       selector: #selector(onWillTerminate),
       name: NSApplication.willTerminateNotification,
       object: nil)
+
+    updateBackdropTransparency()
+    backdropTimer = Timer.scheduledTimer(withTimeInterval: 0.75, repeats: true) { [weak self] _ in
+      self?.updateBackdropTransparency()
+    }
   }
 
   deinit {
+    backdropTimer?.invalidate()
+    NSWorkspace.shared.notificationCenter.removeObserver(self)
     NotificationCenter.default.removeObserver(self)
   }
 
@@ -443,6 +470,73 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
 
   @objc private func onWindowLayoutChanged() {
     centreTrafficLights()
+    updateBackdropTransparency()
+  }
+
+  /// Checks whether any normal on-screen application window sits behind this
+  /// window's frame. When only the desktop wallpaper is behind Snippet, vibrancy
+  /// and transparency stay active; when another window is behind us, the window
+  /// switches to a solid opaque carbon backing so nothing bleeds through.
+  private func hasApplicationWindowBehind() -> Bool {
+    guard self.isVisible && !self.isMiniaturized && self.windowNumber > 0 else {
+      return false
+    }
+    guard let primaryScreen = NSScreen.screens.first else {
+      return false
+    }
+    let primaryH = primaryScreen.frame.height
+    let f = self.frame
+    // Convert AppKit bottom-left screen coordinates to CoreGraphics top-left screen coordinates.
+    let cgSelfRect = CGRect(
+      x: f.origin.x,
+      y: primaryH - f.maxY,
+      width: f.width,
+      height: f.height
+    ).insetBy(dx: 8, dy: 8)
+
+    let options: CGWindowListOption = [.optionOnScreenBelowWindow, .excludeDesktopElements]
+    guard let list = CGWindowListCopyWindowInfo(options, CGWindowID(self.windowNumber)) as? [[String: Any]] else {
+      return false
+    }
+    let myPid = ProcessInfo.processInfo.processIdentifier
+    for info in list {
+      guard let layer = (info[kCGWindowLayer as String] as? NSNumber)?.intValue,
+            layer == 0 else {
+        continue
+      }
+      if let pid = (info[kCGWindowOwnerPID as String] as? NSNumber)?.int32Value,
+         pid == myPid {
+        continue
+      }
+      if let alpha = (info[kCGWindowAlpha as String] as? NSNumber)?.doubleValue,
+         alpha <= 0.05 {
+        continue
+      }
+      guard let boundsDict = info[kCGWindowBounds as String] as? NSDictionary,
+            let winRect = CGRect(dictionaryRepresentation: boundsDict) else {
+        continue
+      }
+      if winRect.width < 48 || winRect.height < 48 {
+        continue
+      }
+      if cgSelfRect.intersects(winRect) {
+        return true
+      }
+    }
+    return false
+  }
+
+  private func updateBackdropTransparency() {
+    let shouldBeOpaque = hasApplicationWindowBehind()
+    guard shouldBeOpaque != isBackdropOpaque else { return }
+    isBackdropOpaque = shouldBeOpaque
+    if shouldBeOpaque {
+      blurView?.isHidden = true
+      self.backgroundColor = NSColor(srgbRed: 0x0D / 255.0, green: 0x0C / 255.0, blue: 0x0B / 255.0, alpha: 1.0)
+    } else {
+      blurView?.isHidden = false
+      self.backgroundColor = .clear
+    }
   }
 
   private func centreTrafficLights() {
