@@ -117,7 +117,7 @@ class Pills<T> extends StatelessWidget {
                       },
                 child: Container(
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
                     // Selection is a NEUTRAL surface step, not the accent. The
                     // accent is reserved for STATE (running, needs-attention), so
