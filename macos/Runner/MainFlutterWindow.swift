@@ -755,6 +755,238 @@ final class FlippedDocumentView: NSView {
   override var isFlipped: Bool { return true }
 }
 
+// MARK: - Markdown Parser & Attributed Renderer for Notch HUD
+
+enum NotchMarkdown {
+  enum Block {
+    case text(NSAttributedString)
+    case code(language: String, code: String)
+  }
+
+  /// Strips raw Markdown tokens for a clean 1-line notification banner preview.
+  static func plainPreview(_ raw: String) -> String {
+    var s = raw
+    // Convert [label](url) -> label
+    if let linkRe = try? NSRegularExpression(pattern: "\\[([^\\]]+)\\]\\([^\\)]+\\)") {
+      s = linkRe.stringByReplacingMatches(in: s, range: NSRange(s.startIndex..., in: s), withTemplate: "$1")
+    }
+    // Strip heading prefixes, fences, backticks, bold/italic markers
+    if let tokenRe = try? NSRegularExpression(pattern: "(^#+\\s*|```[a-zA-Z0-9_-]*|`+|\\*\\*+|__+)") {
+      s = tokenRe.stringByReplacingMatches(in: s, range: NSRange(s.startIndex..., in: s), withTemplate: "")
+    }
+    s = s.replacingOccurrences(of: "\n", with: " ")
+    while s.contains("  ") {
+      s = s.replacingOccurrences(of: "  ", with: " ")
+    }
+    return s.trimmingCharacters(in: .whitespacesAndNewlines)
+  }
+
+  /// Parses a Markdown message into rich text blocks and fenced code blocks.
+  static func parseBlocks(_ markdown: String, isUser: Bool) -> [Block] {
+    let normalized = markdown.replacingOccurrences(of: "\r\n", with: "\n")
+    let lines = normalized.components(separatedBy: "\n")
+    var blocks: [Block] = []
+    var proseLines: [String] = []
+    var inCode = false
+    var codeLang = ""
+    var codeLines: [String] = []
+
+    func flushProse() {
+      guard !proseLines.isEmpty else { return }
+      let joined = proseLines.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
+      proseLines.removeAll()
+      guard !joined.isEmpty else { return }
+      blocks.append(.text(renderProse(joined, isUser: isUser)))
+    }
+
+    for line in lines {
+      let trimmed = line.trimmingCharacters(in: .whitespaces)
+      if trimmed.hasPrefix("```") {
+        if inCode {
+          let codeText = codeLines.joined(separator: "\n")
+          blocks.append(.code(language: codeLang, code: codeText))
+          codeLines.removeAll()
+          codeLang = ""
+          inCode = false
+        } else {
+          flushProse()
+          inCode = true
+          codeLang = String(trimmed.dropFirst(3)).trimmingCharacters(in: .whitespaces)
+        }
+      } else if inCode {
+        codeLines.append(line)
+      } else {
+        proseLines.append(line)
+      }
+    }
+    if inCode && !codeLines.isEmpty {
+      blocks.append(.code(language: codeLang, code: codeLines.joined(separator: "\n")))
+    }
+    flushProse()
+    return blocks
+  }
+
+  private static func renderProse(_ text: String, isUser: Bool) -> NSAttributedString {
+    let result = NSMutableAttributedString()
+    let lines = text.components(separatedBy: "\n")
+    let baseColor = isUser
+      ? NSColor(srgbRed: 0.96, green: 0.96, blue: 0.98, alpha: 1.0)
+      : NSColor(srgbRed: 0.91, green: 0.91, blue: 0.94, alpha: 1.0)
+
+    for (idx, rawLine) in lines.enumerated() {
+      if idx > 0 {
+        result.append(NSAttributedString(string: "\n"))
+      }
+      let trimmed = rawLine.trimmingCharacters(in: .whitespaces)
+      if trimmed.isEmpty {
+        continue
+      }
+
+      var lineText = trimmed
+      var fontSize: CGFloat = 12.5
+      var baseWeight: NSFont.Weight = .regular
+      var lineColor = baseColor
+      var headIndent: CGFloat = 0
+      var firstIndent: CGFloat = 0
+      var spacingBefore: CGFloat = 0
+
+      if lineText.hasPrefix("### ") {
+        lineText = String(lineText.dropFirst(4))
+        fontSize = 13.0
+        baseWeight = .semibold
+        lineColor = NSColor(srgbRed: 0.97, green: 0.97, blue: 0.99, alpha: 1.0)
+        spacingBefore = idx > 0 ? 4 : 0
+      } else if lineText.hasPrefix("## ") {
+        lineText = String(lineText.dropFirst(3))
+        fontSize = 13.5
+        baseWeight = .semibold
+        lineColor = NSColor(srgbRed: 0.98, green: 0.98, blue: 1.0, alpha: 1.0)
+        spacingBefore = idx > 0 ? 5 : 0
+      } else if lineText.hasPrefix("# ") {
+        lineText = String(lineText.dropFirst(2))
+        fontSize = 14.0
+        baseWeight = .bold
+        lineColor = NSColor.white
+        spacingBefore = idx > 0 ? 6 : 0
+      } else if lineText.hasPrefix("- ") || lineText.hasPrefix("* ") || lineText.hasPrefix("+ ") {
+        lineText = "•  " + String(lineText.dropFirst(2))
+        headIndent = 14
+        firstIndent = 2
+      } else if lineText.hasPrefix("> ") {
+        lineText = "▎ " + String(lineText.dropFirst(2))
+        lineColor = NSColor(srgbRed: 0.72, green: 0.72, blue: 0.79, alpha: 1.0)
+        headIndent = 10
+      } else if let dotRange = lineText.range(of: "^\\d+\\.\\s+", options: .regularExpression) {
+        let prefix = String(lineText[dotRange])
+        let rest = String(lineText[dotRange.upperBound...])
+        lineText = prefix + rest
+        headIndent = 16
+        firstIndent = 0
+      }
+
+      let pStyle = NSMutableParagraphStyle()
+      pStyle.lineSpacing = 3.2
+      pStyle.paragraphSpacing = 2.0
+      pStyle.paragraphSpacingBefore = spacingBefore
+      pStyle.headIndent = headIndent
+      pStyle.firstLineHeadIndent = firstIndent
+
+      let inlineAttr = renderInline(
+        lineText,
+        fontSize: fontSize,
+        baseWeight: baseWeight,
+        baseColor: lineColor,
+        paragraphStyle: pStyle
+      )
+      result.append(inlineAttr)
+    }
+    return result
+  }
+
+  private static func renderInline(
+    _ input: String,
+    fontSize: CGFloat,
+    baseWeight: NSFont.Weight,
+    baseColor: NSColor,
+    paragraphStyle: NSParagraphStyle
+  ) -> NSAttributedString {
+    // Convert [label](url) to label first so links read cleanly
+    var working = input
+    if let linkRe = try? NSRegularExpression(pattern: "\\[([^\\]]+)\\]\\([^\\)]+\\)") {
+      working = linkRe.stringByReplacingMatches(
+        in: working,
+        range: NSRange(working.startIndex..., in: working),
+        withTemplate: "$1"
+      )
+    }
+
+    let out = NSMutableAttributedString()
+    let baseFont = NSFont.systemFont(ofSize: fontSize, weight: baseWeight)
+    let boldFont = NSFont.systemFont(ofSize: fontSize, weight: .semibold)
+    let italicFont = NSFontManager.shared.convert(baseFont, toHaveTrait: .italicFontMask)
+    let codeFont = NSFont.monospacedSystemFont(ofSize: max(11.0, fontSize - 1.0), weight: .medium)
+
+    let defaultAttrs: [NSAttributedString.Key: Any] = [
+      .font: baseFont,
+      .foregroundColor: baseColor,
+      .paragraphStyle: paragraphStyle,
+    ]
+
+    // Tokenize by inline code (`...`), bold (**...**), or italic (*...*)
+    let pattern = "(`[^`]+`|\\*\\*[^*]+\\*\\*|__[^_]+__|\\*[^*]+\\*)"
+    guard let regex = try? NSRegularExpression(pattern: pattern) else {
+      return NSAttributedString(string: working, attributes: defaultAttrs)
+    }
+
+    let ns = working as NSString
+    let matches = regex.matches(in: working, range: NSRange(location: 0, length: ns.length))
+    var cursor = 0
+
+    for m in matches {
+      if m.range.location > cursor {
+        let plain = ns.substring(with: NSRange(location: cursor, length: m.range.location - cursor))
+        out.append(NSAttributedString(string: plain, attributes: defaultAttrs))
+      }
+      let token = ns.substring(with: m.range)
+      if token.hasPrefix("`") && token.hasSuffix("`") && token.count >= 2 {
+        let inner = String(token.dropFirst().dropLast())
+        let codeAttrs: [NSAttributedString.Key: Any] = [
+          .font: codeFont,
+          .foregroundColor: NSColor(srgbRed: 0.76, green: 0.80, blue: 1.0, alpha: 1.0),
+          .backgroundColor: NSColor(srgbRed: 0.14, green: 0.15, blue: 0.20, alpha: 1.0),
+          .paragraphStyle: paragraphStyle,
+        ]
+        out.append(NSAttributedString(string: " \(inner) ", attributes: codeAttrs))
+      } else if (token.hasPrefix("**") && token.hasSuffix("**")) || (token.hasPrefix("__") && token.hasSuffix("__")) {
+        let inner = String(token.dropFirst(2).dropLast(2))
+        let boldAttrs: [NSAttributedString.Key: Any] = [
+          .font: boldFont,
+          .foregroundColor: NSColor.white,
+          .paragraphStyle: paragraphStyle,
+        ]
+        out.append(NSAttributedString(string: inner, attributes: boldAttrs))
+      } else if token.hasPrefix("*") && token.hasSuffix("*") && token.count >= 2 {
+        let inner = String(token.dropFirst().dropLast())
+        let itAttrs: [NSAttributedString.Key: Any] = [
+          .font: italicFont,
+          .foregroundColor: baseColor,
+          .paragraphStyle: paragraphStyle,
+        ]
+        out.append(NSAttributedString(string: inner, attributes: itAttrs))
+      } else {
+        out.append(NSAttributedString(string: token, attributes: defaultAttrs))
+      }
+      cursor = m.range.location + m.range.length
+    }
+
+    if cursor < ns.length {
+      let tail = ns.substring(from: cursor)
+      out.append(NSAttributedString(string: tail, attributes: defaultAttrs))
+    }
+    return out
+  }
+}
+
 // MARK: - DynamicNotchKit / boring.notch Style Notch HUD Controller
 
 final class NotchHUDController {
@@ -1002,13 +1234,13 @@ final class NotchHUDController {
     if conversationExpanded {
       topCornerRadius = 15
       bottomCornerRadius = 24
-      targetWidth = max(hw.width + 260, 448) + topCornerRadius * 2
-      targetHeight = hw.height + 368
+      targetWidth = max(hw.width + 276, 464) + topCornerRadius * 2
+      targetHeight = hw.height + 392
     } else if hasNotif {
       topCornerRadius = 12
       bottomCornerRadius = 20
-      targetWidth = max(hw.width + 188, 376) + topCornerRadius * 2
-      targetHeight = hw.height + 64
+      targetWidth = max(hw.width + 196, 388) + topCornerRadius * 2
+      targetHeight = hw.height + 66
     } else if assistantSpeaking || userSpeaking {
       topCornerRadius = 8
       bottomCornerRadius = 16
@@ -1292,72 +1524,133 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
     for sub in documentView.subviews {
       sub.removeFromSuperview()
     }
-    let width = max(180, scrollView.contentSize.width)
-    var y: CGFloat = 6
+    let width = max(200, scrollView.contentSize.width)
+    var y: CGFloat = 8
 
     if convMessages.isEmpty {
       let empty = NSTextField(labelWithString: convStatus == "loading" ? "Loading conversation…" : "No messages yet.")
       empty.font = NSFont.systemFont(ofSize: 12, weight: .regular)
       empty.textColor = NSColor(srgbRed: 0.56, green: 0.56, blue: 0.62, alpha: 1.0)
-      empty.frame = NSRect(x: 8, y: 16, width: width - 16, height: 20)
+      empty.frame = NSRect(x: 8, y: 18, width: width - 16, height: 20)
       documentView.addSubview(empty)
       y = 48
     } else {
       for msg in convMessages {
         let isUser = msg.role == "user"
-        let maxBubbleW = width * 0.85
-        let font = NSFont.systemFont(ofSize: 12.5, weight: .regular)
-        let pStyle = NSMutableParagraphStyle()
-        pStyle.lineSpacing = 2.5
-        let attrs: [NSAttributedString.Key: Any] = [
-          .font: font,
-          .foregroundColor: NSColor(
-            srgbRed: isUser ? 0.96 : 0.90,
-            green: isUser ? 0.96 : 0.90,
-            blue: isUser ? 0.98 : 0.93,
-            alpha: 1.0
-          ),
-          .paragraphStyle: pStyle,
-        ]
-        let attributed = NSAttributedString(string: msg.text, attributes: attrs)
-        let textBounds = attributed.boundingRect(
-          with: NSSize(width: maxBubbleW - 22, height: 4000),
-          options: [.usesLineFragmentOrigin, .usesFontLeading]
-        )
-        let bubbleW = min(maxBubbleW, max(54, ceil(textBounds.width) + 22))
-        let bubbleH = max(28, ceil(textBounds.height) + 14)
-        let bubbleX = isUser ? (width - bubbleW - 2) : 2
+        let blocks = NotchMarkdown.parseBlocks(msg.text, isUser: isUser)
+        if blocks.isEmpty { continue }
 
-        let bubble = NSView(frame: NSRect(x: bubbleX, y: y, width: bubbleW, height: bubbleH))
-        bubble.wantsLayer = true
         if isUser {
-          bubble.layer?.backgroundColor = NSColor(srgbRed: 0.17, green: 0.18, blue: 0.22, alpha: 1.0).cgColor
-          bubble.layer?.cornerRadius = 11
-        } else {
-          bubble.layer?.backgroundColor = NSColor(srgbRed: 0.08, green: 0.08, blue: 0.10, alpha: 1.0).cgColor
-          bubble.layer?.cornerRadius = 9
+          let maxBubbleW = width * 0.82
+          let attr = NotchMarkdown.parseBlocks(msg.text, isUser: true).compactMap { b -> NSAttributedString? in
+            if case let .text(a) = b { return a }
+            return nil
+          }.first ?? NSAttributedString(string: msg.text)
+
+          let textBounds = attr.boundingRect(
+            with: NSSize(width: maxBubbleW - 24, height: 4000),
+            options: [.usesLineFragmentOrigin, .usesFontLeading]
+          )
+          let bubbleW = min(maxBubbleW, max(56, ceil(textBounds.width) + 24))
+          let bubbleH = max(30, ceil(textBounds.height) + 14)
+          let bubbleX = width - bubbleW - 4
+
+          let bubble = NSView(frame: NSRect(x: bubbleX, y: y, width: bubbleW, height: bubbleH))
+          bubble.wantsLayer = true
+          bubble.layer?.backgroundColor = NSColor(srgbRed: 0.14, green: 0.15, blue: 0.19, alpha: 1.0).cgColor
+          bubble.layer?.cornerRadius = 12
           bubble.layer?.borderWidth = 1
-          bubble.layer?.borderColor = NSColor(srgbRed: 0.15, green: 0.15, blue: 0.19, alpha: 1.0).cgColor
+          bubble.layer?.borderColor = NSColor(srgbRed: 0.22, green: 0.23, blue: 0.28, alpha: 1.0).cgColor
+
+          let label = NSTextField(labelWithAttributedString: attr)
+          label.isSelectable = true
+          label.allowsEditingTextAttributes = false
+          label.lineBreakMode = .byWordWrapping
+          label.maximumNumberOfLines = 0
+          label.frame = NSRect(x: 12, y: 7, width: bubbleW - 24, height: bubbleH - 14)
+          bubble.addSubview(label)
+          documentView.addSubview(bubble)
+
+          y += bubbleH + 10
+        } else {
+          // Assistant / Mission Control editorial turn with subtle left accent bar & rich Markdown blocks
+          let turnX: CGFloat = 12
+          let turnW = width - turnX - 6
+          let turnStart = y
+
+          for block in blocks {
+            switch block {
+            case .text(let attr):
+              let bounds = attr.boundingRect(
+                with: NSSize(width: turnW - 10, height: 8000),
+                options: [.usesLineFragmentOrigin, .usesFontLeading]
+              )
+              let h = max(18, ceil(bounds.height) + 4)
+              let label = NSTextField(labelWithAttributedString: attr)
+              label.isSelectable = true
+              label.allowsEditingTextAttributes = false
+              label.lineBreakMode = .byWordWrapping
+              label.maximumNumberOfLines = 0
+              label.frame = NSRect(x: turnX + 8, y: y, width: turnW - 10, height: h)
+              documentView.addSubview(label)
+              y += h + 6
+
+            case .code(let lang, let code):
+              let codeFont = NSFont.monospacedSystemFont(ofSize: 11.5, weight: .regular)
+              let pStyle = NSMutableParagraphStyle()
+              pStyle.lineSpacing = 2.5
+              let codeAttrs: [NSAttributedString.Key: Any] = [
+                .font: codeFont,
+                .foregroundColor: NSColor(srgbRed: 0.86, green: 0.87, blue: 0.92, alpha: 1.0),
+                .paragraphStyle: pStyle,
+              ]
+              let codeAttr = NSAttributedString(string: code, attributes: codeAttrs)
+              let bounds = codeAttr.boundingRect(
+                with: NSSize(width: turnW - 28, height: 6000),
+                options: [.usesLineFragmentOrigin, .usesFontLeading]
+              )
+              let headerH: CGFloat = lang.isEmpty ? 0 : 18
+              let boxH = max(30, ceil(bounds.height) + 16 + headerH)
+              let box = NSView(frame: NSRect(x: turnX + 6, y: y, width: turnW - 8, height: boxH))
+              box.wantsLayer = true
+              box.layer?.backgroundColor = NSColor(srgbRed: 0.06, green: 0.06, blue: 0.08, alpha: 1.0).cgColor
+              box.layer?.cornerRadius = 8
+              box.layer?.borderWidth = 1
+              box.layer?.borderColor = NSColor(srgbRed: 0.16, green: 0.16, blue: 0.20, alpha: 1.0).cgColor
+
+              if !lang.isEmpty {
+                let langLabel = NSTextField(labelWithString: lang.uppercased())
+                langLabel.font = NSFont.monospacedSystemFont(ofSize: 9.5, weight: .semibold)
+                langLabel.textColor = NSColor(srgbRed: 0.55, green: 0.56, blue: 0.65, alpha: 1.0)
+                langLabel.frame = NSRect(x: 10, y: 5, width: turnW - 28, height: 13)
+                box.addSubview(langLabel)
+              }
+
+              let codeField = NSTextField(labelWithAttributedString: codeAttr)
+              codeField.isSelectable = true
+              codeField.lineBreakMode = .byWordWrapping
+              codeField.maximumNumberOfLines = 0
+              codeField.frame = NSRect(x: 10, y: 8 + headerH, width: turnW - 28, height: max(16, boxH - 16 - headerH))
+              box.addSubview(codeField)
+              documentView.addSubview(box)
+              y += boxH + 8
+            }
+          }
+
+          // Subtle vertical accent bar on the left of the assistant turn
+          let barH = max(14, y - turnStart - 6)
+          let bar = NSView(frame: NSRect(x: 6, y: turnStart + 2, width: 2.5, height: barH))
+          bar.wantsLayer = true
+          bar.layer?.backgroundColor = NSColor(srgbRed: 0.55, green: 0.56, blue: 1.0, alpha: 0.55).cgColor
+          bar.layer?.cornerRadius = 1.25
+          documentView.addSubview(bar)
+
+          y += 6
         }
-
-        let label = NSTextField(wrappingLabelWithString: msg.text)
-        label.font = font
-        label.textColor = NSColor(
-          srgbRed: isUser ? 0.96 : 0.90,
-          green: isUser ? 0.96 : 0.90,
-          blue: isUser ? 0.98 : 0.93,
-          alpha: 1.0
-        )
-        label.isSelectable = true
-        label.frame = NSRect(x: 11, y: 7, width: bubbleW - 22, height: bubbleH - 14)
-        bubble.addSubview(label)
-        documentView.addSubview(bubble)
-
-        y += bubbleH + 8
       }
     }
 
-    let docH = max(scrollView.contentSize.height, y + 4)
+    let docH = max(scrollView.contentSize.height, y + 6)
     documentView.frame = NSRect(x: 0, y: 0, width: width, height: docH)
     if scrollToBottom {
       let bottomPoint = NSPoint(x: 0, y: max(0, docH - scrollView.contentSize.height))
@@ -1652,7 +1945,8 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
       .paragraphStyle: pStyle,
     ]
 
-    if subtitle.isEmpty {
+    let cleanSub = NotchMarkdown.plainPreview(subtitle)
+    if cleanSub.isEmpty {
       (title as NSString).draw(
         in: NSRect(x: textX, y: bodyRect.midY - 8, width: textW, height: 17),
         withAttributes: titleAttrs
@@ -1662,7 +1956,7 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
         in: NSRect(x: textX, y: bodyRect.midY + 1, width: textW, height: 17),
         withAttributes: titleAttrs
       )
-      (subtitle as NSString).draw(
+      (cleanSub as NSString).draw(
         in: NSRect(x: textX, y: bodyRect.midY - 15, width: textW, height: 15),
         withAttributes: subAttrs
       )
