@@ -57,8 +57,8 @@ class MainFlutterWindow: NSWindow {
 
     super.awakeFromNib()
 
-    self.isOpaque = true
-    self.backgroundColor = shellColor
+    self.isOpaque = false
+    self.backgroundColor = .clear
     self.appearance = NSAppearance(named: .darkAqua)
 
     // AppKit sizes the native titlebar for a ~28pt band and centres the traffic
