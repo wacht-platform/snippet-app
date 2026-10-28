@@ -1537,9 +1537,8 @@ final class NotchHUDController {
 
   private func refreshHUD(animated: Bool) {
     let hasNotif = notifTitle != nil
-    // Always keep the Notch HUD active when Snippet is minimized/closed to the menu bar,
-    // even when ambient voice is inactive, so Mission Control chats and notifications are always right in the Notch.
-    let shouldShow = windowHidden
+    let showAmbient = windowHidden && (ambientActive || assistantSpeaking || userSpeaking)
+    let shouldShow = windowHidden && (conversationExpanded || hasNotif || showAmbient)
 
     if !shouldShow {
       waveTimer?.invalidate()
@@ -2177,29 +2176,31 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
       )
     }
 
-    // Right Wing: 5-bar Dynamic Island listening/speaking equalizer (always visible)
-    let rightWingX = cameraRight
-    let rightWingW = max(24, (b.maxX - topCornerRadius) - rightWingX)
-    let barCount = 5
-    let barW: CGFloat = 2.5
-    let barGap: CGFloat = 2.6
-    let totalBarsW = CGFloat(barCount) * barW + CGFloat(barCount - 1) * barGap
-    let startX = notifTitle != nil && !conversationExpanded
-      ? (b.maxX - topCornerRadius - 12 - totalBarsW)
-      : (rightWingX + (rightWingW - totalBarsW) / 2)
+    // Right Wing: 5-bar listening/speaking equalizer ONLY when listening/speaking is actually active
+    if ambientActive || assistantSpeaking || userSpeaking {
+      let rightWingX = cameraRight
+      let rightWingW = max(24, (b.maxX - topCornerRadius) - rightWingX)
+      let barCount = 5
+      let barW: CGFloat = 2.5
+      let barGap: CGFloat = 2.6
+      let totalBarsW = CGFloat(barCount) * barW + CGFloat(barCount - 1) * barGap
+      let startX = notifTitle != nil && !conversationExpanded
+        ? (b.maxX - topCornerRadius - 12 - totalBarsW)
+        : (rightWingX + (rightWingW - totalBarsW) / 2)
 
-    let waveColor = userSpeaking ? SnippetTheme.ok : SnippetTheme.accent
-    for i in 0..<barCount {
-      let wave = sin(Double(phase) + Double(i) * 0.9)
-      let amp: CGFloat = assistantSpeaking
-        ? 1.0
-        : (userSpeaking ? max(CGFloat(probability), 0.6) : 0.22)
-      let barH = max(3.5, 3.5 + 11.5 * amp * CGFloat(0.5 + 0.5 * wave))
-      let bx = startX + CGFloat(i) * (barW + barGap)
-      let by = topBandMidY - barH / 2
-      let barRect = NSRect(x: bx, y: by, width: barW, height: barH)
-      waveColor.withAlphaComponent(assistantSpeaking || userSpeaking ? 0.95 : 0.70).setFill()
-      NSBezierPath(roundedRect: barRect, xRadius: 1.25, yRadius: 1.25).fill()
+      let waveColor = userSpeaking ? SnippetTheme.ok : SnippetTheme.accent
+      for i in 0..<barCount {
+        let wave = sin(Double(phase) + Double(i) * 0.9)
+        let amp: CGFloat = assistantSpeaking
+          ? 1.0
+          : (userSpeaking ? max(CGFloat(probability), 0.6) : 0.22)
+        let barH = max(3.5, 3.5 + 11.5 * amp * CGFloat(0.5 + 0.5 * wave))
+        let bx = startX + CGFloat(i) * (barW + barGap)
+        let by = topBandMidY - barH / 2
+        let barRect = NSRect(x: bx, y: by, width: barW, height: barH)
+        waveColor.withAlphaComponent(assistantSpeaking || userSpeaking ? 0.95 : 0.70).setFill()
+        NSBezierPath(roundedRect: barRect, xRadius: 1.25, yRadius: 1.25).fill()
+      }
     }
   }
 
