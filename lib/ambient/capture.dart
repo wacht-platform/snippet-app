@@ -245,20 +245,24 @@ class AmbientCapture {
           _error!.startsWith('The microphone is only sending silence')) {
         _error = null;
       }
-      final selfPlaying = defaultTargetPlatform != TargetPlatform.android &&
-          (_playOn ||
-              (_playEndedAt != null &&
-                  DateTime.now().difference(_playEndedAt!) <
-                      const Duration(milliseconds: 300)));
-      if (selfPlaying) {
-        _probability = 0;
-        gate.addFrame(Uint8List(chunkBytes), 0);
-        offset += chunkBytes;
-        continue;
-      }
-      if (energy / samples.length > 0.0004 && _probability < 0.3) _loudQuiet++;
+      final rms = energy / samples.length;
+      if (rms > 0.0004 && _probability < 0.3) _loudQuiet++;
       gate.addFrame(frame, _probability);
-      _duckCheck(_probability >= threshold);
+      final voiced = _probability >= threshold;
+      if (defaultTargetPlatform == TargetPlatform.android) {
+        _duckCheck(voiced);
+      } else if (_playOn) {
+        if (_echoRms == 0) {
+          _echoRms = rms > 0.0001 ? rms : 0.0005;
+        } else if (!voiced || rms <= _echoRms * 2.0) {
+          _echoRms = _echoRms * 0.92 + rms * 0.08;
+        }
+        final bargeVoiced = voiced && rms > _echoRms * 2.4 && rms > 0.0015;
+        _duckCheck(bargeVoiced);
+      } else {
+        _echoRms = 0;
+        _duckCheck(false);
+      }
       offset += chunkBytes;
     }
     if (offset < buffer.length) {
@@ -271,6 +275,7 @@ class AmbientCapture {
   }
 
   int _loud = 0;
+  double _echoRms = 0;
   bool _ducked = false;
   Timer? _unduck;
 
@@ -296,13 +301,13 @@ class AmbientCapture {
     unawaited(_voice?.duck(false));
   }
 
-  DateTime? _playEndedAt;
-
   void _onSpeaking() {
     final on = _voice?.speaking.value ?? false;
-    if (!on) _restoreVolume();
+    if (!on) {
+      _echoRms = 0;
+      _restoreVolume();
+    }
     if (on == _playOn) return;
-    if (_playOn && !on) _playEndedAt = DateTime.now();
     _playOn = on;
     uploader.flag('play', on);
   }
