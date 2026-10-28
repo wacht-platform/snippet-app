@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'api.dart';
 import 'device_events.dart';
+import 'macos_notch.dart';
 import 'models.dart';
 import 'notification_inbox.dart';
 import 'notifications.dart';
@@ -88,6 +89,15 @@ Future<void> presentNotifications(Instance instance, NotificationInbox inbox,
   if (!background && (notificationAppForeground || kMacOS)) {
     for (final event in received) {
       final payload = notificationDestination(instance.url, event);
+      if (kMacOS) {
+        final content = notificationContent(instance, event);
+        MacosNotch.showNotification(
+          title: payload['title']?.toString() ?? content.head,
+          subtitle: payload['body']?.toString() ?? content.body,
+          kind: payload['kind']?.toString() ?? '',
+          payload: payload,
+        );
+      }
       if (!suppressVisibleNotification(payload)) {
         foregroundNotifications.add(payload);
       }

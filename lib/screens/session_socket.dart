@@ -336,6 +336,46 @@ extension _SessionScreenSocketExt on _SessionScreenState {
           session: widget.sessionId,
           workspace: next.workspace,
         );
+        if (kMacOS && cur != null && next.events.length > cur.events.length) {
+          final added = next.events.sublist(cur.events.length);
+          for (final e in added.reversed) {
+            final kind = e['kind'] as String? ?? '';
+            var msgText = '';
+            if (kind == 'assistant_text' || kind == 'assistant') {
+              msgText = ((e['text'] as String?) ?? '').trim();
+            } else if (kind == 'tool_call') {
+              final tool = (e['tool_name'] as String?) ?? '';
+              if (tool == 'speak' || tool == 'ambient_speak') {
+                final args = e['arguments'];
+                msgText = args is Map ? '${args['text'] ?? ''}'.trim() : '';
+              }
+            } else if (kind == 'user_question') {
+              msgText = 'Needs your input';
+            }
+            if (msgText.isNotEmpty) {
+              final cleaned = msgText.replaceAll(RegExp(r'\s+'), ' ').trim();
+              final title = _isMissionControl
+                  ? 'Mission Control'
+                  : (_title.trim().isEmpty ? 'Snippet' : _title.trim());
+              MacosNotch.showNotification(
+                title: title,
+                subtitle: cleaned,
+                kind: kind == 'user_question' ? 'waiting' : 'message',
+                payload: {
+                  'url': widget.client.baseUrl,
+                  'session': widget.sessionId,
+                  'title': title,
+                  'body': cleaned,
+                  'destination': {
+                    'type': 'session',
+                    'id': widget.sessionId,
+                  },
+                },
+              );
+              break;
+            }
+          }
+        }
       }
       widget.onMacControls
           ?.call(() => _send({'kind': 'interrupt'}), _performMacAction);

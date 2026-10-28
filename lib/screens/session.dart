@@ -20,6 +20,7 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 import '../api.dart';
 import '../desktop_pick.dart';
 import '../drafts.dart';
+import '../macos_notch.dart';
 import '../models.dart';
 import '../mochi.dart';
 import '../platform.dart';
