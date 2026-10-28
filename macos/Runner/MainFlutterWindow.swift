@@ -281,10 +281,11 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
           let title = args["title"] as? String ?? "Conversation"
           let status = args["status"] as? String ?? "idle"
           let rawMsgs = args["messages"] as? [[String: Any]] ?? []
-          let messages: [(role: String, text: String)] = rawMsgs.compactMap { m in
+          let messages: [(role: String, text: String, meta: String)] = rawMsgs.compactMap { m in
             guard let text = m["text"] as? String, !text.isEmpty else { return nil }
             let role = m["role"] as? String ?? "assistant"
-            return (role: role, text: text)
+            let meta = m["meta"] as? String ?? ""
+            return (role: role, text: text, meta: meta)
           }
           self.notchHUD?.updateConversation(title: title, status: status, messages: messages)
         }
@@ -1136,7 +1137,7 @@ final class NotchHUDController {
   func updateConversation(
     title: String,
     status: String,
-    messages: [(role: String, text: String)]
+    messages: [(role: String, text: String, meta: String)]
   ) {
     hudView.setConversationData(title: title, status: status, messages: messages)
   }
@@ -1167,7 +1168,7 @@ final class NotchHUDController {
       hudView.setConversationData(
         title: title,
         status: "loading",
-        messages: sub.isEmpty ? [] : [(role: "assistant", text: sub)]
+        messages: sub.isEmpty ? [] : [(role: "assistant", text: sub, meta: "")]
       )
       refreshHUD(animated: true)
       onOpenConversation(payload)
@@ -1327,7 +1328,7 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
   private var conversationExpanded = false
   private var convTitle = "Conversation"
   private var convStatus = "idle"
-  private var convMessages: [(role: String, text: String)] = []
+  private var convMessages: [(role: String, text: String, meta: String)] = []
 
   private let containerView = NSView()
   private let titleField = NSTextField(labelWithString: "Conversation")
@@ -1431,7 +1432,7 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
     let text = replyField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !text.isEmpty else { return }
     replyField.stringValue = ""
-    convMessages.append((role: "user", text: text))
+    convMessages.append((role: "user", text: text, meta: ""))
     rebuildMessageViews(scrollToBottom: true)
     onSubmitReply?(text)
   }
@@ -1461,7 +1462,7 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
   func setConversationData(
     title: String,
     status: String,
-    messages: [(role: String, text: String)]
+    messages: [(role: String, text: String, meta: String)]
   ) {
     convTitle = title
     convStatus = status
@@ -1557,10 +1558,10 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
 
           let bubble = NSView(frame: NSRect(x: bubbleX, y: y, width: bubbleW, height: bubbleH))
           bubble.wantsLayer = true
-          bubble.layer?.backgroundColor = NSColor(srgbRed: 0.14, green: 0.15, blue: 0.19, alpha: 1.0).cgColor
-          bubble.layer?.cornerRadius = 12
+          bubble.layer?.backgroundColor = NSColor(srgbRed: 0.12, green: 0.12, blue: 0.14, alpha: 1.0).cgColor
+          bubble.layer?.cornerRadius = 10
           bubble.layer?.borderWidth = 1
-          bubble.layer?.borderColor = NSColor(srgbRed: 0.22, green: 0.23, blue: 0.28, alpha: 1.0).cgColor
+          bubble.layer?.borderColor = NSColor(srgbRed: 0.19, green: 0.19, blue: 0.22, alpha: 1.0).cgColor
 
           let label = NSTextField(labelWithAttributedString: attr)
           label.isSelectable = true
@@ -1571,12 +1572,30 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
           bubble.addSubview(label)
           documentView.addSubview(bubble)
 
-          y += bubbleH + 10
+          y += bubbleH + 3
+          if !msg.meta.isEmpty {
+            let metaField = NSTextField(labelWithString: msg.meta)
+            metaField.font = NSFont.systemFont(ofSize: 10.5, weight: .regular)
+            metaField.textColor = NSColor(srgbRed: 0.45, green: 0.45, blue: 0.51, alpha: 1.0)
+            metaField.alignment = .right
+            metaField.frame = NSRect(x: 8, y: y, width: width - 12, height: 14)
+            documentView.addSubview(metaField)
+            y += 15
+          }
+          y += 7
         } else {
-          // Assistant / Mission Control editorial turn with subtle left accent bar & rich Markdown blocks
+          // Assistant / Mission Control editorial turn matching the main chat transcript
           let turnX: CGFloat = 12
           let turnW = width - turnX - 6
           let turnStart = y
+          if !msg.meta.isEmpty {
+            let badgeField = NSTextField(labelWithString: msg.meta.uppercased())
+            badgeField.font = NSFont.monospacedSystemFont(ofSize: 9.5, weight: .semibold)
+            badgeField.textColor = NSColor(srgbRed: 0.55, green: 0.56, blue: 1.0, alpha: 0.85)
+            badgeField.frame = NSRect(x: turnX + 8, y: y, width: turnW - 10, height: 13)
+            documentView.addSubview(badgeField)
+            y += 15
+          }
 
           for block in blocks {
             switch block {

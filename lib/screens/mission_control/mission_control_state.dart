@@ -802,6 +802,15 @@ List<FeedItem> feedItemsFromEvents(List<Map<String, dynamic>> events) {
         final text = (e['text'] ?? '').toString().trim();
         if (text.isEmpty) break;
         out.add(AgentTextItem(id: 'h-a-$i', timestamp: now, text: text));
+      case 'tool_call':
+        final tool = (e['tool_name'] ?? '').toString();
+        if (tool == 'speak' || tool == 'ambient_speak') {
+          final args = e['arguments'];
+          final spoken = args is Map ? '${args['text'] ?? ''}'.trim() : '';
+          if (spoken.isNotEmpty) {
+            out.add(AgentTextItem(id: 'h-s-$i', timestamp: now, text: spoken));
+          }
+        }
       case 'user_question':
         final q = missionControlQuestionText(e);
         if (q.isEmpty) break;

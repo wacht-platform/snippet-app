@@ -2,6 +2,14 @@ part of 'session.dart';
 
 extension _SessionScreenComposerExt on _SessionScreenState {
   void _send(Map<String, dynamic> m, {bool tracked = false}) {
+    final kind = m['kind'];
+    if (kind == 'user_message' ||
+        kind == 'queue' ||
+        kind == 'steer_queued' ||
+        kind == 'interrupt') {
+      unawaited(
+          AmbientController.instance.voice.value?.stopNow() ?? Future.value());
+    }
     final payload = jsonEncode(m);
     final ch = _channel;
     if (ch == null) {

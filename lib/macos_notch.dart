@@ -5,10 +5,25 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
+import 'ambient/controller.dart';
 import 'api.dart';
 import 'models.dart';
 import 'notifications.dart';
 import 'platform.dart';
+import 'screens/mission_control/mission_control_state.dart'
+    show
+        AmbientTurn,
+        isAmbientResume,
+        parseAmbientTurn,
+        parseAssignmentEnvelope,
+        parseAutonomousRound,
+        parseBoardMessage,
+        parseCoordinationReply,
+        parseDirectMessage,
+        parseMissionEnvelope,
+        parseParentMessage,
+        parseWorkerQuestion,
+        supersededAmbientTurns;
 import 'store.dart';
 
 class MacosNotch {
@@ -204,19 +219,70 @@ class MacosNotch {
     return t;
   }
 
+  static String _ambientMeta(AmbientTurn turn) {
+    final os = turn.device.split('-').first;
+    final where = switch (os) {
+      'android' => 'Android',
+      'ios' => 'iPhone',
+      'macos' => 'Mac',
+      'linux' => 'Linux',
+      'windows' => 'Windows',
+      _ => turn.device,
+    };
+    final at = turn.at;
+    final time = at == null
+        ? ''
+        : '${at.hour.toString().padLeft(2, '0')}:${at.minute.toString().padLeft(2, '0')}';
+    return [
+      if (where.isNotEmpty) where,
+      if (time.isNotEmpty) time,
+      if (turn.mode == 'passive') 'passive',
+      if (turn.wake) 'wake word',
+      if (turn.interruptedReply.isNotEmpty) 'interrupted a reply',
+    ].join(' · ');
+  }
+
   static void _emitSessionMessages() {
     final state = _activeState;
     if (state == null) return;
+    final superseded = supersededAmbientTurns([
+      for (final e in state.events)
+        if (e['kind'] == 'user_input' || e['kind'] == 'steer')
+          (e['text'] as String?) ?? '',
+    ]);
     final messages = <Map<String, String>>[];
     for (final e in state.events) {
       final kind = e['kind'] as String? ?? '';
       if (kind == 'user_input' || kind == 'steer') {
         final raw = (e['text'] as String?) ?? '';
+        final ambient = parseAmbientTurn(raw);
+        if (ambient != null) {
+          if (ambient.ids.isNotEmpty &&
+              ambient.ids.every(superseded.contains)) {
+            continue;
+          }
+          if (ambient.text.trim().isNotEmpty) {
+            messages.add({
+              'role': 'user',
+              'text': ambient.text.trim(),
+              'meta': _ambientMeta(ambient),
+            });
+          }
+          continue;
+        }
         final text = _cleanUserText(raw);
         if (text.isEmpty ||
-            text.startsWith('<ambient_') ||
-            text.startsWith('[mission_control_task]') ||
-            text.startsWith('[coordination_board_message]')) {
+            isAmbientResume(text) ||
+            text.startsWith('<ambient_context_alert') ||
+            text.startsWith('<ambient_check_in') ||
+            parseMissionEnvelope(text) != null ||
+            parseAutonomousRound(text) != null ||
+            parseWorkerQuestion(text) != null ||
+            parseBoardMessage(text) != null ||
+            parseDirectMessage(text) != null ||
+            parseCoordinationReply(text) != null ||
+            parseParentMessage(text) != null ||
+            parseAssignmentEnvelope(text) != null) {
           continue;
         }
         messages.add({'role': 'user', 'text': text});
@@ -231,7 +297,11 @@ class MacosNotch {
           final args = e['arguments'];
           final spoken = args is Map ? '${args['text'] ?? ''}'.trim() : '';
           if (spoken.isNotEmpty) {
-            messages.add({'role': 'assistant', 'text': spoken});
+            messages.add({
+              'role': 'assistant',
+              'text': spoken,
+              'meta': 'Said aloud',
+            });
           }
         }
       }
@@ -250,6 +320,7 @@ class MacosNotch {
   }
 
   static Future<void> _sendReply(String text) async {
+    unawaited(AmbientController.instance.voice.value?.stopNow() ?? Future.value());
     final client = _activeClient;
     final peerId = _activePeerAgentId;
     if (client != null && peerId != null) {
