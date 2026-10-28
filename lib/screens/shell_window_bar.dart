@@ -368,7 +368,7 @@ class MacWindowBar extends StatelessWidget {
       height: 46,
       padding: const EdgeInsets.fromLTRB(8, 0, 10, 0),
       decoration: BoxDecoration(
-        color: readingBg,
+        color: AppColors.windowBg,
         border: Border(bottom: BorderSide(color: AppColors.line)),
       ),
       child: Row(
