@@ -1011,21 +1011,21 @@ final class NotchTextView: NSView {
 
   init(attributedString: NSAttributedString, maxWidth: CGFloat) {
     let safeMaxW = max(16, floor(maxWidth))
-    self.storage = NSTextStorage(attributedString: attributedString)
-    self.layoutManager = NSLayoutManager()
-    self.textContainer = NSTextContainer(size: NSSize(width: safeMaxW, height: .greatestFiniteMagnitude))
-    self.textContainer.lineFragmentPadding = 0
-    self.layoutManager.addTextContainer(self.textContainer)
-    self.storage.addLayoutManager(self.layoutManager)
-    self.layoutManager.ensureLayout(for: self.textContainer)
+    let ts = NSTextStorage(attributedString: attributedString)
+    let lm = NSLayoutManager()
+    let tc = NSTextContainer(size: NSSize(width: safeMaxW, height: .greatestFiniteMagnitude))
+    tc.lineFragmentPadding = 0
+    lm.addTextContainer(tc)
+    ts.addLayoutManager(lm)
+    lm.ensureLayout(for: tc)
 
-    let glyphRange = self.layoutManager.glyphRange(for: self.textContainer)
-    let used = self.layoutManager.usedRect(for: self.textContainer)
+    let glyphRange = lm.glyphRange(for: tc)
+    let used = lm.usedRect(for: tc)
     let rawNS = attributedString.string as NSString
     var maxLineRight: CGFloat = 0
 
-    self.layoutManager.enumerateLineFragments(forGlyphRange: glyphRange) { _, usedRect, _, lineGlyphRange, _ in
-      var charRange = self.layoutManager.characterRange(forGlyphRange: lineGlyphRange, actualGlyphRange: nil)
+    lm.enumerateLineFragments(forGlyphRange: glyphRange) { _, usedRect, _, lineGlyphRange, _ in
+      var charRange = lm.characterRange(forGlyphRange: lineGlyphRange, actualGlyphRange: nil)
       while charRange.length > 0 {
         let lastChar = rawNS.character(at: charRange.location + charRange.length - 1)
         if let scalar = UnicodeScalar(lastChar), CharacterSet.whitespacesAndNewlines.contains(scalar) {
@@ -1035,8 +1035,8 @@ final class NotchTextView: NSView {
         }
       }
       guard charRange.length > 0 else { return }
-      let visGlyphRange = self.layoutManager.glyphRange(forCharacterRange: charRange, actualCharacterRange: nil)
-      let visBounds = self.layoutManager.boundingRect(forGlyphRange: visGlyphRange, in: self.textContainer)
+      let visGlyphRange = lm.glyphRange(forCharacterRange: charRange, actualCharacterRange: nil)
+      let visBounds = lm.boundingRect(forGlyphRange: visGlyphRange, in: tc)
       let lineRight = min(usedRect.maxX, visBounds.maxX)
       if lineRight > maxLineRight {
         maxLineRight = lineRight
@@ -1045,6 +1045,9 @@ final class NotchTextView: NSView {
 
     let tightW = maxLineRight > 0 ? min(safeMaxW, ceil(maxLineRight)) : min(safeMaxW, ceil(used.width))
     let tightH = max(18, ceil(used.height))
+    self.storage = ts
+    self.layoutManager = lm
+    self.textContainer = tc
     self.measuredSize = NSSize(width: tightW, height: tightH)
     super.init(frame: NSRect(x: 0, y: 0, width: tightW, height: tightH))
   }
