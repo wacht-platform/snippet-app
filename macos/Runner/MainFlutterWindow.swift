@@ -1,7 +1,74 @@
 import AVFoundation
 import Cocoa
+import CoreText
 import FlutterMacOS
 import QuartzCore
+
+// MARK: - Snippet Theme & Bundled Font Loader (Geist + JetBrainsMono + Graphite Palette)
+
+enum SnippetTheme {
+  static var fontsRegistered = false
+
+  static func ensureFontsRegistered() {
+    guard !fontsRegistered else { return }
+    fontsRegistered = true
+    let candidates: [URL?] = [
+      Bundle.main.bundleURL.appendingPathComponent("Contents/Frameworks/App.framework/Resources/flutter_assets/assets/fonts"),
+      Bundle.main.resourceURL?.appendingPathComponent("flutter_assets/assets/fonts"),
+    ]
+    let fm = FileManager.default
+    for dirOpt in candidates {
+      guard let dir = dirOpt, let items = try? fm.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil) else {
+        continue
+      }
+      for url in items where url.pathExtension.lowercased() == "ttf" {
+        CTFontManagerRegisterFontsForURL(url as CFURL, .process, nil)
+      }
+    }
+  }
+
+  static func sans(_ size: CGFloat, weight: NSFont.Weight = .regular) -> NSFont {
+    ensureFontsRegistered()
+    let name = weight.rawValue >= NSFont.Weight.medium.rawValue ? "Geist-Medium" : "Geist-Regular"
+    if let font = NSFont(name: name, size: size) {
+      return font
+    }
+    return NSFont.systemFont(ofSize: size, weight: weight)
+  }
+
+  static func mono(_ size: CGFloat, weight: NSFont.Weight = .regular) -> NSFont {
+    ensureFontsRegistered()
+    let name: String
+    if weight.rawValue >= NSFont.Weight.semibold.rawValue {
+      name = "JetBrainsMono-SemiBold"
+    } else if weight.rawValue >= NSFont.Weight.medium.rawValue {
+      name = "JetBrainsMono-Medium"
+    } else {
+      name = "JetBrainsMono-Regular"
+    }
+    if let font = NSFont(name: name, size: size) {
+      return font
+    }
+    return NSFont.monospacedSystemFont(ofSize: size, weight: weight)
+  }
+
+  // Exact Graphite (_amoled) palette from lib/theme.dart
+  static let canvas = NSColor(srgbRed: 0x0B / 255.0, green: 0x0B / 255.0, blue: 0x0D / 255.0, alpha: 1.0)
+  static let bg = NSColor(srgbRed: 0x10 / 255.0, green: 0x10 / 255.0, blue: 0x12 / 255.0, alpha: 1.0)
+  static let surface1 = NSColor(srgbRed: 0x17 / 255.0, green: 0x17 / 255.0, blue: 0x1A / 255.0, alpha: 1.0)
+  static let surface2 = NSColor(srgbRed: 0x1E / 255.0, green: 0x1E / 255.0, blue: 0x22 / 255.0, alpha: 1.0)
+  static let surface3 = NSColor(srgbRed: 0x26 / 255.0, green: 0x26 / 255.0, blue: 0x2B / 255.0, alpha: 1.0)
+  static let border = NSColor(srgbRed: 0x26 / 255.0, green: 0x26 / 255.0, blue: 0x2B / 255.0, alpha: 1.0)
+  static let border2 = NSColor(srgbRed: 0x32 / 255.0, green: 0x32 / 255.0, blue: 0x38 / 255.0, alpha: 1.0)
+  static let fg1 = NSColor(srgbRed: 0xEE / 255.0, green: 0xEE / 255.0, blue: 0xF1 / 255.0, alpha: 1.0)
+  static let fg2 = NSColor(srgbRed: 0xC4 / 255.0, green: 0xC4 / 255.0, blue: 0xCC / 255.0, alpha: 1.0)
+  static let fg3 = NSColor(srgbRed: 0x8F / 255.0, green: 0x8F / 255.0, blue: 0x9B / 255.0, alpha: 1.0)
+  static let fg4 = NSColor(srgbRed: 0x62 / 255.0, green: 0x62 / 255.0, blue: 0x6D / 255.0, alpha: 1.0)
+  static let accent = NSColor(srgbRed: 0x8B / 255.0, green: 0x8D / 255.0, blue: 0xFF / 255.0, alpha: 1.0)
+  static let accentFill = NSColor(srgbRed: 0x5E / 255.0, green: 0x6A / 255.0, blue: 0xD2 / 255.0, alpha: 1.0)
+  static let ok = NSColor(srgbRed: 0x4C / 255.0, green: 0xC3 / 255.0, blue: 0x8A / 255.0, alpha: 1.0)
+  static let run = NSColor(srgbRed: 0xD9 / 255.0, green: 0x9E / 255.0, blue: 0x45 / 255.0, alpha: 1.0)
+}
 
 extension NSBezierPath {
   /// Exact quadratic Bezier curve using cubic control-point elevation so it works
@@ -24,6 +91,47 @@ extension NSBezierPath {
 
 enum MochiRenderer {
   /// Draws Snippet's Mochi mascot inside `rect` (in unflipped or flipped coordinates).
+  private static func easeOut(_ t: CGFloat) -> CGFloat {
+    let inv = 1.0 - t
+    return 1.0 - inv * inv * inv
+  }
+
+  private static func easeIn(_ t: CGFloat) -> CGFloat {
+    return t * t * t
+  }
+
+  /// Computes `WorkingMochi` bounce/squash/stretch/look/blink parameters from `phase` (in seconds).
+  static func playMetrics(time: Double) -> (dy: CGFloat, sx: CGFloat, sy: CGFloat, look: CGFloat, blink: CGFloat) {
+    let period = 1.4
+    let t = CGFloat((time.truncatingRemainder(dividingBy: period)) / period)
+    var dy: CGFloat = 0.0
+    var sx: CGFloat = 1.0
+    var sy: CGFloat = 1.0
+    let h: CGFloat = 11.0
+    if t < 0.18 {
+      let e = easeOut(t / 0.18)
+      sy = 1.0 - 0.15 * e
+      sx = 1.0 + 0.11 * e
+    } else if t < 0.50 {
+      let p = (t - 0.18) / 0.32
+      dy = -h * easeOut(p)
+      sy = 1.0 + 0.09 * (1.0 - p)
+      sx = 1.0 - 0.05 * (1.0 - p)
+    } else if t < 0.72 {
+      let p = (t - 0.50) / 0.22
+      dy = -h * (1.0 - easeIn(p))
+      sy = 1.0 + 0.05 * p
+      sx = 1.0 - 0.03 * p
+    } else if t < 0.86 {
+      let k = CGFloat(sin(Double((t - 0.72) / 0.14) * Double.pi))
+      sy = 1.0 - 0.16 * k
+      sx = 1.0 + 0.12 * k
+    }
+    let blink: CGFloat = (t > 0.90 && t < 0.96) ? 1.0 : 0.0
+    let look = CGFloat(sin(time / 0.9)) * 2.8
+    return (dy: dy, sx: sx, sy: sy, look: look, blink: blink)
+  }
+
   static func drawMochi(
     in rect: NSRect,
     bodyColor: NSColor,
@@ -31,16 +139,26 @@ enum MochiRenderer {
     eyeColor: NSColor,
     blushColor: NSColor?,
     cutoutEyes: Bool = false,
-    blink: CGFloat = 0.0
+    blink: CGFloat = 0.0,
+    playTime: Double? = nil
   ) {
     guard let ctx = NSGraphicsContext.current?.cgContext else { return }
     ctx.saveGState()
-    // Map the 84x84 logical Mochi canvas (translated by -18, -26 in Flutter's
-    // top-down coordinates) into `rect`.
+    let metrics = playTime.map { playMetrics(time: $0) }
+    let effBlink = metrics != nil ? max(blink, metrics!.blink) : blink
+    let look = metrics?.look ?? 0.0
+    let sx = metrics?.sx ?? 1.0
+    let sy = metrics?.sy ?? 1.0
+    let dy = metrics?.dy ?? 0.0
+
+    // Map the 84x84 logical Mochi canvas into `rect` with bottom-center squash/stretch
     let scale = min(rect.width, rect.height) / 84.0
-    ctx.translateBy(x: rect.minX, y: rect.maxY)
+    ctx.translateBy(x: rect.midX, y: rect.minY)
+    ctx.scaleBy(x: sx, y: sy)
+    ctx.translateBy(x: -rect.width / 2.0, y: 0.0)
+    ctx.translateBy(x: 0.0, y: rect.height)
     ctx.scaleBy(x: scale, y: -scale)
-    ctx.translateBy(x: -18.0, y: -22.0)
+    ctx.translateBy(x: -18.0, y: -22.0 + dy)
 
     // 1. Mochi dome body
     let body = CGMutablePath()
@@ -91,9 +209,9 @@ enum MochiRenderer {
 
     // 4. Eyes + w-mouth
     let r: CGFloat = cutoutEyes ? 5.8 : 4.8
-    let ry: CGFloat = max(1.2, r * (1.0 - blink * 0.85))
-    let leftEye = CGRect(x: 48.0 - r, y: 72.0 - ry, width: r * 2, height: ry * 2)
-    let rightEye = CGRect(x: 72.0 - r, y: 72.0 - ry, width: r * 2, height: ry * 2)
+    let ry: CGFloat = max(1.2, r * (1.0 - effBlink * 0.85))
+    let leftEye = CGRect(x: 48.0 + look - r, y: 72.0 - ry, width: r * 2, height: ry * 2)
+    let rightEye = CGRect(x: 72.0 + look - r, y: 72.0 - ry, width: r * 2, height: ry * 2)
 
     let mouth = CGMutablePath()
     mouth.move(to: CGPoint(x: 54, y: 80))
@@ -125,17 +243,18 @@ enum MochiRenderer {
     ctx.restoreGState()
   }
 
-  /// Creates the 18x18 Snippet Mochi icon for the macOS menu bar (matching the app icon).
-  static func makeMenuBarTemplateIcon() -> NSImage {
-    let size = NSSize(width: 19, height: 19)
+  /// Creates the animated Snippet Mochi icon frame for the macOS menu bar.
+  static func makeMenuBarIcon(playTime: Double) -> NSImage {
+    let size = NSSize(width: 20, height: 20)
     let image = NSImage(size: size, flipped: false) { rect in
       drawMochi(
-        in: rect.insetBy(dx: 0.5, dy: 0.5),
+        in: rect.insetBy(dx: 1.0, dy: 1.0),
         bodyColor: NSColor(srgbRed: 0.725, green: 0.776, blue: 1.0, alpha: 1.0),
         leafColor: NSColor(srgbRed: 0.498, green: 0.820, blue: 0.651, alpha: 1.0),
         eyeColor: NSColor(srgbRed: 0.082, green: 0.086, blue: 0.110, alpha: 1.0),
         blushColor: NSColor(srgbRed: 0.949, green: 0.655, blue: 0.627, alpha: 0.90),
-        cutoutEyes: false
+        cutoutEyes: false,
+        playTime: playTime
       )
       return true
     }
@@ -156,6 +275,7 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
   private var aecEngine: MacosVoiceProcessingEngine?
   private var blurView: NSVisualEffectView?
   private var backdropTimer: Timer?
+  private var menuMochiTimer: Timer?
   private var isBackdropOpaque = false
   private var allowTerminate = false
 
@@ -348,14 +468,25 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
       name: NSApplication.willTerminateNotification,
       object: nil)
 
+    SnippetTheme.ensureFontsRegistered()
     updateBackdropTransparency()
     backdropTimer = Timer.scheduledTimer(withTimeInterval: 0.75, repeats: true) { [weak self] _ in
       self?.updateBackdropTransparency()
+    }
+    menuMochiTimer = Timer.scheduledTimer(withTimeInterval: 0.06, repeats: true) { [weak self] _ in
+      guard let self = self else { return }
+      self.statusItem?.button?.image = MochiRenderer.makeMenuBarIcon(
+        playTime: CACurrentMediaTime()
+      )
+    }
+    if let timer = menuMochiTimer {
+      RunLoop.main.add(timer, forMode: .common)
     }
   }
 
   deinit {
     backdropTimer?.invalidate()
+    menuMochiTimer?.invalidate()
     NSWorkspace.shared.notificationCenter.removeObserver(self)
     NotificationCenter.default.removeObserver(self)
   }
@@ -401,7 +532,7 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
   private func setupMenuBarItem() {
     let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
     if let btn = item.button {
-      btn.image = MochiRenderer.makeMenuBarTemplateIcon()
+      btn.image = MochiRenderer.makeMenuBarIcon(playTime: CACurrentMediaTime())
       btn.imagePosition = .imageOnly
       btn.toolTip = "Snippet"
     }
@@ -414,6 +545,14 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
     )
     openItem.target = self
     menu.addItem(openItem)
+
+    let mcNotchItem = NSMenuItem(
+      title: "Mission Control Notch",
+      action: #selector(onMenuOpenMissionControlNotch),
+      keyEquivalent: "m"
+    )
+    mcNotchItem.target = self
+    menu.addItem(mcNotchItem)
 
     menu.addItem(NSMenuItem.separator())
 
@@ -438,6 +577,14 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
 
   @objc private func onMenuOpenSnippet() {
     restoreFromMenuBar()
+  }
+
+  @objc private func onMenuOpenMissionControlNotch() {
+    if self.isVisible && !self.isMiniaturized {
+      self.orderOut(nil)
+      notchHUD?.setWindowHidden(true)
+    }
+    notchHUD?.openMissionControlConversation()
   }
 
   @objc private func onMenuQuitSnippet() {
@@ -852,52 +999,77 @@ final class FlippedDocumentView: NSView {
 
 // MARK: - Markdown Parser & Attributed Renderer for Notch HUD
 
+/// Zero-inset text view backed by the exact `NSLayoutManager` that measures its
+/// line fragments, eliminating `NSTextFieldCell` padding & re-wrapping mismatches.
+final class NotchTextView: NSView {
+  private let storage: NSTextStorage
+  private let layoutManager: NSLayoutManager
+  private let textContainer: NSTextContainer
+  let measuredSize: NSSize
+
+  override var isFlipped: Bool { true }
+
+  init(attributedString: NSAttributedString, maxWidth: CGFloat) {
+    let safeMaxW = max(16, floor(maxWidth))
+    self.storage = NSTextStorage(attributedString: attributedString)
+    self.layoutManager = NSLayoutManager()
+    self.textContainer = NSTextContainer(size: NSSize(width: safeMaxW, height: .greatestFiniteMagnitude))
+    self.textContainer.lineFragmentPadding = 0
+    self.layoutManager.addTextContainer(self.textContainer)
+    self.storage.addLayoutManager(self.layoutManager)
+    self.layoutManager.ensureLayout(for: self.textContainer)
+
+    let glyphRange = self.layoutManager.glyphRange(for: self.textContainer)
+    let used = self.layoutManager.usedRect(for: self.textContainer)
+    let rawNS = attributedString.string as NSString
+    var maxLineRight: CGFloat = 0
+
+    self.layoutManager.enumerateLineFragments(forGlyphRange: glyphRange) { _, usedRect, _, lineGlyphRange, _ in
+      var charRange = self.layoutManager.characterRange(forGlyphRange: lineGlyphRange, actualGlyphRange: nil)
+      while charRange.length > 0 {
+        let lastChar = rawNS.character(at: charRange.location + charRange.length - 1)
+        if let scalar = UnicodeScalar(lastChar), CharacterSet.whitespacesAndNewlines.contains(scalar) {
+          charRange.length -= 1
+        } else {
+          break
+        }
+      }
+      guard charRange.length > 0 else { return }
+      let visGlyphRange = self.layoutManager.glyphRange(forCharacterRange: charRange, actualCharacterRange: nil)
+      let visBounds = self.layoutManager.boundingRect(forGlyphRange: visGlyphRange, in: self.textContainer)
+      let lineRight = min(usedRect.maxX, visBounds.maxX)
+      if lineRight > maxLineRight {
+        maxLineRight = lineRight
+      }
+    }
+
+    let tightW = maxLineRight > 0 ? min(safeMaxW, ceil(maxLineRight)) : min(safeMaxW, ceil(used.width))
+    let tightH = max(18, ceil(used.height))
+    self.measuredSize = NSSize(width: tightW, height: tightH)
+    super.init(frame: NSRect(x: 0, y: 0, width: tightW, height: tightH))
+  }
+
+  required init?(coder: NSCoder) {
+    fatalError("init(coder:) has not been implemented")
+  }
+
+  override func draw(_ dirtyRect: NSRect) {
+    super.draw(dirtyRect)
+    let glyphRange = layoutManager.glyphRange(for: textContainer)
+    guard glyphRange.length > 0 else { return }
+    layoutManager.drawBackground(forGlyphRange: glyphRange, at: .zero)
+    layoutManager.drawGlyphs(forGlyphRange: glyphRange, at: .zero)
+  }
+}
+
 enum NotchMarkdown {
   enum Block {
     case text(NSAttributedString)
     case code(language: String, code: String)
   }
 
-  /// Measures the exact tight width (longest laid-out line fragment) and height
-  /// of an `NSAttributedString` within `maxWidth` using `NSLayoutManager`.
-  static func measure(_ attr: NSAttributedString, maxWidth: CGFloat) -> NSSize {
-    guard attr.length > 0 && maxWidth > 10 else {
-      return NSSize(width: 0, height: 18)
-    }
-    let storage = NSTextStorage(attributedString: attr)
-    let layoutManager = NSLayoutManager()
-    let container = NSTextContainer(size: NSSize(width: maxWidth, height: .greatestFiniteMagnitude))
-    container.lineFragmentPadding = 0
-    layoutManager.addTextContainer(container)
-    storage.addLayoutManager(layoutManager)
-    layoutManager.ensureLayout(for: container)
-
-    let used = layoutManager.usedRect(for: container)
-    var maxLineW: CGFloat = 0
-    let glyphRange = layoutManager.glyphRange(for: container)
-    layoutManager.enumerateLineFragments(forGlyphRange: glyphRange) { _, usedRect, _, _, _ in
-      if usedRect.width > maxLineW {
-        maxLineW = usedRect.width
-      }
-    }
-    let tightW = maxLineW > 0 ? min(maxWidth, ceil(maxLineW) + 2) : min(maxWidth, ceil(used.width) + 2)
-    let tightH = max(18, ceil(used.height) + 2)
-    return NSSize(width: tightW, height: tightH)
-  }
-
-  static func makeWrappingLabel(_ attr: NSAttributedString) -> NSTextField {
-    let label = NSTextField(wrappingLabelWithString: "")
-    label.isEditable = false
-    label.isBordered = false
-    label.drawsBackground = false
-    label.isSelectable = true
-    label.allowsEditingTextAttributes = true
-    label.cell?.wraps = true
-    label.cell?.isScrollable = false
-    label.lineBreakMode = .byWordWrapping
-    label.maximumNumberOfLines = 0
-    label.attributedStringValue = attr
-    return label
+  static func makeTextView(_ attr: NSAttributedString, maxWidth: CGFloat) -> NotchTextView {
+    return NotchTextView(attributedString: attr, maxWidth: maxWidth)
   }
 
   /// Strips raw Markdown tokens for a clean 1-line notification banner preview.
@@ -966,9 +1138,7 @@ enum NotchMarkdown {
   private static func renderProse(_ text: String, isUser: Bool) -> NSAttributedString {
     let result = NSMutableAttributedString()
     let lines = text.components(separatedBy: "\n")
-    let baseColor = isUser
-      ? NSColor(srgbRed: 0.96, green: 0.96, blue: 0.98, alpha: 1.0)
-      : NSColor(srgbRed: 0.91, green: 0.91, blue: 0.94, alpha: 1.0)
+    let baseColor = SnippetTheme.fg1
 
     for (idx, rawLine) in lines.enumerated() {
       if idx > 0 {
@@ -980,7 +1150,7 @@ enum NotchMarkdown {
       }
 
       var lineText = trimmed
-      var fontSize: CGFloat = 12.5
+      var fontSize: CGFloat = 13.5
       var baseWeight: NSFont.Weight = .regular
       var lineColor = baseColor
       var headIndent: CGFloat = 0
@@ -989,21 +1159,21 @@ enum NotchMarkdown {
 
       if lineText.hasPrefix("### ") {
         lineText = String(lineText.dropFirst(4))
-        fontSize = 13.0
-        baseWeight = .semibold
-        lineColor = NSColor(srgbRed: 0.97, green: 0.97, blue: 0.99, alpha: 1.0)
+        fontSize = 13.5
+        baseWeight = .medium
+        lineColor = SnippetTheme.fg1
         spacingBefore = idx > 0 ? 4 : 0
       } else if lineText.hasPrefix("## ") {
         lineText = String(lineText.dropFirst(3))
-        fontSize = 13.5
-        baseWeight = .semibold
-        lineColor = NSColor(srgbRed: 0.98, green: 0.98, blue: 1.0, alpha: 1.0)
+        fontSize = 14.5
+        baseWeight = .medium
+        lineColor = SnippetTheme.fg1
         spacingBefore = idx > 0 ? 5 : 0
       } else if lineText.hasPrefix("# ") {
         lineText = String(lineText.dropFirst(2))
-        fontSize = 14.0
-        baseWeight = .bold
-        lineColor = NSColor.white
+        fontSize = 15.0
+        baseWeight = .medium
+        lineColor = SnippetTheme.fg1
         spacingBefore = idx > 0 ? 6 : 0
       } else if lineText.hasPrefix("- ") || lineText.hasPrefix("* ") || lineText.hasPrefix("+ ") {
         lineText = "•  " + String(lineText.dropFirst(2))
@@ -1011,7 +1181,7 @@ enum NotchMarkdown {
         firstIndent = 2
       } else if lineText.hasPrefix("> ") {
         lineText = "▎ " + String(lineText.dropFirst(2))
-        lineColor = NSColor(srgbRed: 0.72, green: 0.72, blue: 0.79, alpha: 1.0)
+        lineColor = SnippetTheme.fg3
         headIndent = 10
       } else if let dotRange = lineText.range(of: "^\\d+\\.\\s+", options: .regularExpression) {
         let prefix = String(lineText[dotRange])
@@ -1022,7 +1192,7 @@ enum NotchMarkdown {
       }
 
       let pStyle = NSMutableParagraphStyle()
-      pStyle.lineSpacing = 3.2
+      pStyle.lineSpacing = 3.5
       pStyle.paragraphSpacing = 2.0
       pStyle.paragraphSpacingBefore = spacingBefore
       pStyle.headIndent = headIndent
@@ -1047,7 +1217,6 @@ enum NotchMarkdown {
     baseColor: NSColor,
     paragraphStyle: NSParagraphStyle
   ) -> NSAttributedString {
-    // Convert [label](url) to label first so links read cleanly
     var working = input
     if let linkRe = try? NSRegularExpression(pattern: "\\[([^\\]]+)\\]\\([^\\)]+\\)") {
       working = linkRe.stringByReplacingMatches(
@@ -1058,10 +1227,10 @@ enum NotchMarkdown {
     }
 
     let out = NSMutableAttributedString()
-    let baseFont = NSFont.systemFont(ofSize: fontSize, weight: baseWeight)
-    let boldFont = NSFont.systemFont(ofSize: fontSize, weight: .semibold)
+    let baseFont = SnippetTheme.sans(fontSize, weight: baseWeight)
+    let boldFont = SnippetTheme.sans(fontSize, weight: .medium)
     let italicFont = NSFontManager.shared.convert(baseFont, toHaveTrait: .italicFontMask)
-    let codeFont = NSFont.monospacedSystemFont(ofSize: max(11.0, fontSize - 1.0), weight: .medium)
+    let codeFont = SnippetTheme.mono(max(12.0, fontSize - 1.0), weight: .regular)
 
     let defaultAttrs: [NSAttributedString.Key: Any] = [
       .font: baseFont,
@@ -1069,7 +1238,6 @@ enum NotchMarkdown {
       .paragraphStyle: paragraphStyle,
     ]
 
-    // Tokenize by inline code (`...`), bold (**...**), or italic (*...*)
     let pattern = "(`[^`]+`|\\*\\*[^*]+\\*\\*|__[^_]+__|\\*[^*]+\\*)"
     guard let regex = try? NSRegularExpression(pattern: pattern) else {
       return NSAttributedString(string: working, attributes: defaultAttrs)
@@ -1089,8 +1257,8 @@ enum NotchMarkdown {
         let inner = String(token.dropFirst().dropLast())
         let codeAttrs: [NSAttributedString.Key: Any] = [
           .font: codeFont,
-          .foregroundColor: NSColor(srgbRed: 0.76, green: 0.80, blue: 1.0, alpha: 1.0),
-          .backgroundColor: NSColor(srgbRed: 0.14, green: 0.15, blue: 0.20, alpha: 1.0),
+          .foregroundColor: SnippetTheme.fg1,
+          .backgroundColor: SnippetTheme.surface2,
           .paragraphStyle: paragraphStyle,
         ]
         out.append(NSAttributedString(string: " \(inner) ", attributes: codeAttrs))
@@ -1098,7 +1266,7 @@ enum NotchMarkdown {
         let inner = String(token.dropFirst(2).dropLast(2))
         let boldAttrs: [NSAttributedString.Key: Any] = [
           .font: boldFont,
-          .foregroundColor: NSColor.white,
+          .foregroundColor: SnippetTheme.fg1,
           .paragraphStyle: paragraphStyle,
         ]
         out.append(NSAttributedString(string: inner, attributes: boldAttrs))
@@ -1278,6 +1446,25 @@ final class NotchHUDController {
     hudView.setConversationData(title: title, status: status, messages: messages)
   }
 
+  func openMissionControlConversation() {
+    let defaultPayload = "{\"session\":\"mission-control\",\"title\":\"Mission Control\"}"
+    activePayload = defaultPayload
+    notifDismissTimer?.invalidate()
+    notifTitle = nil
+    notifSubtitle = nil
+    notifKind = nil
+    notifPayload = nil
+    conversationExpanded = true
+    hudView.setConversationExpanded(true)
+    hudView.setConversationData(
+      title: "Mission Control",
+      status: "loading",
+      messages: []
+    )
+    refreshHUD(animated: true)
+    onOpenConversation(defaultPayload)
+  }
+
   private func clearNotification() {
     notifTitle = nil
     notifSubtitle = nil
@@ -1291,7 +1478,7 @@ final class NotchHUDController {
       return
     }
     if let payload = notifPayload, !payload.isEmpty {
-      let title = notifTitle ?? "Conversation"
+      let title = notifTitle ?? "Mission Control"
       let sub = notifSubtitle ?? ""
       activePayload = payload
       notifDismissTimer?.invalidate()
@@ -1309,7 +1496,7 @@ final class NotchHUDController {
       refreshHUD(animated: true)
       onOpenConversation(payload)
     } else {
-      onActivateWindow()
+      openMissionControlConversation()
     }
   }
 
@@ -1347,8 +1534,9 @@ final class NotchHUDController {
 
   private func refreshHUD(animated: Bool) {
     let hasNotif = notifTitle != nil
-    let showAmbient = windowHidden && ambientActive
-    let shouldShow = windowHidden && (conversationExpanded || hasNotif || showAmbient)
+    // Always keep the Notch HUD active when Snippet is minimized/closed to the menu bar,
+    // even when ambient voice is inactive, so Mission Control chats and notifications are always right in the Notch.
+    let shouldShow = windowHidden
 
     if !shouldShow {
       waveTimer?.invalidate()
@@ -1370,25 +1558,23 @@ final class NotchHUDController {
 
     if conversationExpanded {
       topCornerRadius = 15
-      bottomCornerRadius = 24
-      targetWidth = max(hw.width + 276, 464) + topCornerRadius * 2
-      targetHeight = hw.height + 392
+      bottomCornerRadius = 22
+      targetWidth = max(hw.width + 292, 480) + topCornerRadius * 2
+      targetHeight = hw.height + 404
     } else if hasNotif {
-      topCornerRadius = 12
-      bottomCornerRadius = 20
-      targetWidth = max(hw.width + 196, 388) + topCornerRadius * 2
-      targetHeight = hw.height + 66
+      topCornerRadius = 14
+      bottomCornerRadius = 22
+      targetWidth = max(hw.width + 236, 424) + topCornerRadius * 2
+      targetHeight = hw.height + 76
     } else if assistantSpeaking || userSpeaking {
       topCornerRadius = 8
       bottomCornerRadius = 16
-      // Two 48pt wings on either side of the physical camera cutout + a 24pt speaking chin below
       targetWidth = hw.width + 96 + topCornerRadius * 2
       targetHeight = hw.height + 24
     } else {
       topCornerRadius = 6
       bottomCornerRadius = 14
-      // Compact resting state: 42pt left wing (Mochi) + hw.width camera gap + 42pt right wing (waveform)
-      targetWidth = hw.width + 84 + topCornerRadius * 2
+      targetWidth = hw.width + 88 + topCornerRadius * 2
       targetHeight = hw.height
     }
 
@@ -1433,9 +1619,11 @@ final class NotchHUDController {
     }
 
     if waveTimer == nil {
-      waveTimer = Timer.scheduledTimer(withTimeInterval: 0.045, repeats: true) { [weak self] _ in
+      let timer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] _ in
         self?.hudView.stepAnimation()
       }
+      RunLoop.main.add(timer, forMode: .common)
+      waveTimer = timer
     }
   }
 }
@@ -1491,31 +1679,35 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
     containerView.isHidden = true
     addSubview(containerView)
 
-    titleField.font = NSFont.systemFont(ofSize: 13, weight: .semibold)
-    titleField.textColor = NSColor(srgbRed: 0.95, green: 0.95, blue: 0.97, alpha: 1.0)
+    titleField.font = SnippetTheme.sans(13.5, weight: .medium)
+    titleField.textColor = SnippetTheme.fg1
     titleField.lineBreakMode = .byTruncatingTail
     containerView.addSubview(titleField)
 
-    statusField.font = NSFont.monospacedSystemFont(ofSize: 10, weight: .semibold)
-    statusField.textColor = NSColor(srgbRed: 0.55, green: 0.56, blue: 1.0, alpha: 1.0)
+    statusField.font = SnippetTheme.mono(10.0, weight: .medium)
+    statusField.textColor = SnippetTheme.accent
     containerView.addSubview(statusField)
 
     openAppButton.isBordered = false
     openAppButton.wantsLayer = true
-    openAppButton.layer?.backgroundColor = NSColor(srgbRed: 0.14, green: 0.14, blue: 0.17, alpha: 1.0).cgColor
-    openAppButton.layer?.cornerRadius = 7
-    openAppButton.font = NSFont.systemFont(ofSize: 11, weight: .medium)
-    openAppButton.contentTintColor = NSColor(srgbRed: 0.86, green: 0.86, blue: 0.92, alpha: 1.0)
+    openAppButton.layer?.backgroundColor = SnippetTheme.surface1.cgColor
+    openAppButton.layer?.cornerRadius = 8
+    openAppButton.layer?.borderWidth = 1
+    openAppButton.layer?.borderColor = SnippetTheme.border.cgColor
+    openAppButton.font = SnippetTheme.sans(11.5, weight: .medium)
+    openAppButton.contentTintColor = SnippetTheme.fg2
     openAppButton.target = self
     openAppButton.action = #selector(handleOpenAppTap)
     containerView.addSubview(openAppButton)
 
     closeButton.isBordered = false
     closeButton.wantsLayer = true
-    closeButton.layer?.backgroundColor = NSColor(srgbRed: 0.14, green: 0.14, blue: 0.17, alpha: 1.0).cgColor
-    closeButton.layer?.cornerRadius = 7
-    closeButton.font = NSFont.systemFont(ofSize: 11, weight: .semibold)
-    closeButton.contentTintColor = NSColor(srgbRed: 0.72, green: 0.72, blue: 0.78, alpha: 1.0)
+    closeButton.layer?.backgroundColor = SnippetTheme.surface1.cgColor
+    closeButton.layer?.cornerRadius = 8
+    closeButton.layer?.borderWidth = 1
+    closeButton.layer?.borderColor = SnippetTheme.border.cgColor
+    closeButton.font = SnippetTheme.sans(11.5, weight: .medium)
+    closeButton.contentTintColor = SnippetTheme.fg3
     closeButton.target = self
     closeButton.action = #selector(handleCloseTap)
     containerView.addSubview(closeButton)
@@ -1528,18 +1720,18 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
     containerView.addSubview(scrollView)
 
     replyContainer.wantsLayer = true
-    replyContainer.layer?.backgroundColor = NSColor(srgbRed: 0.09, green: 0.09, blue: 0.11, alpha: 1.0).cgColor
-    replyContainer.layer?.cornerRadius = 18
+    replyContainer.layer?.backgroundColor = SnippetTheme.surface1.cgColor
+    replyContainer.layer?.cornerRadius = 14
     replyContainer.layer?.borderWidth = 1
-    replyContainer.layer?.borderColor = NSColor(srgbRed: 0.18, green: 0.18, blue: 0.22, alpha: 1.0).cgColor
+    replyContainer.layer?.borderColor = SnippetTheme.border.cgColor
     containerView.addSubview(replyContainer)
 
     replyField.isBordered = false
     replyField.drawsBackground = false
     replyField.focusRingType = .none
-    replyField.font = NSFont.systemFont(ofSize: 12.5, weight: .regular)
-    replyField.textColor = NSColor(srgbRed: 0.95, green: 0.95, blue: 0.97, alpha: 1.0)
-    replyField.placeholderString = "Reply in conversation…"
+    replyField.font = SnippetTheme.sans(13.0, weight: .regular)
+    replyField.textColor = SnippetTheme.fg1
+    replyField.placeholderString = "Message Mission Control…"
     replyField.delegate = self
     replyField.target = self
     replyField.action = #selector(handleSendTap)
@@ -1547,9 +1739,9 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
 
     sendButton.isBordered = false
     sendButton.wantsLayer = true
-    sendButton.layer?.backgroundColor = NSColor(srgbRed: 0.37, green: 0.42, blue: 0.82, alpha: 1.0).cgColor
+    sendButton.layer?.backgroundColor = SnippetTheme.accentFill.cgColor
     sendButton.layer?.cornerRadius = 13
-    sendButton.font = NSFont.systemFont(ofSize: 13, weight: .bold)
+    sendButton.font = SnippetTheme.sans(13.0, weight: .medium)
     sendButton.contentTintColor = NSColor.white
     sendButton.target = self
     sendButton.action = #selector(handleSendTap)
@@ -1665,9 +1857,9 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
     var y: CGFloat = 8
 
     if convMessages.isEmpty {
-      let empty = NSTextField(labelWithString: convStatus == "loading" ? "Loading conversation…" : "No messages yet.")
-      empty.font = NSFont.systemFont(ofSize: 12, weight: .regular)
-      empty.textColor = NSColor(srgbRed: 0.56, green: 0.56, blue: 0.62, alpha: 1.0)
+      let empty = NSTextField(labelWithString: convStatus == "loading" ? "Loading Mission Control…" : "No messages yet.")
+      empty.font = SnippetTheme.sans(12.5, weight: .regular)
+      empty.textColor = SnippetTheme.fg3
       empty.frame = NSRect(x: 8, y: 18, width: width - 16, height: 20)
       documentView.addSubview(empty)
       y = 48
@@ -1678,116 +1870,103 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
         if blocks.isEmpty { continue }
 
         if isUser {
-          let maxBubbleW = width * 0.82
-          let padX: CGFloat = 12
-          let padY: CGFloat = 7
-          let attr = NotchMarkdown.parseBlocks(msg.text, isUser: true).compactMap { b -> NSAttributedString? in
+          // Matches Bubble(mine: true) in lib/widgets.dart:
+          // padding: EdgeInsets.fromLTRB(14, 9, 14, 10), color: AppColors.surface2 (#1E1E22), no border
+          let maxBubbleW = floor(width * 0.82)
+          let padX: CGFloat = 14
+          let padTop: CGFloat = 9
+          let padBot: CGFloat = 10
+          let attr = blocks.compactMap { b -> NSAttributedString? in
             if case let .text(a) = b { return a }
             return nil
           }.first ?? NSAttributedString(string: msg.text)
 
-          let measured = NotchMarkdown.measure(attr, maxWidth: maxBubbleW - padX * 2)
-          let bubbleW = min(maxBubbleW, max(44, measured.width + padX * 2))
-          let bubbleH = max(30, measured.height + padY * 2)
+          let textView = NotchMarkdown.makeTextView(attr, maxWidth: maxBubbleW - padX * 2)
+          let textSize = textView.measuredSize
+          let bubbleW = min(maxBubbleW, textSize.width + padX * 2)
+          let bubbleH = textSize.height + padTop + padBot
           let bubbleX = width - bubbleW - 4
 
           let bubble = NSView(frame: NSRect(x: bubbleX, y: y, width: bubbleW, height: bubbleH))
           bubble.wantsLayer = true
-          bubble.layer?.backgroundColor = NSColor(srgbRed: 0.12, green: 0.12, blue: 0.14, alpha: 1.0).cgColor
-          bubble.layer?.cornerRadius = 10
-          bubble.layer?.borderWidth = 1
-          bubble.layer?.borderColor = NSColor(srgbRed: 0.19, green: 0.19, blue: 0.22, alpha: 1.0).cgColor
+          bubble.layer?.backgroundColor = SnippetTheme.surface2.cgColor
+          bubble.layer?.cornerRadius = 14
 
-          let label = NotchMarkdown.makeWrappingLabel(attr)
-          label.preferredMaxLayoutWidth = bubbleW - padX * 2
-          label.frame = NSRect(x: padX, y: padY, width: bubbleW - padX * 2, height: bubbleH - padY * 2)
-          bubble.addSubview(label)
+          textView.frame = NSRect(x: padX, y: padTop, width: textSize.width, height: textSize.height)
+          bubble.addSubview(textView)
           documentView.addSubview(bubble)
 
-          y += bubbleH + 3
+          y += bubbleH + 4
           if !msg.meta.isEmpty {
             let metaField = NSTextField(labelWithString: msg.meta)
-            metaField.font = NSFont.systemFont(ofSize: 10.5, weight: .regular)
-            metaField.textColor = NSColor(srgbRed: 0.45, green: 0.45, blue: 0.51, alpha: 1.0)
+            metaField.font = SnippetTheme.sans(11.5, weight: .regular)
+            metaField.textColor = SnippetTheme.fg4
             metaField.alignment = .right
-            metaField.frame = NSRect(x: 8, y: y, width: width - 12, height: 14)
+            metaField.frame = NSRect(x: 8, y: y, width: width - 12, height: 15)
             documentView.addSubview(metaField)
-            y += 15
+            y += 16
           }
-          y += 7
+          y += 8
         } else {
-          // Assistant / Mission Control editorial turn matching the main chat transcript
-          let turnX: CGFloat = 12
-          let turnW = width - turnX - 6
-          let turnStart = y
+          // Matches Bubble(mine: false) in lib/widgets.dart:
+          // Plain full-width Markdown aligned left in Geist 13.5pt (#EEEEF1), with NO left-side blue ribbon.
+          let turnX: CGFloat = 4
+          let turnW = width - turnX - 8
           if !msg.meta.isEmpty {
-            let badgeField = NSTextField(labelWithString: msg.meta.uppercased())
-            badgeField.font = NSFont.monospacedSystemFont(ofSize: 9.5, weight: .semibold)
-            badgeField.textColor = NSColor(srgbRed: 0.55, green: 0.56, blue: 1.0, alpha: 0.85)
-            badgeField.frame = NSRect(x: turnX + 8, y: y, width: turnW - 10, height: 13)
+            let badgeField = NSTextField(labelWithString: msg.meta)
+            badgeField.font = SnippetTheme.sans(11.5, weight: .medium)
+            badgeField.textColor = SnippetTheme.fg3
+            badgeField.frame = NSRect(x: turnX, y: y, width: turnW, height: 15)
             documentView.addSubview(badgeField)
-            y += 15
+            y += 17
           }
 
           for block in blocks {
             switch block {
             case .text(let attr):
-              let textW = turnW - 10
-              let measured = NotchMarkdown.measure(attr, maxWidth: textW)
-              let h = max(18, measured.height + 2)
-              let label = NotchMarkdown.makeWrappingLabel(attr)
-              label.preferredMaxLayoutWidth = textW
-              label.frame = NSRect(x: turnX + 8, y: y, width: textW, height: h)
-              documentView.addSubview(label)
-              y += h + 6
+              let textView = NotchMarkdown.makeTextView(attr, maxWidth: turnW)
+              let sz = textView.measuredSize
+              textView.frame = NSRect(x: turnX, y: y, width: sz.width, height: sz.height)
+              documentView.addSubview(textView)
+              y += sz.height + 6
 
             case .code(let lang, let code):
-              let codeFont = NSFont.monospacedSystemFont(ofSize: 11.5, weight: .regular)
+              let codeFont = SnippetTheme.mono(12.0, weight: .regular)
               let pStyle = NSMutableParagraphStyle()
-              pStyle.lineSpacing = 2.5
+              pStyle.lineSpacing = 3.0
               let codeAttrs: [NSAttributedString.Key: Any] = [
                 .font: codeFont,
-                .foregroundColor: NSColor(srgbRed: 0.86, green: 0.87, blue: 0.92, alpha: 1.0),
+                .foregroundColor: SnippetTheme.fg2,
                 .paragraphStyle: pStyle,
               ]
               let codeAttr = NSAttributedString(string: code, attributes: codeAttrs)
-              let codeTextW = turnW - 28
-              let measured = NotchMarkdown.measure(codeAttr, maxWidth: codeTextW)
+              let codeTextW = turnW - 24
+              let codeView = NotchMarkdown.makeTextView(codeAttr, maxWidth: codeTextW)
+              let sz = codeView.measuredSize
               let headerH: CGFloat = lang.isEmpty ? 0 : 18
-              let boxH = max(30, measured.height + 16 + headerH)
-              let box = NSView(frame: NSRect(x: turnX + 6, y: y, width: turnW - 8, height: boxH))
+              let boxH = sz.height + 16 + headerH
+              let box = NSView(frame: NSRect(x: turnX, y: y, width: turnW, height: boxH))
               box.wantsLayer = true
-              box.layer?.backgroundColor = NSColor(srgbRed: 0.06, green: 0.06, blue: 0.08, alpha: 1.0).cgColor
+              box.layer?.backgroundColor = SnippetTheme.surface1.cgColor
               box.layer?.cornerRadius = 8
               box.layer?.borderWidth = 1
-              box.layer?.borderColor = NSColor(srgbRed: 0.16, green: 0.16, blue: 0.20, alpha: 1.0).cgColor
+              box.layer?.borderColor = SnippetTheme.border.cgColor
 
               if !lang.isEmpty {
-                let langLabel = NSTextField(labelWithString: lang.uppercased())
-                langLabel.font = NSFont.monospacedSystemFont(ofSize: 9.5, weight: .semibold)
-                langLabel.textColor = NSColor(srgbRed: 0.55, green: 0.56, blue: 0.65, alpha: 1.0)
-                langLabel.frame = NSRect(x: 10, y: 5, width: codeTextW, height: 13)
+                let langLabel = NSTextField(labelWithString: lang)
+                langLabel.font = SnippetTheme.mono(10.5, weight: .medium)
+                langLabel.textColor = SnippetTheme.fg3
+                langLabel.frame = NSRect(x: 12, y: 5, width: codeTextW, height: 14)
                 box.addSubview(langLabel)
               }
 
-              let codeField = NotchMarkdown.makeWrappingLabel(codeAttr)
-              codeField.preferredMaxLayoutWidth = codeTextW
-              codeField.frame = NSRect(x: 10, y: 8 + headerH, width: codeTextW, height: max(16, boxH - 16 - headerH))
-              box.addSubview(codeField)
+              codeView.frame = NSRect(x: 12, y: 8 + headerH, width: sz.width, height: sz.height)
+              box.addSubview(codeView)
               documentView.addSubview(box)
               y += boxH + 8
             }
           }
-
-          // Subtle vertical accent bar on the left of the assistant turn
-          let barH = max(14, y - turnStart - 6)
-          let bar = NSView(frame: NSRect(x: 6, y: turnStart + 2, width: 2.5, height: barH))
-          bar.wantsLayer = true
-          bar.layer?.backgroundColor = NSColor(srgbRed: 0.55, green: 0.56, blue: 1.0, alpha: 0.55).cgColor
-          bar.layer?.cornerRadius = 1.25
-          documentView.addSubview(bar)
-
-          y += 6
+          y += 8
         }
       }
     }
@@ -1846,37 +2025,44 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
     let b = bounds
     guard b.width > 20 && b.height > 16 else { return }
 
-    // 1. Exact DynamicNotchKit / boring.notch silhouette flush with the top bezel (maxY)
     let shapePath = Self.dynamicNotchPath(
       in: b,
       topCornerRadius: topCornerRadius,
       bottomCornerRadius: bottomCornerRadius
     )
 
-    // Pure pitch-black fill (#000000) so there is zero seam against the MacBook camera housing
-    NSColor.black.setFill()
-    shapePath.fill()
+    let periwinkle = NSColor(srgbRed: 0.73, green: 0.78, blue: 1.0, alpha: 1.0)
+    let matcha = NSColor(srgbRed: 0.50, green: 0.82, blue: 0.65, alpha: 1.0)
+    let ink = NSColor(srgbRed: 0.08, green: 0.09, blue: 0.11, alpha: 1.0)
+    let blush = NSColor(srgbRed: 0.95, green: 0.65, blue: 0.63, alpha: 0.85)
+    let now = CACurrentMediaTime()
 
-    // Subtle inner bottom/side hairline (never along the top edge) for depth over dark apps
     NSGraphicsContext.current?.saveGraphicsState()
     shapePath.addClip()
+
+    if conversationExpanded {
+      // Match Snippet's exact #101012 (AppColors.bg) for the expanded panel while
+      // keeping the top hardware camera band pitch-black so the bezel seam is invisible.
+      SnippetTheme.bg.setFill()
+      b.fill()
+      NSColor.black.setFill()
+      NSRect(x: b.minX, y: b.maxY - hwNotchHeight, width: b.width, height: hwNotchHeight).fill()
+    } else {
+      NSColor.black.setFill()
+      b.fill()
+    }
+
     let borderStroke = Self.dynamicNotchBorderPath(
       in: b,
       topCornerRadius: topCornerRadius,
       bottomCornerRadius: bottomCornerRadius
     )
-    NSColor(srgbRed: 1.0, green: 1.0, blue: 1.0, alpha: 0.08).setStroke()
+    (conversationExpanded ? SnippetTheme.border : SnippetTheme.border2).setStroke()
     borderStroke.lineWidth = 1.5
     borderStroke.stroke()
     NSGraphicsContext.current?.restoreGraphicsState()
 
-    let periwinkle = NSColor(srgbRed: 0.73, green: 0.78, blue: 1.0, alpha: 1.0)
-    let matcha = NSColor(srgbRed: 0.50, green: 0.82, blue: 0.65, alpha: 1.0)
-    let ink = NSColor(srgbRed: 0.08, green: 0.09, blue: 0.11, alpha: 1.0)
-    let blush = NSColor(srgbRed: 0.95, green: 0.65, blue: 0.63, alpha: 0.85)
-
     if conversationExpanded {
-      // Mochi avatar next to the conversation header title
       let headerMochiRect = NSRect(
         x: topCornerRadius + 16,
         y: b.height - hwNotchHeight - 6 - 24,
@@ -1888,14 +2074,15 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
         bodyColor: periwinkle,
         leafColor: matcha,
         eyeColor: ink,
-        blushColor: blush
+        blushColor: blush,
+        playTime: now
       )
 
       let sepY = b.height - hwNotchHeight - 6 - 32
       let sep = NSBezierPath()
       sep.move(to: NSPoint(x: topCornerRadius + 16, y: sepY))
       sep.line(to: NSPoint(x: b.width - topCornerRadius - 16, y: sepY))
-      NSColor(srgbRed: 1.0, green: 1.0, blue: 1.0, alpha: 0.07).setStroke()
+      SnippetTheme.border.setStroke()
       sep.lineWidth = 1.0
       sep.stroke()
       return
@@ -1909,7 +2096,8 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
         periwinkle: periwinkle,
         matcha: matcha,
         ink: ink,
-        blush: blush
+        blush: blush,
+        now: now
       )
     } else {
       drawAmbientWingsAndChin(
@@ -1917,37 +2105,32 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
         periwinkle: periwinkle,
         matcha: matcha,
         ink: ink,
-        blush: blush
+        blush: blush,
+        now: now
       )
     }
   }
 
-  /// Renders the left wing (Mochi mascot) and right wing (5-bar audio equalizer)
-  /// strictly outside `hwNotchWidth` so the physical camera never covers a pixel,
-  /// plus a bottom chin caption when Snippet or the user is speaking.
   private func drawAmbientWingsAndChin(
     in b: NSRect,
     periwinkle: NSColor,
     matcha: NSColor,
     ink: NSColor,
-    blush: NSColor
+    blush: NSColor,
+    now: Double
   ) {
     let topBandMinY = b.maxY - hwNotchHeight
     let topBandMidY = topBandMinY + hwNotchHeight / 2
     let cameraLeft = b.midX - hwNotchWidth / 2
     let cameraRight = b.midX + hwNotchWidth / 2
 
-    // Left Wing: Snippet Mochi character (centred between left wall and camera cutout)
+    // Left Wing: Animated WorkingMochi character
     let leftWingX = b.minX + topCornerRadius
     let leftWingW = max(24, cameraLeft - leftWingX)
     let mochiSize: CGFloat = 18
-    let bounce: CGFloat = (assistantSpeaking || userSpeaking)
-      ? CGFloat(sin(Double(phase * 1.4))) * 1.2
-      : 0.0
-    let blink: CGFloat = (sin(Double(phase * 0.35)) > 0.95) ? 1.0 : 0.0
     let mochiRect = NSRect(
       x: leftWingX + (leftWingW - mochiSize) / 2,
-      y: topBandMidY - mochiSize / 2 + bounce,
+      y: topBandMidY - mochiSize / 2,
       width: mochiSize,
       height: mochiSize
     )
@@ -1957,36 +2140,58 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
       leafColor: matcha,
       eyeColor: ink,
       blushColor: blush,
-      blink: blink
+      playTime: now
     )
 
-    // Right Wing: 5-bar Dynamic Island audio equalizer
+    // Right Wing: Audio equalizer when ambient voice is active, or sleek "MC" pill when idle
     let rightWingX = cameraRight
     let rightWingW = max(24, (b.maxX - topCornerRadius) - rightWingX)
-    let barCount = 5
-    let barW: CGFloat = 2.5
-    let barGap: CGFloat = 2.6
-    let totalBarsW = CGFloat(barCount) * barW + CGFloat(barCount - 1) * barGap
-    let startX = rightWingX + (rightWingW - totalBarsW) / 2
 
-    let waveColor = userSpeaking
-      ? NSColor(srgbRed: 0.30, green: 0.76, blue: 0.54, alpha: 1.0)
-      : NSColor(srgbRed: 0.55, green: 0.56, blue: 1.0, alpha: 1.0)
+    if ambientActive || assistantSpeaking || userSpeaking {
+      let barCount = 5
+      let barW: CGFloat = 2.5
+      let barGap: CGFloat = 2.6
+      let totalBarsW = CGFloat(barCount) * barW + CGFloat(barCount - 1) * barGap
+      let startX = rightWingX + (rightWingW - totalBarsW) / 2
 
-    for i in 0..<barCount {
-      let wave = sin(Double(phase) + Double(i) * 0.9)
-      let amp: CGFloat = assistantSpeaking
-        ? 1.0
-        : (userSpeaking ? max(CGFloat(probability), 0.6) : 0.20)
-      let barH = max(3.5, 3.5 + 11.5 * amp * CGFloat(0.5 + 0.5 * wave))
-      let bx = startX + CGFloat(i) * (barW + barGap)
-      let by = topBandMidY - barH / 2
-      let barRect = NSRect(x: bx, y: by, width: barW, height: barH)
-      waveColor.withAlphaComponent(assistantSpeaking || userSpeaking ? 0.95 : 0.65).setFill()
-      NSBezierPath(roundedRect: barRect, xRadius: 1.25, yRadius: 1.25).fill()
+      let waveColor = userSpeaking ? SnippetTheme.ok : SnippetTheme.accent
+      for i in 0..<barCount {
+        let wave = sin(Double(phase) + Double(i) * 0.9)
+        let amp: CGFloat = assistantSpeaking
+          ? 1.0
+          : (userSpeaking ? max(CGFloat(probability), 0.6) : 0.22)
+        let barH = max(3.5, 3.5 + 11.5 * amp * CGFloat(0.5 + 0.5 * wave))
+        let bx = startX + CGFloat(i) * (barW + barGap)
+        let by = topBandMidY - barH / 2
+        let barRect = NSRect(x: bx, y: by, width: barW, height: barH)
+        waveColor.withAlphaComponent(assistantSpeaking || userSpeaking ? 0.95 : 0.70).setFill()
+        NSBezierPath(roundedRect: barRect, xRadius: 1.25, yRadius: 1.25).fill()
+      }
+    } else {
+      let pillW: CGFloat = 28
+      let pillH: CGFloat = 16
+      let pillRect = NSRect(
+        x: rightWingX + (rightWingW - pillW) / 2,
+        y: topBandMidY - pillH / 2,
+        width: pillW,
+        height: pillH
+      )
+      SnippetTheme.surface2.setFill()
+      let pillPath = NSBezierPath(roundedRect: pillRect, xRadius: 5, yRadius: 5)
+      pillPath.fill()
+      let pStyle = NSMutableParagraphStyle()
+      pStyle.alignment = .center
+      let mcAttrs: [NSAttributedString.Key: Any] = [
+        .font: SnippetTheme.mono(9.5, weight: .semibold),
+        .foregroundColor: SnippetTheme.accent,
+        .paragraphStyle: pStyle,
+      ]
+      ("MC" as NSString).draw(
+        in: NSRect(x: pillRect.minX, y: pillRect.minY + 1.5, width: pillW, height: 13),
+        withAttributes: mcAttrs
+      )
     }
 
-    // Chin below the hardware notch when speaking
     if assistantSpeaking || userSpeaking {
       let chinHeight = b.height - hwNotchHeight
       if chinHeight >= 16 {
@@ -1994,8 +2199,8 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
         let pStyle = NSMutableParagraphStyle()
         pStyle.alignment = .center
         let attrs: [NSAttributedString.Key: Any] = [
-          .font: NSFont.systemFont(ofSize: 11, weight: .medium),
-          .foregroundColor: NSColor(srgbRed: 0.86, green: 0.86, blue: 0.92, alpha: 0.92),
+          .font: SnippetTheme.sans(11.5, weight: .medium),
+          .foregroundColor: SnippetTheme.fg2,
           .paragraphStyle: pStyle,
         ]
         let textRect = NSRect(
@@ -2009,8 +2214,9 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
     }
   }
 
-  /// Renders the notification card in the lower region strictly below `hwNotchHeight`
-  /// so the physical camera cutout never obscures the title or message.
+  /// Renders a slick Dynamic Island notification card below `hwNotchHeight`,
+  /// with top wing badges, a glowing status dot, animated Mochi avatar, Geist typography,
+  /// and an interactive "Reply ↵" pill.
   private func drawNotification(
     in b: NSRect,
     title: String,
@@ -2018,88 +2224,141 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
     periwinkle: NSColor,
     matcha: NSColor,
     ink: NSColor,
-    blush: NSColor
+    blush: NSColor,
+    now: Double
   ) {
-    let bodyTopY = b.maxY - hwNotchHeight
-    let bodyRect = NSRect(
-      x: b.minX + topCornerRadius + 16,
-      y: 10,
-      width: b.width - (topCornerRadius + 16) * 2,
-      height: max(36, bodyTopY - 12)
+    let topBandMinY = b.maxY - hwNotchHeight
+    let topBandMidY = topBandMinY + hwNotchHeight / 2
+    let cameraLeft = b.midX - hwNotchWidth / 2
+    let cameraRight = b.midX + hwNotchWidth / 2
+
+    // Top-left wing: live pulsing status dot + category label
+    let isWaiting = notifKind == "waiting"
+    let statusColor = isWaiting ? SnippetTheme.run : SnippetTheme.accent
+    let dotX = b.minX + topCornerRadius + 14
+    let dotRect = NSRect(x: dotX, y: topBandMidY - 3.5, width: 7, height: 7)
+    statusColor.withAlphaComponent(0.28).setFill()
+    NSBezierPath(ovalIn: dotRect.insetBy(dx: -2.5, dy: -2.5)).fill()
+    statusColor.setFill()
+    NSBezierPath(ovalIn: dotRect).fill()
+
+    let wingLabel = isWaiting ? "NEEDS INPUT" : (title == "Mission Control" ? "MISSION CONTROL" : "SNIPPET")
+    let wingAttrs: [NSAttributedString.Key: Any] = [
+      .font: SnippetTheme.mono(9.5, weight: .semibold),
+      .foregroundColor: SnippetTheme.fg3,
+    ]
+    let wingMaxW = max(20, cameraLeft - (dotX + 13) - 6)
+    (wingLabel as NSString).draw(
+      in: NSRect(x: dotX + 13, y: topBandMidY - 6.5, width: wingMaxW, height: 13),
+      withAttributes: wingAttrs
     )
 
-    // Left Mochi avatar inside the notification card
-    let avatarSize: CGFloat = 28
+    // Top-right wing: "NOW" timestamp badge
+    let rightWingW = max(24, (b.maxX - topCornerRadius - 14) - cameraRight)
+    let rightStyle = NSMutableParagraphStyle()
+    rightStyle.alignment = .right
+    let nowAttrs: [NSAttributedString.Key: Any] = [
+      .font: SnippetTheme.mono(9.5, weight: .medium),
+      .foregroundColor: SnippetTheme.fg4,
+      .paragraphStyle: rightStyle,
+    ]
+    ("NOW" as NSString).draw(
+      in: NSRect(x: cameraRight + 4, y: topBandMidY - 6.5, width: rightWingW - 4, height: 13),
+      withAttributes: nowAttrs
+    )
+
+    // Lower card container in Snippet surface1 (#17171A) with 1px border2 (#323238)
+    let cardRect = NSRect(
+      x: b.minX + topCornerRadius + 12,
+      y: 10,
+      width: b.width - (topCornerRadius + 12) * 2,
+      height: max(48, topBandMinY - 12)
+    )
+    let cardPath = NSBezierPath(roundedRect: cardRect, xRadius: 14, yRadius: 14)
+    SnippetTheme.surface1.setFill()
+    cardPath.fill()
+    SnippetTheme.border2.setStroke()
+    cardPath.lineWidth = 1.0
+    cardPath.stroke()
+
+    // Left Mochi avatar in an accent-tinted squircle
+    let avatarSize: CGFloat = 34
     let avatarRect = NSRect(
-      x: bodyRect.minX,
-      y: bodyRect.midY - avatarSize / 2,
+      x: cardRect.minX + 10,
+      y: cardRect.midY - avatarSize / 2,
       width: avatarSize,
       height: avatarSize
     )
-    NSColor(srgbRed: 0.12, green: 0.12, blue: 0.15, alpha: 1.0).setFill()
-    NSBezierPath(roundedRect: avatarRect, xRadius: 8, yRadius: 8).fill()
+    SnippetTheme.surface2.setFill()
+    let avatarPath = NSBezierPath(roundedRect: avatarRect, xRadius: 10, yRadius: 10)
+    avatarPath.fill()
+    statusColor.withAlphaComponent(0.35).setStroke()
+    avatarPath.lineWidth = 1.0
+    avatarPath.stroke()
+
     MochiRenderer.drawMochi(
-      in: avatarRect.insetBy(dx: 4, dy: 4),
+      in: avatarRect.insetBy(dx: 5, dy: 5),
       bodyColor: periwinkle,
       leafColor: matcha,
       eyeColor: ink,
-      blushColor: blush
+      blushColor: blush,
+      playTime: now
     )
 
-    // Right "Reply" pill button
-    let pillW: CGFloat = 58
-    let pillH: CGFloat = 22
+    // Right "Reply ↵" action pill in Snippet accentFill (#5E6AD2)
+    let pillW: CGFloat = 68
+    let pillH: CGFloat = 26
     let pillRect = NSRect(
-      x: bodyRect.maxX - pillW,
-      y: bodyRect.midY - pillH / 2,
+      x: cardRect.maxX - pillW - 10,
+      y: cardRect.midY - pillH / 2,
       width: pillW,
       height: pillH
     )
-    NSColor(srgbRed: 0.15, green: 0.15, blue: 0.19, alpha: 1.0).setFill()
-    NSBezierPath(roundedRect: pillRect, xRadius: 7, yRadius: 7).fill()
+    SnippetTheme.accentFill.setFill()
+    NSBezierPath(roundedRect: pillRect, xRadius: 8, yRadius: 8).fill()
 
     let pillStyle = NSMutableParagraphStyle()
     pillStyle.alignment = .center
     let pillAttrs: [NSAttributedString.Key: Any] = [
-      .font: NSFont.systemFont(ofSize: 11, weight: .medium),
-      .foregroundColor: periwinkle,
+      .font: SnippetTheme.sans(11.5, weight: .medium),
+      .foregroundColor: NSColor.white,
       .paragraphStyle: pillStyle,
     ]
-    ("Reply" as NSString).draw(
-      in: NSRect(x: pillRect.minX, y: pillRect.minY + 3, width: pillW, height: 15),
+    ("Reply ↵" as NSString).draw(
+      in: NSRect(x: pillRect.minX, y: pillRect.minY + 4.5, width: pillW, height: 17),
       withAttributes: pillAttrs
     )
 
-    // Center Title & Subtitle
+    // Center Title & Subtitle in Geist
     let textX = avatarRect.maxX + 11
     let textW = max(40, pillRect.minX - textX - 10)
     let pStyle = NSMutableParagraphStyle()
     pStyle.lineBreakMode = .byTruncatingTail
 
     let titleAttrs: [NSAttributedString.Key: Any] = [
-      .font: NSFont.systemFont(ofSize: 12.5, weight: .semibold),
-      .foregroundColor: NSColor(srgbRed: 0.96, green: 0.96, blue: 0.98, alpha: 1.0),
+      .font: SnippetTheme.sans(13.0, weight: .medium),
+      .foregroundColor: SnippetTheme.fg1,
       .paragraphStyle: pStyle,
     ]
     let subAttrs: [NSAttributedString.Key: Any] = [
-      .font: NSFont.systemFont(ofSize: 11.5, weight: .regular),
-      .foregroundColor: NSColor(srgbRed: 0.62, green: 0.62, blue: 0.68, alpha: 1.0),
+      .font: SnippetTheme.sans(12.0, weight: .regular),
+      .foregroundColor: SnippetTheme.fg2,
       .paragraphStyle: pStyle,
     ]
 
     let cleanSub = NotchMarkdown.plainPreview(subtitle)
     if cleanSub.isEmpty {
       (title as NSString).draw(
-        in: NSRect(x: textX, y: bodyRect.midY - 8, width: textW, height: 17),
+        in: NSRect(x: textX, y: cardRect.midY - 8, width: textW, height: 18),
         withAttributes: titleAttrs
       )
     } else {
       (title as NSString).draw(
-        in: NSRect(x: textX, y: bodyRect.midY + 1, width: textW, height: 17),
+        in: NSRect(x: textX, y: cardRect.midY + 1, width: textW, height: 18),
         withAttributes: titleAttrs
       )
       (cleanSub as NSString).draw(
-        in: NSRect(x: textX, y: bodyRect.midY - 15, width: textW, height: 15),
+        in: NSRect(x: textX, y: cardRect.midY - 16, width: textW, height: 16),
         withAttributes: subAttrs
       )
     }

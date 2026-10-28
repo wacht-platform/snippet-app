@@ -423,14 +423,29 @@ class _AmbientTurnCardState extends State<AmbientTurnCard> {
               behavior: HitTestBehavior.opaque,
               onTap: _hasDetail ? () => setState(() => _open = !_open) : null,
               child: Container(
-                padding: const EdgeInsets.fromLTRB(14, 9, 14, 10),
+                padding: kMobile
+                    ? const EdgeInsets.fromLTRB(15, 10, 15, 11)
+                    : const EdgeInsets.fromLTRB(14, 9, 14, 10),
                 decoration: BoxDecoration(
                   color: AppColors.surface2,
-                  borderRadius: BorderRadius.circular(R.lg),
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(kMobile ? 20 : 16),
+                    topRight: Radius.circular(kMobile ? 20 : 16),
+                    bottomLeft: Radius.circular(kMobile ? 20 : 16),
+                    bottomRight: const Radius.circular(6),
+                  ),
                 ),
-                child: SelectableText(turn.text,
-                    style: sans(kMobile ? 16 : 14,
-                        height: 1.4, color: AppColors.fg1)),
+                child: SelectionArea(
+                  child: Text(
+                    turn.text,
+                    textWidthBasis: TextWidthBasis.longestLine,
+                    style: sans(
+                      kMobile ? 16 : 14,
+                      height: kMobile ? 24 / 16 : 22 / 14,
+                      color: AppColors.fg1,
+                    ),
+                  ),
+                ),
               ),
             ),
             Padding(

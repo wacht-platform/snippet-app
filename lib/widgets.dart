@@ -1344,7 +1344,10 @@ class Bubble extends StatelessWidget {
                   bottomRight: const Radius.circular(6),
                 ),
               ),
-              child: mineText,
+              child: DefaultTextStyle.merge(
+                textWidthBasis: TextWidthBasis.longestLine,
+                child: mineText,
+              ),
             ),
           if (media == null || media.isEmpty) ...[
             for (final v in voice) ...[

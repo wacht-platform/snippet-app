@@ -12,6 +12,7 @@ import '../session_status_updates.dart';
 import '../command_palette.dart';
 import '../device_events.dart';
 import '../models.dart';
+import '../macos_notch.dart';
 import '../notifications.dart';
 import '../notification_sync.dart';
 import '../notification_inbox.dart';
@@ -673,6 +674,7 @@ class _DesktopShellState extends State<DesktopShell>
 
   void _connectEventsWatch() {
     final c = _client;
+    MacosNotch.bindClient(c);
     if (c == null) {
       _stopEventsWatch();
       return;

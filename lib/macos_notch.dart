@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
@@ -32,12 +31,19 @@ class MacosNotch {
   static const MethodChannel _channel = MethodChannel('snippet/macos_notch');
   static bool _initialized = false;
 
+  static DaemonClient? _defaultClient;
+  static WebSocketChannel? _mcSocket;
+  static StreamSubscription<dynamic>? _mcSub;
+  static HarnessState? _mcState;
+  static String _mcLiveStreamText = '';
+  static String _lastNotifiedKey = '';
+
   static WebSocketChannel? _activeSocket;
   static StreamSubscription<dynamic>? _activeSub;
   static DaemonClient? _activeClient;
   static String? _activeSessionId;
   static String? _activePeerAgentId;
-  static String _activeTitle = 'Conversation';
+  static String _activeTitle = 'Mission Control';
   static HarnessState? _activeState;
   static String _liveStreamText = '';
   static Timer? _pollTimer;
@@ -60,6 +66,11 @@ class MacosNotch {
           final arg = call.arguments;
           if (arg is String && arg.isNotEmpty) {
             await _openConversation(arg);
+          } else {
+            await _openConversation(jsonEncode({
+              'session': 'mission-control',
+              'title': 'Mission Control',
+            }));
           }
         case 'sendConversationReply':
           final args = call.arguments;
@@ -75,15 +86,148 @@ class MacosNotch {
     });
   }
 
-  static Future<DaemonClient?> _resolveClient(Map<String, dynamic> payload) async {
-    final url = '${payload['url'] ?? ''}';
-    final name = '${payload['name'] ?? ''}';
+  /// Binds the active daemon client so Mission Control chats are always watched
+  /// and available in the macOS Notch even when ambient voice is inactive or
+  /// another tab is selected.
+  static void bindClient(DaemonClient? client) {
+    if (!kMacOS) return;
+    ensureInitialized();
+    if (_defaultClient?.baseUrl == client?.baseUrl &&
+        _defaultClient?.token == client?.token &&
+        _mcSocket != null) {
+      return;
+    }
+    _stopMcWatch();
+    _defaultClient = client;
+    if (client != null) {
+      _startMcWatch(client);
+    }
+  }
+
+  static void _startMcWatch(DaemonClient client) {
+    try {
+      final ch = client.attach('mission-control');
+      _mcSocket = ch;
+      _mcSub = ch.stream.listen(
+        (msg) {
+          if (!identical(ch, _mcSocket)) return;
+          final raw = switch (msg) {
+            final String s => s,
+            final Uint8List b => utf8.decode(b, allowMalformed: true),
+            final List<int> b => utf8.decode(b, allowMalformed: true),
+            _ => '',
+          };
+          if (raw.isEmpty) return;
+          try {
+            final decoded = jsonDecode(raw);
+            if (decoded is! Map) return;
+            final j = decoded.cast<String, dynamic>();
+            final wire = j['wire'] as String? ?? 'snapshot';
+            if (wire == 'stream') {
+              final append = j['append'] == true;
+              final chunk = (j['text'] as String?) ?? '';
+              _mcLiveStreamText = append ? _mcLiveStreamText + chunk : chunk;
+              if (_activeSessionId == 'mission-control') {
+                _activeState = _mcState;
+                _liveStreamText = _mcLiveStreamText;
+                _emitSessionMessages();
+              }
+              return;
+            }
+            if (wire == 'snapshot' || wire == 'delta') {
+              final prev = _mcState;
+              final next = (wire == 'delta' && prev != null)
+                  ? prev.applyDelta(j)
+                  : HarnessState.fromJson(j);
+              _mcState = next;
+              if (next.status != 'running') {
+                _mcLiveStreamText = '';
+              }
+              if (wire == 'delta' &&
+                  prev != null &&
+                  next.events.length > prev.events.length) {
+                final added = next.events.sublist(prev.events.length);
+                for (final e in added.reversed) {
+                  final kind = e['kind'] as String? ?? '';
+                  var msgText = '';
+                  if (kind == 'assistant_text' || kind == 'assistant') {
+                    msgText = ((e['text'] as String?) ?? '').trim();
+                  } else if (kind == 'tool_call') {
+                    final tool = (e['tool_name'] as String?) ?? '';
+                    if (tool == 'speak' || tool == 'ambient_speak') {
+                      final args = e['arguments'];
+                      msgText =
+                          args is Map ? '${args['text'] ?? ''}'.trim() : '';
+                    }
+                  } else if (kind == 'user_question') {
+                    msgText = 'Needs your input';
+                  }
+                  if (msgText.isNotEmpty) {
+                    final cleaned =
+                        msgText.replaceAll(RegExp(r'\s+'), ' ').trim();
+                    showNotification(
+                      title: 'Mission Control',
+                      subtitle: cleaned,
+                      kind: kind == 'user_question' ? 'waiting' : 'message',
+                      payload: {
+                        'url': client.baseUrl,
+                        'session': 'mission-control',
+                        'title': 'Mission Control',
+                        'body': cleaned,
+                        'destination': const {
+                          'type': 'session',
+                          'id': 'mission-control',
+                        },
+                      },
+                    );
+                    break;
+                  }
+                }
+              }
+              if (_activeSessionId == 'mission-control') {
+                _activeState = next;
+                _liveStreamText = _mcLiveStreamText;
+                _emitSessionMessages();
+              }
+            }
+          } catch (_) {}
+        },
+        onError: (_) {},
+        onDone: () {},
+      );
+    } catch (_) {}
+  }
+
+  static void _stopMcWatch() {
+    _mcSub?.cancel();
+    _mcSub = null;
+    _mcSocket?.sink.close();
+    _mcSocket = null;
+    _mcState = null;
+    _mcLiveStreamText = '';
+  }
+
+  static Future<DaemonClient?> _resolveClient(
+      Map<String, dynamic> payload) async {
+    final url = '${payload['url'] ?? ''}'.trim();
+    final name = '${payload['name'] ?? ''}'.trim();
+    if (_defaultClient != null &&
+        (url.isEmpty || _defaultClient!.baseUrl == url)) {
+      return _defaultClient;
+    }
     final instances = await InstanceStore().load();
-    if (instances.isEmpty) return null;
-    final resolved = instances.where((i) => i.url == url).firstOrNull ??
-        instances.where((i) => name.isNotEmpty && i.label == name).firstOrNull ??
-        instances.first;
-    return DaemonClient(resolved.url, resolved.token);
+    if (instances.isEmpty) return _defaultClient;
+    final resolved =
+        instances.where((i) => url.isNotEmpty && i.url == url).firstOrNull ??
+            instances
+                .where((i) => name.isNotEmpty && i.label == name)
+                .firstOrNull ??
+            instances.first;
+    final client = DaemonClient(resolved.url, resolved.token);
+    if (_defaultClient == null) {
+      bindClient(client);
+    }
+    return client;
   }
 
   static Future<void> _openConversation(String rawPayload) async {
@@ -92,7 +236,10 @@ class MacosNotch {
     try {
       payload = jsonDecode(rawPayload) as Map<String, dynamic>;
     } catch (_) {
-      return;
+      payload = const {
+        'session': 'mission-control',
+        'title': 'Mission Control',
+      };
     }
 
     final client = await _resolveClient(payload);
@@ -100,9 +247,8 @@ class MacosNotch {
     _activeClient = client;
 
     final destination = payload['destination'];
-    final sessionId = '${payload['session'] ?? ''}'.trim();
-    _activeTitle = '${payload['title'] ?? 'Conversation'}'.trim();
-    if (_activeTitle.isEmpty) _activeTitle = 'Conversation';
+    var sessionId = '${payload['session'] ?? ''}'.trim();
+    _activeTitle = '${payload['title'] ?? ''}'.trim();
 
     if (destination is Map && destination['type'] == 'conversation') {
       final threadId = '${destination['id'] ?? ''}';
@@ -116,6 +262,7 @@ class MacosNotch {
           }
         }
         if (_activePeerAgentId != null) {
+          if (_activeTitle.isEmpty) _activeTitle = 'Conversation';
           await _refreshAgentThread();
           _pollTimer = Timer.periodic(
             const Duration(seconds: 3),
@@ -126,19 +273,24 @@ class MacosNotch {
       } catch (_) {}
     }
 
-    if (sessionId.isNotEmpty) {
-      _activeSessionId = sessionId;
-      _attachSession(client, sessionId);
-    } else {
-      final body = '${payload['body'] ?? ''}'.trim();
-      _pushConversationUpdate(
-        title: _activeTitle,
-        status: 'idle',
-        messages: [
-          if (body.isNotEmpty) {'role': 'assistant', 'text': body},
-        ],
-      );
+    // Default to Mission Control whenever no specific session ID is given.
+    if (sessionId.isEmpty) {
+      sessionId = 'mission-control';
     }
+    if (sessionId == 'mission-control' || _activeTitle.isEmpty) {
+      _activeTitle =
+          sessionId == 'mission-control' ? 'Mission Control' : 'Conversation';
+    }
+
+    _activeSessionId = sessionId;
+    if (sessionId == 'mission-control' &&
+        _mcState != null &&
+        _defaultClient?.baseUrl == client.baseUrl) {
+      _activeState = _mcState;
+      _liveStreamText = _mcLiveStreamText;
+      _emitSessionMessages();
+    }
+    _attachSession(client, sessionId);
   }
 
   static Future<void> _refreshAgentThread() async {
@@ -195,7 +347,10 @@ class MacosNotch {
                 ? cur.applyDelta(j)
                 : HarnessState.fromJson(j);
             _activeState = next;
-            if (next.title != null && next.title!.trim().isNotEmpty) {
+            if (sessionId == 'mission-control') {
+              _activeTitle = 'Mission Control';
+              _mcState = next;
+            } else if (next.title != null && next.title!.trim().isNotEmpty) {
               _activeTitle = next.title!.trim();
             }
             if (next.status != 'running') {
@@ -320,7 +475,8 @@ class MacosNotch {
   }
 
   static Future<void> _sendReply(String text) async {
-    unawaited(AmbientController.instance.voice.value?.stopNow() ?? Future.value());
+    unawaited(
+        AmbientController.instance.voice.value?.stopNow() ?? Future.value());
     final client = _activeClient;
     final peerId = _activePeerAgentId;
     if (client != null && peerId != null) {
@@ -333,7 +489,8 @@ class MacosNotch {
 
     final ch = _activeSocket;
     if (ch != null && _activeSessionId != null) {
-      final nonce = 'notch-${DateTime.now().millisecondsSinceEpoch}-${_nonceCounter++}';
+      final nonce =
+          'notch-${DateTime.now().millisecondsSinceEpoch}-${_nonceCounter++}';
       final running = _activeState?.status == 'running';
       if (running) {
         ch.sink.add(jsonEncode({
@@ -371,11 +528,11 @@ class MacosNotch {
     required List<Map<String, String>> messages,
   }) {
     if (!kMacOS) return;
-    _channel.invokeMethod<void>('updateConversation', {
+    _channel.invokeMethod<void>('updateConversation', <String, Object?>{
       'title': title,
       'status': status,
       'messages': messages,
-    }).catchError((_) {});
+    }).catchError((Object _) {});
   }
 
   static void updateAmbient({
@@ -386,12 +543,12 @@ class MacosNotch {
   }) {
     if (!kMacOS) return;
     ensureInitialized();
-    _channel.invokeMethod<void>('updateAmbient', {
+    _channel.invokeMethod<void>('updateAmbient', <String, Object?>{
       'active': active,
       'userSpeaking': userSpeaking,
       'assistantSpeaking': assistantSpeaking,
       'probability': probability,
-    }).catchError((_) {});
+    }).catchError((Object _) {});
   }
 
   static void showNotification({
@@ -402,11 +559,17 @@ class MacosNotch {
   }) {
     if (!kMacOS) return;
     ensureInitialized();
-    _channel.invokeMethod<void>('showNotification', {
+    final dedupeKey = '$title|$subtitle|$kind';
+    if (dedupeKey == _lastNotifiedKey) return;
+    _lastNotifiedKey = dedupeKey;
+    Future<void>.delayed(const Duration(seconds: 2), () {
+      if (_lastNotifiedKey == dedupeKey) _lastNotifiedKey = '';
+    });
+    _channel.invokeMethod<void>('showNotification', <String, Object?>{
       'title': title,
       'subtitle': subtitle,
       'kind': kind,
       'payload': jsonEncode(payload),
-    }).catchError((_) {});
+    }).catchError((Object _) {});
   }
 }

@@ -326,7 +326,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     final t = task;
     return Scaffold(
       backgroundColor:
-          !kMobile && (widget.embedded || widget.pane) ? AppColors.windowBg : AppColors.bg,
+          !kMobile && (widget.embedded || widget.pane) ? Colors.transparent : AppColors.bg,
       body: SafeArea(
         bottom: false,
         child: Column(children: [

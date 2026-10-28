@@ -995,7 +995,7 @@ class SidebarState extends State<Sidebar> {
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 8),
                 child: Row(children: [
-                  MochiIcon(color: AppColors.accent, size: 17),
+                  WorkingMochi(color: AppColors.accent, size: 17),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text('Mission Control',

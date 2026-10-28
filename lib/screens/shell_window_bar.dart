@@ -84,7 +84,7 @@ class TopWorkspaceTabChip extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             if (tab.isMissionControl)
-              MochiIcon(color: AppColors.accent, size: 14)
+              WorkingMochi(color: AppColors.accent, size: 14)
             else if (tab.isPrs)
               AppIcon('pull-request', size: 13, color: AppColors.ok)
             else if (provider != null)

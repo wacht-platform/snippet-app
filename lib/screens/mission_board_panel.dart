@@ -216,20 +216,14 @@ class _MissionBoardPanelState extends State<MissionBoardPanel> {
   Widget build(BuildContext context) {
     final reading = _readout;
     if (reading != null && widget.readoutBody != null) {
-      return Container(
-        color: AppColors.windowBg,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _headerBar(),
-            Expanded(
-              child: ColoredBox(
-                color: AppColors.bg,
-                child: widget.readoutBody!(reading),
-              ),
-            ),
-          ],
-        ),
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _headerBar(),
+          Expanded(
+            child: widget.readoutBody!(reading),
+          ),
+        ],
       );
     }
     final now = DateTime.now();
@@ -243,8 +237,8 @@ class _MissionBoardPanelState extends State<MissionBoardPanel> {
         .toList();
     final done =
         _tasks.where((t) => t.status == 'done' && today(t.updatedAt)).toList();
-    return Container(
-      color: AppColors.windowBg,
+    return ColoredBox(
+      color: Colors.transparent,
       child: !_loaded
           ? Center(child: DelayedSpinner(size: 16))
           : ListView(
