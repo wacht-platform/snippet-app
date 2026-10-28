@@ -1565,10 +1565,11 @@ final class NotchHUDController {
       targetWidth = max(hw.width + 292, 480) + topCornerRadius * 2
       targetHeight = hw.height + 404
     } else if hasNotif {
-      topCornerRadius = 10
-      bottomCornerRadius = 16
-      targetWidth = max(hw.width + 148, 336) + topCornerRadius * 2
-      targetHeight = hw.height + 44
+      topCornerRadius = 6
+      bottomCornerRadius = 14
+      // Expand horizontally along the notch itself (left & right wings) at exact notch height
+      targetWidth = hw.width + 310 + topCornerRadius * 2
+      targetHeight = hw.height
     } else if assistantSpeaking || userSpeaking {
       topCornerRadius = 6
       bottomCornerRadius = 14
@@ -2197,7 +2198,8 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
 
   }
 
-  /// Renders a compact, sleek Dynamic Island notification row below `hwNotchHeight`.
+  /// Renders the notification directly on the notch itself (left and right wings
+  /// flanking the hardware camera cutout at `hwNotchHeight`, with zero vertical drop).
   private func drawNotification(
     in b: NSRect,
     title: String,
@@ -2208,72 +2210,23 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
     blush: NSColor,
     now: Double
   ) {
-    let topBandMinY = b.maxY - hwNotchHeight
-    let topBandMidY = topBandMinY + hwNotchHeight / 2
+    let midY = b.midY
     let cameraLeft = b.midX - hwNotchWidth / 2
     let cameraRight = b.midX + hwNotchWidth / 2
-
     let isWaiting = notifKind == "waiting"
     let statusColor = isWaiting ? SnippetTheme.run : SnippetTheme.accent
 
-    // Top-left wing: subtle pulsing status dot + compact label
-    let dotX = b.minX + topCornerRadius + 10
-    let dotRect = NSRect(x: dotX, y: topBandMidY - 3, width: 6, height: 6)
-    statusColor.withAlphaComponent(0.28).setFill()
-    NSBezierPath(ovalIn: dotRect.insetBy(dx: -2, dy: -2)).fill()
-    statusColor.setFill()
-    NSBezierPath(ovalIn: dotRect).fill()
-
-    let wingLabel = isWaiting ? "INPUT" : (title == "Mission Control" ? "MC" : "NEW")
-    let wingAttrs: [NSAttributedString.Key: Any] = [
-      .font: SnippetTheme.mono(9.0, weight: .semibold),
-      .foregroundColor: SnippetTheme.fg3,
-    ]
-    let wingMaxW = max(16, cameraLeft - (dotX + 10) - 4)
-    (wingLabel as NSString).draw(
-      in: NSRect(x: dotX + 10, y: topBandMidY - 6, width: wingMaxW, height: 12),
-      withAttributes: wingAttrs
+    // Left Wing (between left notch edge and camera cutout): Mochi icon + sender title
+    let leftStart = b.minX + topCornerRadius + 10
+    let mochiSize: CGFloat = 16
+    let mochiRect = NSRect(
+      x: leftStart,
+      y: midY - mochiSize / 2,
+      width: mochiSize,
+      height: mochiSize
     )
-
-    // Top-right wing: "NOW" badge
-    let rightWingW = max(20, (b.maxX - topCornerRadius - 10) - cameraRight)
-    let rightStyle = NSMutableParagraphStyle()
-    rightStyle.alignment = .right
-    let nowAttrs: [NSAttributedString.Key: Any] = [
-      .font: SnippetTheme.mono(9.0, weight: .medium),
-      .foregroundColor: SnippetTheme.fg4,
-      .paragraphStyle: rightStyle,
-    ]
-    ("NOW" as NSString).draw(
-      in: NSRect(x: cameraRight + 4, y: topBandMidY - 6, width: rightWingW - 4, height: 12),
-      withAttributes: nowAttrs
-    )
-
-    // Compact row below camera cutout (height ~36pt)
-    let rowRect = NSRect(
-      x: b.minX + topCornerRadius + 12,
-      y: 6,
-      width: b.width - (topCornerRadius + 12) * 2,
-      height: max(30, topBandMinY - 8)
-    )
-
-    // Compact 22x22 Mochi avatar on the left
-    let avatarSize: CGFloat = 22
-    let avatarRect = NSRect(
-      x: rowRect.minX,
-      y: rowRect.midY - avatarSize / 2,
-      width: avatarSize,
-      height: avatarSize
-    )
-    SnippetTheme.surface2.setFill()
-    let avatarPath = NSBezierPath(roundedRect: avatarRect, xRadius: 6.5, yRadius: 6.5)
-    avatarPath.fill()
-    statusColor.withAlphaComponent(0.32).setStroke()
-    avatarPath.lineWidth = 1.0
-    avatarPath.stroke()
-
     MochiRenderer.drawMochi(
-      in: avatarRect.insetBy(dx: 3, dy: 3),
+      in: mochiRect,
       bodyColor: periwinkle,
       leafColor: matcha,
       eyeColor: ink,
@@ -2281,63 +2234,50 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
       playTime: now
     )
 
-    // Compact "Reply" pill on the right (48x20)
-    let pillW: CGFloat = 48
-    let pillH: CGFloat = 20
-    let pillRect = NSRect(
-      x: rowRect.maxX - pillW,
-      y: rowRect.midY - pillH / 2,
-      width: pillW,
-      height: pillH
-    )
-    SnippetTheme.accentFill.setFill()
-    NSBezierPath(roundedRect: pillRect, xRadius: 6, yRadius: 6).fill()
-
-    let pillStyle = NSMutableParagraphStyle()
-    pillStyle.alignment = .center
-    let pillAttrs: [NSAttributedString.Key: Any] = [
-      .font: SnippetTheme.sans(10.5, weight: .medium),
-      .foregroundColor: NSColor.white,
-      .paragraphStyle: pillStyle,
-    ]
-    ("Reply" as NSString).draw(
-      in: NSRect(x: pillRect.minX, y: pillRect.minY + 2.5, width: pillW, height: 15),
-      withAttributes: pillAttrs
-    )
-
-    // Center Title & Subtitle in compact Geist
-    let textX = avatarRect.maxX + 9
-    let textW = max(40, pillRect.minX - textX - 8)
-    let pStyle = NSMutableParagraphStyle()
-    pStyle.lineBreakMode = .byTruncatingTail
-
+    let titleX = mochiRect.maxX + 7
+    let titleMaxW = max(24, cameraLeft - titleX - 8)
+    let leftStyle = NSMutableParagraphStyle()
+    leftStyle.lineBreakMode = .byTruncatingTail
+    let shortTitle = (title == "Mission Control") ? "MC" : title
     let titleAttrs: [NSAttributedString.Key: Any] = [
-      .font: SnippetTheme.sans(12.0, weight: .medium),
+      .font: SnippetTheme.sans(11.5, weight: .medium),
       .foregroundColor: SnippetTheme.fg1,
-      .paragraphStyle: pStyle,
+      .paragraphStyle: leftStyle,
     ]
-    let subAttrs: [NSAttributedString.Key: Any] = [
-      .font: SnippetTheme.sans(11.0, weight: .regular),
-      .foregroundColor: SnippetTheme.fg2,
-      .paragraphStyle: pStyle,
-    ]
+    (shortTitle as NSString).draw(
+      in: NSRect(x: titleX, y: midY - 7.5, width: titleMaxW, height: 15),
+      withAttributes: titleAttrs
+    )
+
+    // Right Wing (between camera cutout and right notch edge): message preview + status dot
+    let rightEnd = b.maxX - topCornerRadius - 10
+    let dotSize: CGFloat = 6
+    let dotRect = NSRect(
+      x: rightEnd - dotSize,
+      y: midY - dotSize / 2,
+      width: dotSize,
+      height: dotSize
+    )
+    statusColor.withAlphaComponent(0.28).setFill()
+    NSBezierPath(ovalIn: dotRect.insetBy(dx: -2, dy: -2)).fill()
+    statusColor.setFill()
+    NSBezierPath(ovalIn: dotRect).fill()
 
     let cleanSub = NotchMarkdown.plainPreview(subtitle)
-    if cleanSub.isEmpty {
-      (title as NSString).draw(
-        in: NSRect(x: textX, y: rowRect.midY - 7, width: textW, height: 15),
-        withAttributes: titleAttrs
-      )
-    } else {
-      (title as NSString).draw(
-        in: NSRect(x: textX, y: rowRect.midY + 0.5, width: textW, height: 15),
-        withAttributes: titleAttrs
-      )
-      (cleanSub as NSString).draw(
-        in: NSRect(x: textX, y: rowRect.midY - 13.5, width: textW, height: 14),
-        withAttributes: subAttrs
-      )
-    }
+    let previewText = cleanSub.isEmpty ? title : cleanSub
+    let subX = cameraRight + 8
+    let subMaxW = max(28, dotRect.minX - subX - 7)
+    let subStyle = NSMutableParagraphStyle()
+    subStyle.lineBreakMode = .byTruncatingTail
+    let subAttrs: [NSAttributedString.Key: Any] = [
+      .font: SnippetTheme.sans(11.5, weight: .regular),
+      .foregroundColor: SnippetTheme.fg2,
+      .paragraphStyle: subStyle,
+    ]
+    (previewText as NSString).draw(
+      in: NSRect(x: subX, y: midY - 7.5, width: subMaxW, height: 15),
+      withAttributes: subAttrs
+    )
   }
 
   /// Exact `DynamicNotchKit` / `boring.notch` silhouette in AppKit coordinates
