@@ -273,7 +273,7 @@ class AppColors {
   static Color get bg => currentTheme.bg;
   static Color get canvas => kMobile
       ? currentTheme.canvas
-      : currentTheme.canvas.withValues(alpha: 0.66);
+      : currentTheme.canvas.withValues(alpha: 0.78);
   static Color get floor => currentTheme.floor;
   static Color get surface1 => currentTheme.surface1;
   static Color get surface2 => currentTheme.surface2;
@@ -288,9 +288,9 @@ class AppColors {
 
   static const Color scrim = Color(0x99000000);
   static Color get windowBg =>
-      kMobile ? currentTheme.bg : const Color(0x9E0D0C0B);
+      kMobile ? currentTheme.bg : const Color(0xB80D0C0B);
   static Color get sidebarPanel =>
-      kMobile ? const Color(0xFF171513) : const Color(0xA6171513);
+      kMobile ? const Color(0xFF171513) : const Color(0xBD171513);
   static Color get glassSurface => currentTheme.surface2;
   static Color get glassBorder => currentTheme.border;
 
