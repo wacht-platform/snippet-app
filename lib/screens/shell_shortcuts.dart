@@ -78,17 +78,8 @@ class ShellShortcutsHandler {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) return false;
     final key = event.logicalKey;
 
-    // 1. Tab navigation via Alt without Cmd/Ctrl (Linux/Windows standard)
+    // 1. Alt + 1..9 (Linux/Windows tab jumping; Option+Arrow is reserved for word navigation)
     if (!cmdOrCtrl && altDown && !shiftDown) {
-      if (key == LogicalKeyboardKey.arrowLeft) {
-        onActivateRelativeTab(-1);
-        return true;
-      }
-      if (key == LogicalKeyboardKey.arrowRight) {
-        onActivateRelativeTab(1);
-        return true;
-      }
-      // Alt + 1..9 (Linux/Windows tab jumping)
       for (var i = 0; i < 9; i++) {
         if (key.keyId == LogicalKeyboardKey.digit1.keyId + i ||
             key.keyId == LogicalKeyboardKey.numpad1.keyId + i) {
