@@ -4,6 +4,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import '../macos_notch.dart';
 import '../platform.dart';
 import '../theme.dart';
 import 'controller.dart';
@@ -175,6 +176,13 @@ class _AmbientEdgeGlowState extends State<AmbientEdgeGlow>
     } else if (!active && _fadeController.value == 0.0) {
       _cycleController.stop();
     }
+
+    MacosNotch.updateAmbient(
+      active: active,
+      userSpeaking: _isUserSpeaking,
+      assistantSpeaking: speaking,
+      probability: _speechProbability,
+    );
   }
 
   @override

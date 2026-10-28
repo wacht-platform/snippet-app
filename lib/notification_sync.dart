@@ -85,7 +85,7 @@ Future<void> presentNotifications(Instance instance, NotificationInbox inbox,
     List<Map<String, dynamic>> received,
     {bool background = false}) async {
   if (received.isEmpty) return;
-  if (!background && notificationAppForeground) {
+  if (!background && (notificationAppForeground || kMacOS)) {
     for (final event in received) {
       final payload = notificationDestination(instance.url, event);
       if (!suppressVisibleNotification(payload)) {

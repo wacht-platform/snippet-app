@@ -1227,8 +1227,7 @@ class _SendBtn extends StatelessWidget {
         : running
             ? (kMobile ? AppColors.bg : AppColors.fg1)
             : (kMobile ? AppColors.accentFg : AppColors.bg);
-    final ShapeBorder shape =
-        RoundedRectangleBorder(borderRadius: BorderRadius.circular(R.sm));
+    const ShapeBorder shape = CircleBorder();
     return Material(
       color: fill,
       shape: shape,

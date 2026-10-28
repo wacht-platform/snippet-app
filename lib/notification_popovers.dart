@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'macos_notch.dart';
 import 'notification_sync.dart';
 import 'notifications.dart';
 import 'theme.dart';
@@ -136,13 +137,29 @@ class _NotificationPopoversState extends State<NotificationPopovers> {
     return body.isEmpty ? label : (label.isEmpty ? body : '$label · $body');
   }
 
+  void _forwardToMacNotch(Map<String, dynamic> payload) {
+    if (!kMacOS) return;
+    MacosNotch.showNotification(
+      title: payload['title']?.toString() ?? 'Snippet',
+      subtitle: _contextLabel(payload),
+      kind: payload['kind']?.toString() ?? '',
+      payload: payload,
+    );
+  }
+
   @override
   void initState() {
     super.initState();
+    MacosNotch.ensureInitialized();
     _contentEntry = OverlayEntry(builder: _buildContent);
-    _pending.addAll(foregroundNotifications.drain());
+    final initial = foregroundNotifications.drain();
+    _pending.addAll(initial);
+    for (final p in initial) {
+      _forwardToMacNotch(p);
+    }
     visibleNotificationSession.addListener(_visibilityChanged);
     _subscription = foregroundNotifications.stream.listen((payload) {
+      _forwardToMacNotch(payload);
       if (mounted) setState(() => _pending.add(payload));
     });
   }
