@@ -270,36 +270,30 @@ ThemePreset get currentTheme => ThemeManager.instance.current;
 
 class AppColors {
   // Surfaces
-  static Color get bg =>
-      kMobile ? currentTheme.bg : currentTheme.bg.withValues(alpha: 0.72);
+  static Color get bg => currentTheme.bg;
   static Color get canvas => kMobile
       ? currentTheme.canvas
-      : currentTheme.canvas.withValues(alpha: 0.76);
-  static Color get floor =>
-      kMobile ? currentTheme.floor : currentTheme.floor.withValues(alpha: 0.72);
-  static Color get surface1 => kMobile
-      ? currentTheme.surface1
-      : currentTheme.surface1.withValues(alpha: 0.84);
-  static Color get surface2 => kMobile
-      ? currentTheme.surface2
-      : currentTheme.surface2.withValues(alpha: 0.88);
+      : currentTheme.canvas.withValues(alpha: 0.83);
+  static Color get floor => currentTheme.floor;
+  static Color get surface1 => currentTheme.surface1;
+  static Color get surface2 => currentTheme.surface2;
   static Color get surface3 => currentTheme.surface3;
 
-  static Color get base => bg;
-  static Color get raised => surface1;
-  static Color get overlay => surface2;
+  static Color get base => currentTheme.bg;
+  static Color get raised => currentTheme.surface1;
+  static Color get overlay => currentTheme.surface2;
   static Color get hover => currentTheme.surface3;
   static Color get line => currentTheme.border;
   static Color get lineStrong => currentTheme.border2;
 
   static const Color scrim = Color(0x99000000);
   static Color get windowBg =>
-      kMobile ? currentTheme.bg : const Color(0xAD0D0C0B);
+      kMobile ? currentTheme.bg : const Color(0xCC0D0C0B);
   static Color get sidebarPanel =>
-      kMobile ? const Color(0xFF171513) : const Color(0xB8171513);
+      kMobile ? const Color(0xFF171513) : const Color(0xD6171513);
   static Color get glassSurface => kMobile
       ? currentTheme.surface2
-      : currentTheme.surface2.withValues(alpha: 0.82);
+      : currentTheme.surface2.withValues(alpha: 0.97);
   static Color get glassBorder => currentTheme.border;
 
   // Foreground
