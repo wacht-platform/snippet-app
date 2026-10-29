@@ -810,6 +810,7 @@ final class MacosVoiceProcessingEngine: NSObject, FlutterStreamHandler {
   private var resamplePos: Double = 0.0
   private var scheduledFrames: Int = 0
   private var completedFrames: Int = 0
+  private var ttsPaused = false
 
   func register(with messenger: FlutterBinaryMessenger) {
     let methodChannel = FlutterMethodChannel(
@@ -844,6 +845,16 @@ final class MacosVoiceProcessingEngine: NSObject, FlutterStreamHandler {
         if let args = call.arguments as? [String: Any],
            let vol = args["volume"] as? Double {
           self.setVolume(vol)
+        }
+        result(nil)
+      case "pauseTts":
+        self.ttsPaused = true
+        self.playerNode.pause()
+        result(nil)
+      case "resumeTts":
+        if self.ttsPaused {
+          self.ttsPaused = false
+          self.playerNode.play()
         }
         result(nil)
       case "stopTts":
@@ -987,9 +998,10 @@ final class MacosVoiceProcessingEngine: NSObject, FlutterStreamHandler {
     scheduledFrames = 0
     completedFrames = 0
     lock.unlock()
-    if playerNode.isPlaying {
+    if playerNode.isPlaying || ttsPaused {
       playerNode.stop()
     }
+    ttsPaused = false
   }
 
   private func writeTts(pcmData: Data) -> Int {
@@ -1027,7 +1039,7 @@ final class MacosVoiceProcessingEngine: NSObject, FlutterStreamHandler {
       self.completedFrames += sampleCount
       self.lock.unlock()
     }
-    if !playerNode.isPlaying {
+    if !playerNode.isPlaying && !ttsPaused {
       playerNode.play()
     }
     return currentHead()
@@ -1054,9 +1066,10 @@ final class MacosVoiceProcessingEngine: NSObject, FlutterStreamHandler {
   }
 
   private func stopTts() {
-    if playerNode.isPlaying {
+    if playerNode.isPlaying || ttsPaused {
       playerNode.stop()
     }
+    ttsPaused = false
     lock.lock()
     completedFrames = scheduledFrames
     lock.unlock()

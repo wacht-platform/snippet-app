@@ -17,6 +17,8 @@ abstract class PcmOut {
   void write(Uint8List pcm);
   int head();
   void volume(double v);
+  void pause();
+  void resume();
   void close();
 }
 
@@ -33,6 +35,8 @@ class MacosAecOut implements PcmOut {
   int _writtenFrames = 0;
   int _playedFrames = 0;
   DateTime? _lastSyncAt;
+  bool _paused = false;
+  int _pausedHead = 0;
   bool _closed = false;
 
   @override
@@ -53,6 +57,7 @@ class MacosAecOut implements PcmOut {
     if (_closed) return _playedFrames;
     final syncAt = _lastSyncAt;
     if (syncAt == null) return _playedFrames;
+    if (_paused) return _pausedHead;
     final elapsedUs = DateTime.now().difference(syncAt).inMicroseconds;
     final est = _playedFrames + (elapsedUs * _rate ~/ 1000000);
     return est.clamp(0, _writtenFrames);
@@ -62,6 +67,23 @@ class MacosAecOut implements PcmOut {
   void volume(double v) {
     _volume = v;
     _c.invokeMethod<void>('setVolume', {'volume': v}).catchError((_) {});
+  }
+
+  @override
+  void pause() {
+    if (_closed || _paused) return;
+    _pausedHead = head();
+    _paused = true;
+    _c.invokeMethod<void>('pauseTts').catchError((_) {});
+  }
+
+  @override
+  void resume() {
+    if (_closed || !_paused) return;
+    _paused = false;
+    _playedFrames = _pausedHead;
+    _lastSyncAt = DateTime.now();
+    _c.invokeMethod<void>('resumeTts').catchError((_) {});
   }
 
   @override
@@ -102,6 +124,12 @@ class SoloudOut implements PcmOut {
   }
 
   @override
+  void pause() {}
+
+  @override
+  void resume() {}
+
+  @override
   void volume(double v) {
     _volume = v;
     final h = _handle;
@@ -135,6 +163,8 @@ class _Boundary {
 
 class _Session {
   _Session(this.out);
+  bool paused = false;
+  int pausedHead = 0;
   final PcmOut out;
   final Queue<_Chunk> queue = Queue();
   final List<_Boundary> written = [];
@@ -193,7 +223,7 @@ class DesktopSink implements AmbientSink {
   }
 
   void _pump(_Session s) {
-    if (s.stopping || !identical(_sink, s)) return;
+    if (s.stopping || !identical(_sink, s) || s.paused) return;
     final head = _head(s);
     while (s.framesWritten - head < _ahead) {
       final cur = s.cur;
@@ -405,6 +435,23 @@ class DesktopSink implements AmbientSink {
   Future<void> volume(double volume) async {
     _volume = volume;
     _sink?.out.volume(volume);
+  }
+
+  @override
+  Future<void> pauseTts() async {
+    final s = _sink;
+    if (s == null || s.paused) return;
+    s.pausedHead = _head(s);
+    s.paused = true;
+    s.out.pause();
+  }
+
+  @override
+  Future<void> resumeTts() async {
+    final s = _sink;
+    if (s == null || !s.paused || s.stopping) return;
+    s.paused = false;
+    s.out.resume();
   }
 
   @override

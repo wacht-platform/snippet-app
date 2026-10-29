@@ -299,12 +299,15 @@ class AmbientCapture {
       return;
     }
     _loud = voiced ? _loud + 1 : 0;
-    if (_loud >= 3 && !_ducked) {
-      _ducked = true;
-      unawaited(voice.duck(true));
+    if (_loud >= 3) {
+      if (!_ducked) {
+        _ducked = true;
+        unawaited(voice.duck(true));
+      }
       _unduck?.cancel();
-      _unduck = Timer(const Duration(milliseconds: 1500), _restoreVolume);
+      _unduck = Timer(const Duration(milliseconds: 700), _restoreVolume);
     }
+    unawaited(voice.localSpeech(voiced, canPause: defaultTargetPlatform == TargetPlatform.macOS && _loud >= 5));
   }
 
   void _restoreVolume() {

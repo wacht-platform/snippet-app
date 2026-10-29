@@ -20,6 +20,8 @@ abstract class AmbientSink {
   Future<Map<String, dynamic>> stopStream(int turn, {int fadeMs = 25});
   Future<void> cancelAfter(int turn, int seq, {int fadeMs = 50});
   Future<void> volume(double volume);
+  Future<void> pauseTts();
+  Future<void> resumeTts();
   Future<Map<String, dynamic>> stop();
   Future<bool> mediaActive();
   Future<bool> inCall();
@@ -51,6 +53,10 @@ class _ChannelSink implements AmbientSink {
   @override
   Future<void> volume(double volume) => _c.invokeMethod('volume', {'volume': volume});
   @override
+  Future<void> pauseTts() async {}
+  @override
+  Future<void> resumeTts() async {}
+  @override
   Future<Map<String, dynamic>> stop() => _map('stop');
   @override
   Future<bool> mediaActive() async => await _c.invokeMethod<bool>('mediaActive') == true;
@@ -80,6 +86,10 @@ class _NullSink implements AmbientSink {
   Future<void> cancelAfter(int turn, int seq, {int fadeMs = 50}) async {}
   @override
   Future<void> volume(double volume) async {}
+  @override
+  Future<void> pauseTts() async {}
+  @override
+  Future<void> resumeTts() async {}
   @override
   Future<Map<String, dynamic>> stop() async => _pos;
   @override
