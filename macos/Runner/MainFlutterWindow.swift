@@ -1770,7 +1770,7 @@ final class NotchHUDController {
     } else if hasNotif {
       topCornerRadius = 6
       bottomCornerRadius = 14
-      targetWidth = hw.width + 340 + topCornerRadius * 2
+      targetWidth = hw.width + 220 + topCornerRadius * 2
       targetHeight = hw.height
     } else if assistantSpeaking || userSpeaking {
       topCornerRadius = 6
