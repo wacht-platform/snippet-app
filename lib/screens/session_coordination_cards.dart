@@ -15,16 +15,16 @@ import 'mission_control/mission_control_state.dart'
         WorkerQuestion,
         parseTaskOffer;
 
-class _MarkdownBody extends StatefulWidget {
+class CardMarkdownBody extends StatefulWidget {
   final String body;
   final String? preview;
-  const _MarkdownBody({required this.body, this.preview});
+  const CardMarkdownBody({super.key, required this.body, this.preview});
 
   @override
-  State<_MarkdownBody> createState() => _MarkdownBodyState();
+  State<CardMarkdownBody> createState() => _CardMarkdownBodyState();
 }
 
-class _MarkdownBodyState extends State<_MarkdownBody> {
+class _CardMarkdownBodyState extends State<CardMarkdownBody> {
   bool _open = false;
 
   @override
@@ -145,7 +145,7 @@ class _ThreadCard extends StatelessWidget {
                   sans(kMobile ? 13 : 12.5, height: 1.4, color: AppColors.fg3)),
       child: body.trim().isEmpty
           ? null
-          : _MarkdownBody(body: body, preview: preview),
+          : CardMarkdownBody(body: body, preview: preview),
     );
   }
 }

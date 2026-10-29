@@ -8,6 +8,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'mochi.dart';
+import 'motion.dart' show Shimmer;
+import 'screens/session_coordination_cards.dart' show CardMarkdownBody;
 import 'models.dart';
 import 'platform.dart';
 import 'theme.dart';
@@ -483,8 +485,6 @@ class _LaneNoticeState extends State<LaneNotice> {
     final title = widget.title.trim().isNotEmpty
         ? widget.title.trim()
         : lane?.title.trim() ?? '';
-    final activity = lane?.activity?.trim() ?? '';
-    final body = running ? (activity.isNotEmpty ? activity : 'Working') : summary;
     final (String? status, Tone tone) = running
         ? (_elapsed(lane), Tone.accent)
         : failed
@@ -497,26 +497,133 @@ class _LaneNoticeState extends State<LaneNotice> {
                         ? (null, Tone.neutral)
                         : (state == 'cancelled' ? 'Cancelled' : 'Queued', Tone.neutral);
     final color = agent.isEmpty ? mochiPalette.first.$2 : mochiColorFor(agent);
+    final small = kMobile ? 13.0 : 12.5;
+    final header = Row(children: [
+      running
+          ? WorkingMochi(size: 16, color: color)
+          : MochiIcon(
+              color: failed
+                  ? AppColors.danger
+                  : completed
+                      ? color
+                      : AppColors.fg4,
+              size: 16),
+      const SizedBox(width: S.s8),
+      Expanded(
+        child: Text.rich(
+          TextSpan(children: [
+            TextSpan(text: title.isEmpty ? 'Lane' : title),
+            if (agent.isNotEmpty)
+              TextSpan(
+                  text: '  $agent',
+                  style: sans(small, color: AppColors.fg4)),
+          ]),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: sans(TranscriptCard.titleSize,
+              weight: W.label, height: 1.3, color: AppColors.fg1),
+        ),
+      ),
+      if (status != null && status.isNotEmpty) ...[
+        const SizedBox(width: S.s8),
+        running
+            ? Text(status,
+                style: mono(small - 1, color: AppColors.fg3))
+            : Tag(status, tone: tone),
+      ],
+    ]);
+    Widget? body;
+    if (running) {
+      body = _LaneActivityLine(lane: lane, size: small);
+    } else if (failed && (lane?.error?.trim().isNotEmpty ?? false)) {
+      body = Text(lane!.error!.trim(),
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: sans(small, height: 1.4, color: AppColors.fg3));
+    } else if (summary.isNotEmpty) {
+      body = CardMarkdownBody(
+          body: summary, preview: MarkdownPreview.plain(summary));
+    }
+    final pad = kMobile
+        ? const EdgeInsets.fromLTRB(12, 10, 12, 10)
+        : const EdgeInsets.fromLTRB(12, 8, 12, 9);
     return Semantics(
       button: true,
       label: '$title, ${(status ?? '').toLowerCase()}. Open the lane.',
       onTap: widget.onOpen,
-      child: TranscriptCard(
-        kind: agent.isEmpty ? 'Lane' : 'Lane · $agent',
-        leading: running
-            ? WorkingMochi(size: 18, color: color)
-            : MochiIcon(
-                color: failed
-                    ? AppColors.danger
-                    : completed
-                        ? color
-                        : AppColors.fg4,
-                size: 18),
-        status: status,
-        tone: tone,
-        title: title,
-        body: body,
-        onTap: widget.onOpen,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: S.s4),
+        child: Material(
+          color: AppColors.surface1,
+          borderRadius: BorderRadius.circular(R.lg - 2),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: widget.onOpen,
+            child: Padding(
+              padding: pad,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  header,
+                  if (body != null)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 24, top: S.s4),
+                      child: body,
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _LaneActivityLine extends StatelessWidget {
+  final LaneInfo? lane;
+  final double size;
+  const _LaneActivityLine({required this.lane, required this.size});
+
+  @override
+  Widget build(BuildContext context) {
+    final current = lane?.activity?.trim() ?? '';
+    final thinking = lane?.activityKind == 'model' || current.isEmpty;
+    String last = '';
+    if (thinking) {
+      for (final a in (lane?.activityLog ?? const <LaneActivity>[]).reversed) {
+        if (a.kind == 'tool_call' && a.text.trim().isNotEmpty) {
+          last = a.text.trim();
+          break;
+        }
+      }
+    }
+    final now = thinking ? 'Thinking' : current;
+    final style = sans(size, height: 1.4, color: AppColors.fg2);
+    return AnimatedSwitcher(
+      duration: Motion.fast,
+      layoutBuilder: (cur, prev) => Stack(
+          alignment: Alignment.centerLeft, children: [...prev, if (cur != null) cur]),
+      child: Row(
+        key: ValueKey('$now|$last'),
+        children: [
+          Flexible(
+            flex: 0,
+            child: Shimmer(
+              color: AppColors.fg2,
+              child: Text(now,
+                  maxLines: 1, overflow: TextOverflow.ellipsis, style: style),
+            ),
+          ),
+          if (last.isNotEmpty)
+            Expanded(
+              child: Text('  ·  $last',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: style.copyWith(color: AppColors.fg4)),
+            ),
+        ],
       ),
     );
   }
