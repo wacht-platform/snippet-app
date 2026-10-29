@@ -287,7 +287,7 @@ class _PlanChecklistState extends State<PlanChecklist> {
       children: [
         for (final (text, state) in shown)
           Padding(
-            padding: const EdgeInsets.only(bottom: 1),
+            padding: const EdgeInsets.only(bottom: 3),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -312,7 +312,7 @@ class _PlanChecklistState extends State<PlanChecklist> {
             behavior: HitTestBehavior.opaque,
             onTap: () => setState(() => _open = !_open),
             child: Padding(
-              padding: const EdgeInsets.only(top: S.s2, left: 20),
+              padding: const EdgeInsets.only(top: S.s4, left: 20),
               child: Text(
                   _open ? 'Show less' : 'Show all ${steps.length} steps',
                   style: sans(TranscriptCard.metaSize,

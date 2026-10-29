@@ -113,7 +113,7 @@ class _TranscriptCardState extends State<TranscriptCard> {
             ],
           ]),
           if (title.isNotEmpty) ...[
-            const SizedBox(height: S.s2),
+            const SizedBox(height: S.s4),
             Text(title,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
@@ -121,15 +121,15 @@ class _TranscriptCardState extends State<TranscriptCard> {
                     weight: W.label, height: 1.3, color: AppColors.fg1)),
           ],
           if (body.isNotEmpty) ...[
-            SizedBox(height: title.isEmpty ? S.s4 : S.s2),
+            SizedBox(height: title.isEmpty ? S.s4 : S.s6),
             _body(body),
           ],
           if (widget.child != null) ...[
-            SizedBox(height: title.isEmpty ? S.s4 : S.s2),
+            const SizedBox(height: S.s8),
             widget.child!,
           ],
           if (widget.footer != null) ...[
-            const SizedBox(height: S.s4),
+            const SizedBox(height: S.s8),
             widget.footer!,
           ],
         ],
