@@ -500,7 +500,7 @@ Future<void> initNotifications() async {
     'waiting' => ('${inst.label} needs your input', title),
     'done' => ('${inst.label} finished', title),
     'error' => ('${inst.label} hit an error', title),
-    'idle' => ('${inst.label} stopped', title),
+    'idle' => (title.isEmpty ? 'Session' : title, stoppedSummary(e['lanes_running'])),
     'ping' => (title.isEmpty ? 'Mission Control' : title, message),
     'term' => (
         message.isEmpty ? '${inst.label} · $title' : message,
@@ -522,6 +522,17 @@ Future<void> initNotifications() async {
     'message': message,
   });
   return (head: head, body: body, payload: payload);
+}
+
+String stoppedSummary(Object? lanes) {
+  final names = lanes is List
+      ? lanes.map((l) => l.toString().trim()).where((l) => l.isNotEmpty).toList()
+      : const <String>[];
+  if (names.isEmpty) return 'Done for now';
+  if (names.length == 1) return 'Paused while a lane works: ${names.first}';
+  final shown = names.take(2).join(', ');
+  final rest = names.length > 2 ? ' +${names.length - 2}' : '';
+  return 'Paused while ${names.length} lanes work: $shown$rest';
 }
 
 void _route(String payload) {
