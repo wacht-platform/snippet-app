@@ -610,6 +610,7 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
     }
     self.orderOut(nil)
     notchHUD?.setWindowHidden(true)
+    NSApp.setActivationPolicy(.accessory)
     return false
   }
 
@@ -626,6 +627,7 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
   }
 
   func restoreFromMenuBar() {
+    NSApp.setActivationPolicy(.regular)
     if self.isMiniaturized {
       self.deminiaturize(nil)
     }
