@@ -327,7 +327,11 @@ NotificationDetails sessionNotificationDetails(
   );
 }
 
-const _snippetPerson = Person(name: 'Snippet', key: 'snippet', bot: true);
+const _snippetPerson = Person(
+    name: 'Snippet',
+    key: 'snippet',
+    bot: true,
+    icon: DrawableResourceAndroidIcon('notification_avatar'));
 
 Future<bool> routeNotificationAction(
     {required String? actionId,
