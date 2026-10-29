@@ -606,10 +606,10 @@ class _LaneActivityLine extends StatelessWidget {
         key: ValueKey('$now|$last'),
         children: [
           Flexible(
-            flex: 0,
+            flex: last.isEmpty ? 1 : 0,
             child: Shimmer(
               color: AppColors.fg2,
-              child: Text(now,
+              child: Text(now.replaceAll(RegExp(r'\s+'), ' '),
                   maxLines: 1, overflow: TextOverflow.ellipsis, style: style),
             ),
           ),
