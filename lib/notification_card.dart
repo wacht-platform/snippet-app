@@ -162,6 +162,7 @@ class _NotificationMessageCardState extends State<NotificationMessageCard> {
     final ago = _ago(p['created_at']);
     final busy = _state == _Send.sending;
     final pad = kMobile ? S.s12 : 10.0;
+    if (!kMobile) return _desktop(title, body, state, action, ago, busy);
 
     final header = Row(children: [
       MochiIcon(color: AppColors.accent, size: kMobile ? 22 : 20),
@@ -304,6 +305,201 @@ class _NotificationMessageCardState extends State<NotificationMessageCard> {
       ),
     );
   }
+}
+
+(String, Color, MochiEyes) _mood(Map<String, dynamic> p, CardAction a) =>
+    switch ('${p['kind'] ?? ''}'.split('.').last) {
+      'waiting' => (
+          a == CardAction.approval ? 'wants approval' : 'has a question',
+          AppColors.run,
+          MochiEyes.dot
+        ),
+      'done' || 'completed' => ('done', AppColors.ok, MochiEyes.happy),
+      'error' || 'failed' => ('failed', AppColors.danger, MochiEyes.flat),
+      'idle' => ('stopped', AppColors.fg3, MochiEyes.flat),
+      _ => ('', AppColors.fg3, MochiEyes.dot),
+    };
+
+extension on _NotificationMessageCardState {
+  Widget _desktop(String title, String body, (String, Tone)? state,
+      CardAction action, String ago, bool busy) {
+    final mood = _mood(widget.payload, action);
+    final actions = switch (action) {
+      CardAction.approval => Wrap(spacing: S.s8, runSpacing: S.s8, children: [
+          Btn('Approve',
+              small: true,
+              disabled: busy,
+              onTap: () => _send(const QuickApprove())),
+          Btn('Deny',
+              small: true,
+              variant: BtnVariant.secondary,
+              disabled: busy,
+              onTap: () => _send(const QuickDeny())),
+        ]),
+      CardAction.answer || CardAction.reply => _ReplyField(
+          controller: _text,
+          focus: _focus,
+          busy: busy,
+          hint: action == CardAction.answer ? 'Answer…' : 'Reply…',
+          onSubmit: () => _submitText(action),
+        ),
+      CardAction.view => Btn('Open',
+          small: true, variant: BtnVariant.secondary, onTap: widget.onOpen),
+      CardAction.none => null,
+    };
+
+    final head = Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+      Expanded(
+        child: Row(children: [
+          Flexible(
+            child: Text(title.isEmpty ? 'Snippet' : title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: sans(12.5,
+                    weight: W.label, height: 1.4, color: AppColors.fg2)),
+          ),
+          if (mood.$1.isNotEmpty) ...[
+            const SizedBox(width: S.s6),
+            Text(mood.$1,
+                maxLines: 1,
+                style: sans(12.5, height: 1.4, color: mood.$2)),
+          ],
+        ]),
+      ),
+      const SizedBox(width: S.s8),
+      if (ago.isNotEmpty)
+        Text(ago, style: mono(11, color: AppColors.fg4)),
+      SizedBox.square(
+        dimension: 24,
+        child: IconButton(
+          tooltip: 'Dismiss',
+          padding: EdgeInsets.zero,
+          style: const ButtonStyle(
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap),
+          icon: AppIcon('x', size: 12, color: AppColors.fg4),
+          onPressed: widget.onDismiss,
+        ),
+      ),
+    ]);
+
+    final bubble = Container(
+      padding: const EdgeInsets.fromLTRB(12, 6, 4, 10),
+      decoration: BoxDecoration(
+        color: AppColors.surface2,
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(4),
+          topRight: Radius.circular(14),
+          bottomLeft: Radius.circular(14),
+          bottomRight: Radius.circular(14),
+        ),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          head,
+          if (body.isNotEmpty && body != title)
+            Padding(
+              padding: const EdgeInsets.only(right: S.s8, top: 2),
+              child: Text(body,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: sans(13.5, height: 19 / 13.5, color: AppColors.fg1)),
+            ),
+          if (actions != null)
+            Padding(
+              padding: const EdgeInsets.only(right: S.s8, top: S.s8),
+              child: actions,
+            ),
+          if (_state == _Send.failed)
+            Padding(
+              padding: const EdgeInsets.only(top: S.s6),
+              child: GestureDetector(
+                onTap: widget.onOpen,
+                child: Text("Couldn't send. Open chat",
+                    style: sans(12, color: AppColors.danger)),
+              ),
+            ),
+        ],
+      ),
+    );
+
+    return Material(
+      color: AppColors.bg,
+      elevation: 3,
+      shadowColor: Colors.black.withValues(alpha: 0.3),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: AppColors.lineStrong),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: widget.onOpen,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: MochiIcon(
+                      color: AppColors.accent, size: 34, eyes: mood.$3),
+                ),
+                const SizedBox(width: 4),
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: CustomPaint(
+                      size: const Size(8, 12),
+                      painter: _Tail(AppColors.surface2)),
+                ),
+                Expanded(child: bubble),
+              ]),
+              if (widget.rest.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(left: 40, top: S.s8),
+                  child: Wrap(
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                    Text(_moreLabel, style: mono(11.5, color: AppColors.fg4)),
+                    const SizedBox(width: S.s12),
+                    InkWell(
+                      onTap: widget.onClearAll,
+                      borderRadius: BorderRadius.circular(R.xs),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 4, vertical: 2),
+                        child: Text('Clear all',
+                            style: sans(12,
+                                weight: W.label, color: AppColors.accent)),
+                      ),
+                    ),
+                  ]),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _Tail extends CustomPainter {
+  _Tail(this.color);
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size s) => canvas.drawPath(
+      Path()
+        ..moveTo(s.width, 0)
+        ..lineTo(0, s.height * .35)
+        ..quadraticBezierTo(0, s.height * .5, s.width, s.height)
+        ..close(),
+      Paint()..color = color);
+
+  @override
+  bool shouldRepaint(_Tail old) => old.color != color;
 }
 
 class _ReplyField extends StatelessWidget {
