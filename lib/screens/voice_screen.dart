@@ -8,6 +8,7 @@ import '../models.dart';
 import '../platform.dart';
 import '../settings_form.dart';
 import '../theme.dart';
+import '../voiceprint_enrol.dart';
 import '../widgets.dart';
 import 'shell_nav.dart';
 
@@ -34,82 +35,141 @@ class _VoiceScreenState extends State<VoiceScreen> {
   VoiceSettings? _voice;
   Object? _error;
   bool _busy = false;
-  bool _recordingSample = false;
+  EnrolPhase _phase = EnrolPhase.idle;
+  String? _enrolError;
+  bool _manageOpen = false;
   AudioRecorder? _sampleRecorder;
+  StreamSubscription<Uint8List>? _sampleSub;
+  Timer? _tick;
+  BytesBuilder _chunks = BytesBuilder(copy: false);
+  double _rawLevel = 0;
+  double _smooth = 0;
+  List<double> _levels = List.filled(12, 0.0);
+  final ValueNotifier<EnrolLive> _live =
+      ValueNotifier(EnrolLive(Duration.zero, List.filled(12, 0.0)));
 
   @override
   void dispose() {
+    _tick?.cancel();
+    _sampleSub?.cancel();
     _sampleRecorder?.dispose();
+    _live.dispose();
     super.dispose();
   }
 
-  Future<void> _recordVoiceprintSample(AmbientSettings a) async {
-    if (_busy || _recordingSample) return;
+  void _resetLive() => _live.value = const EnrolLive(
+      Duration.zero, [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+
+  Future<void> _teardownRecorder() async {
+    _tick?.cancel();
+    _tick = null;
+    final sub = _sampleSub;
+    final rec = _sampleRecorder;
+    _sampleSub = null;
+    _sampleRecorder = null;
+    await sub?.cancel();
+    try {
+      await rec?.stop();
+    } catch (_) {}
+    await rec?.dispose();
+  }
+
+  Future<void> _startSample() async {
+    if (_busy || _phase != EnrolPhase.idle) return;
     final rec = AudioRecorder();
     _sampleRecorder = rec;
+    setState(() => _enrolError = null);
     try {
       if (!await rec.hasPermission()) {
-        if (mounted)
-          toast(context, 'Microphone permission denied', danger: true);
-        await rec.dispose();
-        _sampleRecorder = null;
+        await _teardownRecorder();
+        if (mounted) {
+          setState(() => _enrolError =
+              'Microphone access is off. Allow it in system settings, then retry.');
+        }
         return;
       }
-      setState(() => _recordingSample = true);
-      final chunks = <int>[];
+      _chunks = BytesBuilder(copy: false);
+      _rawLevel = 0;
+      _smooth = 0;
+      _levels = List.filled(12, 0.0);
+      _resetLive();
       final stream = await rec.startStream(const RecordConfig(
         encoder: AudioEncoder.pcm16bits,
         sampleRate: 16000,
         numChannels: 1,
       ));
-      final sub = stream.listen((data) => chunks.addAll(data));
-      await Future<void>.delayed(const Duration(seconds: 3));
-      await sub.cancel();
-      await rec.stop();
-      await rec.dispose();
-      _sampleRecorder = null;
-      if (!mounted) return;
-      setState(() {
-        _recordingSample = false;
-        _busy = true;
+      _sampleSub = stream.listen((data) {
+        _chunks.add(data);
+        _rawLevel = pcmLevel(data);
       });
-      final next = await widget.client.enrollVoiceprint(
-        audioBytes: Uint8List.fromList(chunks),
-        label: 'Sample ${a.voiceprints.length + 1}',
-      );
+      final clock = Stopwatch()..start();
+      _tick = Timer.periodic(const Duration(milliseconds: 60), (_) {
+        _smooth = _rawLevel > _smooth
+            ? _smooth + (_rawLevel - _smooth) * 0.6
+            : _smooth * 0.8;
+        _levels = [..._levels.skip(1), _smooth];
+        _live.value = EnrolLive(clock.elapsed, _levels);
+        if (clock.elapsed >= kEnrolMax) _finishSample();
+      });
+      if (mounted) setState(() => _phase = EnrolPhase.recording);
+    } catch (e) {
+      await _teardownRecorder();
+      if (mounted) setState(() => _enrolError = "Couldn't start recording: $e");
+    }
+  }
+
+  Future<void> _cancelSample() async {
+    await _teardownRecorder();
+    if (mounted) setState(() => _phase = EnrolPhase.idle);
+  }
+
+  Future<void> _finishSample() async {
+    if (_phase != EnrolPhase.recording) return;
+    _phase = EnrolPhase.saving;
+    await _teardownRecorder();
+    if (!mounted) return;
+    setState(() {});
+    final audio = _chunks.takeBytes();
+    if (voicedDuration(audio) < kEnrolMinVoiced) {
+      setState(() {
+        _phase = EnrolPhase.idle;
+        _enrolError = kEnrolTooQuiet;
+      });
+      return;
+    }
+    await _enroll(() => widget.client.enrollVoiceprint(
+          audioBytes: audio,
+          label: 'Sample ${(_ambient?.voiceprints.length ?? 0) + 1}',
+        ));
+  }
+
+  Future<void> _enroll(Future<AmbientSettings> Function() call) async {
+    setState(() {
+      _phase = EnrolPhase.saving;
+      _enrolError = null;
+    });
+    try {
+      final next = await call();
       if (!mounted) return;
       setState(() => _ambient = next);
-      toast(context, 'Voice sample ${next.voiceprints.length} saved');
     } catch (e) {
+      final msg = '$e';
       if (mounted) {
-        toast(context, "Couldn't enroll voice sample: $e", danger: true);
+        setState(() => _enrolError = msg.contains('Not enough')
+            ? kEnrolTooQuiet
+            : "Couldn't save that sample: ${msg.replaceFirst('Exception: ', '')}");
       }
     } finally {
-      if (mounted) {
-        setState(() {
-          _recordingSample = false;
-          _busy = false;
-        });
-      }
+      if (mounted) setState(() => _phase = EnrolPhase.idle);
     }
   }
 
   Future<void> _enrollFromRecent() async {
-    if (_busy || _recordingSample) return;
-    setState(() => _busy = true);
-    try {
-      final next = await widget.client.enrollVoiceprint(
-        fromRecent: true,
-        label: 'Sample ${(_ambient?.voiceprints.length ?? 0) + 1}',
-      );
-      if (!mounted) return;
-      setState(() => _ambient = next);
-      toast(context, 'Enrolled from recent voice turn');
-    } catch (e) {
-      if (mounted) toast(context, '$e', danger: true);
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
+    if (_busy || _phase != EnrolPhase.idle) return;
+    await _enroll(() => widget.client.enrollVoiceprint(
+          fromRecent: true,
+          label: 'Sample ${(_ambient?.voiceprints.length ?? 0) + 1}',
+        ));
   }
 
   Future<void> _deleteVoiceprint(String? id) async {
@@ -371,62 +431,20 @@ class _VoiceScreenState extends State<VoiceScreen> {
           ),
         ],
       ),
-      SettingsGroup(
-        header: 'Voiceprint recognition',
-        footer: a.voiceprintAdaptive > 0
-            ? 'Record 2–4 short samples so Snippet can tell your voice from others. It also learns from your clear lines; ${a.voiceprintAdaptive} learned on this device so far.'
-            : 'Record 2–4 short samples so Snippet can tell your voice from others. It also learns from your clear lines as you talk.',
-        children: [
-          if (a.voiceprintReenrol)
-            SettingsRow(
-              label: 'Voice recognition was upgraded',
-              sub:
-                  'Your old samples no longer count. Record 3 new ones so Snippet recognises you again.',
-              trailing: const Tag('Re-record', tone: Tone.run),
-            ),
-          SettingsRow(
-            label: _recordingSample
-                ? 'Listening for 3 seconds — speak naturally…'
-                : 'Enrolled samples (${a.voiceprints.length})',
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Btn(
-                  _recordingSample ? 'Recording…' : 'Record 3s sample',
-                  small: true,
-                  variant: BtnVariant.primary,
-                  disabled: _busy || _recordingSample,
-                  onTap: () => _recordVoiceprintSample(a),
-                ),
-                const SizedBox(width: S.s8),
-                Btn(
-                  'Use last turn',
-                  small: true,
-                  variant: BtnVariant.secondary,
-                  disabled: _busy || _recordingSample,
-                  onTap: _enrollFromRecent,
-                ),
-              ],
-            ),
-          ),
-          for (final vp in a.voiceprints)
-            SettingsRow(
-              label: vp.current ? vp.label : '${vp.label} · old model',
-              trailing: Btn(
-                'Remove',
-                small: true,
-                variant: BtnVariant.secondary,
-                disabled: _busy || _recordingSample,
-                onTap: () => _deleteVoiceprint(vp.id),
-              ),
-            ),
-          if (a.voiceprints.length > 1)
-            SettingsRow(
-              label: 'Clear all voiceprints',
-              danger: true,
-              onTap: _busy ? null : () => _deleteVoiceprint(null),
-            ),
-        ],
+      VoiceprintGroup(
+        ambient: a,
+        phase: _phase,
+        live: _live,
+        manageOpen: _manageOpen,
+        busy: _busy,
+        error: _enrolError,
+        onRecord: _startSample,
+        onStop: _finishSample,
+        onCancel: _cancelSample,
+        onRecent: _enrollFromRecent,
+        onToggleManage: () => setState(() => _manageOpen = !_manageOpen),
+        onRemove: _deleteVoiceprint,
+        onClear: () => _deleteVoiceprint(null),
       ),
     ];
   }
