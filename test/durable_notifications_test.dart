@@ -353,7 +353,11 @@ void main() {
       foregroundNotifications.add(payload);
       await tester.pump();
       await tester.tap(find.text('Hello'));
-      await tester.pump();
+      await tester.pumpAndSettle();
+      if (find.text('Open chat').evaluate().isNotEmpty) {
+        await tester.tap(find.text('Open chat'));
+        await tester.pumpAndSettle();
+      }
       expect(opened?['destination']['id'], 'target');
       expect(opened?['session'], type == 'session' ? 'target' : 'recipient');
       expect(find.text('Hello'), findsNothing);

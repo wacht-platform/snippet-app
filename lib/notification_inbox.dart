@@ -279,6 +279,7 @@ Map<String, dynamic> notificationDestination(
     'body': event['body'] ?? event['message'],
     'destination': destination,
     if (event['workspace'] != null) 'workspace': event['workspace'],
+    if (event['attention'] is Map) 'attention': event['attention'],
     'session': destination['type'] == 'session'
         ? destination['id']
         : destination['session'] ?? event['session']
