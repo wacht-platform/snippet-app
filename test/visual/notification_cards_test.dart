@@ -86,7 +86,7 @@ void main() {
     var done = false;
     await tester.pumpWidget(
         frame(card(_approval, sent: sent, onSent: () => done = true)));
-    expect(find.text('Needs input'), findsOneWidget);
+    expect(find.text('wants approval'), findsOneWidget);
     expect(find.textContaining('**'), findsNothing);
     await tester.tap(find.text('Approve'));
     await tester.pump();

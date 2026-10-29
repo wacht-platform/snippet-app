@@ -34,15 +34,6 @@ CardAction cardActionFor(Map<String, dynamic> p) {
   return CardAction.none;
 }
 
-(String, Tone)? cardStateFor(Map<String, dynamic> p) =>
-    switch ('${p['kind'] ?? ''}'.split('.').last) {
-      'waiting' => ('Needs input', Tone.run),
-      'done' || 'completed' => ('Done', Tone.ok),
-      'error' || 'failed' => ('Failed', Tone.danger),
-      'idle' => ('Stopped', Tone.neutral),
-      _ => null,
-    };
-
 final _fence = RegExp(r'```[^\n]*\n?');
 final _link = RegExp(r'!?\[([^\]]*)\]\([^)]*\)');
 final _heading = RegExp(r'^\s{0,3}#{1,6}\s+', multiLine: true);
@@ -157,160 +148,20 @@ class _NotificationMessageCardState extends State<NotificationMessageCard> {
     final title = '${p['title'] ?? ''}'.trim();
     final body = plainPreview(
         '${(p['body'] ?? '').toString().trim().isNotEmpty ? p['body'] : p['message'] ?? ''}');
-    final state = cardStateFor(p);
     final action = cardActionFor(p);
-    final ago = _ago(p['created_at']);
-    final busy = _state == _Send.sending;
-    final pad = kMobile ? S.s12 : 10.0;
-    if (!kMobile) return _desktop(title, body, state, action, ago, busy);
-
-    final header = Row(children: [
-      MochiIcon(color: AppColors.accent, size: kMobile ? 22 : 20),
-      const SizedBox(width: S.s8),
-      Expanded(
-        child: Text(title.isEmpty ? 'New notification' : title,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: sans(kMobile ? 14 : 13,
-                weight: W.label,
-                height: kMobile ? 19 / 14 : 18 / 13,
-                color: AppColors.fg1)),
-      ),
-      if (state != null) ...[
-        const SizedBox(width: S.s8),
-        Tag(state.$1, tone: state.$2),
-      ],
-      if (ago.isNotEmpty)
-        Padding(
-          padding: const EdgeInsets.only(left: S.s8),
-          child: Text(ago, style: mono(11, color: AppColors.fg4)),
-        ),
-      SizedBox.square(
-        dimension: kMobile ? 44 : 28,
-        child: IconButton(
-          tooltip: 'Dismiss',
-          padding: EdgeInsets.zero,
-          style: const ButtonStyle(
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap),
-          icon: AppIcon('x', size: kMobile ? 14 : 13, color: AppColors.fg3),
-          onPressed: widget.onDismiss,
-        ),
-      ),
-    ]);
-
-    final actions = switch (action) {
-      CardAction.approval => Wrap(spacing: S.s8, runSpacing: S.s8, children: [
-          Btn('Approve',
-              small: true,
-              disabled: busy,
-              onTap: () => _send(const QuickApprove())),
-          Btn('Deny',
-              small: true,
-              variant: BtnVariant.secondary,
-              disabled: busy,
-              onTap: () => _send(const QuickDeny())),
-        ]),
-      CardAction.answer || CardAction.reply => _ReplyField(
-          controller: _text,
-          focus: _focus,
-          busy: busy,
-          hint: action == CardAction.answer ? 'Answer…' : 'Reply…',
-          onSubmit: () => _submitText(action),
-        ),
-      CardAction.view => Align(
-          alignment: Alignment.centerLeft,
-          child: Btn('View',
-              small: true,
-              variant: BtnVariant.secondary,
-              onTap: widget.onOpen),
-        ),
-      CardAction.none => null,
-    };
-
-    return Material(
-      color: kMobile ? AppColors.surface2 : AppColors.surface1,
-      elevation: 6,
-      shadowColor: Colors.black.withValues(alpha: 0.45),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(kMobile ? 14 : 12),
-        side: BorderSide(color: AppColors.line),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: widget.onOpen,
-        onLongPress: widget.rest.isEmpty ? null : widget.onClearAll,
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(pad, kMobile ? 4 : 2, 4, pad),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              header,
-              if (body.isNotEmpty && body != title)
-                Padding(
-                  padding: EdgeInsets.only(
-                      left: (kMobile ? 22 : 20) + S.s8, right: pad - 4),
-                  child: Text(body,
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
-                      style: sans(kMobile ? 13.5 : 13,
-                          height: kMobile ? 19 / 13.5 : 18 / 13,
-                          color: AppColors.fg2)),
-                ),
-              if (actions != null)
-                Padding(
-                  padding: EdgeInsets.only(
-                      left: (kMobile ? 22 : 20) + S.s8,
-                      right: pad - 4,
-                      top: S.s8),
-                  child: actions,
-                ),
-              if (_state == _Send.failed)
-                Padding(
-                  padding: EdgeInsets.only(
-                      left: (kMobile ? 22 : 20) + S.s8, top: S.s6),
-                  child: GestureDetector(
-                    onTap: widget.onOpen,
-                    child: Text("Couldn't send. Open chat",
-                        style: sans(12, color: AppColors.danger)),
-                  ),
-                ),
-              if (widget.rest.isNotEmpty)
-                Padding(
-                  padding: EdgeInsets.only(
-                      left: (kMobile ? 22 : 20) + S.s8, top: S.s8),
-                  child: Wrap(
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                    Text(_moreLabel, style: sans(12, color: AppColors.fg3)),
-                    if (!kMobile) ...[
-                      const SizedBox(width: S.s12),
-                      InkWell(
-                        onTap: widget.onClearAll,
-                        borderRadius: BorderRadius.circular(R.xs),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 4, vertical: 2),
-                          child: Text('Clear all',
-                              style: sans(12,
-                                  weight: W.label, color: AppColors.accent)),
-                        ),
-                      ),
-                    ],
-                  ]),
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
+    return _card(title, body, action, _ago(p['created_at']),
+        _state == _Send.sending);
   }
 }
 
 (String, Color, MochiEyes) _mood(Map<String, dynamic> p, CardAction a) =>
     switch ('${p['kind'] ?? ''}'.split('.').last) {
       'waiting' => (
-          a == CardAction.approval ? 'wants approval' : 'has a question',
+          switch (a) {
+            CardAction.approval => 'wants approval',
+            CardAction.answer => 'has a question',
+            _ => 'needs you',
+          },
           AppColors.run,
           MochiEyes.dot
         ),
@@ -321,8 +172,8 @@ class _NotificationMessageCardState extends State<NotificationMessageCard> {
     };
 
 extension on _NotificationMessageCardState {
-  Widget _desktop(String title, String body, (String, Tone)? state,
-      CardAction action, String ago, bool busy) {
+  Widget _card(
+      String title, String body, CardAction action, String ago, bool busy) {
     final mood = _mood(widget.payload, action);
     final actions = switch (action) {
       CardAction.approval => Wrap(spacing: S.s8, runSpacing: S.s8, children: [
@@ -348,6 +199,18 @@ extension on _NotificationMessageCardState {
       CardAction.none => null,
     };
 
+    final close = SizedBox.square(
+      dimension: kMobile ? 44 : 24,
+      child: IconButton(
+        tooltip: 'Dismiss',
+        padding: EdgeInsets.zero,
+        style: const ButtonStyle(
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap),
+        icon: AppIcon('x', size: kMobile ? 14 : 12, color: AppColors.fg4),
+        onPressed: widget.onDismiss,
+      ),
+    );
+
     final head = Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
       Expanded(
         child: Row(children: [
@@ -355,35 +218,25 @@ extension on _NotificationMessageCardState {
             child: Text(title.isEmpty ? 'Snippet' : title,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: sans(12.5,
+                style: sans(kMobile ? 13 : 12.5,
                     weight: W.label, height: 1.4, color: AppColors.fg2)),
           ),
           if (mood.$1.isNotEmpty) ...[
             const SizedBox(width: S.s6),
             Text(mood.$1,
                 maxLines: 1,
-                style: sans(12.5, height: 1.4, color: mood.$2)),
+                style: sans(kMobile ? 13 : 12.5, height: 1.4, color: mood.$2)),
           ],
         ]),
       ),
       const SizedBox(width: S.s8),
       if (ago.isNotEmpty)
         Text(ago, style: mono(11, color: AppColors.fg4)),
-      SizedBox.square(
-        dimension: 24,
-        child: IconButton(
-          tooltip: 'Dismiss',
-          padding: EdgeInsets.zero,
-          style: const ButtonStyle(
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap),
-          icon: AppIcon('x', size: 12, color: AppColors.fg4),
-          onPressed: widget.onDismiss,
-        ),
-      ),
+      kMobile ? const SizedBox(width: 30) : close,
     ]);
 
     final bubble = Container(
-      padding: const EdgeInsets.fromLTRB(12, 6, 4, 10),
+      padding: EdgeInsets.fromLTRB(12, kMobile ? 4 : 6, 4, kMobile ? 8 : 10),
       decoration: BoxDecoration(
         color: AppColors.surface2,
         borderRadius: const BorderRadius.only(
@@ -404,7 +257,9 @@ extension on _NotificationMessageCardState {
               child: Text(body,
                   maxLines: 3,
                   overflow: TextOverflow.ellipsis,
-                  style: sans(13.5, height: 19 / 13.5, color: AppColors.fg1)),
+                  style: sans(kMobile ? 14.5 : 13.5,
+                      height: kMobile ? 20 / 14.5 : 19 / 13.5,
+                      color: AppColors.fg1)),
             ),
           if (actions != null)
             Padding(
@@ -433,10 +288,12 @@ extension on _NotificationMessageCardState {
         side: BorderSide(color: AppColors.lineStrong),
       ),
       clipBehavior: Clip.antiAlias,
-      child: InkWell(
+      child: Stack(children: [
+      InkWell(
         onTap: widget.onOpen,
+        onLongPress: widget.rest.isEmpty ? null : widget.onClearAll,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
+          padding: const EdgeInsets.all(10),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -445,7 +302,9 @@ extension on _NotificationMessageCardState {
                 Padding(
                   padding: const EdgeInsets.only(top: 2),
                   child: MochiIcon(
-                      color: AppColors.accent, size: 34, eyes: mood.$3),
+                      color: AppColors.accent,
+                      size: kMobile ? 38 : 34,
+                      eyes: mood.$3),
                 ),
                 const SizedBox(width: 4),
                 Padding(
@@ -458,11 +317,13 @@ extension on _NotificationMessageCardState {
               ]),
               if (widget.rest.isNotEmpty)
                 Padding(
-                  padding: const EdgeInsets.only(left: 40, top: S.s8),
+                  padding:
+                      EdgeInsets.only(left: kMobile ? 46 : 40, top: S.s8),
                   child: Wrap(
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                     Text(_moreLabel, style: mono(11.5, color: AppColors.fg4)),
+                    if (!kMobile) ...[
                     const SizedBox(width: S.s12),
                     InkWell(
                       onTap: widget.onClearAll,
@@ -475,12 +336,15 @@ extension on _NotificationMessageCardState {
                                 weight: W.label, color: AppColors.accent)),
                       ),
                     ),
+                    ],
                   ]),
                 ),
             ],
           ),
         ),
       ),
+      if (kMobile) Positioned(top: 4, right: 4, child: close),
+      ]),
     );
   }
 }
