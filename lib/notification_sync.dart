@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'api.dart';
+import 'call_tracking.dart';
 import 'device_events.dart';
 import 'macos_notch.dart';
 import 'models.dart';
@@ -68,6 +69,7 @@ Future<void> syncNotificationInstance(Instance instance,
       since = NotificationCursor.parse(page['next_cursor']);
     }
     await inbox.prune(key);
+    if (!background) unawaited(callTracker.refresh(key, client));
   });
   _fetches[key] = next;
   return next;
@@ -86,6 +88,7 @@ Future<void> receiveLiveNotification(Instance instance, Object? message,
 Future<void> presentNotifications(Instance instance, NotificationInbox inbox,
     List<Map<String, dynamic>> received,
     {bool background = false}) async {
+  received = await _takeCallEvents(instance, received, background);
   if (received.isEmpty) return;
   if (!background && (notificationAppForeground || kMacOS)) {
     for (final event in received) {
@@ -175,5 +178,44 @@ Future<void> _postMacCentre(Instance instance, NotificationInbox inbox,
           stack: stack,
           library: 'notification presentation'));
     }
+  }
+}
+
+/// Peels call_prompt / call_state events off the batch and returns the rest.
+Future<List<Map<String, dynamic>>> _takeCallEvents(Instance instance,
+    List<Map<String, dynamic>> received, bool background) async {
+  final rest = <Map<String, dynamic>>[];
+  for (final event in received) {
+    final call = parseCallEvent(event);
+    if (call == null) {
+      rest.add(event);
+      continue;
+    }
+    await presentCallEvent(instance, call, background: background);
+  }
+  return rest;
+}
+
+Future<void> presentCallEvent(Instance instance, CallEvent call,
+    {bool background = false}) async {
+  if (!call.isPrompt) {
+    callTracker.apply(instance.url, call);
+    await cancelCallPrompt(call.callId);
+    return;
+  }
+  final inApp = !background && (notificationAppForeground || kMacOS);
+  if (inApp) {
+    callTracker.apply(instance.url, call);
+    return;
+  }
+  if (!kMobile) return;
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.reload();
+  if (!(prefs.getBool('notif_enabled') ?? false)) return;
+  try {
+    await notifyCallPrompt(url: instance.url, event: call);
+  } catch (error, stack) {
+    FlutterError.reportError(FlutterErrorDetails(
+        exception: error, stack: stack, library: 'call prompt'));
   }
 }

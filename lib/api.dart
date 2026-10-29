@@ -204,6 +204,25 @@ class DaemonClient {
     return jsonDecode(r.body) as Map<String, dynamic>;
   }
 
+  /// GET /ambient/call: `{"state":"idle"}` or the current call.
+  Future<Map<String, dynamic>> ambientCall() async {
+    final r = await http.get(_uri('/ambient/call'));
+    if (r.statusCode != 200) throw _err('ambient call', r);
+    return jsonDecode(r.body) as Map<String, dynamic>;
+  }
+
+  /// POST /ambient/call/{id}/track|ignore|stop. Returns the HTTP status so the
+  /// caller can treat 404/409 (already resolved) as a dismissal.
+  Future<int> ambientCallAction(String callId, String action) async {
+    final r = await http.post(
+        _uri('/ambient/call/${Uri.encodeComponent(callId)}/$action'));
+    return r.statusCode;
+  }
+
+  Future<int> trackCall(String callId) => ambientCallAction(callId, 'track');
+  Future<int> ignoreCall(String callId) => ambientCallAction(callId, 'ignore');
+  Future<int> stopCall(String callId) => ambientCallAction(callId, 'stop');
+
   /// Device-wide `/events` firehose (status + terminal bells). Independent of
   /// the notification watcher so the session list can update live even when
   /// OS banners are off.

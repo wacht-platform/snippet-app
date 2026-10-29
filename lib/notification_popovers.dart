@@ -1,12 +1,16 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'api.dart';
+import 'call_prompt_card.dart';
+import 'call_tracking.dart';
 import 'macos_notch.dart';
 import 'notification_sync.dart';
 import 'notifications.dart';
 import 'theme.dart';
 import 'platform.dart';
 import 'notification_card.dart';
+import 'session_quick_send.dart' show resolveInstanceForPayload;
 
 class NotificationPopovers extends StatefulWidget {
   const NotificationPopovers({super.key, required this.child});
@@ -102,11 +106,23 @@ class _NotificationPopoversState extends State<NotificationPopovers> {
     for (final p in initial) {
       _forwardToMacNotch(p);
     }
+    callTracker.state.addListener(_callChanged);
     visibleNotificationSession.addListener(_visibilityChanged);
     _subscription = foregroundNotifications.stream.listen((payload) {
       _forwardToMacNotch(payload);
       if (mounted) setState(() => _pending.add(payload));
     });
+  }
+
+  void _callChanged() {
+    if (mounted) setState(() {});
+  }
+
+  Future<bool> _callAction(CallStatus status, String action) async {
+    final instance = await resolveInstanceForPayload({'url': status.url});
+    if (instance == null) return false;
+    return callTracker.act(
+        DaemonClient(instance.url, instance.token), status.callId, action);
   }
 
   void _visibilityChanged() {
@@ -120,6 +136,7 @@ class _NotificationPopoversState extends State<NotificationPopovers> {
 
   @override
   void dispose() {
+    callTracker.state.removeListener(_callChanged);
     visibleNotificationSession.removeListener(_visibilityChanged);
     _subscription?.cancel();
     _expiry?.cancel();
@@ -138,9 +155,27 @@ class _NotificationPopoversState extends State<NotificationPopovers> {
     _pending.removeWhere(suppressVisibleNotification);
     _syncExpiry();
     final payload = _pending.firstOrNull;
+    final call = callTracker.state.value;
     final reducedMotion = MediaQuery.disableAnimationsOf(context);
     return Stack(children: [
       widget.child,
+      if (call != null)
+        Positioned(
+            top: S.s8,
+            left: S.s12,
+            right: S.s12,
+            child: SafeArea(
+                child: Align(
+              alignment: kMobile ? Alignment.topCenter : Alignment.topRight,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 420),
+                child: CallPromptCard(
+                    key: ValueKey('${call.callId}|${call.phase.name}'),
+                    status: call,
+                    onAction: (a) => _callAction(call, a)),
+              ),
+            )))
+      else
       Positioned(
           top: S.s8,
           left: S.s12,

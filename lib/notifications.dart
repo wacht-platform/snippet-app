@@ -7,6 +7,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'android_reconciliation.dart';
+import 'call_tracking.dart';
 import 'notification_sync.dart';
 import 'notification_inbox.dart';
 import 'file_actions.dart';
@@ -20,6 +21,9 @@ const _summaryId = 2147483600;
 const _actionApprove = 'approve';
 const _actionDeny = 'deny';
 const _actionReply = 'reply';
+const _actionCallTrack = 'call_track';
+const _actionCallIgnore = 'call_ignore';
+const _callChannel = 'snippet_call';
 const _androidGroupPrefix = 'snippet_machine_';
 final Map<String, int> _machineSummaryIds = {};
 const _downloadChannel = 'snippet_downloads';
@@ -344,6 +348,13 @@ Future<bool> routeNotificationAction(
   } catch (_) {
     return false;
   }
+  if (data['type'] == callPromptType) {
+    return switch (actionId) {
+      _actionCallTrack => callActionForPayload(data, callActionTrack),
+      _actionCallIgnore => callActionForPayload(data, callActionIgnore),
+      _ => Future.value(false),
+    };
+  }
   final attn = data['attention'];
   final question = attn is Map && attn['type'] == 'question';
   final text = input?.trim() ?? '';
@@ -355,6 +366,64 @@ Future<bool> routeNotificationAction(
     _ => null,
   };
   return action == null ? false : quickSendForPayload(data, action);
+}
+
+bool _isQuickActionId(String? id) => const {
+      _actionApprove,
+      _actionDeny,
+      _actionReply,
+      _actionCallTrack,
+      _actionCallIgnore,
+    }.contains(id);
+
+/// Heads-up prompt that vanishes when the daemon's 120 s window closes.
+Future<void> notifyCallPrompt({
+  required String url,
+  required CallEvent event,
+  int? nowMs,
+  FlutterLocalNotificationsPlugin? plugin,
+}) async {
+  if (!kMobile || !kCanNotify) return;
+  final remaining = event.expiresAtMs -
+      (nowMs ?? DateTime.now().millisecondsSinceEpoch);
+  if (event.expiresAtMs > 0 && remaining <= 0) return;
+  await (plugin ?? _mainNotif).show(
+    id: callNotificationId(event.callId),
+    title: event.title,
+    body: event.body,
+    notificationDetails: callPromptDetails(timeoutMs: remaining),
+    payload: jsonEncode({
+      'type': callPromptType,
+      'url': url,
+      'call_id': event.callId,
+      'expires_at': event.expiresAtMs,
+    }),
+  );
+}
+
+NotificationDetails callPromptDetails({required int timeoutMs}) =>
+    NotificationDetails(
+      android: AndroidNotificationDetails(_callChannel, 'Calls',
+          channelDescription: 'Asks before Snippet takes notes on a call',
+          importance: Importance.high,
+          priority: Priority.high,
+          category: AndroidNotificationCategory.call,
+          timeoutAfter: timeoutMs > 0 ? timeoutMs : null,
+          autoCancel: false,
+          actions: const [
+            AndroidNotificationAction(_actionCallTrack, 'Track',
+                cancelNotification: false),
+            AndroidNotificationAction(_actionCallIgnore, 'Ignore',
+                cancelNotification: false),
+          ]),
+    );
+
+Future<void> cancelCallPrompt(String callId,
+    {FlutterLocalNotificationsPlugin? plugin}) async {
+  if (!kMobile || !kCanNotify) return;
+  try {
+    await (plugin ?? _mainNotif).cancel(id: callNotificationId(callId));
+  } catch (_) {}
 }
 
 @pragma('vm:entry-point')
@@ -436,8 +505,7 @@ Future<void> initNotifications() async {
           _downloadCancels[resp.id]?.call();
           return;
         }
-        if ([_actionApprove, _actionDeny, _actionReply]
-            .contains(resp.actionId)) {
+        if (_isQuickActionId(resp.actionId)) {
           if (await routeNotificationAction(
                   actionId: resp.actionId,
                   input: resp.input,
@@ -451,6 +519,16 @@ Future<void> initNotifications() async {
         if (p != null) _route(p);
       },
     );
+    String? shownCall;
+    callTracker.state.addListener(() {
+      final c = callTracker.state.value;
+      if (c != null && c.phase == CallPhase.pending) {
+        shownCall = c.callId;
+      } else if (shownCall != null) {
+        unawaited(cancelCallPrompt(shownCall!));
+        shownCall = null;
+      }
+    });
     // Cold start from a tapped notification.
     final launch = await _mainNotif.getNotificationAppLaunchDetails();
     if (launch?.didNotificationLaunchApp == true) {
@@ -475,7 +553,7 @@ Future<void> initNotifications() async {
     ),
     onDidReceiveBackgroundNotificationResponse: notificationBackgroundResponse,
     onDidReceiveNotificationResponse: (resp) async {
-      if ([_actionApprove, _actionDeny, _actionReply].contains(resp.actionId)) {
+      if (_isQuickActionId(resp.actionId)) {
         if (await routeNotificationAction(
                 actionId: resp.actionId,
                 input: resp.input,
@@ -527,6 +605,7 @@ Future<void> initNotifications() async {
 void _route(String payload) {
   try {
     final m = jsonDecode(payload) as Map<String, dynamic>;
+    if (m['type'] == callPromptType) return;
     // A download notification opens the saved file directly, not a session.
     if (m['type'] == 'download') {
       final path = m['path'] as String?;
@@ -567,6 +646,10 @@ Future<String?> startWatching() async {
     await android?.createNotificationChannel(const AndroidNotificationChannel(
         _needsInputChannel, 'Needs input',
         description: 'Sessions waiting for input',
+        importance: Importance.high));
+    await android?.createNotificationChannel(const AndroidNotificationChannel(
+        _callChannel, 'Calls',
+        description: 'Asks before Snippet takes notes on a call',
         importance: Importance.high));
     await android?.createNotificationChannel(const AndroidNotificationChannel(
         _alertChannel, 'Updates',

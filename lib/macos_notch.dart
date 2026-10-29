@@ -6,6 +6,7 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 
 import 'ambient/controller.dart';
 import 'api.dart';
+import 'call_tracking.dart';
 import 'models.dart';
 import 'notifications.dart';
 import 'platform.dart';
@@ -33,7 +34,8 @@ import 'session_quick_send.dart'
         QuickDeny,
         QuickReply,
         quickSend,
-        quickSendForPayload;
+        quickSendForPayload,
+        resolveInstanceForPayload;
 
 class MacosNotch {
   MacosNotch._();
@@ -102,8 +104,46 @@ class MacosNotch {
           _closeActiveConversation();
         case 'toggleAmbient':
           await _toggleAmbient();
+        case 'callAction':
+          final args = call.arguments;
+          if (args is Map) {
+            await _callAction('${args['action'] ?? ''}');
+          }
       }
     });
+    callTracker.state.addListener(_syncCall);
+  }
+
+  static String? _notchCallKey;
+
+  static Future<void> _callAction(String action) async {
+    final status = callTracker.state.value;
+    if (status == null || !const {'track', 'ignore', 'stop'}.contains(action)) {
+      return;
+    }
+    final instance = await resolveInstanceForPayload({'url': status.url});
+    if (instance == null) return;
+    await callTracker.act(
+        DaemonClient(instance.url, instance.token), status.callId, action);
+  }
+
+  static void _syncCall() {
+    final c = callTracker.state.value;
+    final key = c == null ? null : '${c.callId}|${c.phase.name}';
+    if (key == _notchCallKey) return;
+    _notchCallKey = key;
+    final future = switch (c?.phase) {
+      CallPhase.pending => _channel.invokeMethod<void>('callPrompt', {
+          'callId': c!.callId,
+          'expiresAtMs': c.expiresAtMs,
+          'title': 'Call',
+          'message': c.title,
+        }),
+      CallPhase.tracking =>
+        _channel.invokeMethod<void>('callTracking', {'callId': c!.callId}),
+      null => _channel.invokeMethod<void>('callClear'),
+    };
+    future.catchError((Object _) {});
   }
 
   static Future<void> _toggleAmbient() async {

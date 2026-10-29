@@ -425,6 +425,9 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
     hud.onNotchAction = { [weak self] action, text in
       self?.notchChannel?.invokeMethod("notchAction", arguments: ["action": action, "text": text])
     }
+    hud.onCallAction = { [weak self] action in
+      self?.notchChannel?.invokeMethod("callAction", arguments: ["action": action])
+    }
     self.notchHUD = hud
 
     notchChan.setMethodCallHandler { [weak self] call, result in
@@ -463,6 +466,23 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
             )
           }
         }
+        result(nil)
+      case "callPrompt":
+        if let args = call.arguments as? [String: Any] {
+          let expiresAtMs = (args["expiresAtMs"] as? NSNumber)?.doubleValue ?? 0
+          let seconds = expiresAtMs > 0 ? expiresAtMs / 1000 - Date().timeIntervalSince1970 : 120
+          self.notchHUD?.presentCallPrompt(
+            callId: args["callId"] as? String ?? "",
+            title: args["title"] as? String ?? "Call",
+            message: args["message"] as? String ?? "Track this call?",
+            seconds: seconds)
+        }
+        result(nil)
+      case "callTracking":
+        self.notchHUD?.presentCallTracking(callId: (call.arguments as? [String: Any])?["callId"] as? String ?? "")
+        result(nil)
+      case "callClear":
+        self.notchHUD?.clearCall()
         result(nil)
       case "openInApp":
         if let args = call.arguments as? [String: Any], let payloadData = try? JSONSerialization.data(withJSONObject: args), let payload = String(data: payloadData, encoding: .utf8) {
@@ -1481,7 +1501,12 @@ final class NotchHUDController {
   private let onOpenConversation: (String) -> Void
   private let onSendReply: (String) -> Void
   var onNotchAction: ((String, String) -> Void)?
+  var onCallAction: ((String) -> Void)?
   private let onCloseConversation: () -> Void
+
+  private var callMode: String?
+  private var callTimer: Timer?
+  private var callDuration: TimeInterval = 120
 
   private var windowHidden = false
   private var ambientActive = false
@@ -1556,6 +1581,9 @@ final class NotchHUDController {
     v.onNotchAction = { [weak self] action, text in
       self?.onNotchAction?(action, text)
     }
+    v.onCallAction = { [weak self] action in
+      self?.onCallAction?(action)
+    }
 
     NotificationCenter.default.addObserver(
       self,
@@ -1620,7 +1648,7 @@ final class NotchHUDController {
     payload: String
   ) {
     // Do not show a notification banner while Snippet is speaking aloud
-    if assistantSpeaking {
+    if assistantSpeaking || callMode == "prompt" {
       return
     }
     notifTitle = title
@@ -1672,6 +1700,48 @@ final class NotchHUDController {
     onOpenConversation(defaultPayload)
   }
 
+  func presentCallPrompt(callId: String, title: String, message: String, seconds: TimeInterval) {
+    guard seconds > 0 else { return }
+    callTimer?.invalidate()
+    notifDismissTimer?.invalidate()
+    callMode = "prompt"
+    callDuration = seconds
+    notifTitle = title
+    notifSubtitle = message
+    notifKind = "call"
+    notifPayload = ""
+    hasUnreadNotification = false
+    notifStartedAt = CACurrentMediaTime()
+    callTimer = Timer.scheduledTimer(withTimeInterval: seconds, repeats: false) { [weak self] _ in
+      self?.clearCall()
+    }
+    refreshHUD(animated: true)
+  }
+
+  func presentCallTracking(callId: String) {
+    callTimer?.invalidate()
+    if callMode == "prompt" {
+      notifTitle = nil
+      notifSubtitle = nil
+      notifKind = nil
+      notifPayload = nil
+    }
+    callMode = "tracking"
+    refreshHUD(animated: true)
+  }
+
+  func clearCall() {
+    callTimer?.invalidate()
+    if callMode == "prompt" {
+      notifTitle = nil
+      notifSubtitle = nil
+      notifKind = nil
+      notifPayload = nil
+    }
+    callMode = nil
+    refreshHUD(animated: true)
+  }
+
   private func clearNotification() {
     notifTitle = nil
     notifSubtitle = nil
@@ -1682,7 +1752,7 @@ final class NotchHUDController {
   }
 
   private func handleBannerTap() {
-    if conversationExpanded {
+    if conversationExpanded || callMode == "prompt" {
       return
     }
     if let payload = notifPayload, !payload.isEmpty {
@@ -1744,7 +1814,7 @@ final class NotchHUDController {
   private func refreshHUD(animated: Bool) {
     let hasNotif = notifTitle != nil
     let showAmbient = windowHidden && (ambientActive || assistantSpeaking || userSpeaking)
-    let shouldShow = windowHidden && (conversationExpanded || hasNotif || hasUnreadNotification || showAmbient)
+    let shouldShow = windowHidden && (conversationExpanded || hasNotif || hasUnreadNotification || showAmbient || callMode != nil)
 
     if !shouldShow {
       waveTimer?.invalidate()
@@ -1773,7 +1843,12 @@ final class NotchHUDController {
       topCornerRadius = 6
       bottomCornerRadius = 18
       targetWidth = hw.width + 120 + topCornerRadius * 2
-      targetHeight = hw.height + 62
+      targetHeight = hw.height + (callMode == "prompt" ? 92 : 62)
+    } else if callMode == "tracking" {
+      topCornerRadius = 6
+      bottomCornerRadius = 16
+      targetWidth = hw.width + 120 + topCornerRadius * 2
+      targetHeight = hw.height + 34
     } else if assistantSpeaking || userSpeaking {
       topCornerRadius = 6
       bottomCornerRadius = 14
@@ -1804,7 +1879,8 @@ final class NotchHUDController {
       bottomCornerRadius: bottomCornerRadius,
       hasUnreadNotification: hasUnreadNotification,
       notifStartedAt: notifStartedAt,
-      notifDuration: notifDuration
+      notifDuration: callMode == "prompt" ? callDuration : notifDuration,
+      callMode: callMode
     )
 
     if !panel.isVisible {
@@ -1853,6 +1929,12 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
   var onOpenFullApp: (() -> Void)?
   var onSubmitReply: ((String) -> Void)?
   var onNotchAction: ((String, String) -> Void)?
+  var onCallAction: ((String) -> Void)?
+
+  private var callMode: String?
+  private let trackButton = NSButton(title: "Track", target: nil, action: nil)
+  private let ignoreButton = NSButton(title: "Ignore", target: nil, action: nil)
+  private let stopButton = NSButton(title: "Stop", target: nil, action: nil)
 
   private var notifTitle: String?
   private var notifSubtitle: String?
@@ -1891,11 +1973,19 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
   override init(frame frameRect: NSRect) {
     super.init(frame: frameRect)
     setupConversationSubviews()
+    setupCallButtons()
   }
 
   required init?(coder: NSCoder) {
     super.init(coder: coder)
     setupConversationSubviews()
+    setupCallButtons()
+  }
+
+  private func setupCallButtons() {
+    styleCallButton(trackButton, action: #selector(handleTrackTap), filled: true)
+    styleCallButton(ignoreButton, action: #selector(handleIgnoreTap), filled: false)
+    styleCallButton(stopButton, action: #selector(handleStopTap), filled: false)
   }
 
   private func setupConversationSubviews() {
@@ -1968,6 +2058,38 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
     sendButton.target = self
     sendButton.action = #selector(handleSendTap)
     replyContainer.addSubview(sendButton)
+  }
+
+  private func styleCallButton(_ button: NSButton, action: Selector, filled: Bool) {
+    button.isBordered = false
+    button.wantsLayer = true
+    button.layer?.cornerRadius = 6
+    button.layer?.backgroundColor = (filled ? SnippetTheme.accentFill : NSColor(srgbRed: 0.165, green: 0.165, blue: 0.188, alpha: 1)).cgColor
+    button.attributedTitle = NSAttributedString(string: button.title, attributes: [
+      .font: SnippetTheme.sans(11.5, weight: .medium),
+      .foregroundColor: SnippetTheme.fg1,
+    ])
+    button.target = self
+    button.action = action
+    button.isHidden = true
+    addSubview(button)
+  }
+
+  @objc private func handleTrackTap() { onCallAction?("track") }
+  @objc private func handleIgnoreTap() { onCallAction?("ignore") }
+  @objc private func handleStopTap() { onCallAction?("stop") }
+
+  private func layoutCallButtons() {
+    let b = bounds
+    let showPrompt = callMode == "prompt" && notifTitle != nil && !conversationExpanded
+    let showStop = callMode == "tracking" && notifTitle == nil && !conversationExpanded
+    trackButton.isHidden = !showPrompt
+    ignoreButton.isHidden = !showPrompt
+    stopButton.isHidden = !showStop
+    let left = b.minX + topCornerRadius + 16
+    trackButton.frame = NSRect(x: left, y: b.minY + 10, width: 64, height: 24)
+    ignoreButton.frame = NSRect(x: left + 72, y: b.minY + 10, width: 64, height: 24)
+    stopButton.frame = NSRect(x: b.maxX - topCornerRadius - 16 - 56, y: b.minY + 6, width: 56, height: 22)
   }
 
   @objc private func handleOpenAppTap() {
@@ -2056,6 +2178,7 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
 
   override func layout() {
     super.layout()
+    layoutCallButtons()
     guard conversationExpanded else { return }
     let b = bounds
     let innerX = topCornerRadius + 16
@@ -2345,8 +2468,10 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
     bottomCornerRadius: CGFloat,
     hasUnreadNotification: Bool,
     notifStartedAt: TimeInterval,
-    notifDuration: TimeInterval
+    notifDuration: TimeInterval,
+    callMode: String?
   ) {
+    self.callMode = callMode
     self.notifTitle = notifTitle
     self.notifSubtitle = notifSubtitle
     self.notifKind = notifKind
@@ -2386,7 +2511,7 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
   }
 
   override func mouseDown(with event: NSEvent) {
-    if !conversationExpanded {
+    if !conversationExpanded && callMode == nil {
       onBannerTap?()
     }
   }
@@ -2445,6 +2570,15 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
       }
       SnippetTheme.accent.setFill()
       NSBezierPath(ovalIn: dot).fill()
+    }
+    if callMode == "tracking" && notifTitle == nil {
+      let left = b.minX + topCornerRadius + 16
+      let rowMidY = b.minY + 17
+      NSColor(srgbRed: 0.90, green: 0.45, blue: 0.40, alpha: 1).setFill()
+      NSBezierPath(ovalIn: NSRect(x: left, y: rowMidY - 3, width: 6, height: 6)).fill()
+      ("Tracking call" as NSString).draw(
+        at: NSPoint(x: left + 14, y: rowMidY - 8),
+        withAttributes: [.font: SnippetTheme.sans(12, weight: .medium), .foregroundColor: SnippetTheme.fg2])
     }
     if let title = notifTitle {
       drawNotificationDrop(in: b, title: title)
