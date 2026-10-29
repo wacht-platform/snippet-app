@@ -8,16 +8,22 @@ class NotificationCursor implements Comparable<NotificationCursor> {
   final int createdAt;
   final int eventId;
   static NotificationCursor parse(Object? raw) {
-    if (raw is! Map || raw['created_at'] is! int || raw['event_id'] is! int ||
-        (raw['created_at'] as int) < 0 || (raw['event_id'] as int) < 0) {
+    if (raw is! Map ||
+        raw['created_at'] is! int ||
+        raw['event_id'] is! int ||
+        (raw['created_at'] as int) < 0 ||
+        (raw['event_id'] as int) < 0) {
       throw const FormatException('Malformed notification cursor');
     }
     return NotificationCursor(raw['created_at'] as int, raw['event_id'] as int);
   }
+
   @override
   int compareTo(NotificationCursor other) => createdAt == other.createdAt
-      ? eventId.compareTo(other.eventId) : createdAt.compareTo(other.createdAt);
-  NotificationCursor get overlap => NotificationCursor(createdAt > 10800 ? createdAt - 10800 : 0, 0);
+      ? eventId.compareTo(other.eventId)
+      : createdAt.compareTo(other.createdAt);
+  NotificationCursor get overlap =>
+      NotificationCursor(createdAt > 10800 ? createdAt - 10800 : 0, 0);
 }
 
 class NotificationInbox {
@@ -45,21 +51,24 @@ class NotificationInbox {
     final db = await factory.openDatabase(
         '${await factory.getDatabasesPath()}/notification_inbox.db',
         options: OpenDatabaseOptions(
-        version: 3, onCreate: (db, _) async {
-      await db.execute(
-          'CREATE TABLE cursors (instance TEXT PRIMARY KEY, cursor INTEGER NOT NULL, created_at INTEGER NOT NULL DEFAULT 0)');
-      await db.execute(
-          'CREATE TABLE inbox (id TEXT PRIMARY KEY, instance TEXT NOT NULL, event TEXT NOT NULL, created INTEGER NOT NULL, read INTEGER NOT NULL DEFAULT 0)');
-      await createAlertIds(db);
-    }, onUpgrade: (db, oldVersion, _) async {
-      if (oldVersion < 2) await createAlertIds(db);
-      if (oldVersion < 3) await migrateTimeCursor(db);
-    }));
+            version: 3,
+            onCreate: (db, _) async {
+              await db.execute(
+                  'CREATE TABLE cursors (instance TEXT PRIMARY KEY, cursor INTEGER NOT NULL, created_at INTEGER NOT NULL DEFAULT 0)');
+              await db.execute(
+                  'CREATE TABLE inbox (id TEXT PRIMARY KEY, instance TEXT NOT NULL, event TEXT NOT NULL, created INTEGER NOT NULL, read INTEGER NOT NULL DEFAULT 0)');
+              await createAlertIds(db);
+            },
+            onUpgrade: (db, oldVersion, _) async {
+              if (oldVersion < 2) await createAlertIds(db);
+              if (oldVersion < 3) await migrateTimeCursor(db);
+            }));
     return NotificationInbox(db);
   }
 
   static Future<void> migrateTimeCursor(DatabaseExecutor db) async {
-    await db.execute('ALTER TABLE cursors ADD COLUMN created_at INTEGER NOT NULL DEFAULT 0');
+    await db.execute(
+        'ALTER TABLE cursors ADD COLUMN created_at INTEGER NOT NULL DEFAULT 0');
     // ID-only checkpoints cannot prove a time boundary; replay retained history.
     await db.update('cursors', {'cursor': 0, 'created_at': 0});
   }
@@ -67,7 +76,8 @@ class NotificationInbox {
   static Future<void> createAlertIds(DatabaseExecutor db) async {
     await db.execute(
         'CREATE TABLE alert_ids (alert_id INTEGER PRIMARY KEY AUTOINCREMENT CHECK(alert_id <= 2147483647), notification_id TEXT NOT NULL UNIQUE)');
-    await db.execute('INSERT INTO alert_ids (notification_id) SELECT id FROM inbox ORDER BY created, id');
+    await db.execute(
+        'INSERT INTO alert_ids (notification_id) SELECT id FROM inbox ORDER BY created, id');
   }
 
   Future<int> alertId(String notificationId) async {
@@ -81,7 +91,8 @@ class NotificationInbox {
     final id = event['notification_id'];
     final destination = event['destination'];
     if (id is! String ||
-        !RegExp(r'^[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}$').hasMatch(id) ||
+        !RegExp(r'^[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}$')
+            .hasMatch(id) ||
         event['event_id'] is! int ||
         (event['event_id'] as int) <= 0 ||
         event['created_at'] is! int ||
@@ -103,33 +114,61 @@ class NotificationInbox {
 
   Future<NotificationCursor> cursor(String instance) => _cursor(db, instance);
 
-  static Future<NotificationCursor> _cursor(DatabaseExecutor tx, String instance) async {
-    final rows = await tx.query('cursors', where: 'instance = ?', whereArgs: [instance]);
-    return rows.isEmpty ? const NotificationCursor(0, 0)
-        : NotificationCursor(rows.first['created_at'] as int, rows.first['cursor'] as int);
+  static Future<NotificationCursor> _cursor(
+      DatabaseExecutor tx, String instance) async {
+    final rows =
+        await tx.query('cursors', where: 'instance = ?', whereArgs: [instance]);
+    return rows.isEmpty
+        ? const NotificationCursor(0, 0)
+        : NotificationCursor(
+            rows.first['created_at'] as int, rows.first['cursor'] as int);
   }
 
-  static Future<NotificationCursor> _advance(DatabaseExecutor tx, String instance, NotificationCursor next) async {
+  static Future<NotificationCursor> _advance(
+      DatabaseExecutor tx, String instance, NotificationCursor next) async {
     final current = await _cursor(tx, instance);
     final high = next.compareTo(current) > 0 ? next : current;
-    await tx.insert('cursors', {'instance': instance, 'cursor': high.eventId, 'created_at': high.createdAt}, conflictAlgorithm: ConflictAlgorithm.replace);
+    await tx.insert(
+        'cursors',
+        {
+          'instance': instance,
+          'cursor': high.eventId,
+          'created_at': high.createdAt
+        },
+        conflictAlgorithm: ConflictAlgorithm.replace);
     return high;
   }
 
-  static Future<void> _prune(DatabaseExecutor tx, String instance, NotificationCursor high) async {
-    final rows = await tx.query('inbox', columns: ['id'], where: 'instance = ? AND created < ?', whereArgs: [instance, high.overlap.createdAt], limit: 500);
+  static Future<void> _prune(
+      DatabaseExecutor tx, String instance, NotificationCursor high) async {
+    final rows = await tx.query('inbox',
+        columns: ['id'],
+        where: 'instance = ? AND created < ?',
+        whereArgs: [instance, high.overlap.createdAt],
+        limit: 500);
     for (final row in rows) {
-      await tx.delete('alert_ids', where: 'notification_id = ?', whereArgs: [row['id']]);
+      await tx.delete('alert_ids',
+          where: 'notification_id = ?', whereArgs: [row['id']]);
       await tx.delete('inbox', where: 'id = ?', whereArgs: [row['id']]);
     }
   }
 
-  static Future<bool> _insert(DatabaseExecutor tx, String instance, Map<String, dynamic> event, int now) async {
+  static Future<bool> _insert(DatabaseExecutor tx, String instance,
+      Map<String, dynamic> event, int now) async {
     if ((event['expires_at'] as int) <= now) return false;
     final id = event['notification_id'] as String;
-    final exists = await tx.query('inbox', columns: ['id'], where: 'id = ? OR (instance = ? AND json_extract(event, \'\$.event_id\') = ?)', whereArgs: [id, instance, event['event_id']]);
+    final exists = await tx.query('inbox',
+        columns: ['id'],
+        where:
+            'id = ? OR (instance = ? AND json_extract(event, \'\$.event_id\') = ?)',
+        whereArgs: [id, instance, event['event_id']]);
     if (exists.isNotEmpty) return false;
-    await tx.insert('inbox', {'id': id, 'instance': instance, 'event': jsonEncode(event), 'created': event['created_at']});
+    await tx.insert('inbox', {
+      'id': id,
+      'instance': instance,
+      'event': jsonEncode(event),
+      'created': event['created_at']
+    });
     await tx.insert('alert_ids', {'notification_id': id});
     return true;
   }
@@ -182,7 +221,8 @@ class NotificationInbox {
       if ((event['created_at'] as int) < current.overlap.createdAt) return [];
       final inserted = await _insert(tx, instance, event,
           now ?? DateTime.now().millisecondsSinceEpoch ~/ 1000);
-      final high = await _advance(tx, instance, NotificationCursor.parse(event));
+      final high =
+          await _advance(tx, instance, NotificationCursor.parse(event));
       await _prune(tx, instance, high);
       return inserted ? [event] : [];
     });
@@ -190,8 +230,8 @@ class NotificationInbox {
   }
 
   Future<void> prune(String instance) => db.transaction((tx) async {
-    await _prune(tx, instance, await _cursor(tx, instance));
-  });
+        await _prune(tx, instance, await _cursor(tx, instance));
+      });
 
   Future<List<Map<String, Object?>>> entries() =>
       db.query('inbox', orderBy: 'created DESC');
@@ -238,6 +278,7 @@ Map<String, dynamic> notificationDestination(
     'kind': event['kind'],
     'body': event['body'] ?? event['message'],
     'destination': destination,
+    if (event['workspace'] != null) 'workspace': event['workspace'],
     'session': destination['type'] == 'session'
         ? destination['id']
         : destination['session'] ?? event['session']

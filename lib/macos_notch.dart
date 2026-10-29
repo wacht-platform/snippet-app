@@ -612,7 +612,12 @@ class MacosNotch {
       lanes: [
         for (final lane in state.lanes)
           if (lane.status == 'running')
-            {'title': lane.title, 'state': lane.status, 'activity': lane.activity ?? '', 'id': lane.id}
+            {
+              'title': lane.title,
+              'state': lane.status,
+              'activity': lane.activity ?? '',
+              'id': lane.id
+            }
       ],
       pendingQuestion: waiting ? state.pendingQuestion : null,
       approval: approval.isEmpty ? null : approval,
@@ -634,7 +639,8 @@ class MacosNotch {
       return;
     }
     final QuickAction quickAction = switch (action) {
-      'answer' => QuickAnswer(notchAnswerText(_activeState?.pendingQuestion, text)),
+      'answer' =>
+        QuickAnswer(notchAnswerText(_activeState?.pendingQuestion, text)),
       'approve' => const QuickApprove(),
       'deny' => const QuickDeny(),
       _ => QuickReply(text),
@@ -737,6 +743,12 @@ class MacosNotch {
   }) {
     if (!kMacOS) return;
     ensureInitialized();
+    final channel = notchChannel(payload, title);
+    final head = title.trim();
+    if (channel != head && head.isNotEmpty && head != 'Snippet') {
+      subtitle = subtitle.trim().isEmpty ? head : '$head · $subtitle';
+    }
+    title = channel;
     final dedupeKey = '$title|$subtitle|$kind';
     if (dedupeKey == _lastNotifiedKey) return;
     _lastNotifiedKey = dedupeKey;
@@ -752,8 +764,12 @@ class MacosNotch {
   }
 }
 
-
-const _notchHiddenTools = {'ask_user', 'present_file', 'update_plan', 'set_session_title'};
+const _notchHiddenTools = {
+  'ask_user',
+  'present_file',
+  'update_plan',
+  'set_session_title'
+};
 final _imageExt = RegExp(r'\.(png|jpe?g|gif|webp|heic)$', caseSensitive: false);
 
 /// Shapes the ordered transcript rows for the notch: activity only for the
@@ -804,7 +820,8 @@ List<Map<String, dynamic>> finishNotchItems(
   for (final lane in lanes) {
     capped.add({
       'role': 'lane',
-      'text': lane['activity']?.isNotEmpty == true ? lane['activity'] : 'Working',
+      'text':
+          lane['activity']?.isNotEmpty == true ? lane['activity'] : 'Working',
       'meta': '',
       'type': 'lane',
       'title': lane['title'] ?? '',
@@ -816,14 +833,17 @@ List<Map<String, dynamic>> finishNotchItems(
   if (questions is List && questions.length > 1) {
     capped.add({
       'role': 'question',
-      'text': '${questions.length} questions are waiting. Open the app to answer them.',
+      'text':
+          '${questions.length} questions are waiting. Open the app to answer them.',
       'meta': '',
       'type': 'question',
       'id': '',
       'choices': <String>[],
       'answerKind': 'free_text',
     });
-  } else if (questions is List && questions.isNotEmpty && questions.first is Map) {
+  } else if (questions is List &&
+      questions.isNotEmpty &&
+      questions.first is Map) {
     final q = questions.first as Map;
     final ak = q['answer_kind'] is Map ? q['answer_kind'] as Map : const {};
     final kind = '${ak['kind'] ?? 'free_text'}';
@@ -851,7 +871,8 @@ List<Map<String, dynamic>> finishNotchItems(
   } else if (approval != null) {
     capped.add({
       'role': 'approval',
-      'text': '${approval['summary'] ?? approval['text'] ?? approval['tool_name'] ?? 'Approval required'}',
+      'text':
+          '${approval['summary'] ?? approval['text'] ?? approval['tool_name'] ?? 'Approval required'}',
       'meta': '',
       'type': 'approval',
       'id': '${approval['id'] ?? ''}',
@@ -867,4 +888,26 @@ String notchAnswerText(Map<String, dynamic>? pendingQuestion, String answer) {
     return '${(questions.first as Map)['text']}\n→ $answer';
   }
   return answer;
+}
+
+/// Where a notch notification came from, shown in the left wing.
+String notchChannel(Map<String, dynamic> payload, String title) {
+  final destination = (payload['destination'] as Map?) ?? const {};
+  final session =
+      (payload['session'] ?? destination['session'] ?? '').toString();
+  final kind = (payload['kind'] ?? '').toString();
+  if (session == 'mission-control' ||
+      destination['type'] == 'task' ||
+      kind == 'ping') {
+    return 'Mission Control';
+  }
+  if (kind == 'direct_message.sent') return 'Message';
+  final head = title.trim();
+  if (head.isNotEmpty && head != 'Snippet') return head;
+  final workspace = (payload['workspace'] ?? '').toString().trim();
+  if (workspace.isNotEmpty) {
+    final parts = workspace.split('/').where((p) => p.isNotEmpty);
+    if (parts.isNotEmpty) return parts.last;
+  }
+  return 'Snippet';
 }

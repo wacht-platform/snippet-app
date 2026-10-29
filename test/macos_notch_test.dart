@@ -47,7 +47,12 @@ void main() {
     final items = finishNotchItems(
       [for (var i = 0; i < 50; i++) _msg('assistant', 'm$i')],
       lanes: [
-        {'title': 'audit', 'state': 'running', 'activity': 'Reading a.rs', 'id': 'l1'}
+        {
+          'title': 'audit',
+          'state': 'running',
+          'activity': 'Reading a.rs',
+          'id': 'l1'
+        }
       ],
       pendingQuestion: {
         'questions': [
@@ -74,13 +79,18 @@ void main() {
   });
 
   test('approval only when no question is pending', () {
-    final withQ = finishNotchItems([],
-        pendingQuestion: {
-          'questions': [
-            {'id': 'q', 'text': 'Ok?', 'answer_kind': {'kind': 'yes_no'}}
-          ]
-        },
-        approval: {'summary': 'Run tests', 'id': 'a'});
+    final withQ = finishNotchItems([], pendingQuestion: {
+      'questions': [
+        {
+          'id': 'q',
+          'text': 'Ok?',
+          'answer_kind': {'kind': 'yes_no'}
+        }
+      ]
+    }, approval: {
+      'summary': 'Run tests',
+      'id': 'a'
+    });
     expect(withQ.single['type'], 'question');
     expect(withQ.single['choices'], ['Yes', 'No']);
     final onlyApproval =
@@ -109,5 +119,17 @@ void main() {
         }, 'Alpha'),
         'Which?\n→ Alpha');
     expect(notchAnswerText(null, 'hi'), 'hi');
+  });
+
+  test('notch channel names the source', () {
+    expect(
+        notchChannel({'session': 'mission-control'}, 'x'), 'Mission Control');
+    expect(notchChannel({'kind': 'ping', 'session': 's'}, 'Deploy done'),
+        'Mission Control');
+    expect(notchChannel({'session': 's'}, 'Fix login redirect'),
+        'Fix login redirect');
+    expect(notchChannel({'session': 's', 'workspace': '/home/u/code/app'}, ''),
+        'app');
+    expect(notchChannel({'kind': 'direct_message.sent'}, 'Snippet'), 'Message');
   });
 }
