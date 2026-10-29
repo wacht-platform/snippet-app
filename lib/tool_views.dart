@@ -826,12 +826,11 @@ List<Widget> _imageView(BuildContext context, Map? a, Map? d) {
   if (client == null) return [Text(path, style: TS.label(AppColors.fg2))];
   return [
     LayoutBuilder(
-      builder: (_, c) => ImageThumb(
+      builder: (_, c) => SingleImage(
         client: client,
         path: path,
-        width: c.maxWidth.clamp(0, 420),
-        height: 220,
-        fit: BoxFit.contain,
+        maxWidth: c.maxWidth.clamp(72.0, kMobile ? 240.0 : 360.0),
+        maxHeight: kMobile ? 180 : 200,
       ),
     ),
   ];
