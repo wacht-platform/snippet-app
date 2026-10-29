@@ -21,6 +21,20 @@ const _question = {
   'body': 'Which version should the notes cover?',
   'attention': {'type': 'question', 'id': '9:y'},
 };
+const _choice = {
+  'title': 'Notification card',
+  'kind': 'waiting',
+  'session': 's-4',
+  'body': 'How does the new card look on your phone?',
+  'attention': {
+    'type': 'question',
+    'id': '7:z',
+    'choices': [
+      {'label': 'Looks good', 'value': 'good'},
+      {'label': 'Needs tweaks', 'value': 'tweak'},
+    ],
+  },
+};
 const _done = {
   'title': 'Coordination review',
   'kind': 'done',
@@ -48,7 +62,8 @@ void main() {
           {List<Map<String, dynamic>> rest = const [],
           List<QuickAction>? sent,
           VoidCallback? onSent,
-          bool ok = true}) =>
+          bool ok = true,
+          bool open = false}) =>
       NotificationMessageCard(
         payload: p,
         rest: rest,
@@ -57,6 +72,7 @@ void main() {
         onClearAll: () {},
         onHold: (_) {},
         onSent: onSent ?? () {},
+        initiallyExpanded: open,
         send: (_, a) async {
           sent?.add(a);
           return ok;
@@ -88,6 +104,9 @@ void main() {
         frame(card(_approval, sent: sent, onSent: () => done = true)));
     expect(find.text('wants approval'), findsOneWidget);
     expect(find.textContaining('**'), findsNothing);
+    expect(find.text('Approve'), findsNothing);
+    await tester.tap(find.text('Fix login redirect'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Approve'));
     await tester.pump();
     expect(sent.single, isA<QuickApprove>());
@@ -98,11 +117,22 @@ void main() {
       (tester) async {
     final sent = <QuickAction>[];
     await tester.pumpWidget(frame(card(_question, sent: sent, ok: false)));
+    await tester.tap(find.text('Release notes draft'));
+    await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), '1.4');
     await tester.testTextInput.receiveAction(TextInputAction.send);
     await tester.pump();
     expect((sent.single as QuickAnswer).text, '1.4');
     expect(find.text("Couldn't send. Open chat"), findsOneWidget);
+  });
+
+  testWidgets('choice question answers with the picked label',
+      (tester) async {
+    final sent = <QuickAction>[];
+    await tester.pumpWidget(frame(card(_choice, sent: sent, open: true)));
+    await tester.tap(find.text('Needs tweaks'));
+    await tester.pump();
+    expect((sent.single as QuickAnswer).text, 'Needs tweaks (tweak)');
   });
 
   testWidgets('groups the rest by chat', (tester) async {
@@ -120,14 +150,16 @@ void main() {
     testWidgets('message cards render ($name)', (tester) async {
       debugDefaultTargetPlatformOverride = platform;
       try {
-        await tester.binding.setSurfaceSize(Size(width, 560));
+        await tester.binding.setSurfaceSize(Size(width, 620));
         await tester.pumpWidget(frame(
             Column(children: [
               card(_approval, rest: [_question, _done]),
               const SizedBox(height: 12),
-              card(_question),
-              const SizedBox(height: 12),
               card(_done),
+              const SizedBox(height: 12),
+              card(_choice, open: true),
+              const SizedBox(height: 12),
+              card(_question, open: true),
             ]),
             width: width));
         await expectGolden(tester, find.byType(Scaffold),

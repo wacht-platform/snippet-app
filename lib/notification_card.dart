@@ -74,6 +74,7 @@ class NotificationMessageCard extends StatefulWidget {
     required this.onHold,
     required this.onSent,
     this.send = quickSendForPayload,
+    this.initiallyExpanded = false,
   });
 
   final Map<String, dynamic> payload;
@@ -84,6 +85,7 @@ class NotificationMessageCard extends StatefulWidget {
   final ValueChanged<bool> onHold;
   final VoidCallback onSent;
   final Future<bool> Function(Map<String, dynamic>, QuickAction) send;
+  final bool initiallyExpanded;
 
   @override
   State<NotificationMessageCard> createState() =>
@@ -94,6 +96,7 @@ class _NotificationMessageCardState extends State<NotificationMessageCard> {
   final _text = TextEditingController();
   final _focus = FocusNode();
   var _state = _Send.idle;
+  late var _open = widget.initiallyExpanded;
 
   @override
   void initState() {
@@ -141,6 +144,37 @@ class _NotificationMessageCardState extends State<NotificationMessageCard> {
     return chats > 1 ? '+$n more from $chats chats' : '+$n more';
   }
 
+  bool get _expandable => const {
+        CardAction.approval,
+        CardAction.answer,
+        CardAction.reply
+      }.contains(cardActionFor(widget.payload));
+
+  void _toggle() {
+    if (!_expandable) {
+      widget.onOpen();
+      return;
+    }
+    setState(() => _open = !_open);
+    widget.onHold(_open || _focus.hasFocus);
+  }
+
+  List<(String, String)> get _choices {
+    final a = widget.payload['attention'];
+    final cs = a is Map ? a['choices'] : null;
+    if (cs is! List) return const [];
+    return [
+      for (final c in cs)
+        if (c is Map && '${c['label'] ?? ''}'.isNotEmpty)
+          ('${c['label']}', '${c['value'] ?? c['label']}')
+    ];
+  }
+
+  int get _moreQuestions {
+    final a = widget.payload['attention'];
+    return a is Map && a['more'] is int ? a['more'] as int : 0;
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = widget.payload;
@@ -148,8 +182,195 @@ class _NotificationMessageCardState extends State<NotificationMessageCard> {
     final body = plainPreview(
         '${(p['body'] ?? '').toString().trim().isNotEmpty ? p['body'] : p['message'] ?? ''}');
     final action = cardActionFor(p);
-    return _card(title, body, action, _ago(p['created_at']),
-        _state == _Send.sending);
+    final busy = _state == _Send.sending;
+    final mood = _mood(p, action);
+    final ago = _ago(p['created_at']);
+    final showBody = body.isNotEmpty && body != title;
+
+    final head = Row(children: [
+      Container(
+        width: 8,
+        height: 8,
+        decoration: BoxDecoration(color: mood.$2, shape: BoxShape.circle),
+      ),
+      const SizedBox(width: 10),
+      Expanded(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(children: [
+              Flexible(
+                child: Text(title.isEmpty ? 'Snippet' : title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: sans(kMobile ? 14 : 13.5,
+                        weight: W.label, height: 1.35, color: AppColors.fg1)),
+              ),
+              if (mood.$1.isNotEmpty) ...[
+                const SizedBox(width: S.s6),
+                Text(mood.$1,
+                    maxLines: 1,
+                    style: sans(12.5, height: 1.35, color: mood.$2)),
+              ],
+            ]),
+            if (showBody && !_open)
+              Text(body,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: sans(kMobile ? 13 : 12.5,
+                      height: 1.35, color: AppColors.fg3)),
+          ],
+        ),
+      ),
+      if (ago.isNotEmpty) ...[
+        const SizedBox(width: S.s8),
+        Text(ago, style: mono(11, color: AppColors.fg4)),
+      ],
+      SizedBox.square(
+        dimension: kMobile ? 44 : 28,
+        child: IconButton(
+          tooltip: 'Dismiss',
+          padding: EdgeInsets.zero,
+          style: const ButtonStyle(
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap),
+          icon: AppIcon('x', size: kMobile ? 14 : 12, color: AppColors.fg4),
+          onPressed: widget.onDismiss,
+        ),
+      ),
+    ]);
+
+    final choices = _choices;
+    final Widget? actions = switch (action) {
+      CardAction.approval => Wrap(spacing: S.s8, runSpacing: S.s8, children: [
+          Btn('Approve',
+              small: true,
+              disabled: busy,
+              onTap: () => _send(const QuickApprove())),
+          Btn('Deny',
+              small: true,
+              variant: BtnVariant.secondary,
+              disabled: busy,
+              onTap: () => _send(const QuickDeny())),
+        ]),
+      CardAction.answer when choices.isNotEmpty => Wrap(
+          spacing: S.s8,
+          runSpacing: S.s8,
+          children: [
+            for (final (i, (label, value)) in choices.indexed)
+              Btn(label,
+                  small: true,
+                  variant: i == 0 ? BtnVariant.primary : BtnVariant.secondary,
+                  disabled: busy,
+                  onTap: () => _send(QuickAnswer(
+                      label == value ? label : '$label ($value)'))),
+          ]),
+      CardAction.answer || CardAction.reply => _ReplyField(
+          controller: _text,
+          focus: _focus,
+          busy: busy,
+          hint: action == CardAction.answer ? 'Answer…' : 'Reply…',
+          onSubmit: () => _submitText(action),
+        ),
+      _ => null,
+    };
+
+    final link = sans(12.5, weight: W.label, color: AppColors.accent);
+    Widget textLink(String label, VoidCallback onTap) => InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(R.xs),
+          child: Padding(
+            padding: EdgeInsets.symmetric(
+                horizontal: 4, vertical: kMobile ? 8 : 3),
+            child: Text(label, style: link),
+          ),
+        );
+
+    final expanded = Padding(
+      padding: const EdgeInsets.only(left: 18, right: S.s12),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (showBody)
+            Text(body,
+                maxLines: 10,
+                overflow: TextOverflow.ellipsis,
+                style: sans(kMobile ? 14.5 : 13.5,
+                    height: 1.45, color: AppColors.fg1)),
+          if (_moreQuestions > 0)
+            Padding(
+              padding: const EdgeInsets.only(top: S.s4),
+              child: Text(
+                  '+$_moreQuestions more question${_moreQuestions == 1 ? '' : 's'} in the chat',
+                  style: sans(12, color: AppColors.fg3)),
+            ),
+          if (actions != null && _moreQuestions == 0)
+            Padding(
+                padding: const EdgeInsets.only(top: 10), child: actions),
+          if (_state == _Send.failed)
+            Padding(
+              padding: const EdgeInsets.only(top: S.s6),
+              child: Text("Couldn't send. Open chat",
+                  style: sans(12, color: AppColors.danger)),
+            ),
+          Padding(
+            padding: const EdgeInsets.only(top: S.s4),
+            child: Wrap(
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: S.s8,
+                children: [
+                  Transform.translate(
+                      offset: const Offset(-4, 0),
+                      child: textLink('Open chat', widget.onOpen)),
+                ]),
+          ),
+        ],
+      ),
+    );
+
+    return Material(
+      color: AppColors.surface2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(color: AppColors.lineStrong),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: _toggle,
+        onLongPress: widget.rest.isEmpty ? null : widget.onClearAll,
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(14, kMobile ? 6 : 8, 4, kMobile ? 6 : 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              head,
+              AnimatedSize(
+                duration: MediaQuery.maybeDisableAnimationsOf(context) == true
+                    ? Duration.zero
+                    : const Duration(milliseconds: 160),
+                curve: Curves.easeOutCubic,
+                alignment: Alignment.topLeft,
+                child: _open ? expanded : const SizedBox(width: double.infinity),
+              ),
+              if (widget.rest.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(left: 18, top: S.s4),
+                  child: Wrap(
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: S.s8,
+                      children: [
+                        Text(_moreLabel,
+                            style: mono(11.5, color: AppColors.fg4)),
+                        if (!kMobile) textLink('Clear all', widget.onClearAll),
+                      ]),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -166,152 +387,8 @@ class _NotificationMessageCardState extends State<NotificationMessageCard> {
       'done' || 'completed' => ('done', AppColors.ok),
       'error' || 'failed' => ('failed', AppColors.danger),
       'idle' => ('stopped', AppColors.fg3),
-      _ => ('', AppColors.fg3),
+      _ => ('', AppColors.fg4),
     };
-
-extension on _NotificationMessageCardState {
-  Widget _card(
-      String title, String body, CardAction action, String ago, bool busy) {
-    final mood = _mood(widget.payload, action);
-    final actions = switch (action) {
-      CardAction.approval => Wrap(spacing: S.s8, runSpacing: S.s8, children: [
-          Btn('Approve',
-              small: true,
-              disabled: busy,
-              onTap: () => _send(const QuickApprove())),
-          Btn('Deny',
-              small: true,
-              variant: BtnVariant.secondary,
-              disabled: busy,
-              onTap: () => _send(const QuickDeny())),
-        ]),
-      CardAction.answer || CardAction.reply => _ReplyField(
-          controller: _text,
-          focus: _focus,
-          busy: busy,
-          hint: action == CardAction.answer ? 'Answer…' : 'Reply…',
-          onSubmit: () => _submitText(action),
-        ),
-      CardAction.view => Btn('Open',
-          small: true, variant: BtnVariant.secondary, onTap: widget.onOpen),
-      CardAction.none => null,
-    };
-
-    final close = SizedBox.square(
-      dimension: kMobile ? 44 : 24,
-      child: IconButton(
-        tooltip: 'Dismiss',
-        padding: EdgeInsets.zero,
-        style: const ButtonStyle(
-            tapTargetSize: MaterialTapTargetSize.shrinkWrap),
-        icon: AppIcon('x', size: kMobile ? 14 : 12, color: AppColors.fg4),
-        onPressed: widget.onDismiss,
-      ),
-    );
-
-    final head = Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
-      Expanded(
-        child: Row(children: [
-          Flexible(
-            child: Text(title.isEmpty ? 'Snippet' : title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: sans(kMobile ? 13 : 12.5,
-                    weight: W.label, height: 1.4, color: AppColors.fg2)),
-          ),
-          if (mood.$1.isNotEmpty) ...[
-            const SizedBox(width: S.s6),
-            Text(mood.$1,
-                maxLines: 1,
-                style: sans(kMobile ? 13 : 12.5, height: 1.4, color: mood.$2)),
-          ],
-        ]),
-      ),
-      const SizedBox(width: S.s8),
-      if (ago.isNotEmpty)
-        Text(ago, style: mono(11, color: AppColors.fg4)),
-      kMobile ? const SizedBox(width: 30) : close,
-    ]);
-
-    final bubble = Container(
-      padding: EdgeInsets.fromLTRB(14, kMobile ? 4 : 6, 4, kMobile ? 10 : 10),
-      decoration: BoxDecoration(
-        color: AppColors.surface2,
-        border: Border.all(color: AppColors.lineStrong),
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          head,
-          if (body.isNotEmpty && body != title)
-            Padding(
-              padding: const EdgeInsets.only(right: S.s8, top: 2),
-              child: Text(body,
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
-                  style: sans(kMobile ? 14.5 : 13.5,
-                      height: kMobile ? 20 / 14.5 : 19 / 13.5,
-                      color: AppColors.fg1)),
-            ),
-          if (actions != null)
-            Padding(
-              padding: const EdgeInsets.only(right: S.s8, top: S.s8),
-              child: actions,
-            ),
-          if (_state == _Send.failed)
-            Padding(
-              padding: const EdgeInsets.only(top: S.s6),
-              child: GestureDetector(
-                onTap: widget.onOpen,
-                child: Text("Couldn't send. Open chat",
-                    style: sans(12, color: AppColors.danger)),
-              ),
-            ),
-          if (widget.rest.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: S.s8),
-              child: Wrap(
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    Text(_moreLabel, style: mono(11.5, color: AppColors.fg4)),
-                    if (!kMobile) ...[
-                      const SizedBox(width: S.s12),
-                      InkWell(
-                        onTap: widget.onClearAll,
-                        borderRadius: BorderRadius.circular(R.xs),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 4, vertical: 2),
-                          child: Text('Clear all',
-                              style: sans(12,
-                                  weight: W.label, color: AppColors.accent)),
-                        ),
-                      ),
-                    ],
-                  ]),
-            ),
-        ],
-      ),
-    );
-
-    return Material(
-      type: MaterialType.transparency,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: widget.onOpen,
-        onLongPress: widget.rest.isEmpty ? null : widget.onClearAll,
-        borderRadius: BorderRadius.circular(14),
-        child: Stack(clipBehavior: Clip.none, children: [
-          bubble,
-          if (kMobile) Positioned(top: 0, right: 0, child: close),
-        ]),
-      ),
-    );
-  }
-}
 
 class _ReplyField extends StatelessWidget {
   const _ReplyField({
