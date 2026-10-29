@@ -45,7 +45,8 @@ bool suppressVisibleNotification(Map<String, dynamic> payload) =>
     payload['url'] is String &&
     payload['session'] is String &&
     visibleNotificationSession.value ==
-        notificationSessionKey(payload['url'] as String, payload['session'] as String);
+        notificationSessionKey(
+            payload['url'] as String, payload['session'] as String);
 final Map<String, Future<void>> _fetches = {};
 
 Future<void> syncNotificationInstance(Instance instance,
@@ -102,6 +103,10 @@ Future<void> presentNotifications(Instance instance, NotificationInbox inbox,
         foregroundNotifications.add(payload);
       }
     }
+    // The notch banner is transient; a waiting request also persists here.
+    if (kMacOS && !notificationAppForeground) {
+      await _postMacCentre(instance, inbox, received);
+    }
     return;
   }
   if (!kMobile) return;
@@ -112,13 +117,16 @@ Future<void> presentNotifications(Instance instance, NotificationInbox inbox,
   for (final event in received) {
     await prefs.reload();
     if (!(prefs.getBool('notif_enabled') ?? false) ||
-        (background && await inbox.foregroundActive())) return;
+        (background && await inbox.foregroundActive())) {
+      return;
+    }
     final payload = notificationDestination(instance.url, event);
     if (suppressVisibleNotification(payload)) continue;
     final content = notificationContent(instance, event);
     try {
       await notifySessionEvent(
-          notificationId: await inbox.alertId(event['notification_id'] as String),
+          notificationId:
+              await inbox.alertId(event['notification_id'] as String),
           title: content.head,
           body: content.body,
           payload: jsonEncode(payload),
@@ -144,4 +152,28 @@ Future<void> syncSavedNotifications({bool background = false}) async {
     }
   }
   if (failure != null) Error.throwWithStackTrace(failure, trace!);
+}
+
+Future<void> _postMacCentre(Instance instance, NotificationInbox inbox,
+    List<Map<String, dynamic>> received) async {
+  for (final event in received) {
+    final kind = event['kind']?.toString() ?? '';
+    if (kind != 'waiting' && kind != 'error') continue;
+    final payload = notificationDestination(instance.url, event);
+    final content = notificationContent(instance, event);
+    try {
+      await notifySessionEvent(
+          notificationId:
+              await inbox.alertId(event['notification_id'] as String),
+          title: content.head,
+          body: content.body,
+          payload: jsonEncode(payload),
+          kind: kind);
+    } catch (error, stack) {
+      FlutterError.reportError(FlutterErrorDetails(
+          exception: error,
+          stack: stack,
+          library: 'notification presentation'));
+    }
+  }
 }

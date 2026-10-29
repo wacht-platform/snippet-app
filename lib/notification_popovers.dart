@@ -6,7 +6,7 @@ import 'notification_sync.dart';
 import 'notifications.dart';
 import 'theme.dart';
 import 'platform.dart';
-import 'widgets.dart';
+import 'notification_card.dart';
 
 class NotificationPopovers extends StatefulWidget {
   const NotificationPopovers({super.key, required this.child});
@@ -63,63 +63,8 @@ class _NotificationPopoversState extends State<NotificationPopovers> {
     });
   }
 
-  Widget _stackedCard({required Widget child}) {
-    final layers = (_pending.length - 1).clamp(0, 2);
-    return Stack(children: [
-      for (var layer = layers; layer > 0; layer--)
-        Positioned.fill(
-          top: layer * 4.0,
-          left: layer * 5.0,
-          right: layer * 5.0,
-          child: IgnorePointer(
-            child: DecoratedBox(
-              key: ValueKey('notification-backing-$layer'),
-              decoration: BoxDecoration(
-                color: AppColors.surface1,
-                borderRadius: BorderRadius.circular(kMobile ? 14 : 11),
-                border: Border.all(color: AppColors.line),
-              ),
-            ),
-          ),
-        ),
-      Padding(
-        padding: EdgeInsets.only(bottom: layers * 4.0),
-        child: child,
-      ),
-    ]);
-  }
-
-  Widget _leadingIcon(Map<String, dynamic> payload) {
-    final kind = payload['kind']?.toString();
-    final (fill, ink) = switch (kind) {
-      'done' || 'completed' => (AppColors.okBg, AppColors.ok),
-      'error' || 'failed' => (AppColors.dangerBg, AppColors.danger),
-      'waiting' => (AppColors.runBg, AppColors.run),
-      _ => (AppColors.accentBg, AppColors.accent),
-    };
-    return Container(
-      width: kMobile ? 30 : 28,
-      height: kMobile ? 30 : 28,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: fill,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: ink.withValues(alpha: 0.22)),
-      ),
-      child: AppIcon(
-        switch ((payload['destination'] as Map?)?['type']) {
-          'session' => 'terminal',
-          'task' => 'check-circle',
-          'conversation' => 'message-circle',
-          _ => 'info',
-        },
-        size: kMobile ? 15 : 14,
-        color: ink,
-      ),
-    );
-  }
-
   String _contextLabel(Map<String, dynamic> payload) {
+    // Preserve the daemon-facing subtitle used by the notch.
     final kind = payload['kind']?.toString().split('.').last;
     final label = switch (kind) {
       'idle' => 'Stopped',
@@ -265,152 +210,28 @@ class _NotificationPopoversState extends State<NotificationPopovers> {
                                 child: child,
                               ),
                             ),
-                            child: _stackedCard(
-                                child: Material(
-                              color: kMobile
-                                  ? AppColors.surface2
-                                  : AppColors.surface1,
-                              elevation: 6,
-                              shadowColor: Colors.black.withValues(alpha: 0.45),
-                              shape: RoundedRectangleBorder(
-                                borderRadius:
-                                    BorderRadius.circular(kMobile ? 14 : 11),
-                                side: BorderSide(color: AppColors.line),
-                              ),
-                              clipBehavior: Clip.antiAlias,
-                              child: InkWell(
-                                onLongPress: () => _clearAll(payload),
-                                onTap: () {
-                                  _remove(payload, open: true, feedback: true);
+                            child: Semantics(
+                              label: _pending.length > 1
+                                  ? '${_pending.length} notifications. Long press to clear all'
+                                  : null,
+                              onLongPress: _pending.length > 1
+                                  ? () => _clearAll(payload)
+                                  : null,
+                              child: NotificationMessageCard(
+                                payload: payload,
+                                rest: _pending.skip(1).toList(),
+                                onOpen: () => _remove(payload,
+                                    open: true, feedback: true),
+                                onDismiss: () =>
+                                    _remove(payload, feedback: true),
+                                onClearAll: () => _clearAll(payload),
+                                onHold: (hold) {
+                                  _pressed = hold;
+                                  hold ? _expiry?.cancel() : _armExpiry();
                                 },
-                                child: Padding(
-                                  padding: EdgeInsetsDirectional.fromSTEB(
-                                      12, kMobile ? 10 : 9, 4, kMobile ? 10 : 9),
-                                  child: Row(children: [
-                                    _leadingIcon(payload),
-                                    const SizedBox(width: 10),
-                                    Expanded(
-                                      child: Column(
-                                        mainAxisSize: MainAxisSize.min,
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Semantics(
-                                            label: _pending.length > 1
-                                                ? '${_pending.length} notifications. Long press to clear all'
-                                                : null,
-                                            onLongPress: _pending.length > 1
-                                                ? () => _clearAll(payload)
-                                                : null,
-                                            child: Text(
-                                              payload['title']?.toString() ??
-                                                  'New notification',
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: sans(kMobile ? 14 : 13,
-                                                  weight: W.label,
-                                                  height: kMobile
-                                                      ? 19 / 14
-                                                      : 18 / 13,
-                                                  color: AppColors.fg1),
-                                            ),
-                                          ),
-                                          if (_contextLabel(payload)
-                                              .isNotEmpty) ...[
-                                            const SizedBox(height: 2),
-                                            Text(_contextLabel(payload),
-                                                maxLines: 2,
-                                                overflow: TextOverflow.ellipsis,
-                                                style: sans(
-                                                    kMobile ? 12.5 : 12,
-                                                    height: kMobile
-                                                        ? 17 / 12.5
-                                                        : 16 / 12,
-                                                    color: AppColors.fg3)),
-                                          ],
-                                          if (!kMobile &&
-                                              _pending.length > 1) ...[
-                                            const SizedBox(height: 5),
-                                            Wrap(
-                                                spacing: 8,
-                                                crossAxisAlignment:
-                                                    WrapCrossAlignment.center,
-                                                children: [
-                                              Container(
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                        horizontal: 5,
-                                                        vertical: 1),
-                                                decoration: BoxDecoration(
-                                                  color: AppColors.surface2,
-                                                  borderRadius:
-                                                      BorderRadius.circular(4),
-                                                  border: Border.all(
-                                                      color: AppColors.line),
-                                                ),
-                                                child: Text(
-                                                    '+${_pending.length - 1} more',
-                                                    style: mono(10.5,
-                                                        color: AppColors.fg3)),
-                                              ),
-                                              InkWell(
-                                                onTap: () =>
-                                                    _clearAll(payload),
-                                                borderRadius:
-                                                    BorderRadius.circular(
-                                                        R.xs),
-                                                child: Padding(
-                                                  padding: const EdgeInsets
-                                                      .symmetric(
-                                                      horizontal: 4,
-                                                      vertical: 2),
-                                                  child: Text('Clear all',
-                                                      style: sans(11.5,
-                                                          weight: W.label,
-                                                          color: AppColors
-                                                              .accent)),
-                                                ),
-                                              ),
-                                            ]),
-                                          ],
-                                        ],
-                                      ),
-                                    ),
-                                    IconButton(
-                                      tooltip: 'Dismiss',
-                                      style: const ButtonStyle(
-                                        tapTargetSize:
-                                            MaterialTapTargetSize.shrinkWrap,
-                                      ),
-                                      padding: EdgeInsets.zero,
-                                      visualDensity: kMobile
-                                          ? null
-                                          : VisualDensity.compact,
-                                      iconSize: kMobile ? 24 : 16,
-                                      constraints:
-                                          BoxConstraints.tightFor(
-                                              width: kMobile ? 44 : 28,
-                                              height: kMobile ? 36 : 28),
-                                      icon: Container(
-                                        width: 24,
-                                        height: 24,
-                                        alignment: Alignment.center,
-                                        decoration: BoxDecoration(
-                                          color: Colors.transparent,
-                                          borderRadius:
-                                              BorderRadius.circular(6),
-                                        ),
-                                        child: AppIcon('x',
-                                            size: kMobile ? 14 : 13,
-                                            color: AppColors.fg3),
-                                      ),
-                                      onPressed: () =>
-                                          _remove(payload, feedback: true),
-                                    ),
-                                  ]),
-                                ),
+                                onSent: () => _remove(payload),
                               ),
-                            )),
+                            ),
                           ),
                         ),
                       ),

@@ -51,10 +51,7 @@ void main() {
     }
     await tester.pump();
     expect(find.textContaining('Hold to clear all'), findsNothing);
-    expect(
-        find.byKey(const ValueKey('notification-backing-1')), findsOneWidget);
-    expect(
-        find.byKey(const ValueKey('notification-backing-2')), findsOneWidget);
+    expect(find.text('+2 more'), findsOneWidget);
     final semantics = tester.ensureSemantics();
     expect(find.bySemanticsLabel(RegExp(r'^3 notifications\. Long press to clear all')),
         findsOneWidget);

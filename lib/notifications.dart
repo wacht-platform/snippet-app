@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -11,8 +12,16 @@ import 'notification_inbox.dart';
 import 'file_actions.dart';
 import 'models.dart';
 import 'platform.dart';
+import 'session_quick_send.dart';
 
-const _alertChannel = 'snippet_alerts';
+const _alertChannel = 'snippet_updates';
+const _needsInputChannel = 'snippet_needs_input';
+const _summaryId = 2147483600;
+const _actionApprove = 'approve';
+const _actionDeny = 'deny';
+const _actionReply = 'reply';
+const _androidGroupPrefix = 'snippet_machine_';
+final Map<String, int> _machineSummaryIds = {};
 const _downloadChannel = 'snippet_downloads';
 const _prefEnabled = 'notif_enabled';
 
@@ -185,30 +194,198 @@ Future<void> notifySessionEvent({
   required int notificationId,
   FlutterLocalNotificationsPlugin? plugin,
 }) async {
-  if (!kCanNotify || !kMobile) return;
-  final important = kind == 'waiting' || kind == 'error' || kind == 'ping';
-  await (plugin ?? _mainNotif).show(
-    id: notificationId,
-    title: title,
-    body: body,
-    notificationDetails: NotificationDetails(
-      android: AndroidNotificationDetails(
-        _alertChannel,
-        'Session activity',
-        channelDescription: 'Important activity on connected machines',
-        importance: important ? Importance.high : Importance.defaultImportance,
-        priority: important ? Priority.high : Priority.defaultPriority,
+  if ((!kMobile && !kMacOS) || (!kCanNotify && !kMacOS)) return;
+  final data = jsonDecode(payload) as Map<String, dynamic>;
+  final notifier = plugin ?? _mainNotif;
+  final session = _sessionOf(data);
+  if (session.isNotEmpty) {
+    notificationId = sessionNotificationId(_machineOf(data), session);
+  }
+  MessagingStyleInformation? priorStyle;
+  if (kMobile && _sessionOf(data).isNotEmpty) {
+    try {
+      priorStyle = await notifier
+          .resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin>()
+          ?.getActiveNotificationMessagingStyle(id: notificationId);
+    } catch (_) {}
+  }
+  final details = sessionNotificationDetails(
+      payload: data,
+      title: title,
+      body: body,
+      kind: kind,
+      previous: priorStyle);
+  await notifier.show(
+      id: notificationId,
+      title: title,
+      body: plainNotificationText(body),
+      notificationDetails: details,
+      payload: payload);
+  if (kMobile) {
+    final group = details.android!.groupKey!;
+    final summaryId = _machineSummaryIds.putIfAbsent(
+        group, () => _summaryId - _machineSummaryIds.length - 1);
+    await notifier.show(
+        id: summaryId,
+        title: data['name']?.toString() ?? 'Snippet',
+        body: 'Session updates',
+        notificationDetails: NotificationDetails(
+            android: AndroidNotificationDetails(_alertChannel, 'Updates',
+                groupKey: group,
+                setAsGroupSummary: true,
+                onlyAlertOnce: true)));
+  }
+}
+
+/// Stable across launches (unlike String.hashCode) so a chat keeps one
+/// notification that accumulates messages.
+int sessionNotificationId(String machine, String session) {
+  var h = 0x811c9dc5;
+  for (final c in '$machine|$session'.codeUnits) {
+    h = ((h ^ c) * 0x01000193) & 0xffffffff;
+  }
+  return 0x40000000 | (h & 0x3fffffff);
+}
+
+String _sessionOf(Map<String, dynamic> data) {
+  final dest = data['destination'];
+  return '${data['session'] ?? (dest is Map ? dest['session'] ?? dest['id'] : '') ?? ''}';
+}
+
+String _machineOf(Map<String, dynamic> data) =>
+    '${data['url'] ?? data['name'] ?? 'snippet'}';
+
+String plainNotificationText(String value) {
+  var text = value.replaceAll(RegExp(r'```[\s\S]*?```'), ' ');
+  text = text.replaceAllMapped(RegExp(r'`([^`]*)`'), (m) => m[1] ?? '');
+  text = text.replaceAllMapped(
+      RegExp(r'!?\[([^\]]*)\]\([^)]*\)'), (m) => m[1] ?? '');
+  text = text
+      .replaceAll(RegExp(r'<[^>]+>'), ' ')
+      .replaceAll(RegExp(r'[*_~>#]'), '');
+  return text.replaceAll(RegExp(r'\s+'), ' ').trim();
+}
+
+NotificationDetails sessionNotificationDetails(
+    {required Map<String, dynamic> payload,
+    required String title,
+    required String body,
+    required String kind,
+    MessagingStyleInformation? previous}) {
+  final attn = payload['attention'];
+  final type = attn is Map ? attn['type'] : null;
+  final waiting = kind == 'waiting';
+  final actions = <AndroidNotificationAction>[];
+  if (waiting && type == 'approval') {
+    actions.addAll(const [
+      AndroidNotificationAction(_actionApprove, 'Approve',
+          cancelNotification: false),
+      AndroidNotificationAction(_actionDeny, 'Deny', cancelNotification: false)
+    ]);
+  } else if (waiting || kind == 'message') {
+    actions.add(const AndroidNotificationAction(_actionReply, 'Reply',
+        cancelNotification: false,
+        inputs: [AndroidNotificationActionInput(label: 'Reply')]));
+  }
+  final group = '$_androidGroupPrefix${_machineOf(payload)}';
+  final session = _sessionOf(payload);
+  final lines = plainNotificationText(body).split('\n');
+  final preview = lines.take(2).join(' ');
+  final channel = waiting ? _needsInputChannel : _alertChannel;
+  final category = waiting && type == 'approval'
+      ? 'approval'
+      : waiting && type == 'question'
+          ? 'question'
+          : 'message';
+  return NotificationDetails(
+    android: AndroidNotificationDetails(
+        channel, waiting ? 'Needs input' : 'Updates',
+        channelDescription:
+            waiting ? 'Sessions waiting for your input' : 'Session activity',
+        importance: waiting ? Importance.high : Importance.defaultImportance,
+        priority: waiting ? Priority.high : Priority.defaultPriority,
         category: AndroidNotificationCategory.message,
+        groupKey: group,
         onlyAlertOnce: true,
-      ),
-    ),
-    payload: payload,
+        actions: actions,
+        styleInformation: MessagingStyleInformation(_snippetPerson,
+            conversationTitle: title,
+            groupConversation: false,
+            messages: [
+              ...?previous?.messages,
+              Message(preview, DateTime.now(), _snippetPerson)
+            ].take(10).toList())),
+    macOS: DarwinNotificationDetails(
+        threadIdentifier: session.isEmpty ? null : session,
+        categoryIdentifier: category,
+        interruptionLevel: waiting
+            ? InterruptionLevel.timeSensitive
+            : (kind == 'done' || kind == 'idle'
+                ? InterruptionLevel.passive
+                : InterruptionLevel.active)),
   );
+}
+
+const _snippetPerson = Person(name: 'Snippet', key: 'snippet', bot: true);
+
+Future<bool> routeNotificationAction(
+    {required String? actionId,
+    required String? input,
+    required String? payload}) async {
+  if (actionId == null || payload == null) return false;
+  Map<String, dynamic> data;
+  try {
+    data = jsonDecode(payload) as Map<String, dynamic>;
+  } catch (_) {
+    return false;
+  }
+  final attn = data['attention'];
+  final question = attn is Map && attn['type'] == 'question';
+  final text = input?.trim() ?? '';
+  final QuickAction? action = switch (actionId) {
+    _actionApprove => const QuickApprove(),
+    _actionDeny => const QuickDeny(),
+    _actionReply when text.isNotEmpty =>
+      question ? QuickAnswer(text) : QuickReply(text),
+    _ => null,
+  };
+  return action == null ? false : quickSendForPayload(data, action);
+}
+
+@pragma('vm:entry-point')
+void notificationBackgroundResponse(NotificationResponse response) async {
+  WidgetsFlutterBinding.ensureInitialized();
+  ui.DartPluginRegistrant.ensureInitialized();
+  if (await routeNotificationAction(
+      actionId: response.actionId,
+      input: response.input,
+      payload: response.payload)) {
+    final plugin = FlutterLocalNotificationsPlugin();
+    await plugin.initialize(
+        settings: const InitializationSettings(
+            android: AndroidInitializationSettings('@mipmap/ic_launcher')));
+    if (response.id != null) await plugin.cancel(id: response.id!);
+  }
 }
 
 /// Routed from a tapped notification (set by main with a navigator).
 void Function(Map<String, dynamic> payload)? onNotifTap;
 
+final _darwinCategories = <DarwinNotificationCategory>[
+  DarwinNotificationCategory('approval', actions: [
+    DarwinNotificationAction.plain(_actionApprove, 'Approve'),
+    DarwinNotificationAction.plain(_actionDeny, 'Deny')
+  ]),
+  DarwinNotificationCategory('question', actions: [
+    DarwinNotificationAction.text(_actionReply, 'Reply',
+        buttonTitle: 'Send', placeholder: 'Answer')
+  ]),
+  DarwinNotificationCategory('message', actions: [
+    DarwinNotificationAction.text(_actionReply, 'Reply',
+        buttonTitle: 'Send', placeholder: 'Reply')
+  ]),
+];
 final FlutterLocalNotificationsPlugin _mainNotif =
     FlutterLocalNotificationsPlugin();
 
@@ -217,6 +394,7 @@ Future<void> _initializeAndroidNotifications(
   await plugin.initialize(
     settings: const InitializationSettings(
         android: AndroidInitializationSettings('@mipmap/ic_launcher')),
+    onDidReceiveBackgroundNotificationResponse: notificationBackgroundResponse,
   );
 }
 
@@ -247,9 +425,22 @@ Future<void> initNotifications() async {
     await _mainNotif.initialize(
       settings: const InitializationSettings(
           android: AndroidInitializationSettings('@mipmap/ic_launcher')),
-      onDidReceiveNotificationResponse: (resp) {
+      onDidReceiveBackgroundNotificationResponse:
+          notificationBackgroundResponse,
+      onDidReceiveNotificationResponse: (resp) async {
         if (resp.actionId == _cancelDownloadAction) {
           _downloadCancels[resp.id]?.call();
+          return;
+        }
+        if ([_actionApprove, _actionDeny, _actionReply]
+            .contains(resp.actionId)) {
+          if (await routeNotificationAction(
+                  actionId: resp.actionId,
+                  input: resp.input,
+                  payload: resp.payload) &&
+              resp.id != null) {
+            await _mainNotif.cancel(id: resp.id!);
+          }
           return;
         }
         final p = resp.payload;
@@ -270,16 +461,27 @@ Future<void> initNotifications() async {
 
   if (!kDesktopNotify) return;
   await _mainNotif.initialize(
-    settings: const InitializationSettings(
+    settings: InitializationSettings(
       macOS: DarwinInitializationSettings(
           requestAlertPermission: false,
           requestBadgePermission: false,
-          requestSoundPermission: false),
+          requestSoundPermission: false,
+          notificationCategories: _darwinCategories),
       linux: LinuxInitializationSettings(defaultActionName: 'Open'),
     ),
-    onDidReceiveNotificationResponse: (resp) {
-      final p = resp.payload;
-      if (p != null) _route(p);
+    onDidReceiveBackgroundNotificationResponse: notificationBackgroundResponse,
+    onDidReceiveNotificationResponse: (resp) async {
+      if ([_actionApprove, _actionDeny, _actionReply].contains(resp.actionId)) {
+        if (await routeNotificationAction(
+                actionId: resp.actionId,
+                input: resp.input,
+                payload: resp.payload) &&
+            resp.id != null) {
+          await _mainNotif.cancel(id: resp.id!);
+        }
+      } else if (resp.payload != null) {
+        _route(resp.payload!);
+      }
     },
   );
 }
@@ -308,7 +510,12 @@ Future<void> initNotifications() async {
     'url': inst.url,
     'name': inst.label,
     'session': session,
-    'title': title
+    'title': title,
+    'kind': e['kind'],
+    'attention': e['attention'],
+    'notification_id': e['notification_id'],
+    'destination': e['destination'],
+    'message': message,
   });
   return (head: head, body: body, payload: payload);
 }
@@ -350,8 +557,24 @@ Future<String?> startWatching() async {
   if (kMobile) {
     final android = _mainNotif.resolvePlatformSpecificImplementation<
         AndroidFlutterLocalNotificationsPlugin>();
-    if (await android?.requestNotificationsPermission() == false)
+    if (await android?.requestNotificationsPermission() == false) {
       return 'Notification permission denied.';
+    }
+    await android?.createNotificationChannel(const AndroidNotificationChannel(
+        _needsInputChannel, 'Needs input',
+        description: 'Sessions waiting for input',
+        importance: Importance.high));
+    await android?.createNotificationChannel(const AndroidNotificationChannel(
+        _alertChannel, 'Updates',
+        description: 'Session activity',
+        importance: Importance.defaultImportance));
+    unawaited(syncSavedNotifications().catchError((Object _) {}));
+    return null;
+  }
+  if (kMacOS) {
+    final darwin = _mainNotif.resolvePlatformSpecificImplementation<
+        MacOSFlutterLocalNotificationsPlugin>();
+    await darwin?.requestPermissions(alert: true, badge: true, sound: true);
     unawaited(syncSavedNotifications().catchError((Object _) {}));
     return null;
   }
@@ -387,6 +610,26 @@ void reportVisibleNotificationSession(String? instance, String? session) {
   if (visibleNotificationSession.value == key) return;
   visibleNotificationSession.value = key;
   if (kMobile) _writeForegroundLease();
+  if ((kMobile || kMacOS) && session != null) {
+    unawaited(_cancelSessionNotification(instance, session));
+  }
+}
+
+Future<void> _cancelSessionNotification(
+    String? instance, String session) async {
+  try {
+    final plugin = _mainNotif;
+    final active = await plugin.getActiveNotifications();
+    for (final item in active) {
+      final raw = item.payload;
+      if (raw == null) continue;
+      final data = jsonDecode(raw) as Map<String, dynamic>;
+      if (_sessionOf(data) == session &&
+          (instance == null || data['url'] == instance)) {
+        if (item.id != null) await plugin.cancel(id: item.id!);
+      }
+    }
+  } catch (_) {}
 }
 
 void reportForeground(bool fg) {

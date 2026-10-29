@@ -217,7 +217,7 @@ void main() {
     expect(suppressVisibleNotification({'url': 'u', 'session': 's'}), isTrue);
     await tester.pumpAndSettle();
     expect(find.text('Held'), findsNothing);
-    expect(find.text('Needs your input'), findsOneWidget);
+    expect(find.text('Needs input'), findsOneWidget);
     await tester.pump(const Duration(seconds: 4));
     expect(find.text('Next'), findsOneWidget);
     await tester.pump(const Duration(seconds: 1));
@@ -289,7 +289,8 @@ void main() {
       ),
     ));
     expect(tester.takeException(), isNull);
-    expect(find.textContaining('Failed · Brief context'), findsOneWidget);
+    expect(find.text('Failed'), findsOneWidget);
+    expect(find.textContaining('Brief context'), findsOneWidget);
     expect(find.byTooltip('Dismiss'), findsOneWidget);
     await tester.tap(find.byTooltip('Dismiss'));
     await tester.pumpAndSettle();

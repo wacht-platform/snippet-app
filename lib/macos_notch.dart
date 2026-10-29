@@ -24,6 +24,16 @@ import 'screens/mission_control/mission_control_state.dart'
         parseWorkerQuestion,
         supersededAmbientTurns;
 import 'store.dart';
+import 'tool_activity.dart' show ToolStep, toolSentence;
+import 'session_quick_send.dart'
+    show
+        QuickAction,
+        QuickAnswer,
+        QuickApprove,
+        QuickDeny,
+        QuickReply,
+        quickSend,
+        quickSendForPayload;
 
 class MacosNotch {
   MacosNotch._();
@@ -73,6 +83,12 @@ class MacosNotch {
               'session': 'mission-control',
               'title': 'Mission Control',
             }));
+          }
+        case 'notchAction':
+          final args = call.arguments;
+          if (args is Map) {
+            await _sendNotchAction(
+                '${args['action'] ?? ''}', '${args['text'] ?? ''}');
           }
         case 'sendConversationReply':
           final args = call.arguments;
@@ -273,6 +289,15 @@ class MacosNotch {
     final client = await _resolveClient(payload);
     if (client == null) return;
     _activeClient = client;
+    final openType = payload['type'];
+    if (openType == 'openArtifact' || openType == 'openImage') {
+      final actionPayload = <String, dynamic>{
+        ...payload,
+        'url': client.baseUrl
+      };
+      await _channel.invokeMethod<void>('openInApp', actionPayload);
+      return;
+    }
 
     final destination = payload['destination'];
     var sessionId = '${payload['session'] ?? ''}'.trim();
@@ -329,7 +354,7 @@ class MacosNotch {
     if (client == null || peerId == null) return;
     try {
       final events = await client.agentThread(peerId: peerId, limit: 60);
-      final messages = <Map<String, String>>[];
+      final messages = <Map<String, dynamic>>[];
       for (final e in events) {
         final text = e.body.trim();
         if (text.isEmpty) continue;
@@ -433,8 +458,7 @@ class MacosNotch {
       if (time.isNotEmpty) time,
       if (turn.mode == 'passive') 'passive',
       if (turn.wake) 'wake word',
-      if (turn.userVoice != null)
-        'voice ${(turn.userVoice! * 100).round()}%',
+      if (turn.userVoice != null) 'voice ${(turn.userVoice! * 100).round()}%',
       if (turn.interruptedReply.isNotEmpty) 'interrupted a reply',
     ].join(' · ');
   }
@@ -447,7 +471,7 @@ class MacosNotch {
         if (e['kind'] == 'user_input' || e['kind'] == 'steer')
           (e['text'] as String?) ?? '',
     ]);
-    final messages = <Map<String, String>>[];
+    final messages = <Map<String, dynamic>>[];
     for (final e in state.events) {
       final kind = e['kind'] as String? ?? '';
       if (kind == 'user_input' || kind == 'steer') {
@@ -482,7 +506,8 @@ class MacosNotch {
             parseAssignmentEnvelope(text) != null) {
           continue;
         }
-        messages.add({'role': 'user', 'text': text});
+        messages
+            .add({'role': 'user', 'text': text, 'meta': '', 'type': 'message'});
       } else if (kind == 'assistant_text' || kind == 'assistant') {
         var text = ((e['text'] as String?) ?? '').trim();
         final idx = state.events.indexOf(e);
@@ -511,7 +536,12 @@ class MacosNotch {
           }
         }
         if (text.isNotEmpty) {
-          messages.add({'role': 'assistant', 'text': text});
+          messages.add({
+            'role': 'assistant',
+            'text': text,
+            'meta': '',
+            'type': 'message'
+          });
         }
       } else if (kind == 'tool_call') {
         final tool = (e['tool_name'] as String?) ?? '';
@@ -525,22 +555,97 @@ class MacosNotch {
               'role': 'assistant',
               'text': spoken,
               'meta': 'Said aloud',
+              'type': 'message',
             });
           }
+        } else if (tool.isNotEmpty && !_notchHiddenTools.contains(tool)) {
+          final step =
+              ToolStep(tool: tool, args: e['arguments'], result: e['result']);
+          messages.add({
+            'role': 'activity',
+            'text': toolSentence(step),
+            'meta': '',
+            'type': 'activity',
+            'live': step.running,
+          });
+        }
+      } else if (kind == 'artifact_presented') {
+        final title = '${e['title'] ?? 'Artifact'}';
+        messages.add({
+          'role': 'artifact',
+          'text': title,
+          'meta': '',
+          'type': 'artifact',
+          'title': title,
+          'id': '${e['id'] ?? ''}',
+          'url': '${e['url'] ?? ''}',
+        });
+      } else if (kind == 'file_presented') {
+        final path = '${e['path'] ?? ''}';
+        if (_imageExt.hasMatch(path)) {
+          messages.add({
+            'role': 'image',
+            'text': '${e['caption'] ?? path}',
+            'meta': '',
+            'type': 'image',
+            'path': path,
+          });
         }
       }
     }
     if (_liveStreamText.trim().isNotEmpty && state.status == 'running') {
-      messages.add({'role': 'assistant', 'text': _liveStreamText.trim()});
+      messages.add({
+        'role': 'assistant',
+        'text': _liveStreamText.trim(),
+        'meta': '',
+        'type': 'message'
+      });
     }
-    final tail = messages.length > 40
-        ? messages.sublist(messages.length - 40)
-        : messages;
+    final waiting = state.status == 'waiting_for_input';
+    final approval = waiting && state.pendingQuestion == null
+        ? state.events.lastWhere((e) => e['kind'] == 'approval_request',
+            orElse: () => const {})
+        : const <String, dynamic>{};
+    final tail = finishNotchItems(
+      messages,
+      running: state.status == 'running',
+      lanes: [
+        for (final lane in state.lanes)
+          if (lane.status == 'running')
+            {'title': lane.title, 'state': lane.status, 'activity': lane.activity ?? '', 'id': lane.id}
+      ],
+      pendingQuestion: waiting ? state.pendingQuestion : null,
+      approval: approval.isEmpty ? null : approval,
+    );
     _pushConversationUpdate(
       title: _activeTitle,
       status: state.status,
       messages: tail,
     );
+  }
+
+  static Future<void> _sendNotchAction(String action, String text) async {
+    if (action == 'openArtifact' || action == 'openImage') {
+      await _channel.invokeMethod<void>('openInApp', {
+        'url': (_activeClient ?? _defaultClient)?.baseUrl ?? '',
+        'session': _activeSessionId ?? 'mission-control',
+        'title': _activeTitle,
+      });
+      return;
+    }
+    final QuickAction quickAction = switch (action) {
+      'answer' => QuickAnswer(notchAnswerText(_activeState?.pendingQuestion, text)),
+      'approve' => const QuickApprove(),
+      'deny' => const QuickDeny(),
+      _ => QuickReply(text),
+    };
+    final client = _activeClient ?? _defaultClient;
+    final session = _activeSessionId ?? 'mission-control';
+    if (client != null) {
+      await quickSend(client: client, session: session, action: quickAction);
+    } else {
+      await quickSendForPayload({'session': session}, quickAction);
+    }
   }
 
   static Future<void> _sendReply(String text) async {
@@ -556,7 +661,8 @@ class MacosNotch {
       return;
     }
 
-    final ch = _activeSessionId == 'mission-control' ? _mcSocket : _activeSocket;
+    final ch =
+        _activeSessionId == 'mission-control' ? _mcSocket : _activeSocket;
     if (ch != null && _activeSessionId != null) {
       final nonce =
           'notch-${DateTime.now().millisecondsSinceEpoch}-${_nonceCounter++}';
@@ -597,7 +703,7 @@ class MacosNotch {
   static void _pushConversationUpdate({
     required String title,
     required String status,
-    required List<Map<String, String>> messages,
+    required List<Map<String, dynamic>> messages,
   }) {
     if (!kMacOS) return;
     _channel.invokeMethod<void>('updateConversation', <String, Object?>{
@@ -644,4 +750,121 @@ class MacosNotch {
       'payload': jsonEncode(payload),
     }).catchError((Object _) {});
   }
+}
+
+
+const _notchHiddenTools = {'ask_user', 'present_file', 'update_plan', 'set_session_title'};
+final _imageExt = RegExp(r'\.(png|jpe?g|gif|webp|heic)$', caseSensitive: false);
+
+/// Shapes the ordered transcript rows for the notch: activity only for the
+/// current turn (last two finished steps, a "+N steps" line, the live step),
+/// a 40-row cap, running lanes, then the pending question or approval last.
+List<Map<String, dynamic>> finishNotchItems(
+  List<Map<String, dynamic>> ordered, {
+  bool running = false,
+  List<Map<String, String>> lanes = const [],
+  Map<String, dynamic>? pendingQuestion,
+  Map<String, dynamic>? approval,
+}) {
+  final lastUser = ordered.lastIndexWhere((m) => m['role'] == 'user');
+  final out = <Map<String, dynamic>>[];
+  for (var i = 0; i < ordered.length; i++) {
+    final m = ordered[i];
+    if (m['type'] == 'activity' && i < lastUser) continue;
+    out.add(Map<String, dynamic>.of(m));
+  }
+  final steps = [
+    for (var i = 0; i < out.length; i++)
+      if (out[i]['type'] == 'activity') i
+  ];
+  for (final i in steps) {
+    out[i]['live'] = false;
+  }
+  if (running && steps.isNotEmpty) {
+    final last = ordered.lastWhere((m) => m['type'] == 'activity');
+    if (last['live'] == true) out[steps.last]['live'] = true;
+  }
+  final finished = steps.where((i) => out[i]['live'] != true).toList();
+  if (finished.length > 2) {
+    final drop = finished.sublist(0, finished.length - 2).toSet();
+    final summaryAt = drop.first;
+    out[summaryAt] = {
+      'role': 'activity',
+      'text': '+${drop.length} steps',
+      'meta': '',
+      'type': 'activity',
+      'state': 'summary',
+    };
+    drop.remove(summaryAt);
+    for (final i in drop.toList()..sort((a, b) => b - a)) {
+      out.removeAt(i);
+    }
+  }
+  final capped = out.length > 40 ? out.sublist(out.length - 40) : out;
+  for (final lane in lanes) {
+    capped.add({
+      'role': 'lane',
+      'text': lane['activity']?.isNotEmpty == true ? lane['activity'] : 'Working',
+      'meta': '',
+      'type': 'lane',
+      'title': lane['title'] ?? '',
+      'state': lane['state'] ?? '',
+      'id': lane['id'] ?? '',
+    });
+  }
+  final questions = pendingQuestion?['questions'];
+  if (questions is List && questions.length > 1) {
+    capped.add({
+      'role': 'question',
+      'text': '${questions.length} questions are waiting. Open the app to answer them.',
+      'meta': '',
+      'type': 'question',
+      'id': '',
+      'choices': <String>[],
+      'answerKind': 'free_text',
+    });
+  } else if (questions is List && questions.isNotEmpty && questions.first is Map) {
+    final q = questions.first as Map;
+    final ak = q['answer_kind'] is Map ? q['answer_kind'] as Map : const {};
+    final kind = '${ak['kind'] ?? 'free_text'}';
+    final choices = switch (kind) {
+      'yes_no' => ['Yes', 'No'],
+      'confirm' => [
+          '${ak['confirm_label'] ?? 'Confirm'}',
+          '${ak['cancel_label'] ?? 'Cancel'}'
+        ],
+      'single_choice' || 'multi_choice' => [
+          for (final c in (ak['choices'] as List? ?? const []).whereType<Map>())
+            '${c['label'] ?? c['value'] ?? ''}'
+        ],
+      _ => <String>[],
+    };
+    capped.add({
+      'role': 'question',
+      'text': '${q['text'] ?? ''}',
+      'meta': questions.length > 1 ? '1 of ${questions.length}' : '',
+      'type': 'question',
+      'id': '${q['id'] ?? ''}',
+      'choices': choices,
+      'answerKind': kind == 'multi_choice' ? 'multi' : kind,
+    });
+  } else if (approval != null) {
+    capped.add({
+      'role': 'approval',
+      'text': '${approval['summary'] ?? approval['text'] ?? approval['tool_name'] ?? 'Approval required'}',
+      'meta': '',
+      'type': 'approval',
+      'id': '${approval['id'] ?? ''}',
+    });
+  }
+  return capped;
+}
+
+/// Matches the session screen's answer format for a single pending question.
+String notchAnswerText(Map<String, dynamic>? pendingQuestion, String answer) {
+  final questions = pendingQuestion?['questions'];
+  if (questions is List && questions.length == 1 && questions.first is Map) {
+    return '${(questions.first as Map)['text']}\n→ $answer';
+  }
+  return answer;
 }

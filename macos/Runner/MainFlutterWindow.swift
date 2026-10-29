@@ -1,9 +1,40 @@
 import AVFoundation
 import Carbon.HIToolbox
 import Cocoa
+
 import CoreText
 import FlutterMacOS
 import QuartzCore
+
+struct NotchItem {
+  var role = "assistant"
+  var text = ""
+  var meta = ""
+  var type = "message"
+  var live = false
+  var state = ""
+  var title = ""
+  var url = ""
+  var path = ""
+  var id = ""
+  var choices: [String] = []
+  var answerKind = ""
+
+  init(_ raw: [String: Any]) {
+    role = raw["role"] as? String ?? role
+    text = raw["text"] as? String ?? text
+    meta = raw["meta"] as? String ?? meta
+    type = raw["type"] as? String ?? type
+    live = raw["live"] as? Bool ?? live
+    state = raw["state"] as? String ?? state
+    title = raw["title"] as? String ?? title
+    url = raw["url"] as? String ?? url
+    path = raw["path"] as? String ?? path
+    id = raw["id"] as? String ?? id
+    choices = (raw["choices"] as? [Any])?.compactMap { $0 as? String } ?? choices
+    answerKind = raw["answerKind"] as? String ?? answerKind
+  }
+}
 
 private func snippetHotKeyCallback(
   nextHandler: EventHandlerCallRef?,
@@ -385,6 +416,9 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
         self?.notchChannel?.invokeMethod("closeConversation", arguments: nil)
       }
     )
+    hud.onNotchAction = { [weak self] action, text in
+      self?.notchChannel?.invokeMethod("notchAction", arguments: ["action": action, "text": text])
+    }
     self.notchHUD = hud
 
     notchChan.setMethodCallHandler { [weak self] call, result in
@@ -424,16 +458,20 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
           }
         }
         result(nil)
+      case "openInApp":
+        if let args = call.arguments as? [String: Any], let payloadData = try? JSONSerialization.data(withJSONObject: args), let payload = String(data: payloadData, encoding: .utf8) {
+          self.notchHUD?.openPayloadInApp(payload)
+        }
+        result(nil)
       case "updateConversation":
         if let args = call.arguments as? [String: Any] {
           let title = args["title"] as? String ?? "Conversation"
           let status = args["status"] as? String ?? "idle"
           let rawMsgs = args["messages"] as? [[String: Any]] ?? []
-          let messages: [(role: String, text: String, meta: String)] = rawMsgs.compactMap { m in
-            guard let text = m["text"] as? String, !text.isEmpty else { return nil }
-            let role = m["role"] as? String ?? "assistant"
-            let meta = m["meta"] as? String ?? ""
-            return (role: role, text: text, meta: meta)
+          let messages = rawMsgs.compactMap { m -> NotchItem? in
+            let item = NotchItem(m)
+            guard !item.text.isEmpty else { return nil }
+            return item
           }
           self.notchHUD?.updateConversation(title: title, status: status, messages: messages)
         }
@@ -1135,10 +1173,20 @@ final class NotchTextView: NSView {
     self.textContainer = tc
     self.measuredSize = NSSize(width: tightW, height: tightH)
     super.init(frame: NSRect(x: 0, y: 0, width: tightW, height: tightH))
+    addGestureRecognizer(NSClickGestureRecognizer(target: self, action: #selector(openLink(_:))))
   }
 
   required init?(coder: NSCoder) {
     fatalError("init(coder:) has not been implemented")
+  }
+
+  @objc private func openLink(_ recognizer: NSClickGestureRecognizer) {
+    let point = recognizer.location(in: self)
+    let glyph = layoutManager.glyphIndex(for: point, in: textContainer)
+    let character = layoutManager.characterIndexForGlyph(at: glyph)
+    if character < storage.length, let url = storage.attribute(.link, at: character, effectiveRange: nil) as? URL {
+      NSWorkspace.shared.open(url)
+    }
   }
 
   override func draw(_ dirtyRect: NSRect) {
@@ -1196,8 +1244,25 @@ enum NotchMarkdown {
       blocks.append(.text(renderProse(joined, isUser: isUser)))
     }
 
-    for line in lines {
+    var lineIndex = 0
+    while lineIndex < lines.count {
+      let line = lines[lineIndex]
       let trimmed = line.trimmingCharacters(in: .whitespaces)
+      if !inCode, trimmed.contains("|"), lineIndex + 1 < lines.count, lines[lineIndex + 1].contains("---") {
+        flushProse()
+        var tableRows = [line]
+        lineIndex += 2
+        while lineIndex < lines.count, lines[lineIndex].contains("|") {
+          tableRows.append(lines[lineIndex])
+          lineIndex += 1
+        }
+        let text = tableRows.map { row in
+          row.split(separator: "|").map { String($0).trimmingCharacters(in: .whitespaces) }.joined(separator: "   │   ")
+        }.joined(separator: "\n")
+        let attrs: [NSAttributedString.Key: Any] = [.font: SnippetTheme.mono(11.5, weight: .regular), .foregroundColor: SnippetTheme.fg2]
+        blocks.append(.text(NSAttributedString(string: text, attributes: attrs)))
+        continue
+      }
       if trimmed.hasPrefix("```") {
         if inCode {
           let codeText = codeLines.joined(separator: "\n")
@@ -1215,6 +1280,7 @@ enum NotchMarkdown {
       } else {
         proseLines.append(line)
       }
+      lineIndex += 1
     }
     if inCode && !codeLines.isEmpty {
       blocks.append(.code(language: codeLang, code: codeLines.joined(separator: "\n")))
@@ -1263,6 +1329,11 @@ enum NotchMarkdown {
         baseWeight = .medium
         lineColor = SnippetTheme.fg1
         spacingBefore = idx > 0 ? 6 : 0
+      } else if lineText.range(of: "^\\s+([-*+]\\s+|\\d+\\.\\s+)", options: .regularExpression) != nil {
+        let leading = lineText.prefix(while: { $0 == " " }).count
+        lineText = String(repeating: "  ", count: leading / 2) + "•  " + lineText.drop(while: { $0 == " " }).dropFirst(2)
+        headIndent = CGFloat(14 + leading * 5)
+        firstIndent = 2
       } else if lineText.hasPrefix("- ") || lineText.hasPrefix("* ") || lineText.hasPrefix("+ ") {
         lineText = "•  " + String(lineText.dropFirst(2))
         headIndent = 14
@@ -1306,12 +1377,13 @@ enum NotchMarkdown {
     paragraphStyle: NSParagraphStyle
   ) -> NSAttributedString {
     var working = input
-    if let linkRe = try? NSRegularExpression(pattern: "\\[([^\\]]+)\\]\\([^\\)]+\\)") {
-      working = linkRe.stringByReplacingMatches(
-        in: working,
-        range: NSRange(working.startIndex..., in: working),
-        withTemplate: "$1"
-      )
+    var linkPairs: [(String, String)] = []
+    if let linkRe = try? NSRegularExpression(pattern: "\\[([^\\]]+)\\]\\(([^\\)]+)\\)") {
+      let ns = working as NSString
+      for match in linkRe.matches(in: working, range: NSRange(location: 0, length: ns.length)).reversed() {
+        linkPairs.append((ns.substring(with: match.range(at: 1)), ns.substring(with: match.range(at: 2))))
+      }
+      working = linkRe.stringByReplacingMatches(in: working, range: NSRange(working.startIndex..., in: working), withTemplate: "$1")
     }
 
     let out = NSMutableAttributedString()
@@ -1326,7 +1398,7 @@ enum NotchMarkdown {
       .paragraphStyle: paragraphStyle,
     ]
 
-    let pattern = "(`[^`]+`|\\*\\*[^*]+\\*\\*|__[^_]+__|\\*[^*]+\\*)"
+    let pattern = "(`[^`]+`|\\*\\*[^*]+\\*\\*|~~[^~]+~~|__[^_]+__|_[^_]+_|\\*[^*]+\\*)"
     guard let regex = try? NSRegularExpression(pattern: pattern) else {
       return NSAttributedString(string: working, attributes: defaultAttrs)
     }
@@ -1358,7 +1430,11 @@ enum NotchMarkdown {
           .paragraphStyle: paragraphStyle,
         ]
         out.append(NSAttributedString(string: inner, attributes: boldAttrs))
-      } else if token.hasPrefix("*") && token.hasSuffix("*") && token.count >= 2 {
+      } else if token.hasPrefix("~~") && token.hasSuffix("~~") {
+        let inner = String(token.dropFirst(2).dropLast(2))
+        let attrs: [NSAttributedString.Key: Any] = [.font: baseFont, .foregroundColor: baseColor, .strikethroughStyle: NSUnderlineStyle.single.rawValue, .paragraphStyle: paragraphStyle]
+        out.append(NSAttributedString(string: inner, attributes: attrs))
+      } else if (token.hasPrefix("_") && token.hasSuffix("_")) || (token.hasPrefix("*") && token.hasSuffix("*") && token.count >= 2) {
         let inner = String(token.dropFirst().dropLast())
         let itAttrs: [NSAttributedString.Key: Any] = [
           .font: italicFont,
@@ -1376,6 +1452,13 @@ enum NotchMarkdown {
       let tail = ns.substring(from: cursor)
       out.append(NSAttributedString(string: tail, attributes: defaultAttrs))
     }
+    for (label, target) in linkPairs {
+      let range = (out.string as NSString).range(of: label)
+      if range.location != NSNotFound, let url = URL(string: target) {
+        out.addAttribute(.link, value: url, range: range)
+        out.addAttribute(.foregroundColor, value: SnippetTheme.accent, range: range)
+      }
+    }
     return out
   }
 }
@@ -1389,6 +1472,7 @@ final class NotchHUDController {
   private let onOpenInApp: (String) -> Void
   private let onOpenConversation: (String) -> Void
   private let onSendReply: (String) -> Void
+  var onNotchAction: ((String, String) -> Void)?
   private let onCloseConversation: () -> Void
 
   private var windowHidden = false
@@ -1460,6 +1544,9 @@ final class NotchHUDController {
     }
     v.onSubmitReply = { [weak self] text in
       self?.onSendReply(text)
+    }
+    v.onNotchAction = { [weak self] action, text in
+      self?.onNotchAction?(action, text)
     }
 
     NotificationCenter.default.addObserver(
@@ -1547,9 +1634,14 @@ final class NotchHUDController {
   func updateConversation(
     title: String,
     status: String,
-    messages: [(role: String, text: String, meta: String)]
+    messages: [NotchItem]
   ) {
     hudView.setConversationData(title: title, status: status, messages: messages)
+  }
+
+  func openPayloadInApp(_ payload: String) {
+    activePayload = payload
+    onOpenInApp(payload)
   }
 
   func openMissionControlConversation() {
@@ -1752,6 +1844,7 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
   var onCloseBar: (() -> Void)?
   var onOpenFullApp: (() -> Void)?
   var onSubmitReply: ((String) -> Void)?
+  var onNotchAction: ((String, String) -> Void)?
 
   private var notifTitle: String?
   private var notifSubtitle: String?
@@ -1772,7 +1865,8 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
   private var conversationExpanded = false
   private var convTitle = "Conversation"
   private var convStatus = "idle"
-  private var convMessages: [(role: String, text: String, meta: String)] = []
+  private var convMessages: [NotchItem] = []
+  private var selectedChoices = Set<String>()
 
   private let containerView = NSView()
   private let titleField = NSTextField(labelWithString: "Conversation")
@@ -1782,6 +1876,7 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
   private let scrollView = NSScrollView()
   private let documentView = FlippedDocumentView()
   private let replyContainer = NSView()
+  private let cardContainer = NSView()
   private let replyField = NSTextField()
   private let sendButton = NSButton(title: "↑", target: nil, action: nil)
 
@@ -1839,6 +1934,10 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
     replyContainer.layer?.backgroundColor = NSColor(srgbRed: 0.086, green: 0.086, blue: 0.094, alpha: 1).cgColor
     replyContainer.layer?.cornerRadius = 18
     containerView.addSubview(replyContainer)
+    cardContainer.wantsLayer = true
+    cardContainer.layer?.backgroundColor = SnippetTheme.surface1.cgColor
+    cardContainer.layer?.cornerRadius = 10
+    containerView.addSubview(cardContainer)
 
     replyField.isBordered = false
     replyField.drawsBackground = false
@@ -1871,13 +1970,43 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
     onCloseBar?()
   }
 
+  @objc private func handleArtifactTap(_ sender: NSButton) {
+    onNotchAction?("openArtifact", sender.identifier?.rawValue ?? "")
+  }
+
+  @objc private func handleImageTap(_ recognizer: NSClickGestureRecognizer) {
+    guard let view = recognizer.view as? NSImageView else { return }
+    onNotchAction?("openImage", view.identifier?.rawValue ?? "")
+  }
+
+  @objc private func handleChoice(_ sender: NSButton) {
+    let answer = sender.identifier?.rawValue ?? sender.title
+    if convMessages.contains(where: { $0.type == "question" && $0.answerKind == "multi" }) {
+      if selectedChoices.contains(answer) { selectedChoices.remove(answer) } else { selectedChoices.insert(answer) }
+      sender.state = selectedChoices.contains(answer) ? .on : .off
+    } else {
+      onNotchAction?("answer", answer)
+    }
+  }
+
+  @objc private func handleSendChoices() {
+    onNotchAction?("answer", selectedChoices.sorted().joined(separator: ", "))
+    selectedChoices.removeAll()
+  }
+
+  @objc private func handleNotchAction(_ sender: NSButton) {
+    let action = sender.identifier?.rawValue ?? "reply"
+    onNotchAction?(action, replyField.stringValue)
+  }
+
   @objc private func handleSendTap() {
     let text = replyField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !text.isEmpty else { return }
     replyField.stringValue = ""
-    convMessages.append((role: "user", text: text, meta: ""))
+    let questionPending = convMessages.contains(where: { $0.type == "question" })
+    convMessages.append(NotchItem(["role": "user", "text": text]))
     rebuildMessageViews(scrollToBottom: true)
-    onSubmitReply?(text)
+    if questionPending { onNotchAction?("answer", text) } else { onSubmitReply?(text) }
   }
 
   func control(_ control: NSControl, textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
@@ -1905,7 +2034,7 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
   func setConversationData(
     title: String,
     status: String,
-    messages: [(role: String, text: String, meta: String)]
+    messages: [NotchItem]
   ) {
     convTitle = title
     convStatus = status
@@ -1953,11 +2082,15 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
     titleField.frame = NSRect(x: 24, y: headerY + 4, width: max(60, titleMaxX - 24), height: 20)
 
     let replyH: CGFloat = 36
+    let hasPendingCard = convMessages.contains(where: { $0.type == "question" || $0.type == "approval" })
+    let cardH: CGFloat = hasPendingCard ? 72 : 0
+    cardContainer.isHidden = !hasPendingCard
+    cardContainer.frame = NSRect(x: 0, y: replyH + 8, width: contentRect.width, height: cardH)
     replyContainer.frame = NSRect(x: 0, y: 0, width: contentRect.width, height: replyH)
     sendButton.frame = NSRect(x: contentRect.width - 32, y: 4, width: 28, height: 28)
     replyField.frame = NSRect(x: 14, y: 7, width: max(60, contentRect.width - 54), height: 22)
 
-    let scrollY = replyH + 10
+    let scrollY = replyH + 10 + cardH + (hasPendingCard ? 8 : 0)
     let scrollH = max(40, headerY - 10 - scrollY)
     scrollView.frame = NSRect(x: 0, y: scrollY, width: contentRect.width, height: scrollH)
     rebuildMessageViews(scrollToBottom: false)
@@ -1968,6 +2101,7 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
     for sub in documentView.subviews {
       sub.removeFromSuperview()
     }
+    for sub in cardContainer.subviews { sub.removeFromSuperview() }
     let width = max(200, scrollView.contentSize.width)
     var y: CGFloat = 8
 
@@ -1980,6 +2114,101 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
       y = 48
     } else {
       for msg in convMessages {
+        if msg.type == "artifact" {
+          let row = NSButton(title: "▣  \(msg.title.isEmpty ? msg.text : msg.title)  artifact", target: self, action: #selector(handleArtifactTap(_:)))
+          row.identifier = NSUserInterfaceItemIdentifier(msg.id.isEmpty ? msg.url : msg.id)
+          row.attributedTitle = NSAttributedString(string: row.title, attributes: [.font: SnippetTheme.sans(11.5, weight: .medium), .foregroundColor: SnippetTheme.fg2])
+          row.frame = NSRect(x: 8, y: y, width: width - 16, height: 28)
+          row.wantsLayer = true
+          row.layer?.backgroundColor = SnippetTheme.surface1.cgColor
+          row.layer?.cornerRadius = 10
+          row.isBordered = false
+          documentView.addSubview(row)
+          y += 34
+          continue
+        }
+        if msg.type == "image" {
+          let image = NSImage(contentsOfFile: msg.path)
+          if let image = image {
+            let view = NSImageView(image: image)
+            view.imageScaling = .scaleProportionallyUpOrDown
+            view.frame = NSRect(x: 8, y: y, width: 72, height: 48)
+            view.wantsLayer = true
+            view.layer?.cornerRadius = 8
+            view.layer?.masksToBounds = true
+            view.identifier = NSUserInterfaceItemIdentifier(msg.path.isEmpty ? msg.url : msg.path)
+            view.addGestureRecognizer(NSClickGestureRecognizer(target: self, action: #selector(handleImageTap(_:))))
+            documentView.addSubview(view)
+            y += 54
+          }
+          continue
+        }
+        if msg.type == "activity" {
+          let dot = NSView(frame: NSRect(x: 8, y: y + 5, width: 5, height: 5))
+          dot.wantsLayer = true
+          dot.layer?.backgroundColor = (msg.live ? SnippetTheme.accent : SnippetTheme.fg4).cgColor
+          dot.layer?.cornerRadius = 2.5
+          documentView.addSubview(dot)
+          let line = NSTextField(labelWithString: msg.text)
+          line.font = SnippetTheme.sans(11.5, weight: .regular)
+          line.textColor = SnippetTheme.fg4
+          line.frame = NSRect(x: 18, y: y, width: width - 28, height: 16)
+          documentView.addSubview(line)
+          y += 19
+          continue
+        }
+        if msg.type == "lane" {
+          let line = NSTextField(labelWithString: "\(msg.title.isEmpty ? msg.text : msg.title) · \(msg.state) · \(msg.text)")
+          line.font = SnippetTheme.sans(11.5, weight: .regular)
+          line.textColor = SnippetTheme.fg3
+          line.frame = NSRect(x: 10, y: y, width: width - 20, height: 18)
+          documentView.addSubview(line)
+          y += 21
+          continue
+        }
+        if msg.type == "question" || msg.type == "approval" {
+          if msg.type == "question" || convMessages.last(where: { $0.type == "approval" })?.id == msg.id {
+            let title = NSTextField(labelWithString: msg.text)
+            title.font = SnippetTheme.sans(12, weight: .medium)
+            title.textColor = SnippetTheme.fg1
+            title.lineBreakMode = .byTruncatingTail
+            title.frame = NSRect(x: 10, y: cardContainer.bounds.height - 26, width: cardContainer.bounds.width - 20, height: 18)
+            cardContainer.addSubview(title)
+            if msg.type == "question", !msg.choices.isEmpty {
+              for (index, choice) in msg.choices.prefix(3).enumerated() {
+                let button = NSButton(title: choice, target: self, action: #selector(handleChoice(_:)))
+                button.identifier = NSUserInterfaceItemIdentifier(choice)
+                button.bezelStyle = .rounded
+                button.frame = NSRect(x: 10 + CGFloat(index) * 92, y: 8, width: 86, height: 28)
+                if msg.answerKind == "multi" {
+                  button.setButtonType(.pushOnPushOff)
+                  button.state = selectedChoices.contains(choice) ? .on : .off
+                }
+                cardContainer.addSubview(button)
+              }
+              if msg.answerKind == "multi" {
+                let send = NSButton(title: "Send", target: self, action: #selector(handleSendChoices))
+                send.bezelStyle = .rounded
+                send.keyEquivalent = "\r"
+                send.frame = NSRect(x: cardContainer.bounds.width - 76, y: 8, width: 64, height: 28)
+                cardContainer.addSubview(send)
+              }
+            }
+            if msg.type == "approval" {
+              let approve = NSButton(title: "Approve", target: self, action: #selector(handleNotchAction(_:)))
+              approve.identifier = NSUserInterfaceItemIdentifier("approve")
+              approve.bezelStyle = .rounded
+              approve.frame = NSRect(x: cardContainer.bounds.width - 150, y: 8, width: 68, height: 28)
+              let deny = NSButton(title: "Deny", target: self, action: #selector(handleNotchAction(_:)))
+              deny.identifier = NSUserInterfaceItemIdentifier("deny")
+              deny.bezelStyle = .rounded
+              deny.frame = NSRect(x: cardContainer.bounds.width - 76, y: 8, width: 64, height: 28)
+              cardContainer.addSubview(approve)
+              cardContainer.addSubview(deny)
+            }
+          }
+          continue
+        }
         let isUser = msg.role == "user"
         let blocks = NotchMarkdown.parseBlocks(msg.text, isUser: isUser)
         if blocks.isEmpty { continue }
