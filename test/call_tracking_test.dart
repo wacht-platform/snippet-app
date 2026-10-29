@@ -151,7 +151,7 @@ void main() {
       final d = callPromptDetails(timeoutMs: 120000).android!;
       expect(d.importance, Importance.high);
       expect(d.timeoutAfter, 120000);
-      expect(d.actions!.map((a) => a.title), ['Track', 'Ignore']);
+      expect(d.actions!.map((a) => a.title), ['Take notes', 'Ignore']);
       expect(callNotificationId('a'), callNotificationId('a'));
       expect(callNotificationId('a'), isNot(callNotificationId('b')));
     });

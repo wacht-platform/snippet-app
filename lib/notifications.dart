@@ -403,7 +403,7 @@ Future<void> notifyCallPrompt({
 
 NotificationDetails callPromptDetails({required int timeoutMs}) =>
     NotificationDetails(
-      android: AndroidNotificationDetails(_callChannel, 'Calls',
+      android: AndroidNotificationDetails(_callChannel, 'Conversations',
           channelDescription: 'Asks before Snippet takes notes on a call',
           importance: Importance.high,
           priority: Priority.high,
@@ -411,7 +411,7 @@ NotificationDetails callPromptDetails({required int timeoutMs}) =>
           timeoutAfter: timeoutMs > 0 ? timeoutMs : null,
           autoCancel: false,
           actions: const [
-            AndroidNotificationAction(_actionCallTrack, 'Track',
+            AndroidNotificationAction(_actionCallTrack, 'Take notes',
                 cancelNotification: false),
             AndroidNotificationAction(_actionCallIgnore, 'Ignore',
                 cancelNotification: false),
@@ -659,7 +659,7 @@ Future<String?> startWatching() async {
         description: 'Sessions waiting for input',
         importance: Importance.high));
     await android?.createNotificationChannel(const AndroidNotificationChannel(
-        _callChannel, 'Calls',
+        _callChannel, 'Conversations',
         description: 'Asks before Snippet takes notes on a call',
         importance: Importance.high));
     await android?.createNotificationChannel(const AndroidNotificationChannel(

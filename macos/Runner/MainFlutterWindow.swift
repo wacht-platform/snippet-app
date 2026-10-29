@@ -474,7 +474,7 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
           self.notchHUD?.presentCallPrompt(
             callId: args["callId"] as? String ?? "",
             title: args["title"] as? String ?? "Call",
-            message: args["message"] as? String ?? "Track this call?",
+            message: args["message"] as? String ?? "Take notes on this conversation?",
             seconds: seconds)
         }
         result(nil)
@@ -1932,7 +1932,7 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
   var onCallAction: ((String) -> Void)?
 
   private var callMode: String?
-  private let trackButton = NSButton(title: "Track", target: nil, action: nil)
+  private let trackButton = NSButton(title: "Take notes", target: nil, action: nil)
   private let ignoreButton = NSButton(title: "Ignore", target: nil, action: nil)
   private let stopButton = NSButton(title: "Stop", target: nil, action: nil)
 
@@ -2087,8 +2087,8 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
     ignoreButton.isHidden = !showPrompt
     stopButton.isHidden = !showStop
     let left = b.minX + topCornerRadius + 16
-    trackButton.frame = NSRect(x: left, y: b.minY + 10, width: 64, height: 24)
-    ignoreButton.frame = NSRect(x: left + 72, y: b.minY + 10, width: 64, height: 24)
+    trackButton.frame = NSRect(x: left, y: b.minY + 10, width: 84, height: 24)
+    ignoreButton.frame = NSRect(x: left + 92, y: b.minY + 10, width: 64, height: 24)
     stopButton.frame = NSRect(x: b.maxX - topCornerRadius - 16 - 56, y: b.minY + 6, width: 56, height: 22)
   }
 
@@ -2576,7 +2576,7 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
       let rowMidY = b.minY + 17
       NSColor(srgbRed: 0.90, green: 0.45, blue: 0.40, alpha: 1).setFill()
       NSBezierPath(ovalIn: NSRect(x: left, y: rowMidY - 3, width: 6, height: 6)).fill()
-      ("Tracking call" as NSString).draw(
+      ("Taking notes" as NSString).draw(
         at: NSPoint(x: left + 14, y: rowMidY - 8),
         withAttributes: [.font: SnippetTheme.sans(12, weight: .medium), .foregroundColor: SnippetTheme.fg2])
     }

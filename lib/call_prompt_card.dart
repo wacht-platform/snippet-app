@@ -61,7 +61,7 @@ class _CallPromptCardState extends State<CallPromptCard> {
               ),
               const SizedBox(width: S.s8),
               Expanded(
-                child: Text(tracking ? 'Tracking call' : widget.status.title,
+                child: Text(tracking ? 'Taking notes' : widget.status.title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: sans(kMobile ? 14 : 13,
@@ -86,7 +86,7 @@ class _CallPromptCardState extends State<CallPromptCard> {
                       disabled: _busy,
                       onTap: () => _run(callActionStop))
                 else ...[
-                  Btn('Track',
+                  Btn('Take notes',
                       small: true,
                       disabled: _busy,
                       onTap: () => _run(callActionTrack)),

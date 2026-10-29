@@ -136,7 +136,7 @@ class MacosNotch {
       CallPhase.pending => _channel.invokeMethod<void>('callPrompt', {
           'callId': c!.callId,
           'expiresAtMs': c.expiresAtMs,
-          'title': 'Call',
+          'title': 'Conversation',
           'message': c.title,
         }),
       CallPhase.tracking =>

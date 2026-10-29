@@ -10,9 +10,9 @@ const callStateType = 'call_state';
 const callActionTrack = 'track';
 const callActionIgnore = 'ignore';
 const callActionStop = 'stop';
-const callPromptTitle = 'Track this call?';
+const callPromptTitle = 'Take notes on this conversation?';
 const callPromptBody =
-    "Sounds like you're talking with someone. Snippet can take notes.";
+    "Sounds like you're talking with someone. Snippet can keep notes.";
 
 class CallEvent {
   const CallEvent({
