@@ -27,7 +27,7 @@ void _stubMediaPlugins() {
 Future<void> _loadBundledFonts() async {
   const families = {
     'JetBrainsMono': 'JetBrainsMono',
-    'Geist': 'Geist',
+    'Inter': 'Inter',
     'Literata': 'Literata',
   };
   for (final entry in families.entries) {

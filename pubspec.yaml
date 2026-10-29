@@ -61,12 +61,14 @@ flutter:
   assets:
     - assets/providers/
   fonts:
-    - family: Geist
+    - family: Inter
       fonts:
-        - asset: assets/fonts/Geist-400.ttf
+        - asset: assets/fonts/Inter-400.ttf
           weight: 400
-        - asset: assets/fonts/Geist-500.ttf
+        - asset: assets/fonts/Inter-500.ttf
           weight: 500
+        - asset: assets/fonts/Inter-600.ttf
+          weight: 600
     - family: Literata
       fonts:
         - asset: assets/fonts/Literata-400.ttf

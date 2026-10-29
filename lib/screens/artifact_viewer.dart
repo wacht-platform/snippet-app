@@ -401,7 +401,7 @@ String snippetPageTheme(bool dark, String bg) {
     '--sn-warn': _cssHex(AppColors.run),
     '--sn-danger': _cssHex(AppColors.danger),
     '--sn-radius': '12px',
-    '--sn-font': "'Geist', -apple-system, system-ui, sans-serif",
+    '--sn-font': "'Inter', -apple-system, system-ui, sans-serif",
     '--sn-mono': "'JetBrains Mono', ui-monospace, monospace",
   };
   final css = ':root{${vars.entries.map((e) => '${e.key}:${e.value}').join(';')}}';
@@ -411,7 +411,7 @@ String snippetPageTheme(bool dark, String bg) {
   var v = d.createElement('style'); v.textContent = ${jsonEncode(css)}; h.insertBefore(v, h.firstChild);
   if (!d.querySelector('link[data-sn-fonts]')) {
     var l = d.createElement('link'); l.rel = 'stylesheet'; l.setAttribute('data-sn-fonts', '');
-    l.href = 'https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap';
+    l.href = 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap';
     h.appendChild(l);
   }
   var b = d.body; if (!b) return;
@@ -505,7 +505,7 @@ class MermaidDiagram extends StatelessWidget {
     final vars = jsonEncode({
       'darkMode': dark,
       'background': 'transparent',
-      'fontFamily': "Geist, -apple-system, system-ui, sans-serif",
+      'fontFamily': "Inter, -apple-system, system-ui, sans-serif",
       'fontSize': '14px',
       'primaryColor': _cssHex(AppColors.surface2),
       'primaryTextColor': _cssHex(AppColors.fg1),

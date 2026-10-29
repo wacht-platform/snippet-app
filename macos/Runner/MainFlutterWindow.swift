@@ -18,7 +18,7 @@ private func snippetHotKeyCallback(
   return noErr
 }
 
-// MARK: - Snippet Theme & Bundled Font Loader (Geist + JetBrainsMono + Graphite Palette)
+// MARK: - Snippet Theme & Bundled Font Loader (JetBrainsMono + Graphite Palette)
 
 enum SnippetTheme {
   static var fontsRegistered = false
@@ -42,12 +42,7 @@ enum SnippetTheme {
   }
 
   static func sans(_ size: CGFloat, weight: NSFont.Weight = .regular) -> NSFont {
-    ensureFontsRegistered()
-    let name = weight.rawValue >= NSFont.Weight.medium.rawValue ? "Geist-Medium" : "Geist-Regular"
-    if let font = NSFont(name: name, size: size) {
-      return font
-    }
-    return NSFont.systemFont(ofSize: size, weight: weight)
+    NSFont.systemFont(ofSize: size, weight: weight)
   }
 
   static func mono(_ size: CGFloat, weight: NSFont.Weight = .regular) -> NSFont {
@@ -1408,6 +1403,9 @@ final class NotchHUDController {
   private var notifPayload: String?
   private var notifDismissTimer: Timer?
   private var waveTimer: Timer?
+  private var notifStartedAt: TimeInterval = 0
+  private let notifDuration: TimeInterval = 3.5
+  private var hasUnreadNotification = false
 
   private var conversationExpanded = false
   private var activePayload: String = ""
@@ -1490,6 +1488,7 @@ final class NotchHUDController {
       notifSubtitle = nil
       notifKind = nil
       notifPayload = nil
+      hasUnreadNotification = false
       if conversationExpanded {
         collapseConversation()
         return
@@ -1514,6 +1513,7 @@ final class NotchHUDController {
       notifSubtitle = nil
       notifKind = nil
       notifPayload = nil
+      hasUnreadNotification = false
     }
     refreshHUD(animated: true)
   }
@@ -1532,10 +1532,12 @@ final class NotchHUDController {
     notifSubtitle = subtitle
     notifKind = kind
     notifPayload = payload
+    hasUnreadNotification = false
+    notifStartedAt = CACurrentMediaTime()
 
     notifDismissTimer?.invalidate()
     if !conversationExpanded {
-      notifDismissTimer = Timer.scheduledTimer(withTimeInterval: 3.5, repeats: false) { [weak self] _ in
+      notifDismissTimer = Timer.scheduledTimer(withTimeInterval: notifDuration, repeats: false) { [weak self] _ in
         self?.clearNotification()
       }
     }
@@ -1558,6 +1560,7 @@ final class NotchHUDController {
     notifSubtitle = nil
     notifKind = nil
     notifPayload = nil
+    hasUnreadNotification = false
     conversationExpanded = true
     hudView.setConversationExpanded(true)
     hudView.setConversationData(
@@ -1574,6 +1577,7 @@ final class NotchHUDController {
     notifSubtitle = nil
     notifKind = nil
     notifPayload = nil
+    hasUnreadNotification = true
     refreshHUD(animated: true)
   }
 
@@ -1590,6 +1594,7 @@ final class NotchHUDController {
       notifSubtitle = nil
       notifKind = nil
       notifPayload = nil
+      hasUnreadNotification = false
       conversationExpanded = true
       hudView.setConversationExpanded(true)
       hudView.setConversationData(
@@ -1639,7 +1644,7 @@ final class NotchHUDController {
   private func refreshHUD(animated: Bool) {
     let hasNotif = notifTitle != nil
     let showAmbient = windowHidden && (ambientActive || assistantSpeaking || userSpeaking)
-    let shouldShow = windowHidden && (conversationExpanded || hasNotif || showAmbient)
+    let shouldShow = windowHidden && (conversationExpanded || hasNotif || hasUnreadNotification || showAmbient)
 
     if !shouldShow {
       waveTimer?.invalidate()
@@ -1665,10 +1670,10 @@ final class NotchHUDController {
       targetWidth = max(hw.width + 292, 480) + topCornerRadius * 2
       targetHeight = hw.height + 380
     } else if hasNotif {
-      topCornerRadius = 8
+      topCornerRadius = 6
       bottomCornerRadius = 14
-      targetWidth = max(hw.width + 116, 296) + topCornerRadius * 2
-      targetHeight = hw.height + 26
+      targetWidth = hw.width + 340 + topCornerRadius * 2
+      targetHeight = hw.height
     } else if assistantSpeaking || userSpeaking {
       topCornerRadius = 6
       bottomCornerRadius = 14
@@ -1696,7 +1701,10 @@ final class NotchHUDController {
       hwNotchWidth: hw.width,
       hwNotchHeight: hw.height,
       topCornerRadius: topCornerRadius,
-      bottomCornerRadius: bottomCornerRadius
+      bottomCornerRadius: bottomCornerRadius,
+      hasUnreadNotification: hasUnreadNotification,
+      notifStartedAt: notifStartedAt,
+      notifDuration: notifDuration
     )
 
     if !panel.isVisible {
@@ -1721,7 +1729,7 @@ final class NotchHUDController {
       panel.setFrame(targetFrame, display: true)
     }
 
-    let needsWaveTimer = !conversationExpanded && (ambientActive || assistantSpeaking || userSpeaking)
+    let needsWaveTimer = !conversationExpanded && (ambientActive || assistantSpeaking || userSpeaking || hasNotif)
     if needsWaveTimer {
       if waveTimer == nil {
         let timer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { [weak self] _ in
@@ -1757,6 +1765,9 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
   private var topCornerRadius: CGFloat = 6.0
   private var bottomCornerRadius: CGFloat = 14.0
   private var phase: CGFloat = 0.0
+  private var hasUnreadNotification = false
+  private var notifStartedAt: TimeInterval = 0
+  private var notifDuration: TimeInterval = 3.5
 
   private var conversationExpanded = false
   private var convTitle = "Conversation"
@@ -1794,29 +1805,25 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
     containerView.addSubview(titleField)
 
     statusField.font = SnippetTheme.mono(10.0, weight: .medium)
-    statusField.textColor = SnippetTheme.accent
+    statusField.textColor = SnippetTheme.fg3
     containerView.addSubview(statusField)
 
     openAppButton.isBordered = false
     openAppButton.wantsLayer = true
-    openAppButton.layer?.backgroundColor = SnippetTheme.surface1.cgColor
     openAppButton.layer?.cornerRadius = 8
-    openAppButton.layer?.borderWidth = 1
-    openAppButton.layer?.borderColor = SnippetTheme.border.cgColor
-    openAppButton.font = SnippetTheme.sans(11.5, weight: .medium)
-    openAppButton.contentTintColor = SnippetTheme.fg2
+    openAppButton.image = NSImage(systemSymbolName: "arrow.up.forward.square", accessibilityDescription: "Open in app")?.withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: 13, weight: .medium))
+    openAppButton.title = ""
+    openAppButton.contentTintColor = NSColor(srgbRed: 0.604, green: 0.604, blue: 0.635, alpha: 1)
     openAppButton.target = self
     openAppButton.action = #selector(handleOpenAppTap)
     containerView.addSubview(openAppButton)
 
     closeButton.isBordered = false
     closeButton.wantsLayer = true
-    closeButton.layer?.backgroundColor = SnippetTheme.surface1.cgColor
     closeButton.layer?.cornerRadius = 8
-    closeButton.layer?.borderWidth = 1
-    closeButton.layer?.borderColor = SnippetTheme.border.cgColor
-    closeButton.font = SnippetTheme.sans(11.5, weight: .medium)
-    closeButton.contentTintColor = SnippetTheme.fg3
+    closeButton.image = NSImage(systemSymbolName: "xmark", accessibilityDescription: "Close conversation")?.withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: 13, weight: .medium))
+    closeButton.title = ""
+    closeButton.contentTintColor = NSColor(srgbRed: 0.604, green: 0.604, blue: 0.635, alpha: 1)
     closeButton.target = self
     closeButton.action = #selector(handleCloseTap)
     containerView.addSubview(closeButton)
@@ -1829,10 +1836,8 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
     containerView.addSubview(scrollView)
 
     replyContainer.wantsLayer = true
-    replyContainer.layer?.backgroundColor = SnippetTheme.surface1.cgColor
-    replyContainer.layer?.cornerRadius = 14
-    replyContainer.layer?.borderWidth = 1
-    replyContainer.layer?.borderColor = SnippetTheme.border.cgColor
+    replyContainer.layer?.backgroundColor = NSColor(srgbRed: 0.086, green: 0.086, blue: 0.094, alpha: 1).cgColor
+    replyContainer.layer?.cornerRadius = 18
     containerView.addSubview(replyContainer)
 
     replyField.isBordered = false
@@ -1840,7 +1845,7 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
     replyField.focusRingType = .none
     replyField.font = SnippetTheme.sans(13.0, weight: .regular)
     replyField.textColor = SnippetTheme.fg1
-    replyField.placeholderString = "Message Mission Control…"
+    replyField.placeholderString = "Reply to Mission Control"
     replyField.delegate = self
     replyField.target = self
     replyField.action = #selector(handleSendTap)
@@ -1848,10 +1853,11 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
 
     sendButton.isBordered = false
     sendButton.wantsLayer = true
-    sendButton.layer?.backgroundColor = SnippetTheme.accentFill.cgColor
-    sendButton.layer?.cornerRadius = 13
-    sendButton.font = SnippetTheme.sans(13.0, weight: .medium)
-    sendButton.contentTintColor = NSColor.white
+    sendButton.image = NSImage(systemSymbolName: "arrow.up", accessibilityDescription: "Send reply")?.withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: 12, weight: .semibold))
+    sendButton.title = ""
+    sendButton.layer?.backgroundColor = NSColor(srgbRed: 0.165, green: 0.165, blue: 0.188, alpha: 1).cgColor
+    sendButton.layer?.cornerRadius = 14
+    sendButton.contentTintColor = NSColor(srgbRed: 0.816, green: 0.816, blue: 0.839, alpha: 1)
     sendButton.target = self
     sendButton.action = #selector(handleSendTap)
     replyContainer.addSubview(sendButton)
@@ -1928,8 +1934,8 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
 
     let headerH: CGFloat = 28
     let headerY = contentRect.height - headerH
-    closeButton.frame = NSRect(x: contentRect.width - 26, y: headerY + 2, width: 26, height: 24)
-    openAppButton.frame = NSRect(x: contentRect.width - 26 - 6 - 72, y: headerY + 2, width: 72, height: 24)
+    closeButton.frame = NSRect(x: contentRect.width - 28, y: headerY, width: 28, height: 28)
+    openAppButton.frame = NSRect(x: contentRect.width - 28 - 4 - 28, y: headerY, width: 28, height: 28)
 
     let statusW: CGFloat = statusField.stringValue.isEmpty ? 0 : 62
     if statusW > 0 {
@@ -1948,8 +1954,8 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
 
     let replyH: CGFloat = 36
     replyContainer.frame = NSRect(x: 0, y: 0, width: contentRect.width, height: replyH)
-    sendButton.frame = NSRect(x: contentRect.width - 31, y: 5, width: 26, height: 26)
-    replyField.frame = NSRect(x: 14, y: 7, width: max(60, contentRect.width - 52), height: 22)
+    sendButton.frame = NSRect(x: contentRect.width - 32, y: 4, width: 28, height: 28)
+    replyField.frame = NSRect(x: 14, y: 7, width: max(60, contentRect.width - 54), height: 22)
 
     let scrollY = replyH + 10
     let scrollH = max(40, headerY - 10 - scrollY)
@@ -2018,7 +2024,7 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
           y += 8
         } else {
           // Matches Bubble(mine: false) in lib/widgets.dart:
-          // Plain full-width Markdown aligned left in Geist 13.5pt (#EEEEF1), with NO left-side blue ribbon.
+          // Plain full-width Markdown aligned left in SF Pro 13.5pt (#EEEEF1), with NO left-side blue ribbon.
           let turnX: CGFloat = 4
           let turnW = width - turnX - 8
           if !msg.meta.isEmpty {
@@ -2099,7 +2105,10 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
     hwNotchWidth: CGFloat,
     hwNotchHeight: CGFloat,
     topCornerRadius: CGFloat,
-    bottomCornerRadius: CGFloat
+    bottomCornerRadius: CGFloat,
+    hasUnreadNotification: Bool,
+    notifStartedAt: TimeInterval,
+    notifDuration: TimeInterval
   ) {
     self.notifTitle = notifTitle
     self.notifSubtitle = notifSubtitle
@@ -2112,13 +2121,19 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
     self.hwNotchHeight = hwNotchHeight
     self.topCornerRadius = topCornerRadius
     self.bottomCornerRadius = bottomCornerRadius
+    self.hasUnreadNotification = hasUnreadNotification
+    self.notifStartedAt = notifStartedAt
+    self.notifDuration = notifDuration
     needsLayout = true
     needsDisplay = true
   }
 
   func stepAnimation() {
     phase += 0.08
-    guard !conversationExpanded && (ambientActive || assistantSpeaking || userSpeaking) else {
+    if notifTitle != nil && !conversationExpanded {
+      setNeedsDisplay(NSRect(x: bounds.minX, y: bounds.minY, width: bounds.width, height: 3))
+    }
+    guard !conversationExpanded && notifTitle == nil && (ambientActive || assistantSpeaking || userSpeaking) else {
       return
     }
     // Invalidate only the right-wing waveform rect instead of repainting the entire Notch
@@ -2159,26 +2174,8 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
     NSGraphicsContext.current?.saveGraphicsState()
     shapePath.addClip()
 
-    if conversationExpanded {
-      // Match Snippet's exact #101012 (AppColors.bg) for the expanded panel while
-      // keeping the top hardware camera band pitch-black so the bezel seam is invisible.
-      SnippetTheme.bg.setFill()
-      b.fill()
-      NSColor.black.setFill()
-      NSRect(x: b.minX, y: b.maxY - hwNotchHeight, width: b.width, height: hwNotchHeight).fill()
-    } else {
-      NSColor.black.setFill()
-      b.fill()
-    }
-
-    let borderStroke = Self.dynamicNotchBorderPath(
-      in: b,
-      topCornerRadius: topCornerRadius,
-      bottomCornerRadius: bottomCornerRadius
-    )
-    (conversationExpanded ? SnippetTheme.border : SnippetTheme.border2).setStroke()
-    borderStroke.lineWidth = 1.5
-    borderStroke.stroke()
+    NSColor.black.setFill()
+    b.fill()
     NSGraphicsContext.current?.restoreGraphicsState()
 
     // Always render the Mochi + 5-bar listening/speaking indicator in the top notch wings
@@ -2192,40 +2189,36 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
     )
 
     if conversationExpanded {
-      let headerMochiRect = NSRect(
-        x: topCornerRadius + 16,
-        y: b.height - hwNotchHeight - 6 - 24,
-        width: 18,
-        height: 18
-      )
-      MochiRenderer.drawMochi(
-        in: headerMochiRect,
-        bodyColor: periwinkle,
-        leafColor: matcha,
-        eyeColor: ink,
-        blushColor: blush
-      )
-
-      let sepY = b.height - hwNotchHeight - 6 - 32
-      let sep = NSBezierPath()
-      sep.move(to: NSPoint(x: topCornerRadius + 16, y: sepY))
-      sep.line(to: NSPoint(x: b.width - topCornerRadius - 16, y: sepY))
-      SnippetTheme.border.setStroke()
-      sep.lineWidth = 1.0
-      sep.stroke()
       return
     }
 
+    let topBandMidY = b.maxY - hwNotchHeight / 2
+    if hasUnreadNotification && notifTitle == nil {
+      let barsShown = ambientActive || assistantSpeaking || userSpeaking
+      let dot: NSRect
+      if barsShown {
+        let cameraLeft = b.midX - hwNotchWidth / 2
+        let leftWingX = b.minX + topCornerRadius
+        let mochiX = leftWingX + (max(24, cameraLeft - leftWingX) - 18) / 2
+        dot = NSRect(x: mochiX + 14, y: topBandMidY + 4, width: 6, height: 6)
+      } else {
+        let cameraRight = b.midX + hwNotchWidth / 2
+        let wingWidth = max(24, b.maxX - topCornerRadius - cameraRight)
+        dot = NSRect(x: cameraRight + (wingWidth - 7) / 2, y: topBandMidY - 3.5, width: 7, height: 7)
+      }
+      SnippetTheme.accent.setFill()
+      NSBezierPath(ovalIn: dot).fill()
+    }
     if let title = notifTitle {
-      drawNotification(
-        in: b,
-        title: title,
-        subtitle: notifSubtitle ?? "",
-        periwinkle: periwinkle,
-        matcha: matcha,
-        ink: ink,
-        blush: blush
-      )
+      drawNotificationWings(in: b, title: title)
+      let progress = CGFloat(max(0, min(1, 1 - (CACurrentMediaTime() - notifStartedAt) / notifDuration)))
+      let inset = topCornerRadius + bottomCornerRadius
+      let width = max(0, b.width - 2 * inset)
+      NSGraphicsContext.current?.saveGraphicsState()
+      shapePath.addClip()
+      NSColor.white.withAlphaComponent(0.28).setFill()
+      NSBezierPath(rect: NSRect(x: b.minX + inset, y: b.minY, width: width * progress, height: 1.5)).fill()
+      NSGraphicsContext.current?.restoreGraphicsState()
     }
   }
 
@@ -2257,16 +2250,18 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
       width: mochiSize,
       height: mochiSize
     )
-    MochiRenderer.drawMochi(
-      in: mochiRect,
-      bodyColor: userSpeaking ? matcha : periwinkle,
-      leafColor: matcha,
-      eyeColor: ink,
-      blushColor: blush
-    )
+    if notifTitle == nil || conversationExpanded {
+      MochiRenderer.drawMochi(
+        in: mochiRect,
+        bodyColor: userSpeaking ? matcha : periwinkle,
+        leafColor: matcha,
+        eyeColor: ink,
+        blushColor: blush
+      )
+    }
 
     // Right Wing: 5-bar listening/speaking equalizer ONLY when listening/speaking is actually active
-    if ambientActive || assistantSpeaking || userSpeaking {
+    if notifTitle == nil && (ambientActive || assistantSpeaking || userSpeaking) {
       let rightWingX = cameraRight
       let rightWingW = max(24, (b.maxX - topCornerRadius) - rightWingX)
       let barCount = 5
@@ -2293,63 +2288,43 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
     }
   }
 
-  /// Uses the top notch wing space for the Mochi + notification title and the right wing
-  /// for the 5-bar listening indicator, while rendering the message preview + Reply pill
-  /// in a tight 1-line row directly below.
-  private func drawNotification(
-    in b: NSRect,
-    title: String,
-    subtitle: String,
-    periwinkle: NSColor,
-    matcha: NSColor,
-    ink: NSColor,
-    blush: NSColor
-  ) {
-    let topBandMinY = b.maxY - hwNotchHeight
-    let rowRect = NSRect(
-      x: b.minX + topCornerRadius + 10,
-      y: 4,
-      width: b.width - (topCornerRadius + 10) * 2,
-      height: max(18, topBandMinY - 4)
+  private func drawNotificationWings(in b: NSRect, title: String) {
+    let cameraLeft = b.midX - hwNotchWidth / 2
+    let cameraRight = b.midX + hwNotchWidth / 2
+    let leftStart = b.minX + topCornerRadius + 12
+    let leftEnd = cameraLeft - 8
+    let midY = b.maxY - hwNotchHeight / 2
+    let mochiSize: CGFloat = 18
+    let mochiX = leftStart + max(0, (leftEnd - leftStart - 25 - 18) / 2)
+    MochiRenderer.drawMochi(
+      in: NSRect(x: mochiX, y: midY - mochiSize / 2, width: mochiSize, height: mochiSize),
+      bodyColor: NSColor(srgbRed: 0.73, green: 0.78, blue: 1, alpha: 1),
+      leafColor: NSColor(srgbRed: 0.50, green: 0.82, blue: 0.65, alpha: 1),
+      eyeColor: NSColor(srgbRed: 0.08, green: 0.09, blue: 0.11, alpha: 1),
+      blushColor: NSColor(srgbRed: 0.95, green: 0.65, blue: 0.63, alpha: 0.85)
     )
-
-    let pillW: CGFloat = 40
-    let pillH: CGFloat = 17
-    let pillRect = NSRect(
-      x: rowRect.maxX - pillW,
-      y: rowRect.midY - pillH / 2,
-      width: pillW,
-      height: pillH
-    )
-    SnippetTheme.accentFill.setFill()
-    NSBezierPath(roundedRect: pillRect, xRadius: 5, yRadius: 5).fill()
-
-    let pillStyle = NSMutableParagraphStyle()
-    pillStyle.alignment = .center
-    let pillAttrs: [NSAttributedString.Key: Any] = [
-      .font: SnippetTheme.sans(10.0, weight: .medium),
-      .foregroundColor: NSColor.white,
-      .paragraphStyle: pillStyle,
-    ]
-    ("Reply" as NSString).draw(
-      in: NSRect(x: pillRect.minX, y: pillRect.minY + 1.5, width: pillW, height: 14),
-      withAttributes: pillAttrs
-    )
-
-    let cleanSub = NotchMarkdown.plainPreview(subtitle)
-    let previewText = cleanSub.isEmpty ? title : cleanSub
-    let textW = max(36, pillRect.minX - rowRect.minX - 8)
-    let pStyle = NSMutableParagraphStyle()
-    pStyle.lineBreakMode = .byTruncatingTail
-    let subAttrs: [NSAttributedString.Key: Any] = [
-      .font: SnippetTheme.sans(11.0, weight: .regular),
+    let titleStyle = NSMutableParagraphStyle()
+    titleStyle.lineBreakMode = .byTruncatingTail
+    let titleAttrs: [NSAttributedString.Key: Any] = [
+      .font: SnippetTheme.sans(12, weight: .regular),
       .foregroundColor: SnippetTheme.fg2,
-      .paragraphStyle: pStyle,
+      .paragraphStyle: titleStyle,
     ]
-    (previewText as NSString).draw(
-      in: NSRect(x: rowRect.minX, y: rowRect.midY - 7, width: textW, height: 14),
-      withAttributes: subAttrs
-    )
+    (title as NSString).draw(in: NSRect(x: mochiX + 23, y: midY - 7, width: max(0, leftEnd - mochiX - 23), height: 15), withAttributes: titleAttrs)
+
+    let rightStart = cameraRight + 8
+    let rightEnd = b.maxX - topCornerRadius - 12
+    let rawPreview = NotchMarkdown.plainPreview(notifSubtitle ?? "")
+    let preview = rawPreview.isEmpty ? title : rawPreview
+    let previewStyle = NSMutableParagraphStyle()
+    previewStyle.alignment = .right
+    previewStyle.lineBreakMode = .byTruncatingTail
+    let previewAttrs: [NSAttributedString.Key: Any] = [
+      .font: SnippetTheme.sans(12, weight: .regular),
+      .foregroundColor: SnippetTheme.fg1,
+      .paragraphStyle: previewStyle,
+    ]
+    (preview as NSString).draw(in: NSRect(x: rightStart, y: midY - 7, width: max(0, rightEnd - rightStart), height: 15), withAttributes: previewAttrs)
   }
 
   /// Exact `DynamicNotchKit` / `boring.notch` silhouette in AppKit coordinates
@@ -2386,33 +2361,4 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
     return path
   }
 
-  /// Open border path covering only the side walls and bottom curve (never the top bezel).
-  private static func dynamicNotchBorderPath(
-    in rect: NSRect,
-    topCornerRadius topR: CGFloat,
-    bottomCornerRadius botR: CGFloat
-  ) -> NSBezierPath {
-    let path = NSBezierPath()
-    path.move(to: NSPoint(x: rect.minX, y: rect.maxY))
-    path.addQuadCurve(
-      to: NSPoint(x: rect.minX + topR, y: rect.maxY - topR),
-      control: NSPoint(x: rect.minX + topR, y: rect.maxY)
-    )
-    path.line(to: NSPoint(x: rect.minX + topR, y: rect.minY + botR))
-    path.addQuadCurve(
-      to: NSPoint(x: rect.minX + topR + botR, y: rect.minY),
-      control: NSPoint(x: rect.minX + topR, y: rect.minY)
-    )
-    path.line(to: NSPoint(x: rect.maxX - topR - botR, y: rect.minY))
-    path.addQuadCurve(
-      to: NSPoint(x: rect.maxX - topR, y: rect.minY + botR),
-      control: NSPoint(x: rect.maxX - topR, y: rect.minY)
-    )
-    path.line(to: NSPoint(x: rect.maxX - topR, y: rect.maxY - topR))
-    path.addQuadCurve(
-      to: NSPoint(x: rect.maxX, y: rect.maxY),
-      control: NSPoint(x: rect.maxX - topR, y: rect.maxY)
-    )
-    return path
-  }
 }

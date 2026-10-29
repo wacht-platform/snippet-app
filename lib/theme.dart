@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:hugeicons/hugeicons.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -504,14 +506,9 @@ FontWeight weightFor(FontWeight w) =>
         ? FontWeight.w500
         : FontWeight.w400;
 
-/// Optical tracking. The reference sits slightly tight at every size
-/// (-0.05px at 12–13px, -0.3px at 20px).
-double _tracking(double size) {
-  if (size >= 32) return -0.5;
-  if (size >= 24) return -0.3;
-  if (size >= 17) return -0.15;
-  return 0;
-}
+/// Inter's published dynamic metrics (rsms.me/inter/dynmetrics).
+double _tracking(double size) =>
+    size * (-0.0223 + 0.185 * math.exp(-0.1745 * size));
 
 TextStyle sans(double size,
         {FontWeight weight = W.body,
@@ -527,7 +524,7 @@ TextStyle sans(double size,
       letterSpacing: spacing ?? _tracking(size),
       color: color ?? AppColors.fg2,
       // Proportional digits have different widths, so a ticking timer or a
-      // counter shimmers and reflows as it updates. Instrument Sans ships `tnum`
+      // counter shimmers and reflows as it updates. Inter ships `tnum`
       // (verified in the font's GSUB table), so this is a real substitution.
       fontFeatures: tabular ? const [FontFeature.tabularFigures()] : null,
     );
@@ -565,16 +562,15 @@ TextStyle mono(double size,
 /// The ONE uppercase label style: small, 500, with POSITIVE tracking.
 ///
 /// Small capitals need a little positive letter-spacing or the letters crowd
-/// together. `_tracking()` returns a NEGATIVE value at every size (it is built
-/// for sentence-case UI text), so any uppercase label that did not pass its own
-/// `spacing:` was tracked the wrong way — the opposite of what it needs.
+/// together. `_tracking()` is built for sentence-case UI text and runs tight
+/// from 13px up, so uppercase labels pass their own `spacing:`.
 /// Five call sites had drifted into three different treatments (no spacing,
 /// `0.4`, `0.5`) with three different inks; this is the single replacement.
 TextStyle caps(double size,
         {Color? color, double spacing = 0.5, FontWeight weight = W.label}) =>
     sans(size, weight: weight, color: color, spacing: spacing);
 
-String get kSansFamily => 'Geist';
+String get kSansFamily => 'Inter';
 const kSerifFamily = 'Literata';
 
 /// The agent's own writing on a phone: a screen serif at a reading size, so a
