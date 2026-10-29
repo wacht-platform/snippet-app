@@ -146,7 +146,7 @@ void main() {
     await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 100)));
     await tester.pump();
     expect(delivered, hasLength(1));
-    await tester.tap(find.byTooltip('Dismiss'));
+    await tester.drag(find.byType(Dismissible), const Offset(-500, 0));
     await tester.pump(const Duration(milliseconds: 400));
     visibleNotificationSession.value = notificationSessionKey(url, 'transport-chat');
     for (final socket in eventSockets) {

@@ -101,18 +101,9 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Dismiss me'), findsOneWidget);
     expect(tester.takeException(), isNull);
-    final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
-    await mouse.addPointer(location: Offset.zero);
-    await mouse.moveTo(tester.getCenter(find.byTooltip('Dismiss')));
-    await tester.pump(const Duration(milliseconds: 800));
-    await tester.pump(const Duration(milliseconds: 200));
-    expect(find.text('Dismiss'), findsOneWidget);
-    expect(tester.takeException(), isNull);
-    await mouse.moveTo(Offset.zero);
-    await tester.tap(find.byTooltip('Dismiss'));
+    await tester.drag(find.byType(Dismissible), const Offset(-500, 0));
     await tester.pumpAndSettle();
     expect(find.text('Dismiss me'), findsNothing);
-    await mouse.removePointer();
     revision.value = 1;
     await tester.pumpAndSettle();
     expect(find.text('Home 1'), findsOneWidget);
@@ -261,9 +252,7 @@ void main() {
         expect(rect.left, greaterThanOrEqualTo(32));
         expect(rect.height, lessThanOrEqualTo(mobile ? 64 : 60));
         expect(find.text('Tap to open'), findsNothing);
-        final dismiss = tester.getSize(find.byType(IconButton));
-        expect(dismiss.width, greaterThanOrEqualTo(mobile ? 44 : 24));
-        expect(dismiss.height, greaterThanOrEqualTo(mobile ? 36 : 24));
+        expect(find.byTooltip('Dismiss'), findsNothing);
         expect(tester.takeException(), isNull);
         await tester.pumpWidget(const SizedBox());
         debugDefaultTargetPlatformOverride = null;
@@ -291,8 +280,7 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(find.text('failed'), findsOneWidget);
     expect(find.textContaining('Brief context'), findsOneWidget);
-    expect(find.byTooltip('Dismiss'), findsOneWidget);
-    await tester.tap(find.byTooltip('Dismiss'));
+    await tester.drag(find.byType(Dismissible), const Offset(-500, 0));
     await tester.pumpAndSettle();
     expect(find.text('Tap to open'), findsNothing);
   });
@@ -315,13 +303,13 @@ void main() {
     expect(opened, [same(first)]);
     expect(haptics, ['HapticFeedbackType.lightImpact']);
     expect(find.text('Second'), findsOneWidget);
-    await tester.tap(find.byTooltip('Dismiss'));
+    await tester.drag(find.byType(Dismissible), const Offset(-500, 0));
     await tester.pumpAndSettle();
     expect(opened, hasLength(1));
     expect(find.text('Third'), findsOneWidget);
     await tester.tap(find.text('Third'));
     await tester.pumpAndSettle();
     expect(opened.last['title'], 'Third');
-    expect(find.byTooltip('Dismiss'), findsNothing);
+    expect(find.byType(Dismissible), findsNothing);
   });
 }

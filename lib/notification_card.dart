@@ -235,17 +235,7 @@ class _NotificationMessageCardState extends State<NotificationMessageCard> {
         const SizedBox(width: S.s8),
         Text(ago, style: mono(11, color: AppColors.fg4)),
       ],
-      SizedBox.square(
-        dimension: kMobile ? 44 : 28,
-        child: IconButton(
-          tooltip: 'Dismiss',
-          padding: EdgeInsets.zero,
-          style: const ButtonStyle(
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap),
-          icon: AppIcon('x', size: kMobile ? 14 : 12, color: AppColors.fg4),
-          onPressed: widget.onDismiss,
-        ),
-      ),
+      SizedBox(width: kMobile ? 18 : 14),
     ]);
 
     final choices = _choices;

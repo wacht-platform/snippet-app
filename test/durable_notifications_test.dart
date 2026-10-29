@@ -129,8 +129,8 @@ void main() {
     visibleNotificationSession.value = notificationSessionKey('a', 'worker');
     await tester.pump();
     await tester.pump();
-    await tester.tap(find.byTooltip('Dismiss'));
-    await tester.pump();
+    await tester.drag(find.byType(Dismissible), const Offset(-500, 0));
+    await tester.pumpAndSettle();
     expect(find.text('Queued'), findsNothing);
     expect(find.text('Other instance'), findsOneWidget);
   });
@@ -335,7 +335,7 @@ void main() {
     await tester.pumpWidget(
         const MaterialApp(home: NotificationPopovers(child: Scaffold())));
     expect(find.text('Queued at startup'), findsOneWidget);
-    await tester.tap(find.byTooltip('Dismiss'));
+    await tester.drag(find.byType(Dismissible), const Offset(-500, 0));
     await tester.pumpAndSettle();
     expect(find.text('Queued at startup'), findsNothing);
   });
