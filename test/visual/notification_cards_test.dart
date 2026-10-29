@@ -29,6 +29,7 @@ const _choice = {
   'attention': {
     'type': 'question',
     'id': '7:z',
+    'text': 'How does the new card look on your phone?',
     'choices': [
       {'label': 'Looks good', 'value': 'good'},
       {'label': 'Needs tweaks', 'value': 'tweak'},
@@ -132,7 +133,8 @@ void main() {
     await tester.pumpWidget(frame(card(_choice, sent: sent, open: true)));
     await tester.tap(find.text('Needs tweaks'));
     await tester.pump();
-    expect((sent.single as QuickAnswer).text, 'Needs tweaks (tweak)');
+    expect((sent.single as QuickAnswer).text,
+        'How does the new card look on your phone?\n→ Needs tweaks (tweak)');
   });
 
   testWidgets('mobile pill grows to full width on tap without overflow',

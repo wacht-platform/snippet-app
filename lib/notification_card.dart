@@ -131,7 +131,13 @@ class _NotificationMessageCardState extends State<NotificationMessageCard> {
   void _submitText(CardAction action) {
     final t = _text.text.trim();
     if (t.isEmpty) return;
-    _send(action == CardAction.answer ? QuickAnswer(t) : QuickReply(t));
+    _send(action == CardAction.answer ? _answer(t) : QuickReply(t));
+  }
+
+  QuickAnswer _answer(String text) {
+    final a = widget.payload['attention'];
+    final q = a is Map ? '${a['text'] ?? ''}'.trim() : '';
+    return QuickAnswer(q.isEmpty || _moreQuestions > 0 ? text : '$q\n→ $text');
   }
 
   String get _moreLabel {
@@ -264,8 +270,8 @@ class _NotificationMessageCardState extends State<NotificationMessageCard> {
                   small: true,
                   variant: i == 0 ? BtnVariant.primary : BtnVariant.secondary,
                   disabled: busy,
-                  onTap: () => _send(QuickAnswer(
-                      label == value ? label : '$label ($value)'))),
+                  onTap: () => _send(
+                      _answer(label == value ? label : '$label ($value)'))),
           ]),
       CardAction.answer || CardAction.reply => _ReplyField(
           controller: _text,
