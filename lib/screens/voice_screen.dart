@@ -49,7 +49,8 @@ class _VoiceScreenState extends State<VoiceScreen> {
     _sampleRecorder = rec;
     try {
       if (!await rec.hasPermission()) {
-        if (mounted) toast(context, 'Microphone permission denied', danger: true);
+        if (mounted)
+          toast(context, 'Microphone permission denied', danger: true);
         await rec.dispose();
         _sampleRecorder = null;
         return;
@@ -242,7 +243,8 @@ class _VoiceScreenState extends State<VoiceScreen> {
           label: label,
           onTap: _busy ? null : onTap,
           trailing: Text(keySet ? 'Set' : 'Not set',
-              style: sans(15, color: keySet ? AppColors.fg3 : AppColors.danger)),
+              style:
+                  sans(15, color: keySet ? AppColors.fg3 : AppColors.danger)),
           chevron: true,
         )
       : SettingsRow(
@@ -371,9 +373,17 @@ class _VoiceScreenState extends State<VoiceScreen> {
       ),
       SettingsGroup(
         header: 'Voiceprint recognition',
-        footer:
-            'Record 2–4 short samples of your voice so Snippet scores your voice in parallel during live transcription and passes the match likelihood to the agent.',
+        footer: a.voiceprintAdaptive > 0
+            ? 'Record 2–4 short samples so Snippet can tell your voice from others. It also learns from your clear lines; ${a.voiceprintAdaptive} learned on this device so far.'
+            : 'Record 2–4 short samples so Snippet can tell your voice from others. It also learns from your clear lines as you talk.',
         children: [
+          if (a.voiceprintReenrol)
+            SettingsRow(
+              label: 'Voice recognition was upgraded',
+              sub:
+                  'Your old samples no longer count. Record 3 new ones so Snippet recognises you again.',
+              trailing: const Tag('Re-record', tone: Tone.run),
+            ),
           SettingsRow(
             label: _recordingSample
                 ? 'Listening for 3 seconds — speak naturally…'
@@ -401,7 +411,7 @@ class _VoiceScreenState extends State<VoiceScreen> {
           ),
           for (final vp in a.voiceprints)
             SettingsRow(
-              label: vp.label,
+              label: vp.current ? vp.label : '${vp.label} · old model',
               trailing: Btn(
                 'Remove',
                 small: true,

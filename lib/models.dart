@@ -108,7 +108,9 @@ class ServerConfig {
         hostname = j['hostname'] as String? ?? '',
         routing = {
           for (final e in ((j['routing'] as Map?) ?? const {}).entries)
-            e.key as String: [for (final p in (e.value as List? ?? const [])) p as String],
+            e.key as String: [
+              for (final p in (e.value as List? ?? const [])) p as String
+            ],
         },
         limited = {
           for (final e in ((j['limited'] as Map?) ?? const {}).entries)
@@ -877,7 +879,8 @@ String limitWindowLabel(RateWindow r) {
     if (i < 0) i = buckets.length - 1;
   }
   if (r.resetsAt > 0) {
-    final left = (r.resetsAt - DateTime.now().millisecondsSinceEpoch ~/ 1000) / 60;
+    final left =
+        (r.resetsAt - DateTime.now().millisecondsSinceEpoch ~/ 1000) / 60;
     while (i < buckets.length - 1 && left > buckets[i].$1 * 1.05) {
       i++;
     }
@@ -1610,8 +1613,9 @@ class AmbientEvent {
   AmbientEvent.fromJson(Map<String, dynamic> j)
       : id = j['id'] as String? ?? '',
         device = j['device'] as String? ?? '',
-        startedAt = DateTime.tryParse(j['started_at'] as String? ?? '')?.toLocal() ??
-            DateTime.fromMillisecondsSinceEpoch(0),
+        startedAt =
+            DateTime.tryParse(j['started_at'] as String? ?? '')?.toLocal() ??
+                DateTime.fromMillisecondsSinceEpoch(0),
         durationMs = (j['duration_ms'] as num?)?.toInt() ?? 0,
         status = j['status'] as String? ?? '',
         text = j['text'] as String? ?? '',
@@ -1664,10 +1668,12 @@ class VoiceprintInfo {
   final String id;
   final String label;
   final DateTime createdAt;
+  final bool current;
 
   VoiceprintInfo.fromJson(Map<String, dynamic> j)
       : id = j['id'] as String? ?? '',
         label = j['label'] as String? ?? 'Voice sample',
+        current = j['current'] != false,
         createdAt = DateTime.fromMillisecondsSinceEpoch(
             ((j['created_at'] as num?)?.toInt() ?? 0) * 1000);
 }
@@ -1695,6 +1701,8 @@ class AmbientSettings {
   final List<TtsVoice> ttsVoices;
   final String stt;
   final List<VoiceprintInfo> voiceprints;
+  final bool voiceprintReenrol;
+  final int voiceprintAdaptive;
 
   const AmbientSettings(
       {this.enabled = false,
@@ -1718,7 +1726,9 @@ class AmbientSettings {
       this.ttsSpeed = 115,
       this.ttsVoices = const [],
       this.stt = 'assemblyai',
-      this.voiceprints = const []});
+      this.voiceprints = const [],
+      this.voiceprintReenrol = false,
+      this.voiceprintAdaptive = 0});
 
   String get shownMode =>
       (enabled && effectiveMode.isNotEmpty) ? effectiveMode : mode;
@@ -1745,7 +1755,9 @@ class AmbientSettings {
       ttsSpeed: ttsSpeed,
       ttsVoices: ttsVoices,
       stt: stt,
-      voiceprints: voiceprints);
+      voiceprints: voiceprints,
+      voiceprintReenrol: voiceprintReenrol,
+      voiceprintAdaptive: voiceprintAdaptive);
 
   AmbientSettings.fromJson(Map<String, dynamic> j)
       : enabled = j['enabled'] == true,
@@ -1756,10 +1768,15 @@ class AmbientSettings {
         conversationOpen = j['conversation'] != null,
         effectiveMode = j['effective_mode'] as String? ?? '',
         watcherChatContext = j['watcher_chat_context'] == true,
-        watcher = (j['watcher'] as String? ?? 'classifier') == 'jev' ? 'classifier' : (j['watcher'] as String? ?? 'classifier'),
+        watcher = (j['watcher'] as String? ?? 'classifier') == 'jev'
+            ? 'classifier'
+            : (j['watcher'] as String? ?? 'classifier'),
         watcherKeySet = j['watcher_key_set'] == true,
-        conversationTimeoutSecs = (j['conversation_timeout_secs'] as num?)?.toInt() ?? 90,
-        wakePhrases = [for (final p in (j['wake_phrases'] as List? ?? const [])) p as String],
+        conversationTimeoutSecs =
+            (j['conversation_timeout_secs'] as num?)?.toInt() ?? 90,
+        wakePhrases = [
+          for (final p in (j['wake_phrases'] as List? ?? const [])) p as String
+        ],
         assemblyaiKeySet = j['assemblyai_key_set'] == true,
         deepgramKeySet = j['deepgram_key_set'] == true,
         deepgramHost = j['deepgram_host'] as String? ?? 'api.deepgram.com',
@@ -1770,6 +1787,8 @@ class AmbientSettings {
         ttsVoice = j['tts_voice'] as String? ?? '',
         ttsSpeed = (j['tts_speed'] as num?)?.toInt() ?? 115,
         stt = j['stt'] as String? ?? 'assemblyai',
+        voiceprintReenrol = j['voiceprint_reenrol'] == true,
+        voiceprintAdaptive = (j['voiceprint_adaptive'] as num?)?.toInt() ?? 0,
         ttsVoices = [
           for (final v in (j['tts_voices'] as List? ?? const []))
             TtsVoice.fromJson((v as Map).cast<String, dynamic>())
