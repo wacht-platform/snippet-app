@@ -1769,9 +1769,9 @@ final class NotchHUDController {
       targetHeight = hw.height + 380
     } else if hasNotif {
       topCornerRadius = 6
-      bottomCornerRadius = 14
-      targetWidth = hw.width + 220 + topCornerRadius * 2
-      targetHeight = hw.height
+      bottomCornerRadius = 18
+      targetWidth = hw.width + 120 + topCornerRadius * 2
+      targetHeight = hw.height + 62
     } else if assistantSpeaking || userSpeaking {
       topCornerRadius = 6
       bottomCornerRadius = 14
@@ -2445,7 +2445,7 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
       NSBezierPath(ovalIn: dot).fill()
     }
     if let title = notifTitle {
-      drawNotificationWings(in: b, title: title)
+      drawNotificationDrop(in: b, title: title)
       let progress = CGFloat(max(0, min(1, 1 - (CACurrentMediaTime() - notifStartedAt) / notifDuration)))
       let inset = topCornerRadius + bottomCornerRadius
       let width = max(0, b.width - 2 * inset)
@@ -2476,16 +2476,14 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
     let leftWingX = b.minX + topCornerRadius
     let leftWingW = max(24, cameraLeft - leftWingX)
     let mochiSize: CGFloat = 18
-    let mochiX = (notifTitle != nil && !conversationExpanded)
-      ? (leftWingX + 12)
-      : (leftWingX + (leftWingW - mochiSize) / 2)
+    let mochiX = leftWingX + (leftWingW - mochiSize) / 2
     let mochiRect = NSRect(
       x: mochiX,
       y: topBandMidY - mochiSize / 2,
       width: mochiSize,
       height: mochiSize
     )
-    if notifTitle == nil || conversationExpanded {
+    do {
       MochiRenderer.drawMochi(
         in: mochiRect,
         bodyColor: userSpeaking ? matcha : periwinkle,
@@ -2523,43 +2521,37 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
     }
   }
 
-  private func drawNotificationWings(in b: NSRect, title: String) {
-    let cameraLeft = b.midX - hwNotchWidth / 2
-    let cameraRight = b.midX + hwNotchWidth / 2
-    let leftStart = b.minX + topCornerRadius + 12
-    let leftEnd = cameraLeft - 8
-    let midY = b.maxY - hwNotchHeight / 2
-    let mochiSize: CGFloat = 18
-    let mochiX = leftStart + max(0, (leftEnd - leftStart - 25 - 18) / 2)
-    MochiRenderer.drawMochi(
-      in: NSRect(x: mochiX, y: midY - mochiSize / 2, width: mochiSize, height: mochiSize),
-      bodyColor: NSColor(srgbRed: 0.73, green: 0.78, blue: 1, alpha: 1),
-      leafColor: NSColor(srgbRed: 0.50, green: 0.82, blue: 0.65, alpha: 1),
-      eyeColor: NSColor(srgbRed: 0.08, green: 0.09, blue: 0.11, alpha: 1),
-      blushColor: NSColor(srgbRed: 0.95, green: 0.65, blue: 0.63, alpha: 0.85)
-    )
-    let titleStyle = NSMutableParagraphStyle()
-    titleStyle.lineBreakMode = .byTruncatingTail
-    let titleAttrs: [NSAttributedString.Key: Any] = [
-      .font: SnippetTheme.sans(12, weight: .regular),
-      .foregroundColor: SnippetTheme.fg2,
-      .paragraphStyle: titleStyle,
-    ]
-    (title as NSString).draw(in: NSRect(x: mochiX + 23, y: midY - 7, width: max(0, leftEnd - mochiX - 23), height: 15), withAttributes: titleAttrs)
+  private func drawNotificationDrop(in b: NSRect, title: String) {
+    let left = b.minX + topCornerRadius + 16
+    let width = max(0, b.maxX - topCornerRadius - 16 - left)
+    let top = b.maxY - hwNotchHeight - 6
 
-    let rightStart = cameraRight + 8
-    let rightEnd = b.maxX - topCornerRadius - 12
+    let channelStyle = NSMutableParagraphStyle()
+    channelStyle.lineBreakMode = .byTruncatingTail
+    let channelAttrs: [NSAttributedString.Key: Any] = [
+      .font: SnippetTheme.sans(11.5, weight: .medium),
+      .foregroundColor: SnippetTheme.fg3,
+      .paragraphStyle: channelStyle,
+    ]
+    (title as NSString).draw(
+      in: NSRect(x: left, y: top - 15, width: width, height: 15),
+      withAttributes: channelAttrs)
+
     let rawPreview = NotchMarkdown.plainPreview(notifSubtitle ?? "")
     let preview = rawPreview.isEmpty ? title : rawPreview
-    let previewStyle = NSMutableParagraphStyle()
-    previewStyle.alignment = .right
-    previewStyle.lineBreakMode = .byTruncatingTail
-    let previewAttrs: [NSAttributedString.Key: Any] = [
-      .font: SnippetTheme.sans(12, weight: .regular),
+    let messageStyle = NSMutableParagraphStyle()
+    messageStyle.lineBreakMode = .byWordWrapping
+    let messageAttrs: [NSAttributedString.Key: Any] = [
+      .font: SnippetTheme.sans(12.5, weight: .regular),
       .foregroundColor: SnippetTheme.fg1,
-      .paragraphStyle: previewStyle,
+      .paragraphStyle: messageStyle,
     ]
-    (preview as NSString).draw(in: NSRect(x: rightStart, y: midY - 7, width: max(0, rightEnd - rightStart), height: 15), withAttributes: previewAttrs)
+    let messageTop = top - 17
+    let messageRect = NSRect(x: left, y: b.minY + 6, width: width, height: max(0, messageTop - b.minY - 6))
+    (preview as NSString).draw(
+      with: messageRect,
+      options: [.usesLineFragmentOrigin, .truncatesLastVisibleLine],
+      attributes: messageAttrs)
   }
 
   /// Exact `DynamicNotchKit` / `boring.notch` silhouette in AppKit coordinates
