@@ -204,7 +204,7 @@ void main() {
       child: NotificationPopovers(child: Scaffold()),
     )));
     expect(
-        tester.widget<AnimatedSwitcher>(find.byType(AnimatedSwitcher)).duration,
+        tester.widget<AnimatedSwitcher>(find.byType(AnimatedSwitcher).first).duration,
         Duration.zero);
     final gesture = await tester.startGesture(
         tester.getTopLeft(find.byType(Dismissible)) + const Offset(1, 1));

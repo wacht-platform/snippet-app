@@ -135,6 +135,26 @@ void main() {
     expect((sent.single as QuickAnswer).text, 'Needs tweaks (tweak)');
   });
 
+  testWidgets('mobile pill grows to full width on tap without overflow',
+      (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    try {
+      await tester.pumpWidget(frame(card(_choice)));
+      final narrow = tester.getSize(find.byType(AnimatedContainer)).width;
+      await tester.tap(find.text('Notification card'));
+      for (var i = 0; i < 12; i++) {
+        await tester.pump(const Duration(milliseconds: 30));
+        expect(tester.takeException(), isNull);
+      }
+      await tester.pumpAndSettle();
+      final wide = tester.getSize(find.byType(AnimatedContainer)).width;
+      expect(narrow, lessThan(wide));
+      expect(find.text('Looks good'), findsOneWidget);
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
+
   testWidgets('groups the rest by chat', (tester) async {
     await tester.pumpWidget(frame(card(_done, rest: [
       {..._approval, 'url': 'u'},

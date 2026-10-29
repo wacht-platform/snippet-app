@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -329,48 +331,78 @@ class _NotificationMessageCardState extends State<NotificationMessageCard> {
       ),
     );
 
-    return Material(
-      color: AppColors.surface2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-        side: BorderSide(color: AppColors.lineStrong),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: _toggle,
-        onLongPress: widget.rest.isEmpty ? null : widget.onClearAll,
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(14, kMobile ? 6 : 8, 4, kMobile ? 6 : 8),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              head,
-              AnimatedSize(
-                duration: MediaQuery.maybeDisableAnimationsOf(context) == true
-                    ? Duration.zero
-                    : const Duration(milliseconds: 160),
-                curve: Curves.easeOutCubic,
-                alignment: Alignment.topLeft,
-                child: _open ? expanded : const SizedBox(width: double.infinity),
-              ),
-              if (widget.rest.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(left: 18, top: S.s4),
-                  child: Wrap(
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      spacing: S.s8,
-                      children: [
-                        Text(_moreLabel,
-                            style: mono(11.5, color: AppColors.fg4)),
-                        if (!kMobile) textLink('Clear all', widget.onClearAll),
-                      ]),
+    final motion = MediaQuery.maybeDisableAnimationsOf(context) == true
+        ? Duration.zero
+        : const Duration(milliseconds: 280);
+    final radius = kMobile ? (_open ? 24.0 : 28.0) : (_open ? 12.0 : 10.0);
+
+    return LayoutBuilder(builder: (context, box) {
+      final full = box.maxWidth;
+      final width = kMobile && !_open ? math.min(full, 300.0) : full;
+      return Align(
+        alignment: kMobile ? Alignment.topCenter : Alignment.topRight,
+        heightFactor: 1,
+        child: AnimatedContainer(
+          duration: motion,
+          curve: Curves.easeOutCubic,
+          width: width,
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(
+            color: AppColors.surface2,
+            border: Border.all(color: AppColors.lineStrong),
+            borderRadius: BorderRadius.circular(radius),
+          ),
+          child: Material(
+            type: MaterialType.transparency,
+            child: InkWell(
+              onTap: _toggle,
+              onLongPress: widget.rest.isEmpty ? null : widget.onClearAll,
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(
+                    kMobile ? 16 : 14, kMobile ? 6 : 8, 4, kMobile ? 6 : 8),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    head,
+                    AnimatedSize(
+                      duration: motion,
+                      curve: Curves.easeOutCubic,
+                      alignment: Alignment.topLeft,
+                      child: AnimatedSwitcher(
+                        duration: motion,
+                        switchInCurve: const Interval(.35, 1,
+                            curve: Curves.easeOut),
+                        switchOutCurve: Curves.easeIn,
+                        child: _open
+                            ? KeyedSubtree(
+                                key: const ValueKey('open'), child: expanded)
+                            : const SizedBox(
+                                key: ValueKey('closed'),
+                                width: double.infinity),
+                      ),
+                    ),
+                    if (widget.rest.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(left: 18, top: S.s4),
+                        child: Wrap(
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            spacing: S.s8,
+                            children: [
+                              Text(_moreLabel,
+                                  style: mono(11.5, color: AppColors.fg4)),
+                              if (!kMobile)
+                                textLink('Clear all', widget.onClearAll),
+                            ]),
+                      ),
+                  ],
                 ),
-            ],
+              ),
+            ),
           ),
         ),
-      ),
-    );
+      );
+    });
   }
 }
 
