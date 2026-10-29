@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import 'mochi.dart';
 import 'notification_sync.dart' show notificationSessionKey;
 import 'platform.dart';
 import 'session_quick_send.dart';
@@ -154,7 +153,7 @@ class _NotificationMessageCardState extends State<NotificationMessageCard> {
   }
 }
 
-(String, Color, MochiEyes) _mood(Map<String, dynamic> p, CardAction a) =>
+(String, Color) _mood(Map<String, dynamic> p, CardAction a) =>
     switch ('${p['kind'] ?? ''}'.split('.').last) {
       'waiting' => (
           switch (a) {
@@ -163,12 +162,11 @@ class _NotificationMessageCardState extends State<NotificationMessageCard> {
             _ => 'needs you',
           },
           AppColors.run,
-          MochiEyes.dot
         ),
-      'done' || 'completed' => ('done', AppColors.ok, MochiEyes.happy),
-      'error' || 'failed' => ('failed', AppColors.danger, MochiEyes.flat),
-      'idle' => ('stopped', AppColors.fg3, MochiEyes.flat),
-      _ => ('', AppColors.fg3, MochiEyes.dot),
+      'done' || 'completed' => ('done', AppColors.ok),
+      'error' || 'failed' => ('failed', AppColors.danger),
+      'idle' => ('stopped', AppColors.fg3),
+      _ => ('', AppColors.fg3),
     };
 
 extension on _NotificationMessageCardState {
@@ -236,15 +234,11 @@ extension on _NotificationMessageCardState {
     ]);
 
     final bubble = Container(
-      padding: EdgeInsets.fromLTRB(12, kMobile ? 4 : 6, 4, kMobile ? 8 : 10),
+      padding: EdgeInsets.fromLTRB(14, kMobile ? 4 : 6, 4, kMobile ? 10 : 10),
       decoration: BoxDecoration(
-        color: AppColors.surface3,
-        borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(4),
-          topRight: Radius.circular(14),
-          bottomLeft: Radius.circular(14),
-          bottomRight: Radius.circular(14),
-        ),
+        color: AppColors.surface2,
+        border: Border.all(color: AppColors.lineStrong),
+        borderRadius: BorderRadius.circular(14),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -275,95 +269,48 @@ extension on _NotificationMessageCardState {
                     style: sans(12, color: AppColors.danger)),
               ),
             ),
+          if (widget.rest.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: S.s8),
+              child: Wrap(
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Text(_moreLabel, style: mono(11.5, color: AppColors.fg4)),
+                    if (!kMobile) ...[
+                      const SizedBox(width: S.s12),
+                      InkWell(
+                        onTap: widget.onClearAll,
+                        borderRadius: BorderRadius.circular(R.xs),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 4, vertical: 2),
+                          child: Text('Clear all',
+                              style: sans(12,
+                                  weight: W.label, color: AppColors.accent)),
+                        ),
+                      ),
+                    ],
+                  ]),
+            ),
         ],
       ),
     );
 
     return Material(
-      color: AppColors.surface2,
-      elevation: 3,
-      shadowColor: Colors.black.withValues(alpha: 0.3),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: AppColors.lineStrong),
-      ),
+      type: MaterialType.transparency,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       clipBehavior: Clip.antiAlias,
-      child: Stack(children: [
-      InkWell(
+      child: InkWell(
         onTap: widget.onOpen,
         onLongPress: widget.rest.isEmpty ? null : widget.onClearAll,
-        child: Padding(
-          padding: const EdgeInsets.all(10),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Padding(
-                  padding: const EdgeInsets.only(top: 2),
-                  child: MochiIcon(
-                      color: AppColors.accent,
-                      size: kMobile ? 38 : 34,
-                      eyes: mood.$3),
-                ),
-                const SizedBox(width: 4),
-                Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: CustomPaint(
-                      size: const Size(8, 12),
-                      painter: _Tail(AppColors.surface3)),
-                ),
-                Expanded(child: bubble),
-              ]),
-              if (widget.rest.isNotEmpty)
-                Padding(
-                  padding:
-                      EdgeInsets.only(left: kMobile ? 46 : 40, top: S.s8),
-                  child: Wrap(
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                    Text(_moreLabel, style: mono(11.5, color: AppColors.fg4)),
-                    if (!kMobile) ...[
-                    const SizedBox(width: S.s12),
-                    InkWell(
-                      onTap: widget.onClearAll,
-                      borderRadius: BorderRadius.circular(R.xs),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 4, vertical: 2),
-                        child: Text('Clear all',
-                            style: sans(12,
-                                weight: W.label, color: AppColors.accent)),
-                      ),
-                    ),
-                    ],
-                  ]),
-                ),
-            ],
-          ),
-        ),
+        borderRadius: BorderRadius.circular(14),
+        child: Stack(clipBehavior: Clip.none, children: [
+          bubble,
+          if (kMobile) Positioned(top: 0, right: 0, child: close),
+        ]),
       ),
-      if (kMobile) Positioned(top: 4, right: 4, child: close),
-      ]),
     );
   }
-}
-
-class _Tail extends CustomPainter {
-  _Tail(this.color);
-  final Color color;
-
-  @override
-  void paint(Canvas canvas, Size s) => canvas.drawPath(
-      Path()
-        ..moveTo(s.width, 0)
-        ..lineTo(0, s.height * .35)
-        ..quadraticBezierTo(0, s.height * .5, s.width, s.height)
-        ..close(),
-      Paint()..color = color);
-
-  @override
-  bool shouldRepaint(_Tail old) => old.color != color;
 }
 
 class _ReplyField extends StatelessWidget {

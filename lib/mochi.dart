@@ -60,17 +60,15 @@ void setRememberedAgentColor(String id, String? color) {
 }
 
 class MochiIcon extends StatelessWidget {
-  const MochiIcon(
-      {super.key, required this.color, this.size = 18, this.eyes = MochiEyes.dot});
+  const MochiIcon({super.key, required this.color, this.size = 18});
 
   final Color color;
   final double size;
-  final MochiEyes eyes;
 
   @override
   Widget build(BuildContext context) => SizedBox.square(
         dimension: size,
-        child: CustomPaint(painter: _MochiPainter(color, size, eyes: eyes)),
+        child: CustomPaint(painter: _MochiPainter(color, size)),
       );
 }
 
