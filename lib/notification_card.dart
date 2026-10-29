@@ -346,7 +346,9 @@ class _NotificationMessageCardState extends State<NotificationMessageCard> {
       final full = box.maxWidth;
       final width = kMobile && !_open ? math.min(full, 300.0) : full;
       return Align(
-        alignment: kMobile ? Alignment.topCenter : Alignment.topRight,
+        alignment: kMobile && _expandable
+            ? Alignment.topCenter
+            : Alignment.topRight,
         heightFactor: 1,
         child: AnimatedContainer(
           duration: motion,
@@ -365,12 +367,16 @@ class _NotificationMessageCardState extends State<NotificationMessageCard> {
               onLongPress: widget.rest.isEmpty ? null : widget.onClearAll,
               child: Padding(
                 padding: EdgeInsets.fromLTRB(
-                    kMobile ? 16 : 14, kMobile ? 6 : 8, 4, kMobile ? 6 : 8),
+                    kMobile ? 18 : 14, kMobile ? 6 : 8, 4, kMobile ? 6 : 8),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    head,
+                    DefaultTextHeightBehavior(
+                      textHeightBehavior: const TextHeightBehavior(
+                          leadingDistribution: TextLeadingDistribution.even),
+                      child: head,
+                    ),
                     AnimatedSize(
                       duration: motion,
                       curve: Curves.easeOutCubic,
