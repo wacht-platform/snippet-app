@@ -72,6 +72,12 @@ enum SnippetTheme {
     }
   }
 
+  static func symbol(_ name: String, _ label: String, size: CGFloat, weight: NSFont.Weight = .medium) -> NSImage? {
+    guard #available(macOS 11.0, *) else { return nil }
+    return NSImage(systemSymbolName: name, accessibilityDescription: label)?
+      .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: size, weight: weight))
+  }
+
   static func sans(_ size: CGFloat, weight: NSFont.Weight = .regular) -> NSFont {
     NSFont.systemFont(ofSize: size, weight: weight)
   }
@@ -1692,7 +1698,7 @@ final class NotchHUDController {
       hudView.setConversationData(
         title: title,
         status: "loading",
-        messages: sub.isEmpty ? [] : [(role: "assistant", text: sub, meta: "")]
+        messages: sub.isEmpty ? [] : [NotchItem(["role": "assistant", "text": sub])]
       )
       refreshHUD(animated: true)
       onOpenConversation(payload)
@@ -1906,8 +1912,8 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
     openAppButton.isBordered = false
     openAppButton.wantsLayer = true
     openAppButton.layer?.cornerRadius = 8
-    openAppButton.image = NSImage(systemSymbolName: "arrow.up.forward.square", accessibilityDescription: "Open in app")?.withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: 13, weight: .medium))
-    openAppButton.title = ""
+    openAppButton.image = SnippetTheme.symbol("arrow.up.forward.square", "Open in app", size: 13, weight: .medium)
+    openAppButton.title = openAppButton.image == nil ? "Open" : ""
     openAppButton.contentTintColor = NSColor(srgbRed: 0.604, green: 0.604, blue: 0.635, alpha: 1)
     openAppButton.target = self
     openAppButton.action = #selector(handleOpenAppTap)
@@ -1916,8 +1922,8 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
     closeButton.isBordered = false
     closeButton.wantsLayer = true
     closeButton.layer?.cornerRadius = 8
-    closeButton.image = NSImage(systemSymbolName: "xmark", accessibilityDescription: "Close conversation")?.withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: 13, weight: .medium))
-    closeButton.title = ""
+    closeButton.image = SnippetTheme.symbol("xmark", "Close conversation", size: 13, weight: .medium)
+    closeButton.title = closeButton.image == nil ? "✕" : ""
     closeButton.contentTintColor = NSColor(srgbRed: 0.604, green: 0.604, blue: 0.635, alpha: 1)
     closeButton.target = self
     closeButton.action = #selector(handleCloseTap)
@@ -1952,8 +1958,8 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
 
     sendButton.isBordered = false
     sendButton.wantsLayer = true
-    sendButton.image = NSImage(systemSymbolName: "arrow.up", accessibilityDescription: "Send reply")?.withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: 12, weight: .semibold))
-    sendButton.title = ""
+    sendButton.image = SnippetTheme.symbol("arrow.up", "Send reply", size: 12, weight: .semibold)
+    sendButton.title = sendButton.image == nil ? "↑" : ""
     sendButton.layer?.backgroundColor = NSColor(srgbRed: 0.165, green: 0.165, blue: 0.188, alpha: 1).cgColor
     sendButton.layer?.cornerRadius = 14
     sendButton.contentTintColor = NSColor(srgbRed: 0.816, green: 0.816, blue: 0.839, alpha: 1)
