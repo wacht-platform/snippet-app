@@ -38,7 +38,8 @@ class _NodeState2 extends State<_Node> with SingleTickerProviderStateMixin {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final animate = widget.state == _NodeState.running && !reduceMotion(context);
+    final animate =
+        widget.state == _NodeState.running && !reduceMotion(context);
     if (animate && !_c.isAnimating) {
       _c.repeat();
     } else if (!animate && _c.isAnimating) {
@@ -90,8 +91,8 @@ class _NodeState2 extends State<_Node> with SingleTickerProviderStateMixin {
               child: Container(
                 width: size + 8 * _c.value,
                 height: size + 8 * _c.value,
-                decoration:
-                    BoxDecoration(color: AppColors.accent, shape: BoxShape.circle),
+                decoration: BoxDecoration(
+                    color: AppColors.accent, shape: BoxShape.circle),
               ),
             ),
             dot,
@@ -185,8 +186,7 @@ class _DenseToolRowState extends State<DenseToolRow> {
               Flexible(child: _sentence(verb, object)),
               if (added > 0) ...[
                 const SizedBox(width: S.s8),
-                Text('+$added',
-                    style: mono(_objectSize, color: AppColors.ok)),
+                Text('+$added', style: mono(_objectSize, color: AppColors.ok)),
               ],
               if (removed > 0) ...[
                 const SizedBox(width: S.s6),
@@ -265,8 +265,8 @@ class _StepDetailState extends State<_StepDetail> {
             children: [
               ClipRect(
                 child: ConstrainedBox(
-                  constraints: BoxConstraints(
-                      maxHeight: _full ? double.infinity : _cap),
+                  constraints:
+                      BoxConstraints(maxHeight: _full ? double.infinity : _cap),
                   child: SingleChildScrollView(
                     physics: const NeverScrollableScrollPhysics(),
                     child: KeyedSubtree(
@@ -328,10 +328,7 @@ class ToolRun extends StatefulWidget {
   final bool open;
   final ValueChanged<bool>? onOpenChanged;
   const ToolRun(this.rows,
-      {super.key,
-      this.running = false,
-      this.open = false,
-      this.onOpenChanged});
+      {super.key, this.running = false, this.open = false, this.onOpenChanged});
   @override
   State<ToolRun> createState() => _ToolRunState();
 }
@@ -360,9 +357,7 @@ class _ToolRunState extends State<ToolRun> {
     ];
     final long = rows.length > _directLimit;
     final open = _open;
-    final List<Widget> shown = !long || open
-        ? rows
-        : [rows.last];
+    final List<Widget> shown = !long || open ? rows : [rows.last];
     final failures = steps.where((s) => !s.running && s.failed).length;
     final summaryNode = widget.running && steps.any((s) => s.running)
         ? _NodeState.running
@@ -405,8 +400,8 @@ class _ToolRunState extends State<ToolRun> {
                   AnimatedRotation(
                     turns: open ? 0.25 : 0,
                     duration: Motion.fast,
-                    child:
-                        AppIcon('chevron-right', size: 12, color: AppColors.fg4),
+                    child: AppIcon('chevron-right',
+                        size: 12, color: AppColors.fg4),
                   ),
                 ]),
               ),
@@ -495,28 +490,30 @@ class _LaneNoticeState extends State<LaneNotice> {
                     ? ('Paused', Tone.neutral)
                     : lane == null
                         ? (null, Tone.neutral)
-                        : (state == 'cancelled' ? 'Cancelled' : 'Queued', Tone.neutral);
+                        : (
+                            state == 'cancelled' ? 'Cancelled' : 'Queued',
+                            Tone.neutral
+                          );
     final color = agent.isEmpty ? mochiPalette.first.$2 : mochiColorFor(agent);
-    final small = kMobile ? 13.0 : 12.5;
+    final small = TranscriptCard.metaSize;
     final header = Row(children: [
       running
-          ? WorkingMochi(size: 16, color: color)
+          ? WorkingMochi(size: 14, color: color)
           : MochiIcon(
               color: failed
                   ? AppColors.danger
                   : completed
                       ? color
                       : AppColors.fg4,
-              size: 16),
-      const SizedBox(width: S.s8),
+              size: 14),
+      const SizedBox(width: S.s6),
       Expanded(
         child: Text.rich(
           TextSpan(children: [
             TextSpan(text: title.isEmpty ? 'Lane' : title),
             if (agent.isNotEmpty)
               TextSpan(
-                  text: '  $agent',
-                  style: sans(small, color: AppColors.fg4)),
+                  text: '  $agent', style: sans(small, color: AppColors.fg4)),
           ]),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
@@ -527,9 +524,8 @@ class _LaneNoticeState extends State<LaneNotice> {
       if (status != null && status.isNotEmpty) ...[
         const SizedBox(width: S.s8),
         running
-            ? Text(status,
-                style: mono(small - 1, color: AppColors.fg3))
-            : Tag(status, tone: tone),
+            ? Text(status, style: mono(small - 1, color: AppColors.fg3))
+            : CardStatus(status, tone: tone),
       ],
     ]);
     Widget? body;
@@ -545,17 +541,17 @@ class _LaneNoticeState extends State<LaneNotice> {
           body: summary, preview: MarkdownPreview.plain(summary));
     }
     final pad = kMobile
-        ? const EdgeInsets.fromLTRB(12, 10, 12, 10)
-        : const EdgeInsets.fromLTRB(12, 8, 12, 9);
+        ? const EdgeInsets.fromLTRB(12, 8, 12, 9)
+        : const EdgeInsets.fromLTRB(12, 6, 12, 7);
     return Semantics(
       button: true,
       label: '$title, ${(status ?? '').toLowerCase()}. Open the lane.',
       onTap: widget.onOpen,
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: S.s4),
+        padding: const EdgeInsets.symmetric(vertical: 3),
         child: Material(
           color: AppColors.surface1,
-          borderRadius: BorderRadius.circular(R.lg - 2),
+          borderRadius: BorderRadius.circular(10),
           clipBehavior: Clip.antiAlias,
           child: InkWell(
             onTap: widget.onOpen,
@@ -568,7 +564,7 @@ class _LaneNoticeState extends State<LaneNotice> {
                   header,
                   if (body != null)
                     Padding(
-                      padding: const EdgeInsets.only(left: 24, top: S.s4),
+                      padding: const EdgeInsets.only(left: 20, top: S.s2),
                       child: body,
                     ),
                 ],
@@ -604,7 +600,8 @@ class _LaneActivityLine extends StatelessWidget {
     return AnimatedSwitcher(
       duration: Motion.fast,
       layoutBuilder: (cur, prev) => Stack(
-          alignment: Alignment.centerLeft, children: [...prev, if (cur != null) cur]),
+          alignment: Alignment.centerLeft,
+          children: [...prev, if (cur != null) cur]),
       child: Row(
         key: ValueKey('$now|$last'),
         children: [
@@ -700,7 +697,8 @@ class SystemRow extends StatelessWidget {
                 selectable: true,
                 styleSheet: markdownStyle(context),
                 builders: {'pre': PreBlockBuilder()},
-                onTapLink: (txt, href, title) => openMarkdownLink(href, context, txt),
+                onTapLink: (txt, href, title) =>
+                    openMarkdownLink(href, context, txt),
               ),
             ),
         ]),

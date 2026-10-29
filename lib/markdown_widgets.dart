@@ -48,14 +48,18 @@ class MarkdownPreview extends StatelessWidget {
     var t = md.replaceAll(RegExp(r'```[a-zA-Z0-9_-]*'), '');
     t = t.replaceAllMapped(
         RegExp(r'!?\[([^\]]*)\]\([^)]*\)'), (m) => m.group(1) ?? '');
-    t = t.replaceAll(RegExp(r'^\s{0,3}#{1,6}\s+', multiLine: true), '');
+    t = t.replaceAllMapped(RegExp(r'^\s{0,3}#{1,6}\s+(.*)$', multiLine: true),
+        (m) => '${m.group(1)!.trim()} · ');
     t = t.replaceAll(RegExp(r'^\s{0,3}>\s?', multiLine: true), '');
     t = t.replaceAll(RegExp(r'^\s*([-*+]|\d+\.)\s+', multiLine: true), '• ');
     t = t.replaceAllMapped(RegExp(r'(\*\*|__)(.+?)\1'), (m) => m.group(2)!);
     t = t.replaceAllMapped(
         RegExp(r'(?<![\w*])[*_]([^*_\n]+)[*_](?![\w*])'), (m) => m.group(1)!);
     t = t.replaceAll('`', '');
-    return t.replaceAll(RegExp(r'\s+'), ' ').trim();
+    return t
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim()
+        .replaceAll(RegExp(r'\s*·$'), '');
   }
 
   @override
@@ -165,8 +169,7 @@ class _MdCodeBlock extends StatelessWidget {
               ]),
             ),
             Divider(
-                height: 1,
-                color: kMobile ? AppColors.line : AppColors.border),
+                height: 1, color: kMobile ? AppColors.line : AppColors.border),
             NotificationListener<ScrollNotification>(
               onNotification: (_) => true,
               child: SingleChildScrollView(
@@ -194,4 +197,3 @@ class _MdCodeBlock extends StatelessWidget {
     );
   }
 }
-

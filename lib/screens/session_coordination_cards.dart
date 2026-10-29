@@ -30,7 +30,7 @@ class _CardMarkdownBodyState extends State<CardMarkdownBody> {
   @override
   Widget build(BuildContext context) {
     final body = widget.body.trim();
-    final long = body.length > 240 || '\n'.allMatches(body).length > 2;
+    final long = body.length > 160 || '\n'.allMatches(body).length > 1;
     final text = TranscriptCard.bodyStyle;
     final sheet = markdownStyle(context).copyWith(
       p: text,
@@ -41,6 +41,15 @@ class _CardMarkdownBodyState extends State<CardMarkdownBody> {
       del: text.copyWith(
           decoration: TextDecoration.lineThrough, color: AppColors.fg3),
       a: text.copyWith(color: AppColors.accent),
+      h1: text.copyWith(color: AppColors.fg1, fontWeight: weightFor(W.strong)),
+      h2: text.copyWith(color: AppColors.fg1, fontWeight: weightFor(W.strong)),
+      h3: text.copyWith(color: AppColors.fg1, fontWeight: weightFor(W.strong)),
+      h4: text.copyWith(color: AppColors.fg1, fontWeight: weightFor(W.strong)),
+      h1Padding: EdgeInsets.zero,
+      h2Padding: EdgeInsets.zero,
+      h3Padding: EdgeInsets.zero,
+      pPadding: EdgeInsets.zero,
+      blockSpacing: 4,
     );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -53,12 +62,12 @@ class _CardMarkdownBodyState extends State<CardMarkdownBody> {
             width: double.infinity,
             child: !_open && long && widget.preview != null
                 ? Text(widget.preview!,
-                    maxLines: 3, overflow: TextOverflow.ellipsis, style: text)
+                    maxLines: 2, overflow: TextOverflow.ellipsis, style: text)
                 : ConstrainedBox(
                     constraints: BoxConstraints(
                         maxHeight: _open || !long
                             ? double.infinity
-                            : text.fontSize! * 1.45 * 3 + 2),
+                            : text.fontSize! * 1.4 * 2 + 2),
                     child: ShaderMask(
                       blendMode: BlendMode.dstIn,
                       shaderCallback: (r) => LinearGradient(
@@ -95,9 +104,9 @@ class _CardMarkdownBodyState extends State<CardMarkdownBody> {
             behavior: HitTestBehavior.opaque,
             onTap: () => setState(() => _open = !_open),
             child: Padding(
-              padding: const EdgeInsets.only(top: S.s4),
+              padding: const EdgeInsets.only(top: S.s2),
               child: Text(_open ? 'Show less' : 'Show more',
-                  style: sans(kMobile ? 13 : 12.5,
+                  style: sans(TranscriptCard.metaSize,
                       weight: W.label, color: AppColors.fg3)),
             ),
           ),
@@ -141,8 +150,10 @@ class _ThreadCard extends StatelessWidget {
       footer: foot.isEmpty
           ? null
           : Text(foot,
-              style:
-                  sans(kMobile ? 13 : 12.5, height: 1.4, color: AppColors.fg3)),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: sans(TranscriptCard.metaSize,
+                  height: 1.35, color: AppColors.fg4)),
       child: body.trim().isEmpty
           ? null
           : CardMarkdownBody(body: body, preview: preview),
@@ -404,8 +415,7 @@ class _AmbientTurnCardState extends State<AmbientTurnCard> {
       if (time.isNotEmpty) time,
       if (turn.mode == 'passive') 'passive',
       if (turn.wake) 'wake word',
-      if (turn.userVoice != null)
-        'voice ${(turn.userVoice! * 100).round()}%',
+      if (turn.userVoice != null) 'voice ${(turn.userVoice! * 100).round()}%',
       if (turn.continuation) 'continuation',
       if (turn.interruptedReply.isNotEmpty) 'interrupted a reply',
       if (turn.context.isNotEmpty)
@@ -499,7 +509,8 @@ class SpeakCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final asking = expecting.isNotEmpty && expecting != 'none' && text.contains('?');
+    final asking =
+        expecting.isNotEmpty && expecting != 'none' && text.contains('?');
     return TranscriptCard(
       icon: 'volume',
       tone: asking ? Tone.accent : Tone.neutral,
