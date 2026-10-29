@@ -238,7 +238,7 @@ extension on _NotificationMessageCardState {
     final bubble = Container(
       padding: EdgeInsets.fromLTRB(12, kMobile ? 4 : 6, 4, kMobile ? 8 : 10),
       decoration: BoxDecoration(
-        color: AppColors.surface2,
+        color: AppColors.surface3,
         borderRadius: const BorderRadius.only(
           topLeft: Radius.circular(4),
           topRight: Radius.circular(14),
@@ -280,7 +280,7 @@ extension on _NotificationMessageCardState {
     );
 
     return Material(
-      color: AppColors.bg,
+      color: AppColors.surface2,
       elevation: 3,
       shadowColor: Colors.black.withValues(alpha: 0.3),
       shape: RoundedRectangleBorder(
@@ -311,7 +311,7 @@ extension on _NotificationMessageCardState {
                   padding: const EdgeInsets.only(top: 8),
                   child: CustomPaint(
                       size: const Size(8, 12),
-                      painter: _Tail(AppColors.surface2)),
+                      painter: _Tail(AppColors.surface3)),
                 ),
                 Expanded(child: bubble),
               ]),
@@ -389,7 +389,7 @@ class _ReplyField extends StatelessWidget {
       height: h,
       padding: const EdgeInsets.only(left: S.s12),
       decoration: BoxDecoration(
-        color: kMobile ? AppColors.surface1 : AppColors.surface2,
+        color: AppColors.surface1,
         borderRadius: BorderRadius.circular(R.pill),
       ),
       child: Row(children: [
