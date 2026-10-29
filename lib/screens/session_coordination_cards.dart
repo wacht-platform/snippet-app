@@ -50,6 +50,8 @@ class _CardMarkdownBodyState extends State<CardMarkdownBody> {
       h3Padding: EdgeInsets.zero,
       pPadding: EdgeInsets.zero,
       blockSpacing: 4,
+      listIndent: 16,
+      listBulletPadding: const EdgeInsets.only(right: 4),
     );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -124,7 +126,6 @@ class _ThreadCard extends StatelessWidget {
   final String body;
   final String? reference;
   final String? footer;
-  final String? preview;
   const _ThreadCard({
     required this.icon,
     required this.tone,
@@ -134,7 +135,6 @@ class _ThreadCard extends StatelessWidget {
     required this.body,
     this.reference,
     this.footer,
-    this.preview,
   });
 
   @override
@@ -154,9 +154,7 @@ class _ThreadCard extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: sans(TranscriptCard.metaSize,
                   height: 1.35, color: AppColors.fg4)),
-      child: body.trim().isEmpty
-          ? null
-          : CardMarkdownBody(body: body, preview: preview),
+      child: body.trim().isEmpty ? null : CardMarkdownBody(body: body),
     );
   }
 }
@@ -189,6 +187,20 @@ class MissionEnvelopeCard extends StatelessWidget {
             'update' => (Tone.neutral, 'info', 'Update'),
             _ => (Tone.accent, 'inbox', 'New task'),
           };
+    if (envelope.isPlan) {
+      final steps = parsePlanSteps(envelope.summary);
+      final done = steps.where((s) => s.$2 == PlanStep.done).length;
+      return TranscriptCard(
+        icon: 'list',
+        tone: Tone.accent,
+        kind: envelope.taskId.isEmpty
+            ? 'Worker plan'
+            : 'Worker plan · ${_short(envelope.taskId)}',
+        title: envelope.title.isEmpty ? 'Task' : envelope.title,
+        status: steps.isEmpty ? 'Plan' : '$done/${steps.length}',
+        child: steps.isEmpty ? null : PlanChecklist(steps: steps),
+      );
+    }
     return _ThreadCard(
       icon: icon,
       tone: tone,
@@ -205,6 +217,109 @@ class MissionEnvelopeCard extends StatelessWidget {
           : envelope.title,
       status: tag,
       body: envelope.summary,
+    );
+  }
+}
+
+enum PlanStep { done, now, todo }
+
+List<(String, PlanStep)> parsePlanSteps(String summary) => [
+      for (final raw in summary.split('\n'))
+        if (raw.trim().startsWith('- '))
+          switch (raw.trim().substring(2).trim()) {
+            final t
+                when t.startsWith('~~') && t.endsWith('~~') && t.length > 4 =>
+              (t.substring(2, t.length - 2), PlanStep.done),
+            final t when t.startsWith('**') && t.endsWith('** · now') => (
+                t.substring(2, t.length - '** · now'.length),
+                PlanStep.now
+              ),
+            final t => (t, PlanStep.todo),
+          },
+    ];
+
+class PlanChecklist extends StatefulWidget {
+  const PlanChecklist({super.key, required this.steps});
+  final List<(String, PlanStep)> steps;
+
+  @override
+  State<PlanChecklist> createState() => _PlanChecklistState();
+}
+
+class _PlanChecklistState extends State<PlanChecklist> {
+  bool _open = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final steps = widget.steps;
+    const cap = 4;
+    var shown = steps;
+    if (!_open && steps.length > cap) {
+      final now = steps.indexWhere((s) => s.$2 != PlanStep.done);
+      final from =
+          (now < 0 ? steps.length - cap : now - 1).clamp(0, steps.length - cap);
+      shown = steps.sublist(from, from + cap);
+    }
+    final style = TranscriptCard.bodyStyle;
+    final lineH = style.fontSize! * style.height!;
+    Widget mark(PlanStep s) => SizedBox(
+          width: 14,
+          height: lineH,
+          child: Center(
+            child: switch (s) {
+              PlanStep.done => AppIcon('check', size: 11, color: AppColors.fg4),
+              PlanStep.now => Container(
+                  width: 6,
+                  height: 6,
+                  decoration: BoxDecoration(
+                      color: AppColors.accent, shape: BoxShape.circle)),
+              PlanStep.todo => Container(
+                  width: 6,
+                  height: 6,
+                  decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: AppColors.fg4, width: 1))),
+            },
+          ),
+        );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (final (text, state) in shown)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 1),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                mark(state),
+                const SizedBox(width: S.s6),
+                Expanded(
+                  child: Text(text,
+                      maxLines: _open ? null : 1,
+                      overflow: _open ? null : TextOverflow.ellipsis,
+                      style: style.copyWith(
+                          color: switch (state) {
+                        PlanStep.done => AppColors.fg4,
+                        PlanStep.now => AppColors.fg1,
+                        PlanStep.todo => AppColors.fg2,
+                      })),
+                ),
+              ],
+            ),
+          ),
+        if (steps.length > cap)
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => setState(() => _open = !_open),
+            child: Padding(
+              padding: const EdgeInsets.only(top: S.s2, left: 20),
+              child: Text(
+                  _open ? 'Show less' : 'Show all ${steps.length} steps',
+                  style: sans(TranscriptCard.metaSize,
+                      weight: W.label, color: AppColors.fg3)),
+            ),
+          ),
+      ],
     );
   }
 }
@@ -258,20 +373,104 @@ class DirectMessageCard extends StatelessWidget {
   }
 }
 
-class AutonomousRoundCard extends StatelessWidget {
+class AutonomousRoundCard extends StatefulWidget {
   const AutonomousRoundCard({super.key, required this.round});
   final AutonomousRound round;
 
   @override
-  Widget build(BuildContext context) => _ThreadCard(
-        icon: 'activity',
-        tone: round.due.isNotEmpty ? Tone.run : Tone.neutral,
-        kind: 'Automated wake',
-        title: round.headline,
-        status: _roundTime(round.time),
-        body: round.markdown,
-        preview: _roundPreview(round),
-      );
+  State<AutonomousRoundCard> createState() => _AutonomousRoundCardState();
+}
+
+class _AutonomousRoundCardState extends State<AutonomousRoundCard> {
+  bool _open = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final r = widget.round;
+    final sections = [
+      ('Due', r.due),
+      ('Changed', r.changed),
+      ('Open', r.open),
+      ('Scheduled', r.scheduled),
+    ].where((s) => s.$2.isNotEmpty).toList();
+    final items = [for (final s in sections) ...s.$2.map(_plain)];
+    final summary = [
+      if (r.firstRound) 'switched on',
+      if (r.due.isNotEmpty) '${r.due.length} due',
+      if (r.changed.isNotEmpty) '${r.changed.length} changed',
+      if (r.open.isNotEmpty) '${r.open.length} open',
+      if (r.due.isEmpty && r.changed.isEmpty && r.open.isEmpty) 'nothing new',
+    ].join(' · ');
+    final meta = TranscriptCard.metaSize;
+    final body = TranscriptCard.bodyStyle;
+    final more = items.length > 1;
+    final content = Padding(
+      padding: kMobile
+          ? const EdgeInsets.fromLTRB(12, 8, 12, 9)
+          : const EdgeInsets.fromLTRB(12, 6, 12, 7),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(children: [
+            AppIcon('activity',
+                size: 12,
+                color: r.due.isNotEmpty ? AppColors.run : AppColors.fg3),
+            const SizedBox(width: S.s6),
+            Expanded(
+              child: Text('Automated wake · $summary',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: sans(meta, color: AppColors.fg3)),
+            ),
+            const SizedBox(width: S.s8),
+            Text(_roundTime(r.time), style: sans(meta, color: AppColors.fg4)),
+          ]),
+          if (items.isNotEmpty && !_open)
+            Padding(
+              padding: const EdgeInsets.only(left: 18, top: S.s2),
+              child: Text.rich(
+                TextSpan(children: [
+                  TextSpan(text: items.first),
+                  if (more)
+                    TextSpan(
+                        text: '  +${items.length - 1}',
+                        style: body.copyWith(color: AppColors.fg4)),
+                ]),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: body,
+              ),
+            ),
+          if (_open)
+            for (final (label, list) in sections) ...[
+              Padding(
+                padding: const EdgeInsets.only(left: 18, top: S.s4),
+                child: Text(label,
+                    style: sans(meta, weight: W.label, color: AppColors.fg4)),
+              ),
+              for (final item in list)
+                Padding(
+                  padding: const EdgeInsets.only(left: 18, top: S.s2),
+                  child: SelectableText(_plain(item), style: body),
+                ),
+            ],
+        ],
+      ),
+    );
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Material(
+        color: AppColors.surface1,
+        borderRadius: BorderRadius.circular(10),
+        clipBehavior: Clip.antiAlias,
+        child: items.isEmpty
+            ? content
+            : InkWell(
+                onTap: () => setState(() => _open = !_open), child: content),
+      ),
+    );
+  }
 }
 
 String _roundTime(String time) {
@@ -281,14 +480,6 @@ String _roundTime(String time) {
 }
 
 String _plain(String line) => line.replaceAll('**', '');
-
-String _roundPreview(AutonomousRound round) {
-  if (round.due.isNotEmpty) return 'Due: ${_plain(round.due.first)}';
-  if (round.changed.isNotEmpty)
-    return 'Changed: ${_plain(round.changed.first)}';
-  if (round.open.isNotEmpty) return _plain(round.open.first);
-  return 'Nothing changed, nothing open.';
-}
 
 class WorkerQuestionCard extends StatelessWidget {
   const WorkerQuestionCard({super.key, required this.question});

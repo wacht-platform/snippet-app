@@ -50,6 +50,16 @@ Widget _cards() => Column(
           status: 'done',
           summary: 'Merged the redirect fix; **12 tests** pass.',
         )),
+        const MissionEnvelopeCard(
+            envelope: MissionEnvelope(
+          isReport: false,
+          isPlan: true,
+          taskId: '41132982-aa',
+          title: 'Find X posts to reply to (xAI lane)',
+          status: '',
+          summary:
+              '- ~~Search both lanes, last 48h~~\n- ~~oEmbed-verify candidates~~\n- **Deliver shortlist artifact** · now\n- Report back',
+        )),
         const DirectMessageCard(
             message: DirectMessage(
           threadId: 't',
@@ -63,6 +73,28 @@ Widget _cards() => Column(
                 taskId: 'x',
                 task: 'Release notes draft',
                 question: 'Which version should the notes cover?')),
+        const AutonomousRoundCard(
+            round: AutonomousRound(
+          time: 'Thu 29 Oct 15:42',
+          firstRound: false,
+          quiet: false,
+          changed: [],
+          open: [],
+          due: [
+            'Check if ambient-voice-film render finished (ambient-voice-launch-v4.mp4); if so, present final video to boss.'
+          ],
+          scheduled: [],
+        )),
+        const AutonomousRoundCard(
+            round: AutonomousRound(
+          time: 'Thu 29 Oct 16:10',
+          firstRound: false,
+          quiet: true,
+          changed: ['Task **Fix login redirect** moved to done'],
+          open: ['Release notes draft'],
+          due: [],
+          scheduled: [],
+        )),
         LaneNotice(title: _running.title, live: () => _running, onOpen: () {}),
         LaneNotice(title: _done.title, live: () => _done, onOpen: () {}),
       ],
@@ -91,8 +123,8 @@ void main() {
             ),
           ),
         ));
-        await expectGolden(
-            tester, find.byType(RepaintBoundary).first, 'goldens/compact_cards_$name.png');
+        await expectGolden(tester, find.byType(RepaintBoundary).first,
+            'goldens/compact_cards_$name.png');
         expect(tester.takeException(), isNull);
       } finally {
         debugDefaultTargetPlatformOverride = null;
