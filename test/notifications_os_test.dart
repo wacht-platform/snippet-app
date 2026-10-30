@@ -52,6 +52,25 @@ void main() {
     expect(style.messages!.map((m) => m.text), ['prior', 'One two three']);
   });
 
+  test('stale standing-by lines and duplicates are dropped from the thread', () {
+    final previous = MessagingStyleInformation(const Person(name: 'Snippet'),
+        messages: [
+          Message('Finished · standing by', DateTime(2024), null),
+          Message('Paused while a lane works: x', DateTime(2024), null),
+          Message('same', DateTime(2024), null),
+          Message('keep', DateTime(2024), null),
+        ]);
+    final details = sessionNotificationDetails(
+        payload: {'url': 'https://m', 'session': 's'},
+        title: 'Run',
+        body: 'same',
+        kind: 'message',
+        previous: previous);
+    final style =
+        details.android!.styleInformation as MessagingStyleInformation;
+    expect(style.messages!.map((m) => m.text), ['keep', 'same']);
+  });
+
   test('question and message reply actions; passive status details', () {
     final question = sessionNotificationDetails(payload: {
       'session': 's',

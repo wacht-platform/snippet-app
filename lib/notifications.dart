@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:isolate';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -32,6 +33,20 @@ const _prefEnabled = 'notif_enabled';
 int _downloadNotifId = 0;
 const _cancelDownloadAction = 'cancel_download';
 final Map<int, VoidCallback> _downloadCancels = {};
+
+const _cancelPort = 'snippet_download_cancel';
+ReceivePort? _cancelReceiver;
+
+void _listenForBackgroundCancels() {
+  if (_cancelReceiver != null) return;
+  final port = ReceivePort();
+  ui.IsolateNameServer.removePortNameMapping(_cancelPort);
+  ui.IsolateNameServer.registerPortWithName(port.sendPort, _cancelPort);
+  port.listen((id) {
+    if (id is int) _downloadCancels[id]?.call();
+  });
+  _cancelReceiver = port;
+}
 
 void registerDownloadCancel(int? id, VoidCallback cancel) {
   if (id != null) _downloadCancels[id] = cancel;
@@ -214,12 +229,18 @@ Future<void> notifySessionEvent({
           ?.getActiveNotificationMessagingStyle(id: notificationId);
     } catch (_) {}
   }
+  final replaces = priorStyle != null && _statusKinds.contains(kind);
   final details = sessionNotificationDetails(
       payload: data,
       title: title,
       body: body,
       kind: kind,
-      previous: priorStyle);
+      previous: replaces ? null : priorStyle);
+  if (priorStyle != null) {
+    try {
+      await notifier.cancel(id: notificationId);
+    } catch (_) {}
+  }
   await notifier.show(
       id: notificationId,
       title: title,
@@ -241,6 +262,13 @@ Future<void> notifySessionEvent({
                 onlyAlertOnce: true)));
   }
 }
+
+const _statusKinds = {'idle', 'done', 'error'};
+
+bool _isStatusLine(String? text) =>
+    text != null &&
+    (text.startsWith('Finished · standing by') ||
+        text.startsWith('Paused while'));
 
 /// Stable across launches (unlike String.hashCode) so a chat keeps one
 /// notification that accumulates messages.
@@ -317,7 +345,8 @@ NotificationDetails sessionNotificationDetails(
             conversationTitle: title,
             groupConversation: false,
             messages: [
-              ...?previous?.messages,
+              ...?previous?.messages?.where((m) =>
+                  !_isStatusLine(m.text) && m.text != preview),
               Message(preview, DateTime.now(), _snippetPerson)
             ].take(10).toList())),
     macOS: DarwinNotificationDetails(
@@ -430,6 +459,11 @@ Future<void> cancelCallPrompt(String callId,
 void notificationBackgroundResponse(NotificationResponse response) async {
   WidgetsFlutterBinding.ensureInitialized();
   ui.DartPluginRegistrant.ensureInitialized();
+  if (response.actionId == _cancelDownloadAction) {
+    final id = response.id;
+    if (id != null) ui.IsolateNameServer.lookupPortByName(_cancelPort)?.send(id);
+    return;
+  }
   if (await routeNotificationAction(
       actionId: response.actionId,
       input: response.input,
@@ -495,6 +529,7 @@ Uri eventsUri(String baseUrl, String token) {
 // ---------------------------------------------------------------------------
 Future<void> initNotifications() async {
   if (kMobile) {
+    _listenForBackgroundCancels();
     await _mainNotif.initialize(
       settings: const InitializationSettings(
           android: AndroidInitializationSettings('@mipmap/ic_launcher')),

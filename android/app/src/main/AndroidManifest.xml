@@ -24,6 +24,9 @@
             android:foregroundServiceType="microphone"
             android:stopWithTask="true"
             android:exported="false" />
+        <receiver
+            android:name="com.dexterous.flutterlocalnotifications.ActionBroadcastReceiver"
+            android:exported="false" />
         <activity
             android:name=".MainActivity"
             android:exported="true"
