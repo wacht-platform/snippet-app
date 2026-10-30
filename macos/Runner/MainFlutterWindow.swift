@@ -3005,6 +3005,8 @@ final class NotchHomeView: NSView {
 
   private var attached = true
   private var wasExpanded = false
+  var maskDuration: CFTimeInterval = 0
+  var maskTiming = CAMediaTimingFunction(name: .easeInEaseOut)
   private let wing: CGFloat = 70
   private let background = NotchHomeBackground(frame: .zero)
 
@@ -3128,15 +3130,30 @@ final class NotchHomeView: NSView {
         v.removeFromSuperview()
       }
     }
-    background.frame = NSRect(origin: .zero, size: size)
-    background.configure(attached: attached, height: size.height)
+    background.isHidden = true
+    layer?.backgroundColor = NSColor.black.cgColor
     let radius = min(attached ? 26 : 20, size.height / 2, size.width / 2)
-    let maskRect = attached
-      ? CGRect(x: 0, y: -radius, width: size.width, height: size.height + radius)
-      : CGRect(origin: .zero, size: size)
-    let mask = CAShapeLayer()
-    mask.path = CGPath(roundedRect: maskRect, cornerWidth: radius, cornerHeight: radius, transform: nil)
-    layer?.mask = mask
+    let flipped = layer?.isGeometryFlipped ?? true
+    let maskRect: CGRect
+    if attached {
+      maskRect = flipped
+        ? CGRect(x: 0, y: -radius, width: size.width, height: size.height + radius)
+        : CGRect(x: 0, y: 0, width: size.width, height: size.height + radius)
+    } else {
+      maskRect = CGRect(origin: .zero, size: size)
+    }
+    let newPath = CGPath(roundedRect: maskRect, cornerWidth: radius, cornerHeight: radius, transform: nil)
+    let mask = (layer?.mask as? CAShapeLayer) ?? CAShapeLayer()
+    if layer?.mask !== mask { layer?.mask = mask }
+    if maskDuration > 0, let from = mask.presentation()?.path ?? mask.path {
+      let anim = CABasicAnimation(keyPath: "path")
+      anim.fromValue = from
+      anim.toValue = newPath
+      anim.duration = maskDuration
+      anim.timingFunction = maskTiming
+      mask.add(anim, forKey: "path")
+    }
+    mask.path = newPath
     defer {
       let delay: TimeInterval = collapsing ? 0.14 : 0
       for v in subviews where v !== background && !leaving.contains(where: { $0 === v }) {
@@ -3503,10 +3520,15 @@ final class NotchHomeController {
 
     let target = NSRect(
       x: round((panelSize.width - w) / 2), y: 0, width: w, height: h)
+    let willAnimate = animated && view.frame.width > 0
+    view.maskDuration = willAnimate ? (expanded ? 0.36 : 0.34) : 0
+    view.maskTiming = expanded
+      ? CAMediaTimingFunction(controlPoints: 0.2, 1.0, 0.3, 1.0)
+      : CAMediaTimingFunction(controlPoints: 0.4, 0.0, 0.2, 1.0)
     view.configure(
       model: model, expanded: expanded, detail: detail, hw: hw.size, attached: hw.attached,
       size: target.size)
-    if animated && view.frame.width > 0 {
+    if willAnimate {
       NSAnimationContext.runAnimationGroup { ctx in
         ctx.duration = expanded ? 0.36 : 0.34
         ctx.timingFunction = expanded
