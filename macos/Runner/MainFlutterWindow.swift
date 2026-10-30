@@ -99,21 +99,21 @@ enum SnippetTheme {
   }
 
   // Exact Graphite (_amoled) palette from lib/theme.dart
-  static let canvas = NSColor(srgbRed: 0x0B / 255.0, green: 0x0B / 255.0, blue: 0x0D / 255.0, alpha: 1.0)
-  static let bg = NSColor(srgbRed: 0x10 / 255.0, green: 0x10 / 255.0, blue: 0x12 / 255.0, alpha: 1.0)
-  static let surface1 = NSColor(srgbRed: 0x17 / 255.0, green: 0x17 / 255.0, blue: 0x1A / 255.0, alpha: 1.0)
-  static let surface2 = NSColor(srgbRed: 0x1E / 255.0, green: 0x1E / 255.0, blue: 0x22 / 255.0, alpha: 1.0)
-  static let surface3 = NSColor(srgbRed: 0x26 / 255.0, green: 0x26 / 255.0, blue: 0x2B / 255.0, alpha: 1.0)
-  static let border = NSColor(srgbRed: 0x26 / 255.0, green: 0x26 / 255.0, blue: 0x2B / 255.0, alpha: 1.0)
-  static let border2 = NSColor(srgbRed: 0x32 / 255.0, green: 0x32 / 255.0, blue: 0x38 / 255.0, alpha: 1.0)
-  static let fg1 = NSColor(srgbRed: 0xEE / 255.0, green: 0xEE / 255.0, blue: 0xF1 / 255.0, alpha: 1.0)
-  static let fg2 = NSColor(srgbRed: 0xC4 / 255.0, green: 0xC4 / 255.0, blue: 0xCC / 255.0, alpha: 1.0)
-  static let fg3 = NSColor(srgbRed: 0x8F / 255.0, green: 0x8F / 255.0, blue: 0x9B / 255.0, alpha: 1.0)
-  static let fg4 = NSColor(srgbRed: 0x62 / 255.0, green: 0x62 / 255.0, blue: 0x6D / 255.0, alpha: 1.0)
-  static let accent = NSColor(srgbRed: 0x8B / 255.0, green: 0x8D / 255.0, blue: 0xFF / 255.0, alpha: 1.0)
-  static let accentFill = NSColor(srgbRed: 0x5E / 255.0, green: 0x6A / 255.0, blue: 0xD2 / 255.0, alpha: 1.0)
-  static let ok = NSColor(srgbRed: 0x4C / 255.0, green: 0xC3 / 255.0, blue: 0x8A / 255.0, alpha: 1.0)
-  static let run = NSColor(srgbRed: 0xD9 / 255.0, green: 0x9E / 255.0, blue: 0x45 / 255.0, alpha: 1.0)
+  static let canvas = NSColor(srgbRed: 0x00 / 255.0, green: 0x00 / 255.0, blue: 0x00 / 255.0, alpha: 1.0)
+  static let bg = NSColor(srgbRed: 0x00 / 255.0, green: 0x00 / 255.0, blue: 0x00 / 255.0, alpha: 1.0)
+  static let surface1 = NSColor(srgbRed: 0x0A / 255.0, green: 0x0A / 255.0, blue: 0x0A / 255.0, alpha: 1.0)
+  static let surface2 = NSColor(srgbRed: 0x10 / 255.0, green: 0x10 / 255.0, blue: 0x10 / 255.0, alpha: 1.0)
+  static let surface3 = NSColor(srgbRed: 0x19 / 255.0, green: 0x19 / 255.0, blue: 0x19 / 255.0, alpha: 1.0)
+  static let border = NSColor(srgbRed: 0x1B / 255.0, green: 0x1B / 255.0, blue: 0x1B / 255.0, alpha: 1.0)
+  static let border2 = NSColor(srgbRed: 0x2C / 255.0, green: 0x2C / 255.0, blue: 0x2C / 255.0, alpha: 1.0)
+  static let fg1 = NSColor(srgbRed: 0xFF / 255.0, green: 0xFF / 255.0, blue: 0xFF / 255.0, alpha: 1.0)
+  static let fg2 = NSColor(srgbRed: 0xD6 / 255.0, green: 0xD6 / 255.0, blue: 0xD6 / 255.0, alpha: 1.0)
+  static let fg3 = NSColor(srgbRed: 0x8E / 255.0, green: 0x8E / 255.0, blue: 0x8E / 255.0, alpha: 1.0)
+  static let fg4 = NSColor(srgbRed: 0x5C / 255.0, green: 0x5C / 255.0, blue: 0x5C / 255.0, alpha: 1.0)
+  static let accent = NSColor(srgbRed: 0xFF / 255.0, green: 0xFF / 255.0, blue: 0xFF / 255.0, alpha: 1.0)
+  static let accentFill = NSColor(srgbRed: 0xF2 / 255.0, green: 0xF2 / 255.0, blue: 0xF2 / 255.0, alpha: 1.0)
+  static let ok = NSColor(srgbRed: 0x34 / 255.0, green: 0xD3 / 255.0, blue: 0x99 / 255.0, alpha: 1.0)
+  static let run = NSColor(srgbRed: 0xF5 / 255.0, green: 0x9E / 255.0, blue: 0x0B / 255.0, alpha: 1.0)
 }
 
 extension NSBezierPath {
@@ -2827,7 +2827,7 @@ enum NotchHomePalette {
   static let amber = SnippetTheme.run
   static let accent = SnippetTheme.accent
   static let ok = SnippetTheme.ok
-  static let danger = NSColor(srgbRed: 0xEB / 255.0, green: 0x57 / 255.0, blue: 0x57 / 255.0, alpha: 1)
+  static let danger = NSColor(srgbRed: 0xFF / 255.0, green: 0x5C / 255.0, blue: 0x5C / 255.0, alpha: 1)
   static let idle = SnippetTheme.fg4
   static let text = SnippetTheme.fg1
   static let muted = SnippetTheme.fg3
@@ -2870,7 +2870,7 @@ final class NotchHomeButton: NSButton {
       string: title,
       attributes: [
         .font: NotchHomeType.sans(12.5, weight: .medium),
-        .foregroundColor: NotchHomePalette.text,
+        .foregroundColor: primary ? NSColor.black : NotchHomePalette.text,
       ])
     target = self
     action = #selector(pressed)

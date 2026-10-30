@@ -112,12 +112,12 @@ ThemePreset _dark({
   required Color danger,
   required Color warn,
 }) {
-  const canvas = Color(0xFF0B0B0D);
-  const bg = Color(0xFF101012);
-  const floor = Color(0xFF101012);
-  const surface1 = Color(0xFF17171A);
-  const surface2 = Color(0xFF1E1E22);
-  const surface3 = Color(0xFF26262B);
+  const canvas = Color(0xFF000000);
+  const bg = Color(0xFF000000);
+  const floor = Color(0xFF000000);
+  const surface1 = Color(0xFF0A0A0A);
+  const surface2 = Color(0xFF101010);
+  const surface3 = Color(0xFF191919);
 
   return ThemePreset(
     name: name,
@@ -132,11 +132,11 @@ ThemePreset _dark({
     fg2: inkMuted,
     fg3: inkSubtle,
     fg4: inkFaint,
-    border: const Color(0xFF26262B),
-    border2: const Color(0xFF323238),
+    border: const Color(0xFF1B1B1B),
+    border2: const Color(0xFF2C2C2C),
     accent: accent,
     accentHover: _lighten(accent, 0.06),
-    accentFg: const Color(0xFFFFFFFF),
+    accentFg: const Color(0xFF000000),
     accentBg: _withAlpha(accent, 0.14),
     accentLine: _withAlpha(accent, 0.38),
     accentRing: _withAlpha(accent, 0.45),
@@ -152,63 +152,63 @@ ThemePreset _dark({
     diffDelBg: _withAlpha(danger, 0.10),
     diffAddFg: _lighten(success, 0.14),
     diffDelFg: _lighten(danger, 0.14),
-    diffGutter: const Color(0xFF323238),
+    diffGutter: const Color(0xFF2C2C2C),
   );
 }
 
 // The only client theme.
 final _amoled = _dark(
   name: 'amoled',
-  label: 'Graphite',
-  accent: const Color(0xFF8B8DFF),
-  accentFill: const Color(0xFF5E6AD2),
-  accentFillHover: const Color(0xFF5560C2),
-  ink: const Color(0xFFEEEEF1),
-  inkMuted: const Color(0xFFC4C4CC),
-  inkSubtle: const Color(0xFF8F8F9B),
-  inkFaint: const Color(0xFF62626D),
-  success: const Color(0xFF4CC38A),
-  danger: const Color(0xFFEB5757),
-  warn: const Color(0xFFD99E45),
+  label: 'Black',
+  accent: const Color(0xFFFFFFFF),
+  accentFill: const Color(0xFFF2F2F2),
+  accentFillHover: const Color(0xFFD9D9D9),
+  ink: const Color(0xFFFFFFFF),
+  inkMuted: const Color(0xFFD6D6D6),
+  inkSubtle: const Color(0xFF8E8E8E),
+  inkFaint: const Color(0xFF5C5C5C),
+  success: const Color(0xFF34D399),
+  danger: const Color(0xFFFF5C5C),
+  warn: const Color(0xFFF59E0B),
 );
 
-// Phones: warm near-black, warm ink and a periwinkle accent, so the reading
-// serif sits on something softer than graphite. Desktop keeps Graphite.
-const _emberCanvas = Color(0xFF121110);
+// The theme in use on every platform: true black with white as the only
+// accent; colour is kept for status (amber, green, red).
+const _emberCanvas = Color(0xFF000000);
 final _ember = ThemePreset(
   name: 'ember',
-  label: 'Ember',
+  label: 'Black',
   bg: _emberCanvas,
   canvas: _emberCanvas,
   floor: _emberCanvas,
-  surface1: const Color(0xFF1B1917),
-  surface2: const Color(0xFF221F1B),
-  surface3: const Color(0xFF2A2621),
-  fg1: const Color(0xFFEDE7DD),
-  fg2: const Color(0xFFCFC8BC),
-  fg3: const Color(0xFFA39C90),
-  fg4: const Color(0xFF7A7368),
-  border: const Color(0xFF242120),
-  border2: const Color(0xFF302C27),
-  accent: const Color(0xFF9DB0FF),
-  accentHover: const Color(0xFFB4C3FF),
-  accentFg: const Color(0xFF10142A),
-  accentBg: const Color(0xFF9DB0FF).withValues(alpha: 0.14),
-  accentLine: const Color(0xFF9DB0FF).withValues(alpha: 0.38),
-  accentRing: const Color(0xFF9DB0FF).withValues(alpha: 0.45),
-  accentFill: const Color(0xFF9DB0FF),
-  accentFillHover: const Color(0xFFB4C3FF),
-  ok: const Color(0xFF7FB88F),
-  okBg: const Color(0xFF7FB88F).withValues(alpha: 0.13),
-  run: const Color(0xFFD4923C),
-  runBg: const Color(0xFFD4923C).withValues(alpha: 0.13),
-  danger: const Color(0xFFE5745F),
-  dangerBg: const Color(0xFFE5745F).withValues(alpha: 0.13),
-  diffAddBg: const Color(0xFF7FB88F).withValues(alpha: 0.10),
-  diffDelBg: const Color(0xFFE5745F).withValues(alpha: 0.10),
-  diffAddFg: const Color(0xFF9DCCA9),
-  diffDelFg: const Color(0xFFEE9583),
-  diffGutter: const Color(0xFF302C27),
+  surface1: const Color(0xFF0A0A0A),
+  surface2: const Color(0xFF101010),
+  surface3: const Color(0xFF191919),
+  fg1: const Color(0xFFFFFFFF),
+  fg2: const Color(0xFFD6D6D6),
+  fg3: const Color(0xFF8E8E8E),
+  fg4: const Color(0xFF5C5C5C),
+  border: const Color(0xFF1B1B1B),
+  border2: const Color(0xFF2C2C2C),
+  accent: const Color(0xFFFFFFFF),
+  accentHover: const Color(0xFFE0E0E0),
+  accentFg: const Color(0xFF000000),
+  accentBg: const Color(0xFFFFFFFF).withValues(alpha: 0.10),
+  accentLine: const Color(0xFFFFFFFF).withValues(alpha: 0.30),
+  accentRing: const Color(0xFFFFFFFF).withValues(alpha: 0.40),
+  accentFill: const Color(0xFFF2F2F2),
+  accentFillHover: const Color(0xFFD9D9D9),
+  ok: const Color(0xFF34D399),
+  okBg: const Color(0xFF34D399).withValues(alpha: 0.13),
+  run: const Color(0xFFF59E0B),
+  runBg: const Color(0xFFF59E0B).withValues(alpha: 0.13),
+  danger: const Color(0xFFFF5C5C),
+  dangerBg: const Color(0xFFFF5C5C).withValues(alpha: 0.13),
+  diffAddBg: const Color(0xFF34D399).withValues(alpha: 0.10),
+  diffDelBg: const Color(0xFFFF5C5C).withValues(alpha: 0.10),
+  diffAddFg: const Color(0xFF6EE7B7),
+  diffDelFg: const Color(0xFFFF8A8A),
+  diffGutter: const Color(0xFF2C2C2C),
 );
 
 final List<ThemePreset> allPresets = [_amoled];

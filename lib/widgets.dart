@@ -1909,9 +1909,9 @@ class AppSwitch extends StatelessWidget {
                     width: thumb,
                     height: thumb,
                     decoration: BoxDecoration(
-                        color: !kMobile
-                            ? Colors.white
-                            : (on ? AppColors.accentFg : AppColors.fg4),
+                        color: on
+                            ? AppColors.accentFg
+                            : (kMobile ? AppColors.fg4 : Colors.white),
                         shape: BoxShape.circle),
                   ),
                 ),

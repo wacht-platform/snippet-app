@@ -64,7 +64,7 @@ class _SessionTermViewState extends State<SessionTermView> {
     cursor: const Color(0xff9DB0FF),
     selection: const Color(0x559DB0FF),
     foreground: const Color(0xffEDE7DD),
-    background: const Color(0xff121110),
+    background: const Color(0xff000000),
     black: const Color(0xff1B1917),
     red: const Color(0xffE5745F),
     green: const Color(0xff7FB88F),
@@ -83,7 +83,7 @@ class _SessionTermViewState extends State<SessionTermView> {
     brightWhite: const Color(0xffEDE7DD),
     searchHitBackground: const Color(0xffD4923C),
     searchHitBackgroundCurrent: const Color(0xffE3A85A),
-    searchHitForeground: const Color(0xff121110),
+    searchHitForeground: const Color(0xff000000),
   );
 
   static TerminalTheme get _theme => _emberTheme;
