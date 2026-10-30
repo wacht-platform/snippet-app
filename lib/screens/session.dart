@@ -718,6 +718,46 @@ class _SessionScreenState extends State<SessionScreen>
   }
 
   late String _title;
+  bool _settled = false;
+
+  void _loadSettled() {
+    if (_isMissionControl) return;
+    widget.client.sessions().then((list) {
+      if (!mounted) return;
+      final now = list.any((x) => x.id == widget.sessionId && x.settled);
+      if (now != _settled) setState(() => _settled = now);
+    }).catchError((_) {});
+  }
+
+  Future<void> _wake() async {
+    try {
+      await widget.client.unsettleSession(widget.sessionId);
+      if (mounted) setState(() => _settled = false);
+    } catch (e) {
+      if (mounted) toast(context, "Couldn't wake: $e", danger: true);
+    }
+  }
+
+  Widget _settledNotice() => Container(
+        margin: EdgeInsets.fromLTRB(
+            kMobile ? M.gutter : 20, 6, kMobile ? M.gutter : 20, 0),
+        padding: const EdgeInsets.fromLTRB(12, 4, 4, 4),
+        decoration: BoxDecoration(
+          color: AppColors.surface1,
+          borderRadius: BorderRadius.circular(R.sm),
+          border: Border.all(color: AppColors.line),
+        ),
+        child: Row(children: [
+          Expanded(
+            child: Text('Settled to save tokens. Sending a message wakes it.',
+                style: sans(12.5, color: AppColors.fg3)),
+          ),
+          TextButton(
+            onPressed: _wake,
+            child: Text('Wake', style: sans(12.5, color: AppColors.accent)),
+          ),
+        ]),
+      );
 
   @override
   void initState() {
@@ -729,6 +769,7 @@ class _SessionScreenState extends State<SessionScreen>
       });
     }
     _loadGithubStatus();
+    _loadSettled();
     _lastInput = _input.text;
     _input.addListener(_interceptBigPaste);
     _restoreDraft();
@@ -1455,6 +1496,9 @@ class _SessionScreenState extends State<SessionScreen>
                                     onSend: _sendDecision),
                               ),
                             )),
+                          if (!widget.readOnly && _settled)
+                            _centerWide(_settledNotice(),
+                                extra: 2 * kComposerGutter),
                           if (!widget.readOnly &&
                               !(waiting && s?.pendingQuestion != null))
                             _centerWide(_inputBar(running), extra: 2 * kComposerGutter),

@@ -696,6 +696,18 @@ class DaemonClient {
     if (r.statusCode != 200) throw _err('delete session', r);
   }
 
+  Future<void> settleSession(String sessionId) async {
+    final r = await http.post(_uri('/session/settle'),
+        headers: _json, body: jsonEncode({'session': sessionId}));
+    if (r.statusCode != 200) throw _err('settle session', r);
+  }
+
+  Future<void> unsettleSession(String sessionId) async {
+    final r = await http.post(_uri('/session/unsettle'),
+        headers: _json, body: jsonEncode({'session': sessionId}));
+    if (r.statusCode != 200) throw _err('wake session', r);
+  }
+
   Future<void> renameSession(String sessionId, String title) async {
     final r = await http.post(_uri('/session/rename'),
         headers: _json,

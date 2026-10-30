@@ -162,6 +162,12 @@ class SessionInfo {
   final bool running;
   final String? profile;
 
+  /// Parked to cut cache cost; the daemon deletes it 15 days after [settledAt].
+  final bool settled;
+  final int? settledAt;
+  final int idleSecs;
+  final String cache;
+
   /// The agent this session IS, if any — an inbox belongs to an agent, and a
   /// specialized session runs as one. A durable property of the session.
   final String? agentId;
@@ -205,6 +211,10 @@ class SessionInfo {
         lastActive = (j['last_active'] as num?)?.toInt() ?? 0,
         running = j['running'] == true,
         profile = j['profile'] as String?,
+        settled = j['settled'] == true,
+        settledAt = (j['settled_at'] as num?)?.toInt(),
+        idleSecs = (j['idle_secs'] as num?)?.toInt() ?? 0,
+        cache = j['cache'] as String? ?? 'warm',
         agentId = j['agent_id'] as String?,
         workerAgentId = j['worker_agent_id'] as String?,
         attention = j['attention'] is Map
@@ -222,6 +232,10 @@ class SessionInfo {
         lastActive: lastActive,
         running: running,
         profile: profile,
+        settled: settled,
+        settledAt: settledAt,
+        idleSecs: idleSecs,
+        cache: cache,
         agentId: agentId,
         workerAgentId: workerAgentId,
         attention: attention,
@@ -254,6 +268,10 @@ class SessionInfo {
     required this.lastActive,
     required this.running,
     required this.profile,
+    this.settled = false,
+    this.settledAt,
+    this.idleSecs = 0,
+    this.cache = 'warm',
     this.agentId,
     this.workerAgentId,
     this.attention,

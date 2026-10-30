@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../api.dart';
 import '../drafts.dart';
 import '../models.dart';
+import '../settled_sessions.dart';
 import '../crew_status.dart';
 import '../crew_widgets.dart';
 import '../platform.dart';
@@ -122,6 +123,7 @@ class SidebarState extends State<Sidebar> {
   final GlobalKey<AgentsSidebarPanelState> _agentsPanelKey =
       GlobalKey<AgentsSidebarPanelState>();
   bool _selecting = false;
+  static bool _settledOpen = false;
   final Set<String> _selected = {};
 
   /// Phone search: a filter field at the top of each tab.
@@ -699,6 +701,58 @@ class SidebarState extends State<Sidebar> {
         (s.branch?.toLowerCase().contains(q) ?? false);
   }
 
+  Widget _settledGroup(List<SessionInfo> rows, {required bool mobile}) {
+    final open = _settledOpen || _filterQuery.trim().isNotEmpty;
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      InkWell(
+        onTap: () => setState(() => _settledOpen = !_settledOpen),
+        child: Padding(
+          padding: mobile
+              ? const EdgeInsets.fromLTRB(4, 16, 4, 10)
+              : const EdgeInsets.fromLTRB(8, 14, 6, 6),
+          child: Row(children: [
+            AppIcon(open ? 'chevron-down' : 'chevron-right',
+                size: 13, color: AppColors.fg4),
+            const SizedBox(width: 6),
+            Text(mobile ? 'Settled' : 'SETTLED',
+                style: mobile
+                    ? sans(13, color: AppColors.fg3)
+                    : sans(11, color: AppColors.fg4, spacing: 0.9)),
+            const SizedBox(width: 8),
+            Text('${rows.length}',
+                style: sans(mobile ? 13 : 11.5,
+                    color: AppColors.fg4, tabular: true)),
+          ]),
+        ),
+      ),
+      if (open)
+        for (var i = 0; i < rows.length; i++)
+          mobile
+              ? _mobileSessionRow(rows[i], divider: i + 1 < rows.length)
+              : _desktopChatRow(rows[i]),
+    ]);
+  }
+
+  Future<void> _setSettled(SessionInfo s, bool settle) async {
+    final c = widget.client;
+    if (c == null) return;
+    try {
+      if (settle) {
+        await c.settleSession(s.id);
+      } else {
+        await c.unsettleSession(s.id);
+      }
+      if (!mounted) return;
+      toast(context, settle ? 'Settled' : 'Awake');
+      widget.onRefreshSessions();
+    } catch (e) {
+      if (mounted) {
+        toast(context, "Couldn't ${settle ? 'settle' : 'wake'}: $e",
+            danger: true);
+      }
+    }
+  }
+
   List<SessionInfo> _sortSessionsByRecency(Iterable<SessionInfo> sessions) {
     final sorted = sessions.toList();
     sorted.sort((a, b) => b.lastActive.compareTo(a.lastActive));
@@ -743,10 +797,12 @@ class SidebarState extends State<Sidebar> {
           ]);
     }
     final mc = all.where((s) => isDedicatedMcSession(s.id)).toList();
-    final list = _sortSessionsByRecency(all.where((s) =>
+    final split = splitSettled(_sortSessionsByRecency(all.where((s) =>
         !isDedicatedMcSession(s.id) &&
         !isInboxSessionRow(s) &&
-        _matchesQuery(s)));
+        _matchesQuery(s))));
+    final list = split.main;
+    final settledRows = split.settled;
     // Phone chats are one flat, chronological surface.
     if (kMobile) {
       bool isActive(SessionInfo s) =>
@@ -773,6 +829,9 @@ class SidebarState extends State<Sidebar> {
           since: _chatsShownAt,
           child: _mobileSessionRow(rows[i], divider: i + 1 < rows.length),
         ));
+      }
+      if (settledRows.isNotEmpty) {
+        mobileChildren.add(_settledGroup(settledRows, mobile: true));
       }
       if (mobileChildren.isEmpty) {
         mobileChildren.add(Padding(
@@ -808,7 +867,7 @@ class SidebarState extends State<Sidebar> {
         children.add(_desktopTreeRow(list[i], last: i == list.length - 1));
       }
     }
-    if (list.isEmpty && mc.isEmpty) {
+    if (list.isEmpty && mc.isEmpty && settledRows.isEmpty) {
       children.add(Padding(
           padding: const EdgeInsets.all(20),
           child: Text('Nothing here.',
@@ -831,10 +890,12 @@ class SidebarState extends State<Sidebar> {
   Widget _sectionedSidebar() {
     final hasClient = widget.client != null;
     final all = _sessions ?? const <SessionInfo>[];
-    final list = _sortSessionsByRecency(all.where((s) =>
+    final split = splitSettled(_sortSessionsByRecency(all.where((s) =>
         !isDedicatedMcSession(s.id) &&
         !isInboxSessionRow(s) &&
-        _matchesQuery(s)));
+        _matchesQuery(s))));
+    final list = split.main;
+    final settledRows = split.settled;
     final mc = all.where((s) => isDedicatedMcSession(s.id)).firstOrNull;
     final groups = <String, List<SessionInfo>>{};
     for (final s in list) {
@@ -1039,12 +1100,15 @@ class SidebarState extends State<Sidebar> {
             children: [
               if (!hasClient)
                 const SidebarEmpty('Add a machine to begin.')
-              else if (list.isEmpty)
+              else if (list.isEmpty && settledRows.isEmpty)
                 SidebarEmpty(_filterQuery.trim().isNotEmpty
                     ? 'No chats match the search.'
                     : 'No chats yet.')
-              else
+              else ...[
                 ...rows,
+                if (settledRows.isNotEmpty)
+                  _settledGroup(settledRows, mobile: false),
+              ],
             ],
           ),
         ),
@@ -1069,8 +1133,9 @@ class SidebarState extends State<Sidebar> {
     }
     final checked = _selected.contains(s.id);
     final draft = _hasDraft(s);
-    final running = sessionIsActive(s.status);
-    final waiting = s.status == 'waiting_for_input';
+    final settled = s.settled;
+    final running = !settled && sessionIsActive(s.status);
+    final waiting = !settled && s.status == 'waiting_for_input';
     final on = _selecting ? checked : selected;
     return Material(
       color: on ? AppColors.surface2 : Colors.transparent,
@@ -1103,12 +1168,21 @@ class SidebarState extends State<Sidebar> {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: sans(13,
-                      color: selected ? AppColors.fg1 : AppColors.fg3)),
+                      color: settled
+                          ? AppColors.fg4
+                          : selected
+                              ? AppColors.fg1
+                              : AppColors.fg3)),
             ),
             const SizedBox(width: 10),
             ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 110),
-              child: running || waiting
+              child: settled
+                  ? Tooltip(
+                      message: settledMeta(s),
+                      child: Text('Settled',
+                          style: sans(11.5, color: AppColors.fg4)))
+                  : running || waiting
                   ? Container(
                       width: 6,
                       height: 6,
@@ -1483,14 +1557,17 @@ class SidebarState extends State<Sidebar> {
         ? ''
         : lastPathSegment(s.projectFolder, ifEmpty: s.projectFolder);
     final draft = !renaming && _hasDraft(s);
-    final running = sessionIsActive(s.status);
-    final waiting = s.status == 'waiting_for_input';
+    final settled = s.settled;
+    final running = !settled && sessionIsActive(s.status);
+    final waiting = !settled && s.status == 'waiting_for_input';
     final branch = s.branch?.trim() ?? '';
     final place = [
       if (folderName.isNotEmpty) folderName,
       if (branch.isNotEmpty) branch,
     ].join(' · ');
-    final (String stamp, Color stampColor) = waiting
+    final (String stamp, Color stampColor) = settled
+        ? ('Settled', AppColors.fg4)
+        : waiting
         ? ('needs you', AppColors.run)
         : running
             ? ('working', AppColors.accent)
@@ -1552,7 +1629,9 @@ class SidebarState extends State<Sidebar> {
                               style: sans(16,
                                   weight: W.strong,
                                   height: 21 / 16,
-                                  color: AppColors.fg1)),
+                                  color: settled
+                                      ? AppColors.fg3
+                                      : AppColors.fg1)),
                     ),
                     const SizedBox(width: 10),
                     Text(stamp,
@@ -1573,7 +1652,16 @@ class SidebarState extends State<Sidebar> {
                         color: AppColors.fg4),
                     const SizedBox(width: 6),
                     Expanded(
-                      child: Text(place.isEmpty ? 'No project' : place,
+                      child: Text(
+                          settled
+                              ? [
+                                  if (place.isNotEmpty) place,
+                                  if (settledDaysLeft(s) != null)
+                                    settledMeta(s).replaceFirst('Settled · ', ''),
+                                ].join(' · ')
+                              : place.isEmpty
+                                  ? 'No project'
+                                  : place,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: sans(13,
@@ -1618,6 +1706,10 @@ class SidebarState extends State<Sidebar> {
         items: [
           appMenuItem(value: 'rename', icon: 'edit', label: 'Rename'),
           appMenuItem(value: 'select', icon: 'check', label: 'Select'),
+          if (s.settled)
+            appMenuItem(value: 'wake', icon: 'play', label: 'Wake')
+          else if (!sessionIsActive(s.status))
+            appMenuItem(value: 'settle', icon: 'archive', label: 'Settle now'),
           const PopupMenuDivider(height: 9),
           appMenuItem(
               value: 'delete', icon: 'trash', label: 'Delete', danger: true),
@@ -1625,6 +1717,8 @@ class SidebarState extends State<Sidebar> {
       );
       if (selected == 'select') {
         _enterSelect(seed: s.id);
+      } else if (selected == 'settle' || selected == 'wake') {
+        await _setSettled(s, selected == 'settle');
       } else if (selected == 'rename') {
         _beginRename(s);
       } else if (selected == 'delete') {
@@ -1643,6 +1737,16 @@ class SidebarState extends State<Sidebar> {
             Navigator.pop(context);
             _beginRename(s);
           }),
+          if (s.settled)
+            SheetAction('play', 'Wake', () {
+              Navigator.pop(context);
+              _setSettled(s, false);
+            })
+          else if (!sessionIsActive(s.status))
+            SheetAction('archive', 'Settle now', () {
+              Navigator.pop(context);
+              _setSettled(s, true);
+            }),
           SheetAction('trash', 'Delete', () {
             Navigator.pop(context);
             _confirmDeleteSessions([s]);

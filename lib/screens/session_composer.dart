@@ -12,6 +12,7 @@ extension _SessionScreenComposerExt on _SessionScreenState {
       unawaited(
           AmbientController.instance.voice.value?.stopNow() ?? Future.value());
     }
+    if (kind == 'user_message' && _settled) _setState(() => _settled = false);
     final payload = jsonEncode(m);
     final ch = _channel;
     if (ch == null) {
