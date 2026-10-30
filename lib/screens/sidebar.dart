@@ -924,15 +924,19 @@ class SidebarState extends State<Sidebar> {
         ),
 
       Padding(
-        padding: const EdgeInsets.fromLTRB(10, 0, 10, 0),
+        padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
         child: Material(
-          color: mcSelected ? AppColors.surface2 : Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
+          color: mcSelected ? AppColors.surface2 : AppColors.surface1,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(
+                color: mcSelected ? AppColors.lineStrong : AppColors.line),
+          ),
+          clipBehavior: Clip.antiAlias,
           child: InkWell(
-            borderRadius: BorderRadius.circular(8),
             onTap: hasClient ? widget.onOpenMissionControl : null,
             child: SizedBox(
-              height: 40,
+              height: 52,
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 8),
                 child: Row(children: [
@@ -1051,32 +1055,14 @@ class SidebarState extends State<Sidebar> {
         child: Column(children: [
           if (widget.onOpenPalette != null)
             Padding(
-              padding: const EdgeInsets.fromLTRB(10, 8, 10, 4),
-              child: Material(
-                color: AppColors.surface1,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  side: BorderSide(color: AppColors.line),
-                ),
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(8),
-                  onTap: widget.onOpenPalette,
-                  child: SizedBox(
-                    height: 30,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                      child: Row(children: [
-                        AppIcon('search', size: 14, color: AppColors.fg4),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text('Search or jump',
-                              style: sans(13, color: AppColors.fg4)),
-                        ),
-                        Text('⌘K', style: mono(11, color: AppColors.fg4)),
-                      ]),
-                    ),
-                  ),
-                ),
+              padding: const EdgeInsets.fromLTRB(10, 4, 10, 0),
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: IconBtn('search',
+                    size: 24,
+                    iconSize: 14,
+                    tooltip: 'Search or jump (⌘K)',
+                    onTap: widget.onOpenPalette),
               ),
             ),
           if (widget.desktopFooter != null) widget.desktopFooter!,

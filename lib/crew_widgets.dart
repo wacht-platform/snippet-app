@@ -16,12 +16,6 @@ Color crewColor(CrewState s) => switch (s) {
       CrewState.standingBy => AppColors.fg4,
     };
 
-String _crewGroup(CrewState s) => switch (s) {
-      CrewState.needsYou => 'Needs you',
-      CrewState.working => 'Working',
-      CrewState.standingBy => 'Standing by',
-    };
-
 class CrewTile extends StatelessWidget {
   const CrewTile(this.entry, {super.key, this.size = 34});
   final CrewEntry entry;
@@ -79,125 +73,94 @@ class _Chip extends StatelessWidget {
       );
 }
 
-Color _lineColor(CrewState s) => switch (s) {
-      CrewState.needsYou => AppColors.run,
-      CrewState.working => AppColors.accent,
-      CrewState.standingBy => AppColors.fg3,
-    };
-
 /// Needs-you first, then working, then standing by; each group keeps the
 /// agent order the daemon gave.
 List<CrewEntry> crewOrdered(List<CrewEntry> c) => [
       for (final s in CrewState.values) ...c.where((e) => e.state == s),
     ];
 
-class CrewRoster extends StatefulWidget {
+class CrewRoster extends StatelessWidget {
   const CrewRoster({
     super.key,
     required this.entries,
     required this.onOpen,
-    this.onBoard,
+    this.columns = 3,
   });
 
   final List<CrewEntry> entries;
   final ValueChanged<CoordinationAgent> onOpen;
-  final VoidCallback? onBoard;
-
-  @override
-  State<CrewRoster> createState() => _CrewRosterState();
-}
-
-class _CrewRosterState extends State<CrewRoster> {
-  bool _showIdle = false;
+  final int columns;
 
   @override
   Widget build(BuildContext context) {
-    final entries = widget.entries;
-    final states = [
-      for (final s in CrewState.values)
-        if (entries.any((e) => e.state == s)) s
-    ];
-    // One state only: a plain list. Several: grouped, with standing-by folded.
-    final single = states.length <= 1;
-    final idle = crewCount(entries, CrewState.standingBy);
-    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      for (final s in states)
-        if (single || s != CrewState.standingBy || _showIdle) ...[
-          if (!single)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(18, 8, 12, 2),
-              child: Text(
-                  '${_crewGroup(s).toUpperCase()} · ${crewCount(entries, s)}',
-                  style: sans(10.5, color: AppColors.fg4, spacing: 0.8)),
-            ),
-          for (final e in entries.where((e) => e.state == s))
-            _RosterRow(e, () => widget.onOpen(e.agent)),
-        ],
-      if (!single && idle > 0)
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          child: InkWell(
-            borderRadius: BorderRadius.circular(R.md - 2),
-            onTap: () => setState(() => _showIdle = !_showIdle),
-            child: Padding(
-              padding: EdgeInsets.fromLTRB(
-                  10, kMobile ? 10 : 6, 10, kMobile ? 10 : 6),
-              child: Text(_showIdle ? 'Hide standing by' : '$idle standing by',
-                  style: sans(12, color: AppColors.fg4)),
-            ),
-          ),
-        ),
-    ]);
+    final list = crewOrdered(entries);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
+      child: LayoutBuilder(builder: (context, box) {
+        const gap = 8.0;
+        final w = (box.maxWidth - gap * (columns - 1)) / columns;
+        return Wrap(spacing: gap, runSpacing: gap, children: [
+          for (final e in list)
+            SizedBox(width: w, child: _Bubble(e, () => onOpen(e.agent))),
+        ]);
+      }),
+    );
   }
 }
 
-class _RosterRow extends StatelessWidget {
-  const _RosterRow(this.e, this.onTap);
+class _Bubble extends StatelessWidget {
+  const _Bubble(this.e, this.onTap);
   final CrewEntry e;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final profile = e.agent.profile;
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(R.md - 2),
-        onTap: onTap,
-        child: Padding(
-          padding:
-              EdgeInsets.symmetric(horizontal: 6, vertical: kMobile ? 8 : 5),
-          child: Row(children: [
-            CrewTile(e, size: kMobile ? 40 : 32),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(e.agent.displayName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: sans(kMobile ? 14.5 : 13.5,
-                          weight: W.label, color: AppColors.fg1)),
-                  Row(children: [
-                    Flexible(
-                      child: Text(e.line,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: sans(12.5, color: _lineColor(e.state))),
-                    ),
-                    if (e.extra > 0)
-                      Text(' +${e.extra}',
-                          style: sans(12.5, color: AppColors.fg4)),
-                  ]),
-                ],
+    final c = crewColor(e.state);
+    final idle = e.state == CrewState.standingBy;
+    final tip = [
+      e.agent.displayName,
+      e.line,
+      if (e.extra > 0) '+${e.extra} more sessions',
+      if (e.agent.profile != null) e.agent.profile!,
+    ].join('\n');
+    return Tooltip(
+      message: tip,
+      child: Material(
+        color: AppColors.surface1,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(
+              color: idle ? AppColors.line : c.withValues(alpha: .8)),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(4, 10, 4, 8),
+            child: Stack(clipBehavior: Clip.none, children: [
+              Column(mainAxisSize: MainAxisSize.min, children: [
+                Opacity(
+                    opacity: idle ? .75 : 1,
+                    child: AgentMochi(e.agent.id, size: 36)),
+                const SizedBox(height: 6),
+                Text(e.agent.displayName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: sans(11.5,
+                        color: idle ? AppColors.fg3 : AppColors.fg1)),
+              ]),
+              Positioned(
+                right: 2,
+                top: -4,
+                child: Container(
+                  width: 9,
+                  height: 9,
+                  decoration: BoxDecoration(color: c, shape: BoxShape.circle),
+                ),
               ),
-            ),
-            if (profile != null) ...[
-              const SizedBox(width: 6),
-              _Chip(profile),
-            ],
-          ]),
+            ]),
+          ),
         ),
       ),
     );
