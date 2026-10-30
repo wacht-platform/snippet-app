@@ -30,6 +30,83 @@ class AgentCard extends StatefulWidget {
 }
 
 class _AgentCardState extends State<AgentCard> {
+  bool _profileSet = false;
+  String? _profile;
+
+  String? get _currentProfile => _profileSet ? _profile : widget.agent.profile;
+
+  Future<void> _setProfile(String? profile) async {
+    final before = (_profileSet, _profile);
+    setState(() {
+      _profileSet = true;
+      _profile = profile;
+    });
+    try {
+      await widget.client.setAgentProfile(widget.agent.id, profile);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _profileSet = before.$1;
+        _profile = before.$2;
+      });
+      ScaffoldMessenger.maybeOf(context)
+          ?.showSnackBar(SnackBar(content: Text('$e')));
+    }
+  }
+
+  Future<void> _pickProfile(String name, {Offset? point}) async {
+    ServerConfig cfg;
+    try {
+      cfg = await widget.client.getConfig();
+    } catch (e) {
+      return;
+    }
+    if (!mounted || cfg.profiles.isEmpty) return;
+    final current = _currentProfile;
+    if (kMobile) {
+      showAppSheet(context,
+          title: '$name works on',
+          child: SheetActions([
+            SheetAction('sparkles', 'Session\'s own model', () {
+              Navigator.pop(context);
+              _setProfile(null);
+            }),
+            for (final p in cfg.profiles)
+              SheetAction(
+                  'provider:${p.provider}',
+                  p.name == current ? '${p.name}  (current)' : p.name, () {
+                Navigator.pop(context);
+                _setProfile(p.name);
+              }),
+          ]));
+      return;
+    }
+    final picked = await showAppMenu<String>(
+      context,
+      point: point,
+      anchor: point == null ? context : null,
+      minWidth: 260,
+      maxWidth: 360,
+      items: [
+        appMenuHeading<String>('Works on'),
+        appMenuRow<String>(
+            value: '',
+            icon: 'sparkles',
+            label: 'Session\'s own model',
+            selected: current == null),
+        for (final p in cfg.profiles)
+          appMenuRow<String>(
+              value: p.name,
+              icon: 'provider:${p.provider}',
+              label: p.name,
+              description: '${p.provider} · ${p.model}',
+              selected: p.name == current),
+      ],
+    );
+    if (picked == null || picked == (current ?? '')) return;
+    _setProfile(picked.isEmpty ? null : picked);
+  }
+
   Future<void> _actions(Offset? point) async {
     final name = widget.agent.displayName.trim().isEmpty
         ? widget.agent.id
@@ -42,6 +119,11 @@ class _AgentCardState extends State<AgentCard> {
               Navigator.pop(context);
               showMochiColorPicker(context, widget.client, widget.agent.id, name);
             }),
+            if (!widget.agent.isMissionControl)
+              SheetAction('cpu', 'Change model', () {
+                Navigator.pop(context);
+                _pickProfile(name);
+              }),
             if (widget.onDelete != null)
               SheetAction('trash', 'Delete agent', () {
                 Navigator.pop(context);
@@ -56,12 +138,15 @@ class _AgentCardState extends State<AgentCard> {
       anchor: point == null ? context : null,
       items: [
         appMenuItem(value: 'color', icon: 'sparkles', label: 'Change colour'),
+        if (!widget.agent.isMissionControl)
+          appMenuItem(value: 'model', icon: 'cpu', label: 'Change model'),
         if (widget.onDelete != null)
           appMenuItem(
               value: 'delete', icon: 'trash', label: 'Delete agent', danger: true),
       ],
     );
     if (picked == 'delete') widget.onDelete?.call();
+    if (picked == 'model' && mounted) _pickProfile(name, point: point);
     if (picked == 'color' && mounted) {
       showMochiColorPicker(context, widget.client, widget.agent.id, name,
           point: point);
@@ -107,7 +192,11 @@ class _AgentCardState extends State<AgentCard> {
         _count({TaskStatus.blocked, TaskStatus.failed}, {'blocked', 'failed'});
     final open = working + queued + blocked;
     final done = _count({TaskStatus.done}, {'done'});
-    final role = agent.role.trim();
+    final profile = _currentProfile;
+    final roleText = agent.role.trim();
+    final role = profile == null
+        ? roleText
+        : (roleText.isEmpty ? profile : '$roleText · $profile');
     final status = !agent.available
         ? 'Paused'
         : working > 0

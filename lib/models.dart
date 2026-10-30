@@ -1050,9 +1050,16 @@ class CoordinationAgent {
 
   final String? color;
 
+  /// The inference profile this agent works on in every session; null when it
+  /// uses the session's own model.
+  final String? profile;
+
   CoordinationAgent.fromJson(Map<String, dynamic> j)
       : id = j['id'] as String? ?? '',
         color = j['color'] as String?,
+        profile = (j['profile'] as String?)?.trim().isEmpty ?? true
+            ? null
+            : (j['profile'] as String).trim(),
         displayName = j['display_name'] as String? ?? '',
         handle = j['handle'] as String? ?? '',
         kind = j['kind'] as String? ?? 'worker',

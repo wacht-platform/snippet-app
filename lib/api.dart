@@ -1422,6 +1422,16 @@ class DaemonClient {
     setRememberedAgentColor(agentId, color);
   }
 
+  /// POST /agents/{id}/profile — the profile the agent works on, or null to use
+  /// whatever model the session it takes is already on.
+  Future<void> setAgentProfile(String agentId, String? profile) async {
+    final r = await http.post(
+        _uri('/agents/${Uri.encodeComponent(agentId)}/profile'),
+        headers: _json,
+        body: jsonEncode({'profile': profile}));
+    if (r.statusCode != 200) throw _err('set agent model', r);
+  }
+
   /// GET /agents/{id}/board — this agent's coordination memory, newest first.
   ///
   /// Optional [workspace] scopes to one folder, [contains] searches the
