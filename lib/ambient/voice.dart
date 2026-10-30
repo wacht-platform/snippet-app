@@ -30,7 +30,8 @@ class _StreamTurn {
 }
 
 class AmbientVoice {
-  AmbientVoice({required this.baseUrl, required this.token, required this.device});
+  AmbientVoice(
+      {required this.baseUrl, required this.token, required this.device});
   final String baseUrl;
   final String token;
   final String device;
@@ -58,11 +59,15 @@ class AmbientVoice {
   void _connect() {
     if (_closed) return;
     final base = Uri.parse(baseUrl);
-    final u = base.replace(scheme: base.scheme == 'https' ? 'wss' : 'ws', path: '/events', queryParameters: {'token': token});
+    final u = base.replace(
+        scheme: base.scheme == 'https' ? 'wss' : 'ws',
+        path: '/events',
+        queryParameters: {'token': token});
     try {
       final c = WebSocketChannel.connect(u);
       _channel = c;
-      _sub = c.stream.listen(_frame, onError: (_) => _reconnect(), onDone: _reconnect);
+      _sub = c.stream
+          .listen(_frame, onError: (_) => _reconnect(), onDone: _reconnect);
       c.ready.then((_) {
         if (identical(_channel, c)) _failures = 0;
       }, onError: (_) {});
@@ -74,7 +79,10 @@ class AmbientVoice {
   void _reconnect() {
     if (_closed || _retry?.isActive == true) return;
     _sub?.cancel();
-    _retry = Timer(Duration(milliseconds: (500 * (1 << _failures.clamp(0, 5))).clamp(500, 15000)), () {
+    _retry = Timer(
+        Duration(
+            milliseconds:
+                (500 * (1 << _failures.clamp(0, 5))).clamp(500, 15000)), () {
       _failures++;
       _connect();
     });
@@ -87,7 +95,10 @@ class AmbientVoice {
       final turn = f['turn'] as int?;
       switch (f['kind']) {
         case 'ambient_state':
-          state.value = AmbientStateEvent(mode: f['mode'] as String? ?? '', sub: f['sub'] as String? ?? '', reason: f['reason'] as String?);
+          state.value = AmbientStateEvent(
+              mode: f['mode'] as String? ?? '',
+              sub: f['sub'] as String? ?? '',
+              reason: f['reason'] as String?);
         case 'ambient_speech_cancel' when turn != null:
           unawaited(stopStream(turn));
         case 'ambient_speech_interrupt':
@@ -122,7 +133,8 @@ class AmbientVoice {
     }
   }
 
-  _StreamTurn _adoptStream(int turn) => _streams.putIfAbsent(turn, _StreamTurn.new);
+  _StreamTurn _adoptStream(int turn) =>
+      _streams.putIfAbsent(turn, _StreamTurn.new);
 
   void _onStreamFrame(int turn, Uint8List pcm) {
     if (_closed || turn <= 0 || _streamDead.contains(turn)) return;
@@ -157,12 +169,14 @@ class AmbientVoice {
       _streamTick?.cancel();
       _streamTick = null;
     } else {
-      _streamTick ??= Timer.periodic(const Duration(milliseconds: 500), (_) => _tickStream());
+      _streamTick ??= Timer.periodic(
+          const Duration(milliseconds: 500), (_) => _tickStream());
     }
   }
 
   Map<int, int> _playedMap(Map<String, dynamic> pos) => {
-        for (final e in ((pos['turns'] as Map?) ?? const {}).entries) (e.key as num).toInt(): (e.value as num).toInt(),
+        for (final e in ((pos['turns'] as Map?) ?? const {}).entries)
+          (e.key as num).toInt(): (e.value as num).toInt(),
       };
 
   Future<void> _tickStream() async {
@@ -179,7 +193,9 @@ class AmbientVoice {
       final heard = pos['turn'] as int? ?? -1;
       final active = pos['active'] == 1;
       final now = DateTime.now();
-      final quietLimit = (_duplex?.open ?? false) ? const Duration(seconds: 8) : const Duration(seconds: 3);
+      final quietLimit = (_duplex?.open ?? false)
+          ? const Duration(seconds: 8)
+          : const Duration(seconds: 3);
       for (final e in _streams.entries.toList()) {
         final turn = e.key, st = e.value;
         if (!identical(_streams[turn], st)) continue;
@@ -195,12 +211,19 @@ class AmbientVoice {
         }
         final total = st.bytes ~/ 48;
         final caughtUp = ms >= total - 5;
-        if (st.ended && (caughtUp || (!active && now.difference(st.lastProgress) > const Duration(milliseconds: 1500)))) {
+        if (st.ended &&
+            (caughtUp ||
+                (!active &&
+                    now.difference(st.lastProgress) >
+                        const Duration(milliseconds: 1500)))) {
           _duplex?.ttsPos(turn, caughtUp ? total : ms, true);
           _endStream(turn);
           continue;
         }
-        if (!st.ended && caughtUp && !(active && heard == turn) && now.difference(st.lastFrame) > quietLimit) {
+        if (!st.ended &&
+            caughtUp &&
+            !(active && heard == turn) &&
+            now.difference(st.lastFrame) > quietLimit) {
           AmbientDiagnostics.log('voice: stream turn $turn stalled at ${ms}ms');
           _duplex?.ttsPos(turn, ms, false);
           _endStream(turn);
@@ -231,27 +254,37 @@ class AmbientVoice {
           st.pauseStarted = DateTime.now();
           st.pauseGeneration++;
           final generation = st.pauseGeneration;
-          Timer(const Duration(seconds: 3), () => _resumeLocal(st, entry.key, generation));
+          Timer(const Duration(seconds: 3),
+              () => _resumeLocal(st, entry.key, generation));
           await _sink.pauseTts();
-          unawaited(AmbientDiagnostics.log('voice: local TTS pause turn ${entry.key}'));
+          unawaited(AmbientDiagnostics.log(
+              'voice: local TTS pause turn ${entry.key}'));
         }
       } else if (st.locallyPaused && st.speechEndedAt == null) {
         st.speechEndedAt = DateTime.now();
         final generation = st.pauseGeneration;
-        st.pauseTimer = Timer(const Duration(milliseconds: 900), () => _resumeLocal(st, entry.key, generation));
+        st.pauseTimer = Timer(const Duration(milliseconds: 900),
+            () => _resumeLocal(st, entry.key, generation));
       }
     }
   }
 
   Future<void> _resumeLocal(_StreamTurn st, int turn, int generation) async {
-    if (!st.locallyPaused || st.pauseGeneration != generation || _streamDead.contains(turn)) return;
-    if (st.speechEndedAt == null && DateTime.now().difference(st.pauseStarted!) < const Duration(seconds: 3)) return;
-    final elapsed = DateTime.now().difference(st.pauseStarted ?? DateTime.now()).inMilliseconds;
+    if (!st.locallyPaused ||
+        st.pauseGeneration != generation ||
+        _streamDead.contains(turn)) return;
+    if (st.speechEndedAt == null &&
+        DateTime.now().difference(st.pauseStarted!) <
+            const Duration(seconds: 3)) return;
+    final elapsed = DateTime.now()
+        .difference(st.pauseStarted ?? DateTime.now())
+        .inMilliseconds;
     st.locallyPaused = false;
     st.pauseTimer?.cancel();
     await _sink.resumeTts();
     await _sink.volume(1);
-    unawaited(AmbientDiagnostics.log('voice: local TTS resume turn $turn after ${elapsed}ms'));
+    unawaited(AmbientDiagnostics.log(
+        'voice: local TTS resume turn $turn after ${elapsed}ms'));
   }
 
   Future<void> stopStream([int turn = 0]) async {
@@ -259,8 +292,11 @@ class AmbientVoice {
     for (final t in stopped) {
       final st = _streams[t];
       if (st?.locallyPaused == true) {
-        final elapsed = DateTime.now().difference(st!.pauseStarted ?? DateTime.now()).inMilliseconds;
-        unawaited(AmbientDiagnostics.log('voice: server TTS stop turn $t after ${elapsed}ms local pause'));
+        final elapsed = DateTime.now()
+            .difference(st!.pauseStarted ?? DateTime.now())
+            .inMilliseconds;
+        unawaited(AmbientDiagnostics.log(
+            'voice: server TTS stop turn $t after ${elapsed}ms local pause'));
       }
       st?.pauseGeneration++;
       st?.pauseTimer?.cancel();

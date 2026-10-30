@@ -89,7 +89,8 @@ class AgentMochi extends StatelessWidget {
 enum MochiEyes { dot, flat, happy }
 
 class WorkingMochi extends StatefulWidget {
-  const WorkingMochi({super.key, this.size = 20, this.squeeze = false, this.color});
+  const WorkingMochi(
+      {super.key, this.size = 20, this.squeeze = false, this.color});
 
   final double size;
   final bool squeeze;
@@ -121,7 +122,12 @@ class _WorkingMochiState extends State<WorkingMochi>
       if (!mounted) return;
       final pool = widget.squeeze
           ? const [MochiEyes.flat, MochiEyes.dot]
-          : const [MochiEyes.dot, MochiEyes.dot, MochiEyes.flat, MochiEyes.happy];
+          : const [
+              MochiEyes.dot,
+              MochiEyes.dot,
+              MochiEyes.flat,
+              MochiEyes.happy
+            ];
       MochiEyes next;
       do {
         next = pool[_rng.nextInt(pool.length)];
@@ -194,9 +200,7 @@ class _WorkingMochiState extends State<WorkingMochi>
               dimension: size,
               child: CustomPaint(
                 painter: _MochiPainter(color, size,
-                    eyes: _eyes,
-                    blink: blink,
-                    look: widget.squeeze ? 0 : look),
+                    eyes: _eyes, blink: blink, look: widget.squeeze ? 0 : look),
               ),
             ),
           ),
@@ -240,8 +244,12 @@ class _MochiPainter extends CustomPainter {
     final ink = Paint()..color = const Color(0xFF15161C);
     if (!small) {
       final blush = Paint()..color = const Color(0xE6F2A7A0);
-      canvas.drawOval(Rect.fromCenter(center: const Offset(39, 81), width: 15, height: 8), blush);
-      canvas.drawOval(Rect.fromCenter(center: const Offset(81, 81), width: 15, height: 8), blush);
+      canvas.drawOval(
+          Rect.fromCenter(center: const Offset(39, 81), width: 15, height: 8),
+          blush);
+      canvas.drawOval(
+          Rect.fromCenter(center: const Offset(81, 81), width: 15, height: 8),
+          blush);
     }
     final r = small ? 6.0 : 4.6;
     final lx = (small ? 47.0 : 48.0) + look, rx = (small ? 73.0 : 72.0) + look;
@@ -343,8 +351,8 @@ class _DottedMochiPainter extends CustomPainter {
         if (r <= 1 && !eye) {
           final lx = (px - 120) / 220, ly = (y - 70) / 200;
           final light = math.max(0.0, 1 - math.sqrt(lx * lx + ly * ly));
-          final s = 2.4 +
-              4.2 * (0.35 + 0.65 * light) * (1 - math.pow(r, 6) * 0.5);
+          final s =
+              2.4 + 4.2 * (0.35 + 0.65 * light) * (1 - math.pow(r, 6) * 0.5);
           canvas.drawCircle(Offset(px, y), s / 2, fill);
         } else if (r > 1 && r < 2.6 && rnd() > 0.55 + (r - 1) * 0.25) {
           canvas.drawCircle(Offset(px, y), 0.8, faint);

@@ -143,7 +143,8 @@ class _RoutingScreenState extends State<RoutingScreen> {
       minWidth: 220,
       maxWidth: 300,
       items: [
-        appMenuHeading<String>(index == 0 ? 'Primary model' : 'Fallback #$index'),
+        appMenuHeading<String>(
+            index == 0 ? 'Primary model' : 'Fallback #$index'),
         if (index > 0)
           appMenuItem<String>(
               value: 'primary', icon: 'sparkles', label: 'Make primary'),
@@ -234,8 +235,7 @@ class _RoutingScreenState extends State<RoutingScreen> {
             ),
           ),
         for (var i = 0; i < chosen.length; i++) ...[
-          if (i > 0)
-            AppIcon('chevron-right', size: 12, color: AppColors.fg4),
+          if (i > 0) AppIcon('chevron-right', size: 12, color: AppColors.fg4),
           Builder(
             builder: (anchor) {
               final name = chosen[i];
@@ -245,7 +245,9 @@ class _RoutingScreenState extends State<RoutingScreen> {
               return Tooltip(
                 message: until != null
                     ? 'Limited until ${limitLabel(until)}'
-                    : (isPrimary ? 'Primary · tap to edit' : 'Fallback · tap to edit'),
+                    : (isPrimary
+                        ? 'Primary · tap to edit'
+                        : 'Fallback · tap to edit'),
                 child: Material(
                   color: isPrimary ? AppColors.surface2 : Colors.transparent,
                   borderRadius: BorderRadius.circular(15),
@@ -272,7 +274,8 @@ class _RoutingScreenState extends State<RoutingScreen> {
                                 name,
                                 style: sans(
                                   12.5,
-                                  color: isPrimary ? AppColors.fg1 : AppColors.fg3,
+                                  color:
+                                      isPrimary ? AppColors.fg1 : AppColors.fg3,
                                 ),
                               ),
                               if (until != null) ...[
@@ -342,9 +345,8 @@ class _RoutingScreenState extends State<RoutingScreen> {
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
       decoration: BoxDecoration(
-        border: isLast
-            ? null
-            : Border(bottom: BorderSide(color: AppColors.line)),
+        border:
+            isLast ? null : Border(bottom: BorderSide(color: AppColors.line)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

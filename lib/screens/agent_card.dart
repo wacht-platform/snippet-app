@@ -72,8 +72,7 @@ class _AgentCardState extends State<AgentCard> {
               _setProfile(null);
             }),
             for (final p in cfg.profiles)
-              SheetAction(
-                  'provider:${p.provider}',
+              SheetAction('provider:${p.provider}',
                   p.name == current ? '${p.name}  (current)' : p.name, () {
                 Navigator.pop(context);
                 _setProfile(p.name);
@@ -117,7 +116,8 @@ class _AgentCardState extends State<AgentCard> {
           child: SheetActions([
             SheetAction('sparkles', 'Change colour', () {
               Navigator.pop(context);
-              showMochiColorPicker(context, widget.client, widget.agent.id, name);
+              showMochiColorPicker(
+                  context, widget.client, widget.agent.id, name);
             }),
             if (!widget.agent.isMissionControl)
               SheetAction('cpu', 'Change model', () {
@@ -142,7 +142,10 @@ class _AgentCardState extends State<AgentCard> {
           appMenuItem(value: 'model', icon: 'cpu', label: 'Change model'),
         if (widget.onDelete != null)
           appMenuItem(
-              value: 'delete', icon: 'trash', label: 'Delete agent', danger: true),
+              value: 'delete',
+              icon: 'trash',
+              label: 'Delete agent',
+              danger: true),
       ],
     );
     if (picked == 'delete') widget.onDelete?.call();
@@ -233,8 +236,7 @@ class _AgentCardState extends State<AgentCard> {
                   Expanded(
                     flex: segments[j].$1,
                     child: ColoredBox(
-                        color: segments[j].$2,
-                        child: const SizedBox.expand()),
+                        color: segments[j].$2, child: const SizedBox.expand()),
                   ),
                 ],
               ]),
@@ -265,8 +267,7 @@ class _AgentCardState extends State<AgentCard> {
                     ),
                     const Spacer(),
                     SwapText(summary,
-                        style:
-                            sans(12, color: summaryColor, tabular: true)),
+                        style: sans(12, color: summaryColor, tabular: true)),
                   ],
                 ),
                 const Spacer(),
@@ -275,9 +276,8 @@ class _AgentCardState extends State<AgentCard> {
                     overflow: TextOverflow.ellipsis,
                     style: sans(15,
                         weight: W.label,
-                        color: agent.available
-                            ? AppColors.fg1
-                            : AppColors.fg3)),
+                        color:
+                            agent.available ? AppColors.fg1 : AppColors.fg3)),
                 const SizedBox(height: 2),
                 Text(role.isEmpty ? status : role,
                     maxLines: 1,
@@ -333,8 +333,8 @@ class _AgentCardState extends State<AgentCard> {
                     ),
                     const SizedBox(width: 8),
                     SwapText(summary,
-                        style: sans(metaSize,
-                            color: summaryColor, tabular: true)),
+                        style:
+                            sans(metaSize, color: summaryColor, tabular: true)),
                   ],
                 ),
                 const SizedBox(height: 7),

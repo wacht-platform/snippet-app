@@ -21,15 +21,23 @@ class _FakeDaemon extends DaemonClient {
         'parent': '/Users/you/code',
         'entries': [
           for (final name in ['android', 'assets', 'lib', 'macos', 'test'])
-            {'name': name, 'path': '/Users/you/code/snippet-app/$name', 'is_dir': true},
+            {
+              'name': name,
+              'path': '/Users/you/code/snippet-app/$name',
+              'is_dir': true
+            },
         ],
       });
 
   @override
-  Future<RepoWorktrees> worktrees(String folder) async => RepoWorktrees.fromJson({
+  Future<RepoWorktrees> worktrees(String folder) async =>
+      RepoWorktrees.fromJson({
         'repo': '/Users/you/code/snippet-app',
         'worktrees': [
-          {'path': '/Users/you/.snippet/worktrees/snippet-app/ab12cd34', 'branch': 'snippet/ab12cd34'},
+          {
+            'path': '/Users/you/.snippet/worktrees/snippet-app/ab12cd34',
+            'branch': 'snippet/ab12cd34'
+          },
           {'path': '/Users/you/code/snippet-app-release', 'branch': 'release'},
         ],
       });
@@ -55,7 +63,8 @@ void main() {
         ),
       ));
       await tester.pumpAndSettle();
-      await expectGolden(tester, find.byType(MaterialApp), 'goldens/worktree_picker.png');
+      await expectGolden(
+          tester, find.byType(MaterialApp), 'goldens/worktree_picker.png');
     } finally {
       debugDefaultTargetPlatformOverride = null;
     }

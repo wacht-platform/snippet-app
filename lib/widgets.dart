@@ -165,11 +165,13 @@ void _openSessionLink(BuildContext context, Uri uri, String? text) {
   final id = Uri.decodeComponent(uri.path).trim();
   final client = DaemonScope.maybeOf(context) ?? DaemonScope.current;
   if (client == null || id.isEmpty) {
-    toast(context, 'Connect to the machine to open this session.', danger: true);
+    toast(context, 'Connect to the machine to open this session.',
+        danger: true);
     return;
   }
   final title = (text ?? '').trim();
-  final open = context.findAncestorWidgetOfExactType<SessionScreen>()?.onOpenSession;
+  final open =
+      context.findAncestorWidgetOfExactType<SessionScreen>()?.onOpenSession;
   if (open != null) {
     open(id, title, null);
     return;
@@ -190,7 +192,8 @@ void _openArtifactLink(BuildContext context, Uri uri) {
   final version = at > 0 ? int.tryParse(tail.substring(at + 1)) : null;
   final client = DaemonScope.maybeOf(context) ?? DaemonScope.current;
   if (client == null || id.isEmpty) {
-    toast(context, 'Connect to the machine to open this artifact.', danger: true);
+    toast(context, 'Connect to the machine to open this artifact.',
+        danger: true);
     return;
   }
   openArtifact(context,
@@ -271,9 +274,11 @@ MarkdownStyleSheet agentMarkdownStyle(BuildContext context) {
     blockquote:
         prose.copyWith(color: AppColors.fg3, fontStyle: FontStyle.italic),
     code: kMobile
-        ? TS.code(Color.lerp(AppColors.fg1, AppColors.run, 0.3)).copyWith(
-            fontSize: 13.5, backgroundColor: AppColors.surface2)
-        : TS.code(AppColors.fg1)
+        ? TS
+            .code(Color.lerp(AppColors.fg1, AppColors.run, 0.3))
+            .copyWith(fontSize: 13.5, backgroundColor: AppColors.surface2)
+        : TS
+            .code(AppColors.fg1)
             .copyWith(fontSize: 13, backgroundColor: AppColors.surface1),
   );
   return _cachedAgentMarkdownStyle!;
@@ -1252,7 +1257,8 @@ class Bubble extends StatelessWidget {
             selectable: false,
             styleSheet: markdownStyle(context),
             builders: {'pre': PreBlockBuilder()},
-            onTapLink: (txt, href, title) => openMarkdownLink(href, context, txt),
+            onTapLink: (txt, href, title) =>
+                openMarkdownLink(href, context, txt),
           )
         : null;
     final voice = <Widget>[
@@ -1321,48 +1327,48 @@ class Bubble extends StatelessWidget {
           : (box.maxWidth.isFinite ? box.maxWidth * 0.18 : 140.0)
               .clamp(24.0, 140.0);
       return Padding(
-      padding: EdgeInsets.only(left: inset, top: 4, bottom: 4),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          if (media != null)
-            for (final m in media) ...[
-              m,
-              const SizedBox(height: 6),
-            ],
-          if (shown.isNotEmpty)
-            Container(
-              padding: kMobile
-                  ? const EdgeInsets.fromLTRB(15, 10, 15, 11)
-                  : const EdgeInsets.fromLTRB(14, 9, 14, 10),
-              decoration: BoxDecoration(
-                color: AppColors.surface2,
-                borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(kMobile ? 20 : 16),
-                  topRight: Radius.circular(kMobile ? 20 : 16),
-                  bottomLeft: Radius.circular(kMobile ? 20 : 16),
-                  bottomRight: const Radius.circular(6),
+        padding: EdgeInsets.only(left: inset, top: 4, bottom: 4),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            if (media != null)
+              for (final m in media) ...[
+                m,
+                const SizedBox(height: 6),
+              ],
+            if (shown.isNotEmpty)
+              Container(
+                padding: kMobile
+                    ? const EdgeInsets.fromLTRB(15, 10, 15, 11)
+                    : const EdgeInsets.fromLTRB(14, 9, 14, 10),
+                decoration: BoxDecoration(
+                  color: AppColors.surface2,
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(kMobile ? 20 : 16),
+                    topRight: Radius.circular(kMobile ? 20 : 16),
+                    bottomLeft: Radius.circular(kMobile ? 20 : 16),
+                    bottomRight: const Radius.circular(6),
+                  ),
+                ),
+                child: DefaultTextStyle.merge(
+                  textWidthBasis: TextWidthBasis.longestLine,
+                  child: mineText,
                 ),
               ),
-              child: DefaultTextStyle.merge(
-                textWidthBasis: TextWidthBasis.longestLine,
-                child: mineText,
-              ),
-            ),
-          if (media == null || media.isEmpty) ...[
-            for (final v in voice) ...[
-              const SizedBox(height: 6),
-              v,
+            if (media == null || media.isEmpty) ...[
+              for (final v in voice) ...[
+                const SizedBox(height: 6),
+                v,
+              ],
+              for (final extra in extras) ...[
+                const SizedBox(height: 6),
+                extra,
+              ],
             ],
-            for (final extra in extras) ...[
-              const SizedBox(height: 6),
-              extra,
-            ],
+            ...pastedCards,
           ],
-          ...pastedCards,
-        ],
-      ),
-    );
+        ),
+      );
     });
   }
 }
@@ -1474,7 +1480,8 @@ class NoteLine extends StatelessWidget {
         child: Text(text,
             maxLines: 3,
             overflow: TextOverflow.ellipsis,
-            style: sans(kMobile ? 13 : 12.5, height: 1.4, color: AppColors.fg3)),
+            style:
+                sans(kMobile ? 13 : 12.5, height: 1.4, color: AppColors.fg3)),
       );
     }
     final limit = text.toLowerCase().contains('session limit') ||
@@ -1760,15 +1767,15 @@ class SnAppBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Theme.of(context); // Rebuild on theme change
-    final onBack = this.onBack != null &&
-            !kMobile &&
-            ShellPanelRoot.isRoot(context)
-        ? null
-        : this.onBack;
+    final onBack =
+        this.onBack != null && !kMobile && ShellPanelRoot.isRoot(context)
+            ? null
+            : this.onBack;
     final actions = ShellPanelRoot.inPanel(context)
         ? this
             .actions
-            .where((a) => !(a is IconBtn && ShellPanelRoot.hides(context, a.name, a.tooltip)))
+            .where((a) => !(a is IconBtn &&
+                ShellPanelRoot.hides(context, a.name, a.tooltip)))
             .toList()
         : this.actions;
     final repeats = subtitle == null &&
@@ -1827,15 +1834,15 @@ class SnAppBar extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 if (!repeats)
-                Text(title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: kMobile && (titleSize ?? 0) >= 22
-                        ? TS.pageTitle()
-                        : kMobile
-                            ? sans(titleSize ?? 18,
-                                spacing: -0.3, color: AppColors.fg1)
-                            : display(titleSize ?? 15)),
+                  Text(title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: kMobile && (titleSize ?? 0) >= 22
+                          ? TS.pageTitle()
+                          : kMobile
+                              ? sans(titleSize ?? 18,
+                                  spacing: -0.3, color: AppColors.fg1)
+                              : display(titleSize ?? 15)),
                 if (subtitle != null)
                   Text(subtitle!,
                       maxLines: 1,

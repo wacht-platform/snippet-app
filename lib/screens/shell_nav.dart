@@ -217,15 +217,15 @@ class ShellSectionHeader extends StatelessWidget {
           if (leading != null)
             Expanded(child: leading!)
           else
-          Expanded(
-            child: GestureDetector(
-              onTap: onToggle,
-              child: Text(label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: sans(13, height: 18 / 13, color: AppColors.fg3)),
+            Expanded(
+              child: GestureDetector(
+                onTap: onToggle,
+                child: Text(label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: sans(13, height: 18 / 13, color: AppColors.fg3)),
+              ),
             ),
-          ),
           for (final a in actions) ...[a, const SizedBox(width: 2)],
         ]),
       );
@@ -277,7 +277,10 @@ class ShellSectionHeader extends StatelessWidget {
 /// an x. Two screens inside one shell should not offer two different exits.
 class MobileBackLink extends StatelessWidget {
   const MobileBackLink(
-      {super.key, required this.onBack, this.label = 'Back', this.trailing = const []});
+      {super.key,
+      required this.onBack,
+      this.label = 'Back',
+      this.trailing = const []});
   final VoidCallback onBack;
   final String label;
   final List<Widget> trailing;
@@ -347,10 +350,7 @@ class NavBackRow extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(S.s4, 0, S.s12, 0),
             child: Row(children: [
               IconBtn('chevron-left',
-                  size: 32,
-                  iconSize: 18,
-                  tooltip: 'Back',
-                  onTap: onBack),
+                  size: 32, iconSize: 18, tooltip: 'Back', onTap: onBack),
               const SizedBox(width: S.s2),
               Expanded(
                 child: Text(title,

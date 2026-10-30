@@ -456,48 +456,50 @@ class _DeskLanesState extends State<_DeskLanes> {
               client: widget.client, liveLanes: () => widget.lanes),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(12, 11, 12, 11),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-              Row(children: [
-                AgentMochi(l.agent ?? l.id, size: 18),
-                const SizedBox(width: 9),
-                Expanded(
-                  child: Text(l.title.isEmpty ? 'Lane' : l.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: sans(13, color: AppColors.fg1)),
-                ),
-                Text(status, style: sans(11.5, color: color)),
-              ]),
-              if (task.isNotEmpty) ...[
-                const SizedBox(height: 7),
-                Text(task,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: sans(12.5, height: 1.45, color: AppColors.fg3)),
-              ],
-              const SizedBox(height: 8),
-              Row(children: [
-                for (var i = 0; i < 14; i++)
-                  Container(
-                    width: 5,
-                    height: 5,
-                    margin: const EdgeInsets.only(right: 3),
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: i < steps
-                          ? color
-                          : AppColors.fg1.withValues(alpha: 0.10),
+            child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(children: [
+                    AgentMochi(l.agent ?? l.id, size: 18),
+                    const SizedBox(width: 9),
+                    Expanded(
+                      child: Text(l.title.isEmpty ? 'Lane' : l.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: sans(13, color: AppColors.fg1)),
                     ),
-                  ),
-                const Spacer(),
-                Text(
-                    [
-                      if ((l.profile ?? '').isNotEmpty) l.profile!,
-                      _elapsed(l.startedAt),
-                    ].where((e) => e.isNotEmpty).join(' · '),
-                    style: mono(10.5, color: AppColors.fg4)),
-              ]),
-            ]),
+                    Text(status, style: sans(11.5, color: color)),
+                  ]),
+                  if (task.isNotEmpty) ...[
+                    const SizedBox(height: 7),
+                    Text(task,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: sans(12.5, height: 1.45, color: AppColors.fg3)),
+                  ],
+                  const SizedBox(height: 8),
+                  Row(children: [
+                    for (var i = 0; i < 14; i++)
+                      Container(
+                        width: 5,
+                        height: 5,
+                        margin: const EdgeInsets.only(right: 3),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: i < steps
+                              ? color
+                              : AppColors.fg1.withValues(alpha: 0.10),
+                        ),
+                      ),
+                    const Spacer(),
+                    Text(
+                        [
+                          if ((l.profile ?? '').isNotEmpty) l.profile!,
+                          _elapsed(l.startedAt),
+                        ].where((e) => e.isNotEmpty).join(' · '),
+                        style: mono(10.5, color: AppColors.fg4)),
+                  ]),
+                ]),
           ),
         ),
       ),
@@ -517,8 +519,7 @@ class _DeskLanesState extends State<_DeskLanes> {
         if (lanes.isEmpty)
           Padding(
             padding: const EdgeInsets.fromLTRB(2, 0, 2, 4),
-            child: Text(
-                'Parallel work this session hands off shows up here.',
+            child: Text('Parallel work this session hands off shows up here.',
                 style: sans(12.5, height: 1.5, color: AppColors.fg4)),
           )
         else

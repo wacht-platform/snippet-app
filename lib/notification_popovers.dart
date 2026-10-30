@@ -10,6 +10,7 @@ import 'notifications.dart';
 import 'theme.dart';
 import 'platform.dart';
 import 'notification_card.dart';
+import 'notification_stack.dart';
 import 'session_quick_send.dart' show resolveInstanceForPayload;
 
 class NotificationPopovers extends StatefulWidget {
@@ -22,48 +23,68 @@ class NotificationPopovers extends StatefulWidget {
 class _NotificationPopoversState extends State<NotificationPopovers> {
   StreamSubscription<Map<String, dynamic>>? _subscription;
   final List<Map<String, dynamic>> _pending = [];
-  Timer? _expiry;
-  Map<String, dynamic>? _timedPayload;
-  bool _pressed = false;
+  final _timers = <Map<String, dynamic>, Timer>{};
+  bool _pointer = false;
+  bool _cardHold = false;
+  bool _expanded = false;
   late final OverlayEntry _contentEntry;
 
-  void _syncExpiry() {
-    final payload = _pending.firstOrNull;
-    if (identical(payload, _timedPayload)) return;
-    _expiry?.cancel();
-    _timedPayload = payload;
-    _pressed = false;
-    _armExpiry();
+  bool get _held => _pointer || _cardHold || _expanded;
+
+  Duration _life(Map<String, dynamic> p) {
+    final base = kMobile ? 5 : 7;
+    return Duration(seconds: needsYou(p) ? base * 3 : base);
   }
 
-  void _armExpiry() {
-    _expiry?.cancel();
-    final payload = _timedPayload;
-    if (payload == null || _pressed) return;
-    _expiry = Timer(Duration(seconds: kMobile ? 5 : 7), () {
-      if (mounted && identical(_pending.firstOrNull, payload)) {
-        _remove(payload);
-      }
+  List<Map<String, dynamic>> get _ordered {
+    final l = _pending.reversed.toList();
+    return [...l.where(needsYou), ...l.where((p) => !needsYou(p))];
+  }
+
+  void _arm() {
+    _timers.removeWhere((p, t) {
+      final gone = !_pending.any((q) => identical(q, p));
+      if (gone || _held) t.cancel();
+      return gone || _held;
     });
+    if (_held) return;
+    for (final p in _pending) {
+      _timers.putIfAbsent(
+          p,
+          () => Timer(_life(p), () {
+                _timers.remove(p);
+                if (mounted) _remove(p);
+              }));
+    }
+  }
+
+  void _afterChange() {
+    if (_pending.length < 2) _expanded = false;
+    _arm();
+  }
+
+  void _setHold({bool? pointer, bool? card}) {
+    _pointer = pointer ?? _pointer;
+    _cardHold = card ?? _cardHold;
+    _arm();
   }
 
   void _remove(Map<String, dynamic> payload,
       {bool open = false, bool feedback = false}) {
-    if (!identical(_pending.firstOrNull, payload)) return;
+    if (!_pending.any((p) => identical(p, payload))) return;
     if (feedback) HapticFeedback.lightImpact();
     setState(() {
-      _pending.removeAt(0);
-      _syncExpiry();
+      _pending.removeWhere((p) => identical(p, payload));
+      _afterChange();
     });
     if (open) onNotifTap?.call(payload);
   }
 
-  void _clearAll(Map<String, dynamic> payload) {
-    if (!identical(_pending.firstOrNull, payload)) return;
+  void _clearAll() {
     HapticFeedback.mediumImpact();
     setState(() {
       _pending.clear();
-      _syncExpiry();
+      _afterChange();
     });
   }
 
@@ -103,6 +124,7 @@ class _NotificationPopoversState extends State<NotificationPopovers> {
     _contentEntry = OverlayEntry(builder: _buildContent);
     final initial = foregroundNotifications.drain();
     _pending.addAll(initial);
+    _arm();
     for (final p in initial) {
       _forwardToMacNotch(p);
     }
@@ -110,7 +132,9 @@ class _NotificationPopoversState extends State<NotificationPopovers> {
     visibleNotificationSession.addListener(_visibilityChanged);
     _subscription = foregroundNotifications.stream.listen((payload) {
       _forwardToMacNotch(payload);
-      if (mounted) setState(() => _pending.add(payload));
+      if (!mounted) return;
+      setState(() => _pending.add(payload));
+      _arm();
     });
   }
 
@@ -128,7 +152,10 @@ class _NotificationPopoversState extends State<NotificationPopovers> {
   void _visibilityChanged() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
-        setState(() => _pending.removeWhere(suppressVisibleNotification));
+        setState(() {
+          _pending.removeWhere(suppressVisibleNotification);
+          _afterChange();
+        });
       }
     });
     WidgetsBinding.instance.ensureVisualUpdate();
@@ -139,7 +166,9 @@ class _NotificationPopoversState extends State<NotificationPopovers> {
     callTracker.state.removeListener(_callChanged);
     visibleNotificationSession.removeListener(_visibilityChanged);
     _subscription?.cancel();
-    _expiry?.cancel();
+    for (final t in _timers.values) {
+      t.cancel();
+    }
     _contentEntry.remove();
     _contentEntry.dispose();
     super.dispose();
@@ -151,10 +180,30 @@ class _NotificationPopoversState extends State<NotificationPopovers> {
     return Overlay(initialEntries: [_contentEntry]);
   }
 
+  Widget _card(
+      Map<String, dynamic> payload, bool embedded, bool reducedMotion) {
+    return Dismissible(
+      key: ObjectKey(payload),
+      direction: DismissDirection.horizontal,
+      movementDuration:
+          reducedMotion ? Duration.zero : const Duration(milliseconds: 160),
+      resizeDuration: null,
+      onDismissed: (_) => _remove(payload, feedback: true),
+      child: NotificationMessageCard(
+        key: ObjectKey(payload),
+        payload: payload,
+        embedded: embedded,
+        onOpen: () => _remove(payload, open: true, feedback: true),
+        onDismiss: () => _remove(payload, feedback: true),
+        onHold: (hold) => _setHold(card: hold),
+        onSent: () => _remove(payload),
+      ),
+    );
+  }
+
   Widget _buildContent(BuildContext context) {
     _pending.removeWhere(suppressVisibleNotification);
-    _syncExpiry();
-    final payload = _pending.firstOrNull;
+    final items = _ordered;
     final call = callTracker.state.value;
     final reducedMotion = MediaQuery.disableAnimationsOf(context);
     return Stack(children: [
@@ -176,104 +225,59 @@ class _NotificationPopoversState extends State<NotificationPopovers> {
               ),
             )))
       else
-      Positioned(
-          top: S.s8,
-          left: S.s12,
-          right: S.s12,
-          child: SafeArea(
-              child: Align(
-            alignment: kMobile ? Alignment.topCenter : Alignment.topRight,
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 420),
-              child: AnimatedSwitcher(
-                duration: reducedMotion
-                    ? Duration.zero
-                    : const Duration(milliseconds: 180),
-                transitionBuilder: (child, animation) => FadeTransition(
-                  opacity: animation,
-                  child: SlideTransition(
-                    position: Tween<Offset>(
-                            begin: const Offset(0, -.08), end: Offset.zero)
-                        .animate(CurvedAnimation(
-                            parent: animation, curve: Curves.easeOutCubic)),
-                    child: child,
+        Positioned(
+            top: S.s8,
+            left: S.s12,
+            right: S.s12,
+            child: SafeArea(
+                child: Align(
+              alignment: kMobile ? Alignment.topCenter : Alignment.topRight,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 420),
+                child: AnimatedSwitcher(
+                  duration: reducedMotion
+                      ? Duration.zero
+                      : const Duration(milliseconds: 180),
+                  transitionBuilder: (child, animation) => FadeTransition(
+                    opacity: animation,
+                    child: SlideTransition(
+                      position: Tween<Offset>(
+                              begin: const Offset(0, -.08), end: Offset.zero)
+                          .animate(CurvedAnimation(
+                              parent: animation, curve: Curves.easeOutCubic)),
+                      child: child,
+                    ),
                   ),
-                ),
-                child: payload == null
-                    ? const SizedBox.shrink()
-                    : MouseRegion(
-                        key: ObjectKey(payload),
-                        onEnter: (_) {
-                          _pressed = true;
-                          _expiry?.cancel();
-                        },
-                        onExit: (_) {
-                          _pressed = false;
-                          _armExpiry();
-                        },
-                        child: Listener(
-                        onPointerDown: (_) {
-                          _pressed = true;
-                          _expiry?.cancel();
-                        },
-                        onPointerUp: (_) {
-                          _pressed = false;
-                          _armExpiry();
-                        },
-                        onPointerCancel: (_) {
-                          _pressed = false;
-                          _armExpiry();
-                        },
-                        child: Dismissible(
-                          key: ObjectKey(payload),
-                          direction: DismissDirection.horizontal,
-                          movementDuration: reducedMotion
-                              ? Duration.zero
-                              : const Duration(milliseconds: 160),
-                          resizeDuration: null,
-                          onDismissed: (_) => _remove(payload, feedback: true),
-                          child: TweenAnimationBuilder<double>(
-                            tween: Tween(begin: 0, end: 1),
-                            duration: reducedMotion
-                                ? Duration.zero
-                                : const Duration(milliseconds: 180),
-                            curve: Curves.easeOutCubic,
-                            builder: (context, value, child) => Opacity(
-                              opacity: value,
-                              child: FractionalTranslation(
-                                translation: Offset(0, -.08 * (1 - value)),
-                                child: child,
-                              ),
-                            ),
+                  child: items.isEmpty
+                      ? const SizedBox.shrink()
+                      : MouseRegion(
+                          onEnter: (_) => _setHold(pointer: true),
+                          onExit: (_) => _setHold(pointer: false),
+                          child: Listener(
+                            onPointerDown: (_) => _setHold(pointer: true),
+                            onPointerUp: (_) => _setHold(pointer: false),
+                            onPointerCancel: (_) => _setHold(pointer: false),
                             child: Semantics(
-                              label: _pending.length > 1
-                                  ? '${_pending.length} notifications. Long press to clear all'
+                              label: items.length > 1
+                                  ? '${items.length} notifications'
                                   : null,
-                              onLongPress: _pending.length > 1
-                                  ? () => _clearAll(payload)
-                                  : null,
-                              child: NotificationMessageCard(
-                                payload: payload,
-                                rest: _pending.skip(1).toList(),
-                                onOpen: () => _remove(payload,
-                                    open: true, feedback: true),
-                                onDismiss: () =>
-                                    _remove(payload, feedback: true),
-                                onClearAll: () => _clearAll(payload),
-                                onHold: (hold) {
-                                  _pressed = hold;
-                                  hold ? _expiry?.cancel() : _armExpiry();
-                                },
-                                onSent: () => _remove(payload),
+                              child: NotificationStack(
+                                items: items,
+                                expanded: _expanded,
+                                onToggle: () => setState(() {
+                                  _expanded = !_expanded;
+                                  _setHold();
+                                }),
+                                onClearAll: _clearAll,
+                                cardBuilder: (payload, embedded) =>
+                                    _card(payload, embedded, reducedMotion),
                               ),
                             ),
                           ),
                         ),
-                      ),
-                      ),
+                ),
               ),
-            ),
-          ))),
+            ))),
     ]);
   }
 }

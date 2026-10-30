@@ -3,7 +3,6 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import 'notification_sync.dart' show notificationSessionKey;
 import 'platform.dart';
 import 'session_quick_send.dart';
 import 'theme.dart';
@@ -23,7 +22,9 @@ CardAction cardActionFor(Map<String, dynamic> p) {
       (dest is Map && '${dest['id'] ?? ''}'.isNotEmpty && destType != 'task');
   if (kind == 'waiting') {
     if (!hasSession) return CardAction.none;
-    return attentionType == 'approval' ? CardAction.approval : CardAction.answer;
+    return attentionType == 'approval'
+        ? CardAction.approval
+        : CardAction.answer;
   }
   if ((kind == 'term' || kind == 'message' || destType == 'conversation') &&
       hasSession) {
@@ -69,25 +70,23 @@ class NotificationMessageCard extends StatefulWidget {
   const NotificationMessageCard({
     super.key,
     required this.payload,
-    required this.rest,
     required this.onOpen,
     required this.onDismiss,
-    required this.onClearAll,
     required this.onHold,
     required this.onSent,
     this.send = quickSendForPayload,
     this.initiallyExpanded = false,
+    this.embedded = false,
   });
 
   final Map<String, dynamic> payload;
-  final List<Map<String, dynamic>> rest;
   final VoidCallback onOpen;
   final VoidCallback onDismiss;
-  final VoidCallback onClearAll;
   final ValueChanged<bool> onHold;
   final VoidCallback onSent;
   final Future<bool> Function(Map<String, dynamic>, QuickAction) send;
   final bool initiallyExpanded;
+  final bool embedded;
 
   @override
   State<NotificationMessageCard> createState() =>
@@ -140,18 +139,6 @@ class _NotificationMessageCardState extends State<NotificationMessageCard> {
     return QuickAnswer(q.isEmpty || _moreQuestions > 0 ? text : '$q\n→ $text');
   }
 
-  String get _moreLabel {
-    final n = widget.rest.length;
-    if (n == 0) return '';
-    final keys = {
-      for (final p in widget.rest)
-        if ('${p['session'] ?? ''}'.isNotEmpty)
-          notificationSessionKey('${p['url'] ?? ''}', '${p['session']}')
-    };
-    final chats = keys.length == n ? keys.length : 0;
-    return chats > 1 ? '+$n more from $chats chats' : '+$n more';
-  }
-
   bool get _expandable => const {
         CardAction.approval,
         CardAction.answer,
@@ -199,7 +186,7 @@ class _NotificationMessageCardState extends State<NotificationMessageCard> {
       Container(
         width: 8,
         height: 8,
-        decoration: BoxDecoration(color: mood.$2, shape: BoxShape.circle),
+        decoration: BoxDecoration(color: mood, shape: BoxShape.circle),
       ),
       const SizedBox(width: 10),
       Expanded(
@@ -215,12 +202,6 @@ class _NotificationMessageCardState extends State<NotificationMessageCard> {
                     style: sans(kMobile ? 14 : 13.5,
                         weight: W.label, height: 1.35, color: AppColors.fg1)),
               ),
-              if (mood.$1.isNotEmpty) ...[
-                const SizedBox(width: S.s6),
-                Text(mood.$1,
-                    maxLines: 1,
-                    style: sans(12.5, height: 1.35, color: mood.$2)),
-              ],
             ]),
             if (showBody && !_open)
               Text(body,
@@ -251,18 +232,16 @@ class _NotificationMessageCardState extends State<NotificationMessageCard> {
               disabled: busy,
               onTap: () => _send(const QuickDeny())),
         ]),
-      CardAction.answer when choices.isNotEmpty => Wrap(
-          spacing: S.s8,
-          runSpacing: S.s8,
-          children: [
-            for (final (i, (label, value)) in choices.indexed)
-              Btn(label,
-                  small: true,
-                  variant: i == 0 ? BtnVariant.primary : BtnVariant.secondary,
-                  disabled: busy,
-                  onTap: () => _send(
-                      _answer(label == value ? label : '$label ($value)'))),
-          ]),
+      CardAction.answer when choices.isNotEmpty =>
+        Wrap(spacing: S.s8, runSpacing: S.s8, children: [
+          for (final (i, (label, value)) in choices.indexed)
+            Btn(label,
+                small: true,
+                variant: i == 0 ? BtnVariant.primary : BtnVariant.secondary,
+                disabled: busy,
+                onTap: () =>
+                    _send(_answer(label == value ? label : '$label ($value)'))),
+        ]),
       CardAction.answer || CardAction.reply => _ReplyField(
           controller: _text,
           focus: _focus,
@@ -278,8 +257,8 @@ class _NotificationMessageCardState extends State<NotificationMessageCard> {
           onTap: onTap,
           borderRadius: BorderRadius.circular(R.xs),
           child: Padding(
-            padding: EdgeInsets.symmetric(
-                horizontal: 4, vertical: kMobile ? 8 : 3),
+            padding:
+                EdgeInsets.symmetric(horizontal: 4, vertical: kMobile ? 8 : 3),
             child: Text(label, style: link),
           ),
         );
@@ -304,8 +283,7 @@ class _NotificationMessageCardState extends State<NotificationMessageCard> {
                   style: sans(12, color: AppColors.fg3)),
             ),
           if (actions != null && _moreQuestions == 0)
-            Padding(
-                padding: const EdgeInsets.only(top: 10), child: actions),
+            Padding(padding: const EdgeInsets.only(top: 10), child: actions),
           if (_state == _Send.failed)
             Padding(
               padding: const EdgeInsets.only(top: S.s6),
@@ -334,27 +312,31 @@ class _NotificationMessageCardState extends State<NotificationMessageCard> {
 
     return LayoutBuilder(builder: (context, box) {
       final full = box.maxWidth;
-      final width = kMobile && !_open ? math.min(full, 300.0) : full;
+      final width =
+          kMobile && !_open && !widget.embedded ? math.min(full, 300.0) : full;
       return Align(
-        alignment: kMobile && _expandable
-            ? Alignment.topCenter
-            : Alignment.topRight,
+        alignment: widget.embedded
+            ? Alignment.topLeft
+            : kMobile && _expandable
+                ? Alignment.topCenter
+                : Alignment.topRight,
         heightFactor: 1,
         child: AnimatedContainer(
           duration: motion,
           curve: Curves.easeOutCubic,
           width: width,
           clipBehavior: Clip.antiAlias,
-          decoration: BoxDecoration(
-            color: AppColors.surface2,
-            border: Border.all(color: AppColors.lineStrong),
-            borderRadius: BorderRadius.circular(radius),
-          ),
+          decoration: widget.embedded
+              ? const BoxDecoration()
+              : BoxDecoration(
+                  color: AppColors.surface2,
+                  border: Border.all(color: AppColors.lineStrong),
+                  borderRadius: BorderRadius.circular(radius),
+                ),
           child: Material(
             type: MaterialType.transparency,
             child: InkWell(
               onTap: _toggle,
-              onLongPress: widget.rest.isEmpty ? null : widget.onClearAll,
               child: Padding(
                 padding: EdgeInsets.fromLTRB(
                     kMobile ? 18 : 14, kMobile ? 6 : 8, 4, kMobile ? 6 : 8),
@@ -373,8 +355,8 @@ class _NotificationMessageCardState extends State<NotificationMessageCard> {
                       alignment: Alignment.topLeft,
                       child: AnimatedSwitcher(
                         duration: motion,
-                        switchInCurve: const Interval(.35, 1,
-                            curve: Curves.easeOut),
+                        switchInCurve:
+                            const Interval(.35, 1, curve: Curves.easeOut),
                         switchOutCurve: Curves.easeIn,
                         child: _open
                             ? KeyedSubtree(
@@ -384,19 +366,6 @@ class _NotificationMessageCardState extends State<NotificationMessageCard> {
                                 width: double.infinity),
                       ),
                     ),
-                    if (widget.rest.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.only(left: 18, top: S.s4),
-                        child: Wrap(
-                            crossAxisAlignment: WrapCrossAlignment.center,
-                            spacing: S.s8,
-                            children: [
-                              Text(_moreLabel,
-                                  style: mono(11.5, color: AppColors.fg4)),
-                              if (!kMobile)
-                                textLink('Clear all', widget.onClearAll),
-                            ]),
-                      ),
                   ],
                 ),
               ),
@@ -408,20 +377,13 @@ class _NotificationMessageCardState extends State<NotificationMessageCard> {
   }
 }
 
-(String, Color) _mood(Map<String, dynamic> p, CardAction a) =>
+Color _mood(Map<String, dynamic> p, CardAction a) =>
     switch ('${p['kind'] ?? ''}'.split('.').last) {
-      'waiting' => (
-          switch (a) {
-            CardAction.approval => 'wants approval',
-            CardAction.answer => 'has a question',
-            _ => 'needs you',
-          },
-          AppColors.run,
-        ),
-      'done' || 'completed' => ('done', AppColors.ok),
-      'error' || 'failed' => ('failed', AppColors.danger),
-      'idle' => ('standing by', AppColors.fg3),
-      _ => ('', AppColors.fg4),
+      'waiting' => AppColors.run,
+      'done' || 'completed' => AppColors.ok,
+      'error' || 'failed' => AppColors.danger,
+      'idle' => AppColors.fg3,
+      _ => AppColors.fg4,
     };
 
 class _ReplyField extends StatelessWidget {

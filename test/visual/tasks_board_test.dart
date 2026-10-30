@@ -81,7 +81,8 @@ void main() {
         // Fixed pump, not pumpAndSettle: the board runs a periodic refresh
         // timer, so the tree never goes fully quiet.
         await tester.pump(const Duration(milliseconds: 120));
-        await expectGolden(tester, find.byType(MaterialApp), 'goldens/tasks_board_$density.png');
+        await expectGolden(tester, find.byType(MaterialApp),
+            'goldens/tasks_board_$density.png');
       } finally {
         debugDefaultTargetPlatformOverride = null;
       }

@@ -437,7 +437,8 @@ class _GitScreenState extends State<GitScreen> {
                   borderRadius: BorderRadius.circular(kMobile ? 20 : R.sm),
                   child: Container(
                     height: kMobile ? 40 : 28,
-                    padding: EdgeInsets.symmetric(horizontal: kMobile ? 14 : S.s8),
+                    padding:
+                        EdgeInsets.symmetric(horizontal: kMobile ? 14 : S.s8),
                     child: Row(mainAxisSize: MainAxisSize.min, children: [
                       AppIcon('git-branch', size: 16, color: AppColors.accent),
                       const SizedBox(width: S.s6),
@@ -529,14 +530,17 @@ class _GitScreenState extends State<GitScreen> {
               focusNode: _commitFocus,
               minLines: 2,
               maxLines: 4,
-              style: kMobile ? sans(16, color: AppColors.fg1) : TS.ui(AppColors.fg1),
+              style: kMobile
+                  ? sans(16, color: AppColors.fg1)
+                  : TS.ui(AppColors.fg1),
               decoration: InputDecoration(
                 isDense: true,
                 hintText: kMobile
                     ? 'Commit message'
                     : 'Commit message (${kMacOS ? 'Cmd' : 'Ctrl'}+Enter to commit)',
-                hintStyle:
-                    kMobile ? sans(16, color: AppColors.fg4) : TS.ui(AppColors.fg4),
+                hintStyle: kMobile
+                    ? sans(16, color: AppColors.fg4)
+                    : TS.ui(AppColors.fg4),
                 contentPadding: const EdgeInsets.symmetric(vertical: S.s4),
                 border: InputBorder.none,
               ),

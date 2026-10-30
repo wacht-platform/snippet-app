@@ -364,8 +364,8 @@ extension _SessionScreenComposerExt on _SessionScreenState {
             child: SizedBox.square(
               dimension: kMobile ? 32 : 24,
               child: Center(
-                  child: AppIcon(icon,
-                      size: 13, color: color ?? AppColors.fg4)),
+                  child:
+                      AppIcon(icon, size: 13, color: color ?? AppColors.fg4)),
             ),
           ),
         );
@@ -406,8 +406,8 @@ extension _SessionScreenComposerExt on _SessionScreenState {
               label,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: sans(13,
-                  color: text.isEmpty ? AppColors.fg3 : AppColors.fg2),
+              style:
+                  sans(13, color: text.isEmpty ? AppColors.fg3 : AppColors.fg2),
             ),
           ),
           if (others > 0) ...[
@@ -437,8 +437,7 @@ extension _SessionScreenComposerExt on _SessionScreenState {
   String _queuedText(String m) => hideAttachmentMarkers(m);
 
   List<String> _queuedImagePaths(String m) => [
-        for (final x
-            in RegExp(r'\[attached image —([^\]]*)\]').allMatches(m))
+        for (final x in RegExp(r'\[attached image —([^\]]*)\]').allMatches(m))
           if ((x.group(1) ?? '').trim().isNotEmpty) x.group(1)!.trim()
       ];
 
@@ -605,45 +604,34 @@ extension _SessionScreenComposerExt on _SessionScreenState {
   /// The composer's status line: where this session runs, and how much context
   /// is left. Sits under the card so the transcript keeps the full width.
   Widget _goalBanner() => Container(
-  margin:
-      const EdgeInsets.only(bottom: 10),
-  padding: const EdgeInsets.fromLTRB(
-      10, 8, 8, 8),
-  decoration: BoxDecoration(
-    color: AppColors.surface2,
-    borderRadius:
-        BorderRadius.circular(R.sm),
-  ),
-  child: Row(children: [
-    AppIcon('goal',
-        size: 14,
-        color: AppColors.accent),
-    const SizedBox(width: 8),
-    Expanded(
-      child: Text(_state!.goal!.text,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: sans(12,
-              color: AppColors.fg2)),
-    ),
-    Text(
-        _state!.goal!.paused
-            ? 'paused'
-            : 'active',
-        style: mono(10,
-            color: AppColors.accent)),
-    const SizedBox(width: 5),
-    IconBtn('x',
-        size: 26,
-        iconSize: 13,
-        tooltip: 'Cancel goal',
-        onTap: _cancelGoal),
-  ]),
-);
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.fromLTRB(10, 8, 8, 8),
+        decoration: BoxDecoration(
+          color: AppColors.surface2,
+          borderRadius: BorderRadius.circular(R.sm),
+        ),
+        child: Row(children: [
+          AppIcon('goal', size: 14, color: AppColors.accent),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(_state!.goal!.text,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: sans(12, color: AppColors.fg2)),
+          ),
+          Text(_state!.goal!.paused ? 'paused' : 'active',
+              style: mono(10, color: AppColors.accent)),
+          const SizedBox(width: 5),
+          IconBtn('x',
+              size: 26,
+              iconSize: 13,
+              tooltip: 'Cancel goal',
+              onTap: _cancelGoal),
+        ]),
+      );
 
   Map<ShortcutActivator, VoidCallback> get _composerShortcuts => {
-        const SingleActivator(
-            LogicalKeyboardKey.enter): () {
+        const SingleActivator(LogicalKeyboardKey.enter): () {
           if (_mentionMatches.isNotEmpty) {
             _applyMention(_mentionMatches[_mentionIndex]);
           } else if (!kMobile && _canSend) {
@@ -654,22 +642,20 @@ extension _SessionScreenComposerExt on _SessionScreenState {
           const SingleActivator(LogicalKeyboardKey.tab): () =>
               _applyMention(_mentionMatches[_mentionIndex]),
           const SingleActivator(LogicalKeyboardKey.arrowDown): () => _setState(
-              () => _mentionIndex = (_mentionIndex + 1) % _mentionMatches.length),
-          const SingleActivator(LogicalKeyboardKey.arrowUp): () => _setState(() =>
-              _mentionIndex = (_mentionIndex - 1 + _mentionMatches.length) %
-                  _mentionMatches.length),
+              () =>
+                  _mentionIndex = (_mentionIndex + 1) % _mentionMatches.length),
+          const SingleActivator(LogicalKeyboardKey.arrowUp): () => _setState(
+              () => _mentionIndex =
+                  (_mentionIndex - 1 + _mentionMatches.length) %
+                      _mentionMatches.length),
         },
         if (_mentionQuery != null)
           const SingleActivator(LogicalKeyboardKey.escape): () =>
               _setState(() => _mentionQuery = null),
-        const SingleActivator(
-            LogicalKeyboardKey.enter,
-            meta: true): () {
+        const SingleActivator(LogicalKeyboardKey.enter, meta: true): () {
           if (_canSend) _sendMessage();
         },
-        const SingleActivator(
-            LogicalKeyboardKey.enter,
-            control: true): () {
+        const SingleActivator(LogicalKeyboardKey.enter, control: true): () {
           if (_canSend) _sendMessage();
         },
       };
@@ -691,11 +677,8 @@ extension _SessionScreenComposerExt on _SessionScreenState {
         Builder(builder: (chipCtx) {
           return _composerChip(
             icon: _modelProvider == null ? 'cpu' : 'provider:$_modelProvider',
-            label: _modelLabel ??
-                'Auto',
-            onTap: () =>
-                _switchModel(
-                    chipCtx),
+            label: _modelLabel ?? 'Auto',
+            onTap: () => _switchModel(chipCtx),
           );
         }),
       ];
@@ -866,16 +849,17 @@ extension _SessionScreenComposerExt on _SessionScreenState {
         Row(mainAxisSize: MainAxisSize.min, children: [
           Flexible(
             child: hit(
-              Text(text,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: sans(13,
-                      color: selected ? AppColors.accent : AppColors.fg3)),
-              onTap,
-              tip: tip),
+                Text(text,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: sans(13,
+                        color: selected ? AppColors.accent : AppColors.fg3)),
+                onTap,
+                tip: tip),
           ),
           if (onClear != null)
-            IconBtn('x', size: 22, iconSize: 11, tooltip: 'Clear', onTap: onClear),
+            IconBtn('x',
+                size: 22, iconSize: 11, tooltip: 'Clear', onTap: onClear),
         ]);
 
     Widget low(Widget w, double bottom) =>
@@ -959,8 +943,8 @@ extension _SessionScreenComposerExt on _SessionScreenState {
                   if (!_isMissionControl && _recipientAgentId != null)
                     low(
                         ConstrainedBox(
-                          constraints: BoxConstraints(
-                              maxWidth: compact ? 110 : 160),
+                          constraints:
+                              BoxConstraints(maxWidth: compact ? 110 : 160),
                           child: Builder(
                             builder: (ctx) => label(
                                 'To ${_recipientAgentName ?? _recipientAgentId!}',
@@ -1017,190 +1001,215 @@ extension _SessionScreenComposerExt on _SessionScreenState {
           constraints: BoxConstraints(
               maxWidth: kMobile ? double.infinity : kDesktopComposerWidth),
           child: Container(
-        // Inset from the pane on EVERY layout. Embedded used to be 0, which is
-        // why the composer stuck to the sides of the shell.
-        padding: EdgeInsets.fromLTRB(
-            kMobile ? M.gutter : (widget.embedded ? kComposerGutter : 20),
-            8,
-            kMobile ? M.gutter : (widget.embedded ? kComposerGutter : 20),
-            10 + (keyboard > 0 ? 8 : mq.padding.bottom)),
-        child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (_heldQueue.isNotEmpty) _queuedCard(),
-              if (_attachments.isNotEmpty) _attachmentBar(),
-              if (_mentionQuery != null && !_isMissionControl) _mentionList(),
-              Swap(
-                stateKey: (_isRecording || _recordingPath != null)
-                    ? 'recorder'
-                    : 'composer',
-                alignment: Alignment.bottomCenter,
-                child: (_isRecording || _recordingPath != null)
-                    ? ValueListenableBuilder<int>(
-                        valueListenable: _recorderTick,
-                        builder: (_, __, ___) => _mobileRecorder(running),
-                      )
-                    : !kMobile
-                        ? _composerStrip(running)
-                        : Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                            Container(
-                              key: _composerCardKey,
-                              decoration: BoxDecoration(
-                                color: AppColors.surface1,
-                                borderRadius: BorderRadius.circular(26),
-                                border: _draggingFiles
-                                    ? Border.all(
-                                        color: AppColors.accent, width: 1.5)
-                                    : Border.all(
-                                        color: AppColors.fg1
-                                            .withValues(alpha: 0.08)),
-                              ),
-                              // The card owns the inset and the rows sit inside it, so there is
-                              // no per-row vertical padding to keep in sync. Slightly taller
-                              // than it is wide-padded, so the field reads as a writing area.
-                              padding:
-                                  const EdgeInsets.fromLTRB(16, 14, 10, 10),
-                              child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.stretch,
-                                  children: [
-                                    if (_state?.goal?.ongoing == true) _goalBanner(),
-                                    CallbackShortcuts(
-                                      bindings: _composerShortcuts,
-                                      child: TextField(
-                                        controller: _input,
-                                        focusNode: _inputFocus,
-                                        // Two lines minimum: a single-line field read as a
-                                        // cramped search box, and it hid the fact that the
-                                        // composer accepts multi-line prose.
-                                        minLines: 1,
-                                        maxLines: 8,
-                                        cursorColor: AppColors.accent,
-                                        onSubmitted: (_) => _sendMessage(),
-                                        style: TS.body(AppColors.fg1),
-                                        decoration: InputDecoration(
-                                          isCollapsed: true,
-                                          // The card supplies the inset; this only adds the gap
-                                          // between the text and the control row beneath it.
-                                          contentPadding:
-                                              const EdgeInsets.fromLTRB(
-                                                  2, 2, 8, 10),
-                                          border: InputBorder.none,
-                                          hintText: _isMissionControl
-                                              ? 'Ask Mission Control…'
-                                              : running
-                                                  ? 'Steer or queue a message'
-                                                  : 'Reply to Snippet',
-                                          hintStyle: TS.body(AppColors.fg4),
-                                        ),
+            // Inset from the pane on EVERY layout. Embedded used to be 0, which is
+            // why the composer stuck to the sides of the shell.
+            padding: EdgeInsets.fromLTRB(
+                kMobile ? M.gutter : (widget.embedded ? kComposerGutter : 20),
+                8,
+                kMobile ? M.gutter : (widget.embedded ? kComposerGutter : 20),
+                10 + (keyboard > 0 ? 8 : mq.padding.bottom)),
+            child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (_heldQueue.isNotEmpty) _queuedCard(),
+                  if (_attachments.isNotEmpty) _attachmentBar(),
+                  if (_mentionQuery != null && !_isMissionControl)
+                    _mentionList(),
+                  Swap(
+                    stateKey: (_isRecording || _recordingPath != null)
+                        ? 'recorder'
+                        : 'composer',
+                    alignment: Alignment.bottomCenter,
+                    child: (_isRecording || _recordingPath != null)
+                        ? ValueListenableBuilder<int>(
+                            valueListenable: _recorderTick,
+                            builder: (_, __, ___) => _mobileRecorder(running),
+                          )
+                        : !kMobile
+                            ? _composerStrip(running)
+                            : Column(
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                    Container(
+                                      key: _composerCardKey,
+                                      decoration: BoxDecoration(
+                                        color: AppColors.surface1,
+                                        borderRadius: BorderRadius.circular(26),
+                                        border: _draggingFiles
+                                            ? Border.all(
+                                                color: AppColors.accent,
+                                                width: 1.5)
+                                            : Border.all(
+                                                color: AppColors.fg1
+                                                    .withValues(alpha: 0.08)),
                                       ),
-                                    ),
-                                    Row(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.center,
-                                        children: [
-                                          Material(
-                                            color: Colors.transparent,
-                                            borderRadius:
-                                                BorderRadius.circular(R.sm),
-                                            child: InkWell(
-                                              onTap: _onAttachTap,
-                                              borderRadius:
-                                                  BorderRadius.circular(R.sm),
-                                              child: Padding(
-                                                padding:
-                                                    const EdgeInsets.all(6),
-                                                child: AppIcon('plus',
-                                                    size: 18,
-                                                    color: AppColors.fg3),
-                                              ),
-                                            ),
-                                          ),
-                                          const SizedBox(width: 6),
-                                          // The chip group SCROLLS and the mic/send controls are
-                                          // pinned outside it. Three chips plus two buttons
-                                          // overflowed a narrow phone, which pushed Send off the
-                                          // card; a scrolling group plus fixed trailing controls
-                                          // cannot.
-                                          Expanded(
-                                            child: SingleChildScrollView(
-                                              scrollDirection: Axis.horizontal,
-                                              child: Row(
-                                                  crossAxisAlignment:
-                                                      CrossAxisAlignment.center,
-                                                  children: [
-                                                    // Sending to an agent remains a composer action: it
-                                                    // changes the destination of this message without
-                                                    // adding another control to the session list.
-                                                    ..._composerChips(),
-                                                  ]),
-                                            ),
-                                          ),
-                                          if (_contextLeftPct != null)
-                                            Padding(
-                                              padding: const EdgeInsets.only(
-                                                  left: 6, right: 2),
-                                              child: Text(
-                                                  '${_contextLeftPct}% left',
-                                                  style: sans(12,
-                                                      tabular: true,
-                                                      color: AppColors.fg4)),
-                                            ),
-                                          const SizedBox(width: 2),
-                                          if (kCanRecord) ...[
-                                            Material(
-                                              color: Colors.transparent,
-                                              borderRadius:
-                                                  BorderRadius.circular(R.sm),
-                                              child: InkWell(
-                                                onTap: _onMicTap,
-                                                borderRadius:
-                                                    BorderRadius.circular(R.sm),
-                                                child: Padding(
-                                                  padding:
-                                                      const EdgeInsets.all(6),
-                                                  child: AppIcon(
-                                                      _isRecording
-                                                          ? 'mic-off'
-                                                          : 'mic',
-                                                      size: 18,
-                                                      color: _isRecording
-                                                          ? AppColors.danger
-                                                          : AppColors.fg3),
+                                      // The card owns the inset and the rows sit inside it, so there is
+                                      // no per-row vertical padding to keep in sync. Slightly taller
+                                      // than it is wide-padded, so the field reads as a writing area.
+                                      padding: const EdgeInsets.fromLTRB(
+                                          16, 14, 10, 10),
+                                      child: Column(
+                                          mainAxisSize: MainAxisSize.min,
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.stretch,
+                                          children: [
+                                            if (_state?.goal?.ongoing == true)
+                                              _goalBanner(),
+                                            CallbackShortcuts(
+                                              bindings: _composerShortcuts,
+                                              child: TextField(
+                                                controller: _input,
+                                                focusNode: _inputFocus,
+                                                // Two lines minimum: a single-line field read as a
+                                                // cramped search box, and it hid the fact that the
+                                                // composer accepts multi-line prose.
+                                                minLines: 1,
+                                                maxLines: 8,
+                                                cursorColor: AppColors.accent,
+                                                onSubmitted: (_) =>
+                                                    _sendMessage(),
+                                                style: TS.body(AppColors.fg1),
+                                                decoration: InputDecoration(
+                                                  isCollapsed: true,
+                                                  // The card supplies the inset; this only adds the gap
+                                                  // between the text and the control row beneath it.
+                                                  contentPadding:
+                                                      const EdgeInsets.fromLTRB(
+                                                          2, 2, 8, 10),
+                                                  border: InputBorder.none,
+                                                  hintText: _isMissionControl
+                                                      ? 'Ask Mission Control…'
+                                                      : running
+                                                          ? 'Steer or queue a message'
+                                                          : 'Reply to Snippet',
+                                                  hintStyle:
+                                                      TS.body(AppColors.fg4),
                                                 ),
                                               ),
                                             ),
-                                            const SizedBox(width: 6),
-                                          ],
-                                          ValueListenableBuilder<
-                                              TextEditingValue>(
-                                            valueListenable: _input,
-                                            builder: (_, __, ___) {
-                                              final queue = running && _canSend;
-                                              final stop = running && !queue;
-                                              return _SendBtn(
-                                                  enabled: stop || _canSend,
-                                                  running: stop,
-                                                  onTap: stop
-                                                      ? () => _send(
-                                                          {'kind': 'interrupt'})
-                                                      : (_canSend
-                                                          ? _sendMessage
-                                                          : null));
-                                            },
-                                          ),
-                                        ]),
+                                            Row(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.center,
+                                                children: [
+                                                  Material(
+                                                    color: Colors.transparent,
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            R.sm),
+                                                    child: InkWell(
+                                                      onTap: _onAttachTap,
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                              R.sm),
+                                                      child: Padding(
+                                                        padding:
+                                                            const EdgeInsets
+                                                                .all(6),
+                                                        child: AppIcon('plus',
+                                                            size: 18,
+                                                            color:
+                                                                AppColors.fg3),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 6),
+                                                  // The chip group SCROLLS and the mic/send controls are
+                                                  // pinned outside it. Three chips plus two buttons
+                                                  // overflowed a narrow phone, which pushed Send off the
+                                                  // card; a scrolling group plus fixed trailing controls
+                                                  // cannot.
+                                                  Expanded(
+                                                    child:
+                                                        SingleChildScrollView(
+                                                      scrollDirection:
+                                                          Axis.horizontal,
+                                                      child: Row(
+                                                          crossAxisAlignment:
+                                                              CrossAxisAlignment
+                                                                  .center,
+                                                          children: [
+                                                            // Sending to an agent remains a composer action: it
+                                                            // changes the destination of this message without
+                                                            // adding another control to the session list.
+                                                            ..._composerChips(),
+                                                          ]),
+                                                    ),
+                                                  ),
+                                                  if (_contextLeftPct != null)
+                                                    Padding(
+                                                      padding:
+                                                          const EdgeInsets.only(
+                                                              left: 6,
+                                                              right: 2),
+                                                      child: Text(
+                                                          '${_contextLeftPct}% left',
+                                                          style: sans(12,
+                                                              tabular: true,
+                                                              color: AppColors
+                                                                  .fg4)),
+                                                    ),
+                                                  const SizedBox(width: 2),
+                                                  if (kCanRecord) ...[
+                                                    Material(
+                                                      color: Colors.transparent,
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                              R.sm),
+                                                      child: InkWell(
+                                                        onTap: _onMicTap,
+                                                        borderRadius:
+                                                            BorderRadius
+                                                                .circular(R.sm),
+                                                        child: Padding(
+                                                          padding:
+                                                              const EdgeInsets
+                                                                  .all(6),
+                                                          child: AppIcon(
+                                                              _isRecording
+                                                                  ? 'mic-off'
+                                                                  : 'mic',
+                                                              size: 18,
+                                                              color: _isRecording
+                                                                  ? AppColors
+                                                                      .danger
+                                                                  : AppColors
+                                                                      .fg3),
+                                                        ),
+                                                      ),
+                                                    ),
+                                                    const SizedBox(width: 6),
+                                                  ],
+                                                  ValueListenableBuilder<
+                                                      TextEditingValue>(
+                                                    valueListenable: _input,
+                                                    builder: (_, __, ___) {
+                                                      final queue =
+                                                          running && _canSend;
+                                                      final stop =
+                                                          running && !queue;
+                                                      return _SendBtn(
+                                                          enabled:
+                                                              stop || _canSend,
+                                                          running: stop,
+                                                          onTap: stop
+                                                              ? () => _send({
+                                                                    'kind':
+                                                                        'interrupt'
+                                                                  })
+                                                              : (_canSend
+                                                                  ? _sendMessage
+                                                                  : null));
+                                                    },
+                                                  ),
+                                                ]),
+                                          ]),
+                                    ),
                                   ]),
-                            ),
-                          ]),
-              ),
-            ]),
-      ),
+                  ),
+                ]),
+          ),
         ),
       ),
     );

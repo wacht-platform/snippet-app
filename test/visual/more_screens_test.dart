@@ -43,12 +43,10 @@ class _FakeDaemon extends DaemonClient {
       MissionControlOverview.fromJson(const {});
 
   @override
-  Future<List<MissionControlTask>> mcTasks({bool? archived}) async =>
-      const [];
+  Future<List<MissionControlTask>> mcTasks({bool? archived}) async => const [];
 
   @override
-  Future<List<ManagedSession>> mcSessions({bool? archived}) async =>
-      const [];
+  Future<List<ManagedSession>> mcSessions({bool? archived}) async => const [];
 
   @override
   Future<List<CoordinationAgent>> coordinationAgents() async =>
@@ -59,8 +57,7 @@ class _FakeDaemon extends DaemonClient {
       ServerConfig.fromJson(config);
 
   @override
-  Future<FileContent> readFile(String path) async =>
-      FileContent.fromJson(file);
+  Future<FileContent> readFile(String path) async => FileContent.fromJson(file);
 
   @override
   Future<GitStatus> gitStatus(String session) async =>
@@ -184,7 +181,8 @@ void main() {
 
         await tester.pumpWidget(_app(MissionControlScreen(client: client)));
         await tester.pump(const Duration(milliseconds: 120));
-        await expectGolden(tester, find.byType(MaterialApp), 'goldens/mission_control_$density.png');
+        await expectGolden(tester, find.byType(MaterialApp),
+            'goldens/mission_control_$density.png');
         await tester.pumpWidget(const SizedBox.shrink());
         await tester.pump();
       } finally {
@@ -236,7 +234,8 @@ void main() {
         await tester.pumpWidget(_app(Scaffold(
             body: CoordinationAgentDirectory(client: client, embedded: true))));
         await tester.pump(const Duration(milliseconds: 120));
-        await expectGolden(tester, find.byType(MaterialApp), 'goldens/agent_directory_$density.png');
+        await expectGolden(tester, find.byType(MaterialApp),
+            'goldens/agent_directory_$density.png');
         await tester.pumpWidget(const SizedBox.shrink());
         await tester.pump();
       } finally {
@@ -269,7 +268,8 @@ void main() {
 
         await tester.pumpWidget(_app(InferenceProfilesScreen(client: client)));
         await tester.pump(const Duration(milliseconds: 120));
-        await expectGolden(tester, find.byType(MaterialApp), 'goldens/inference_profiles_$density.png');
+        await expectGolden(tester, find.byType(MaterialApp),
+            'goldens/inference_profiles_$density.png');
         await tester.pumpWidget(const SizedBox.shrink());
         await tester.pump();
       } finally {
@@ -320,7 +320,8 @@ class Greeting extends StatelessWidget {
           name: 'greeting.dart',
         )));
         await tester.pump(const Duration(milliseconds: 120));
-        await expectGolden(tester, find.byType(MaterialApp), 'goldens/editor_$density.png');
+        await expectGolden(
+            tester, find.byType(MaterialApp), 'goldens/editor_$density.png');
         // `re_editor` starts a cursor blink while focused, then — on Android
         // only — schedules a bare `Future.delayed(100ms)` inside `startBlink`.
         // `stopBlink` cancels the periodic timer but NOT that delayed future,
@@ -392,10 +393,11 @@ class Greeting extends StatelessWidget {
         // under a bare MaterialApp instead, every Text falls back to
         // `DefaultTextStyle` and Flutter paints the yellow double-underline
         // that marks "no Material ancestor". Scaffold here, as in the app.
-        await tester.pumpWidget(_app(
-            Scaffold(body: GitScreen(client: client, sessionId: 's1', embedded: true))));
+        await tester.pumpWidget(_app(Scaffold(
+            body: GitScreen(client: client, sessionId: 's1', embedded: true))));
         await tester.pump(const Duration(milliseconds: 120));
-        await expectGolden(tester, find.byType(MaterialApp), 'goldens/git_$density.png');
+        await expectGolden(
+            tester, find.byType(MaterialApp), 'goldens/git_$density.png');
         await tester.pumpWidget(const SizedBox.shrink());
         await tester.pump();
       } finally {

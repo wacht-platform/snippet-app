@@ -27,18 +27,24 @@ class _AmbientTaskHandler extends TaskHandler {
   Future<void> onStart(DateTime timestamp, TaskStarter starter) async {
     await AmbientDiagnostics.log('service started (${starter.name})');
     try {
-      final url = await FlutterForegroundTask.getData<String>(key: 'ambient_url');
-      final token = await FlutterForegroundTask.getData<String>(key: 'ambient_token');
-      final device = await FlutterForegroundTask.getData<String>(key: 'ambient_device');
-      final label = await FlutterForegroundTask.getData<String>(key: 'ambient_label');
+      final url =
+          await FlutterForegroundTask.getData<String>(key: 'ambient_url');
+      final token =
+          await FlutterForegroundTask.getData<String>(key: 'ambient_token');
+      final device =
+          await FlutterForegroundTask.getData<String>(key: 'ambient_device');
+      final label =
+          await FlutterForegroundTask.getData<String>(key: 'ambient_label');
       if (url == null || token == null) {
         await AmbientDiagnostics.log('service has no server details, stopping');
         await FlutterForegroundTask.stopService();
         return;
       }
-      final capture = AmbientCapture(
-          AmbientUploader(
-              baseUrl: url, token: token, device: device ?? 'android', label: label ?? ''));
+      final capture = AmbientCapture(AmbientUploader(
+          baseUrl: url,
+          token: token,
+          device: device ?? 'android',
+          label: label ?? ''));
       _capture = capture;
       _sub = capture.status.listen((status) {
         FlutterForegroundTask.sendDataToMain(status.toMap());
@@ -58,8 +64,10 @@ class _AmbientTaskHandler extends TaskHandler {
       await AmbientDiagnostics.log('capture running');
     } catch (e, st) {
       await AmbientDiagnostics.log('service failed to start: $e\n$st');
-      FlutterForegroundTask.sendDataToMain(
-          AmbientStatus(error: 'Could not start listening: ${AmbientDiagnostics.redact('$e')}').toMap());
+      FlutterForegroundTask.sendDataToMain(AmbientStatus(
+              error:
+                  'Could not start listening: ${AmbientDiagnostics.redact('$e')}')
+          .toMap());
       await FlutterForegroundTask.stopService();
     }
   }
@@ -96,7 +104,8 @@ class AmbientController extends ChangeNotifier {
 
   bool get running => status.running;
 
-  ValueListenable<AmbientVoice?> get voice => _local?.voiceListenable ?? _emptyVoice;
+  ValueListenable<AmbientVoice?> get voice =>
+      _local?.voiceListenable ?? _emptyVoice;
 
   Future<String> get deviceId async {
     try {
@@ -141,9 +150,7 @@ class AmbientController extends ChangeNotifier {
       FlutterForegroundTask.addTaskDataCallback(_onTaskData);
       if (await FlutterForegroundTask.isRunningService) {
         status = AmbientStatus(
-            running: true,
-            segments: status.segments,
-            pending: status.pending);
+            running: true, segments: status.segments, pending: status.pending);
         notifyListeners();
       }
     }
@@ -159,9 +166,8 @@ class AmbientController extends ChangeNotifier {
   Future<String?> start(DaemonClient client) async {
     if (!supported) return 'Ambient listening is not available in the browser.';
     _init();
-    final granted = kMobile
-        ? (await Permission.microphone.request()).isGranted
-        : true;
+    final granted =
+        kMobile ? (await Permission.microphone.request()).isGranted : true;
     if (!granted) return 'Microphone permission is required.';
     final (deviceId, deviceLabel) = await _identity;
     try {
@@ -170,15 +176,20 @@ class AmbientController extends ChangeNotifier {
       return 'Could not claim listening: ${AmbientDiagnostics.redact('$e')}';
     }
     if (_android) {
-      final notifications = await FlutterForegroundTask.checkNotificationPermission();
+      final notifications =
+          await FlutterForegroundTask.checkNotificationPermission();
       if (notifications != NotificationPermission.granted) {
         await FlutterForegroundTask.requestNotificationPermission();
       }
       await AmbientDiagnostics.log('start requested');
-      await FlutterForegroundTask.saveData(key: 'ambient_url', value: client.baseUrl);
-      await FlutterForegroundTask.saveData(key: 'ambient_token', value: client.token);
-      await FlutterForegroundTask.saveData(key: 'ambient_device', value: deviceId);
-      await FlutterForegroundTask.saveData(key: 'ambient_label', value: deviceLabel);
+      await FlutterForegroundTask.saveData(
+          key: 'ambient_url', value: client.baseUrl);
+      await FlutterForegroundTask.saveData(
+          key: 'ambient_token', value: client.token);
+      await FlutterForegroundTask.saveData(
+          key: 'ambient_device', value: deviceId);
+      await FlutterForegroundTask.saveData(
+          key: 'ambient_label', value: deviceLabel);
       final result = await FlutterForegroundTask.startService(
         serviceId: 4711,
         serviceTypes: [ForegroundServiceTypes.microphone],
@@ -232,10 +243,12 @@ class AmbientController extends ChangeNotifier {
       !_android || await FlutterForegroundTask.isIgnoringBatteryOptimizations;
 
   Future<void> requestBatteryExemption() async {
-    if (_android) await FlutterForegroundTask.requestIgnoreBatteryOptimization();
+    if (_android)
+      await FlutterForegroundTask.requestIgnoreBatteryOptimization();
   }
 
-  Future<(AmbientSettings?, String?)> setEnabled(DaemonClient client, bool on) async {
+  Future<(AmbientSettings?, String?)> setEnabled(
+      DaemonClient client, bool on) async {
     try {
       if (on) {
         var saved = await client.setAmbientSettings(enabled: true);

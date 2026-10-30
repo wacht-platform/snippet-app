@@ -158,7 +158,10 @@ class _ArtifactGridState extends State<ArtifactGrid> {
 
 class _Card extends StatefulWidget {
   const _Card(
-      {required this.title, required this.meta, required this.thumb, this.onTap});
+      {required this.title,
+      required this.meta,
+      required this.thumb,
+      this.onTap});
   final String title;
   final String meta;
   final Widget thumb;
@@ -190,9 +193,12 @@ class _CardState extends State<_Card> {
                     ? AppColors.accent.withValues(alpha: 0.45)
                     : AppColors.line),
           ),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             Expanded(
-              child: Container(color: AppColors.surface2.withValues(alpha: 0.5), child: widget.thumb),
+              child: Container(
+                  color: AppColors.surface2.withValues(alpha: 0.5),
+                  child: widget.thumb),
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(10, 8, 10, 9),
@@ -229,8 +235,8 @@ class _ArtifactThumb extends StatefulWidget {
 class _ArtifactThumbState extends State<_ArtifactThumb> {
   Future<String>? _text;
 
-  bool get _textual => const {'markdown', 'code', 'csv'}
-      .contains(widget.artifact.kind);
+  bool get _textual =>
+      const {'markdown', 'code', 'csv'}.contains(widget.artifact.kind);
 
   @override
   void initState() {
@@ -248,7 +254,8 @@ class _ArtifactThumbState extends State<_ArtifactThumb> {
             borderRadius: BorderRadius.circular(6),
             border: Border.all(color: AppColors.line),
           ),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(children: [
               AppIcon('globe', size: 10, color: AppColors.fg4),
               const SizedBox(width: 5),
@@ -292,7 +299,9 @@ class _ArtifactThumbState extends State<_ArtifactThumb> {
   Widget build(BuildContext context) {
     final a = widget.artifact;
     final v = a.latest;
-    if (v == null) return Center(child: AppIcon(artifactIcon(a.kind), size: 24, color: AppColors.fg4));
+    if (v == null)
+      return Center(
+          child: AppIcon(artifactIcon(a.kind), size: 24, color: AppColors.fg4));
     final uri = widget.client.artifactUri(v.url).toString();
     if (a.kind == 'image') {
       return Image.network(uri,
@@ -321,6 +330,7 @@ class _ArtifactThumbState extends State<_ArtifactThumb> {
         ),
       );
     }
-    return Center(child: AppIcon(artifactIcon(a.kind), size: 26, color: AppColors.fg4));
+    return Center(
+        child: AppIcon(artifactIcon(a.kind), size: 26, color: AppColors.fg4));
   }
 }

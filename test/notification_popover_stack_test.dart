@@ -1,6 +1,5 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:snippet/notification_popovers.dart';
 import 'package:snippet/notification_sync.dart';
@@ -32,52 +31,55 @@ void main() {
 
   void enqueue(String title) => foregroundNotifications.add({'title': title});
 
-  testWidgets(
-      'three stacked notifications clear on hold with haptic, then fresh expiry',
+  testWidgets('stack shows newest on top with a count; Clear all empties it',
       (tester) async {
-    final haptics = <Object?>[];
-    tester.binding.defaultBinaryMessenger
-        .setMockMethodCallHandler(SystemChannels.platform, (call) async {
-      if (call.method == 'HapticFeedback.vibrate') haptics.add(call.arguments);
-      return null;
-    });
-    addTearDown(() => tester.binding.defaultBinaryMessenger
-        .setMockMethodCallHandler(SystemChannels.platform, null));
-    var navigations = 0;
-    onNotifTap = (_) => navigations++;
     await mount(tester);
     for (final title in ['First', 'Second', 'Third']) {
       enqueue(title);
     }
     await tester.pump();
-    expect(find.textContaining('Hold to clear all'), findsNothing);
-    expect(find.text('+2 more'), findsOneWidget);
-    final semantics = tester.ensureSemantics();
-    expect(find.bySemanticsLabel(RegExp(r'^3 notifications\. Long press to clear all')),
-        findsOneWidget);
-    semantics.dispose();
-    await tester.pump(const Duration(milliseconds: 4800));
-    final gesture =
-        await tester.startGesture(tester.getCenter(find.text('First')));
-    await tester.pump(const Duration(milliseconds: 300));
-    expect(find.text('First'), findsOneWidget);
-    await tester.pump(const Duration(milliseconds: 400));
-    await gesture.up();
+    expect(find.text('Third'), findsOneWidget);
+    expect(find.text('Second'), findsNothing);
+    expect(find.text('2 more'), findsOneWidget);
+    await tester.tap(find.text('Clear all'));
     await tester.pump();
-    expect(find.byType(Dismissible), findsNothing);
-    expect(navigations, 0);
-    expect(haptics, contains('HapticFeedbackType.mediumImpact'));
-    enqueue('Fresh');
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 4999));
-    expect(find.text('Fresh'), findsOneWidget);
-    await tester.pump(const Duration(milliseconds: 1));
-    await tester.pump();
-    expect(find.text('Fresh'), findsNothing);
+    expect(find.text('Third'), findsNothing);
+    expect(find.text('2 more'), findsNothing);
+    await tester.pumpWidget(const SizedBox());
   });
 
-  testWidgets('swipe removes only front and next receives five seconds',
+  testWidgets(
+      'expanding lists every row, groups needs-you first, and holds expiry',
       (tester) async {
+    await mount(tester);
+    enqueue('Quiet');
+    foregroundNotifications.add({'title': 'Blocked', 'kind': 'waiting'});
+    enqueue('Newest');
+    await tester.pump();
+    expect(find.text('Blocked'), findsOneWidget);
+    await tester.tap(find.text('2 more'));
+    await tester.pump();
+    for (final t in ['Blocked', 'Quiet', 'Newest']) {
+      expect(find.text(t), findsOneWidget);
+    }
+    expect(find.text('NEEDS YOU'), findsOneWidget);
+    expect(find.text('UPDATES'), findsOneWidget);
+    expect(tester.getTopLeft(find.text('Blocked')).dy,
+        lessThan(tester.getTopLeft(find.text('Newest')).dy));
+    await tester.pump(const Duration(seconds: 60));
+    expect(find.text('Quiet'), findsOneWidget);
+    await tester.tap(find.text('Collapse'));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 6));
+    await tester.pump(const Duration(seconds: 1));
+    expect(find.text('Newest'), findsNothing);
+    expect(find.text('Quiet'), findsNothing);
+    expect(find.text('Blocked'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 20));
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('swipe removes only the top card', (tester) async {
     await mount(tester);
     for (final title in ['First', 'Second', 'Third']) {
       enqueue(title);
@@ -85,12 +87,9 @@ void main() {
     await tester.pump();
     await tester.drag(find.byType(Dismissible), const Offset(-500, 0));
     await tester.pumpAndSettle();
-    expect(find.text('First'), findsNothing);
+    expect(find.text('Third'), findsNothing);
     expect(find.text('Second'), findsOneWidget);
-    expect(find.textContaining('Hold to clear all'), findsNothing);
-    await tester.pump(const Duration(seconds: 5));
-    await tester.pump();
-    expect(find.text('Third'), findsOneWidget);
+    expect(find.text('1 more'), findsOneWidget);
     await tester.pumpWidget(const SizedBox());
   });
 

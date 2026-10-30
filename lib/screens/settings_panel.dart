@@ -267,8 +267,6 @@ class SettingsPanelState extends State<SettingsPanel> {
   bool _modelsEditing = false;
   bool _recurringAdding = false;
 
-
-
   String? _renamingUrl;
   final TextEditingController _renameController = TextEditingController();
 
@@ -1027,20 +1025,19 @@ class SettingsPanelState extends State<SettingsPanel> {
         builder: (anchor) => IconBtn('more-horizontal',
             size: 28,
             iconSize: 15,
-            tooltip: 'Machine actions',
-            onTap: () async {
-              final picked = await showAppMenu<String>(context,
-                  anchor: anchor,
-                  below: true,
-                  alignEnd: true,
-                  minWidth: 160,
-                  items: [
-                    appMenuItem(value: 'rename', label: 'Rename'),
-                    appMenuItem(value: 'remove', label: 'Remove', danger: true),
-                  ]);
-              if (picked == 'rename') _startRename(i);
-              if (picked == 'remove') _confirmRemove(i);
-            }),
+            tooltip: 'Machine actions', onTap: () async {
+          final picked = await showAppMenu<String>(context,
+              anchor: anchor,
+              below: true,
+              alignEnd: true,
+              minWidth: 160,
+              items: [
+                appMenuItem(value: 'rename', label: 'Rename'),
+                appMenuItem(value: 'remove', label: 'Remove', danger: true),
+              ]);
+          if (picked == 'rename') _startRename(i);
+          if (picked == 'remove') _confirmRemove(i);
+        }),
       );
 
   Widget _machineRow(Instance i) {
@@ -1131,7 +1128,8 @@ class SettingsPanelState extends State<SettingsPanel> {
             onTap: _addMachineBusy ? null : _closeAddMachine),
         const SizedBox(width: S.s8),
         Btn(_addMachineBusy ? 'Connecting…' : 'Connect',
-            disabled: !canConnect, onTap: canConnect ? _submitAddMachine : null),
+            disabled: !canConnect,
+            onTap: canConnect ? _submitAddMachine : null),
       ]),
     ];
   }
@@ -1176,8 +1174,7 @@ class SettingsPanelState extends State<SettingsPanel> {
                 label: 'Notifications',
                 sub: 'When a session needs you or finishes.',
                 trailing: SettingsSwitch(
-                    value: _notif,
-                    onChanged: _notifBusy ? null : _toggleNotif),
+                    value: _notif, onChanged: _notifBusy ? null : _toggleNotif),
               ),
           ],
         ),

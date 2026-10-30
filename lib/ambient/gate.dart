@@ -41,7 +41,8 @@ class SpeechGate {
       if (probability >= threshold || keepOpen) {
         _open = true;
         _quiet = 0;
-        final started = DateTime.now().subtract(Duration(milliseconds: (_preRoll.length + 1) * frameMs));
+        final started = DateTime.now()
+            .subtract(Duration(milliseconds: (_preRoll.length + 1) * frameMs));
         final roll = _preRoll.toList()..add(frame);
         _preRoll.clear();
         onOpen(started, roll);

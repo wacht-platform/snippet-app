@@ -122,8 +122,8 @@ List<Widget> buildShellRailTools({
       shape: appMenuShape,
       constraints: const BoxConstraints(minWidth: 260, maxWidth: 280),
       menuPadding: const EdgeInsets.symmetric(vertical: 6),
-      position: RelativeRect.fromLTRB(
-          o.dx + box.size.width - 280, o.dy, screen.width - o.dx - box.size.width, 0),
+      position: RelativeRect.fromLTRB(o.dx + box.size.width - 280, o.dy,
+          screen.width - o.dx - box.size.width, 0),
       items: [
         if (win > 0 && used > 0) ...[
           PopupMenuItem<VoidCallback>(
@@ -174,8 +174,8 @@ List<Widget> buildShellRailTools({
                   borderRadius: BorderRadius.circular(R.sm),
                   child: InkWell(
                     borderRadius: BorderRadius.circular(R.sm),
-                    onTap: () => Navigator.of(ctx).pop<VoidCallback>(
-                        () => onSessionAction('compact')),
+                    onTap: () => Navigator.of(ctx)
+                        .pop<VoidCallback>(() => onSessionAction('compact')),
                     child: Container(
                       height: 30,
                       padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -195,7 +195,8 @@ List<Widget> buildShellRailTools({
         else ...[
           item('git-fork', 'Fork from here', () => onSessionAction('fork')),
           const PopupMenuDivider(height: 9),
-          item('file-diff', 'File changes', () => onSessionAction('file_changes')),
+          item('file-diff', 'File changes',
+              () => onSessionAction('file_changes')),
           item('clipboard', 'Artifacts', () => onSessionAction('artifacts'),
               detail: artifacts > 0 ? '$artifacts' : null),
           item('book-marked', 'Memory', () => onSessionAction('memory')),

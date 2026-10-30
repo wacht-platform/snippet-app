@@ -525,9 +525,9 @@ Future<T?> showAnchoredPanel<T>(
       return FadeTransition(
         opacity: curve,
         child: SlideTransition(
-          position: Tween(
-                  begin: Offset(0, above ? 0.02 : -0.02), end: Offset.zero)
-              .animate(curve),
+          position:
+              Tween(begin: Offset(0, above ? 0.02 : -0.02), end: Offset.zero)
+                  .animate(curve),
           child: child,
         ),
       );

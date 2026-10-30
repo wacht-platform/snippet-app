@@ -205,5 +205,6 @@ Future<bool> callActionForPayload(
   if (id.isEmpty) return false;
   final instance = await resolveInstanceForPayload(payload);
   if (instance == null) return false;
-  return callTracker.act(DaemonClient(instance.url, instance.token), id, action);
+  return callTracker.act(
+      DaemonClient(instance.url, instance.token), id, action);
 }

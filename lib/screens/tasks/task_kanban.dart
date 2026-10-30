@@ -53,8 +53,8 @@ class _TaskKanbanState extends State<TaskKanban> {
 
   Future<void> _loadFolded() async {
     try {
-      final saved = (await SharedPreferences.getInstance())
-          .getStringList(_foldedKey);
+      final saved =
+          (await SharedPreferences.getInstance()).getStringList(_foldedKey);
       if (saved == null || !mounted) return;
       setState(() => _folded
         ..clear()
@@ -68,6 +68,7 @@ class _TaskKanbanState extends State<TaskKanban> {
           .setStringList(_foldedKey, [for (final s in _folded) s.wire]);
     } catch (_) {}
   }
+
   double _columnWidth = _minColumn;
 
   @override
@@ -138,8 +139,7 @@ class _TaskKanbanState extends State<TaskKanban> {
       child: Row(children: [
         Text('Tasks', style: TS.sectionTitle()),
         const SizedBox(width: 10),
-        if (!_feed.loading)
-          Text('$open open', style: TS.meta()),
+        if (!_feed.loading) Text('$open open', style: TS.meta()),
         const Spacer(),
         SizedBox(
           width: 240,
@@ -156,7 +156,9 @@ class _TaskKanbanState extends State<TaskKanban> {
   }
 
   static bool _finished(TaskStatus s) =>
-      s == TaskStatus.done || s == TaskStatus.failed || s == TaskStatus.cancelled;
+      s == TaskStatus.done ||
+      s == TaskStatus.failed ||
+      s == TaskStatus.cancelled;
 
   Widget _board() {
     if (_feed.loading) {
@@ -172,13 +174,13 @@ class _TaskKanbanState extends State<TaskKanban> {
         ]),
       );
     }
-    final visible =
-        _feed.tasks.where((t) => taskMatches(t, _query)).toList();
+    final visible = _feed.tasks.where((t) => taskMatches(t, _query)).toList();
     return LayoutBuilder(builder: (context, constraints) {
       // Open columns fill the pane when they fit, so a board with room never
       // scrolls sideways; a narrow pane scrolls at the minimum width.
       final open = TaskStatus.values.length - _folded.length;
-      final room = constraints.maxWidth - 32 - _folded.length * (_foldedColumn + 8);
+      final room =
+          constraints.maxWidth - 32 - _folded.length * (_foldedColumn + 8);
       _columnWidth = (room / open - 8).clamp(_minColumn, _maxColumn);
       return Scrollbar(
         controller: _scroll,
@@ -317,7 +319,9 @@ class _TaskKanbanState extends State<TaskKanban> {
             ),
             child: Text(
                 status == TaskStatus.inProgress
-                    ? (refuses ? 'Only a dispatch starts work' : 'Nothing running')
+                    ? (refuses
+                        ? 'Only a dispatch starts work'
+                        : 'Nothing running')
                     : 'No tasks',
                 style: TS.meta(AppColors.fg4)),
           ),
@@ -413,7 +417,8 @@ class _TaskCardState extends State<_TaskCard> {
                     const SizedBox(width: 8),
                   ],
                   const Spacer(),
-                  if (age.isNotEmpty) Text(age, style: TS.caption(AppColors.fg4)),
+                  if (age.isNotEmpty)
+                    Text(age, style: TS.caption(AppColors.fg4)),
                 ]),
               ],
             ],

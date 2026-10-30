@@ -77,8 +77,8 @@ class TopWorkspaceTabChip extends StatelessWidget {
         decoration: BoxDecoration(
           color: isActive ? AppColors.surface2 : Colors.transparent,
           borderRadius: BorderRadius.circular(9),
-          border: Border.all(
-              color: isActive ? AppColors.line : Colors.transparent),
+          border:
+              Border.all(color: isActive ? AppColors.line : Colors.transparent),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -374,7 +374,8 @@ class MacWindowBar extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Expanded(child: Align(alignment: Alignment.centerLeft, child: tabsRow)),
+          Expanded(
+              child: Align(alignment: Alignment.centerLeft, child: tabsRow)),
           const SizedBox(width: 8),
           Center(
             child: Row(

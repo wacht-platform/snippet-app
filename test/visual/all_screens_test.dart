@@ -77,15 +77,15 @@ class _FakeDaemon extends DaemonClient {
       TaskItem.fromJson(task);
 
   @override
-  Future<void> addTaskAgent(String id, String agentId, {String role = ''}) async {}
+  Future<void> addTaskAgent(String id, String agentId,
+      {String role = ''}) async {}
 
   @override
   Future<void> linkTasks(String fromId, String toId,
       {TaskLinkKind kind = TaskLinkKind.blocks}) async {}
 
   @override
-  Future<GitStatus> gitStatus(String session) async =>
-      GitStatus.fromJson(git);
+  Future<GitStatus> gitStatus(String session) async => GitStatus.fromJson(git);
 
   /// Task detail and the sidebar panels watch a live socket. A fake has no
   /// server, so throwing is the honest stand-in: each caller's own `try`/`catch`
@@ -159,7 +159,8 @@ void main() {
         await tester.pumpWidget(_app(Scaffold(
             body: FileExplorer(client: client, start: '/home/snippet'))));
         await tester.pump(const Duration(milliseconds: 120));
-        await expectGolden(tester, find.byType(MaterialApp), 'goldens/files_$density.png');
+        await expectGolden(
+            tester, find.byType(MaterialApp), 'goldens/files_$density.png');
         await _teardown(tester);
       } finally {
         debugDefaultTargetPlatformOverride = null;
@@ -189,7 +190,8 @@ void main() {
           onOpenFolder: (_, __) async {},
         ))));
         await tester.pump(const Duration(milliseconds: 120));
-        await expectGolden(tester, find.byType(MaterialApp), 'goldens/new_session_picker_$density.png');
+        await expectGolden(tester, find.byType(MaterialApp),
+            'goldens/new_session_picker_$density.png');
         await _teardown(tester);
       } finally {
         debugDefaultTargetPlatformOverride = null;
@@ -207,7 +209,7 @@ void main() {
             'title': 'Normalise the type scale',
             'description':
                 'Rewrite 255 off-ladder literals onto the nine-step ladder, '
-                'then re-render every screen golden.',
+                    'then re-render every screen golden.',
             'status': 'in_progress',
             'priority': 1,
             'created_by_kind': 'human',
@@ -217,10 +219,11 @@ void main() {
             'thread_id': 'thread-1',
           };
 
-        await tester.pumpWidget(_app(Scaffold(
-            body: TaskDetailScreen(client: client, taskId: 't1'))));
+        await tester.pumpWidget(_app(
+            Scaffold(body: TaskDetailScreen(client: client, taskId: 't1'))));
         await tester.pump(const Duration(milliseconds: 120));
-        await expectGolden(tester, find.byType(MaterialApp), 'goldens/task_detail_$density.png');
+        await expectGolden(tester, find.byType(MaterialApp),
+            'goldens/task_detail_$density.png');
         await _teardown(tester);
       } finally {
         debugDefaultTargetPlatformOverride = null;
@@ -239,7 +242,8 @@ void main() {
             body: CoordinationAgentDetail(
                 agent: agent, client: _FakeDaemon(), embedded: true))));
         await tester.pump(const Duration(milliseconds: 120));
-        await expectGolden(tester, find.byType(MaterialApp), 'goldens/agent_detail_$density.png');
+        await expectGolden(tester, find.byType(MaterialApp),
+            'goldens/agent_detail_$density.png');
         await _teardown(tester);
       } finally {
         debugDefaultTargetPlatformOverride = null;
@@ -258,13 +262,15 @@ void main() {
             _agent('researcher', 'Researcher', ['web', 'search']),
           ];
 
-        await tester.pumpWidget(_app(Scaffold(body: Center(
-          child: SizedBox(
-            width: 260,
-            height: 700,
-            child: AgentsSidebarPanel(client: client))))));
+        await tester.pumpWidget(_app(Scaffold(
+            body: Center(
+                child: SizedBox(
+                    width: 260,
+                    height: 700,
+                    child: AgentsSidebarPanel(client: client))))));
         await tester.pump(const Duration(milliseconds: 120));
-        await expectGolden(tester, find.byType(MaterialApp), 'goldens/agents_panel_$density.png');
+        await expectGolden(tester, find.byType(MaterialApp),
+            'goldens/agents_panel_$density.png');
         await _teardown(tester);
       } finally {
         debugDefaultTargetPlatformOverride = null;
@@ -288,17 +294,19 @@ void main() {
             ],
           });
 
-        await tester.pumpWidget(_app(Scaffold(body: Center(
-          child: SizedBox(
-            width: 260,
-            height: 700,
-            child: FileTreeSidebarPanel(
-              client: client,
-              workspacePath: '/w',
-              onOpenFile: (_, __) {},
-            ))))));
+        await tester.pumpWidget(_app(Scaffold(
+            body: Center(
+                child: SizedBox(
+                    width: 260,
+                    height: 700,
+                    child: FileTreeSidebarPanel(
+                      client: client,
+                      workspacePath: '/w',
+                      onOpenFile: (_, __) {},
+                    ))))));
         await tester.pump(const Duration(milliseconds: 120));
-        await expectGolden(tester, find.byType(MaterialApp), 'goldens/file_tree_panel_$density.png');
+        await expectGolden(tester, find.byType(MaterialApp),
+            'goldens/file_tree_panel_$density.png');
         await _teardown(tester);
       } finally {
         debugDefaultTargetPlatformOverride = null;
@@ -346,17 +354,19 @@ void main() {
             ],
           };
 
-        await tester.pumpWidget(_app(Scaffold(body: Center(
-          child: SizedBox(
-            width: 260,
-            height: 700,
-            child: GitDiffSidebarPanel(
-              client: client,
-              workspacePath: '/w',
-              sessionId: 's1',
-            ))))));
+        await tester.pumpWidget(_app(Scaffold(
+            body: Center(
+                child: SizedBox(
+                    width: 260,
+                    height: 700,
+                    child: GitDiffSidebarPanel(
+                      client: client,
+                      workspacePath: '/w',
+                      sessionId: 's1',
+                    ))))));
         await tester.pump(const Duration(milliseconds: 120));
-        await expectGolden(tester, find.byType(MaterialApp), 'goldens/git_diff_panel_$density.png');
+        await expectGolden(tester, find.byType(MaterialApp),
+            'goldens/git_diff_panel_$density.png');
         await _teardown(tester);
       } finally {
         debugDefaultTargetPlatformOverride = null;
@@ -368,24 +378,35 @@ void main() {
       debugDefaultTargetPlatformOverride = platform;
       try {
         sized(tester);
-        await tester.pumpWidget(_app(Scaffold(body: Center(
-          child: SizedBox(
-            width: 260,
-            height: 700,
-            child: TerminalsSidebarPanel(
-              workspacePath: '/w',
-              terminals: const [
-                TerminalInfo(id: 't1', title: 'cargo watch', alive: true, live: true),
-                TerminalInfo(id: 't2', title: 'shell', alive: true, live: false),
-                TerminalInfo(id: 't3', title: 'flutter build', alive: false, live: true),
-              ],
-              focus: 0,
-              onNewTerminal: () {},
-              onOpenTerminal: (_) {},
-              onCloseTerminal: (_) {},
-            ))))));
+        await tester.pumpWidget(_app(Scaffold(
+            body: Center(
+                child: SizedBox(
+                    width: 260,
+                    height: 700,
+                    child: TerminalsSidebarPanel(
+                      workspacePath: '/w',
+                      terminals: const [
+                        TerminalInfo(
+                            id: 't1',
+                            title: 'cargo watch',
+                            alive: true,
+                            live: true),
+                        TerminalInfo(
+                            id: 't2', title: 'shell', alive: true, live: false),
+                        TerminalInfo(
+                            id: 't3',
+                            title: 'flutter build',
+                            alive: false,
+                            live: true),
+                      ],
+                      focus: 0,
+                      onNewTerminal: () {},
+                      onOpenTerminal: (_) {},
+                      onCloseTerminal: (_) {},
+                    ))))));
         await tester.pump(const Duration(milliseconds: 120));
-        await expectGolden(tester, find.byType(MaterialApp), 'goldens/terminals_panel_$density.png');
+        await expectGolden(tester, find.byType(MaterialApp),
+            'goldens/terminals_panel_$density.png');
         await _teardown(tester);
       } finally {
         debugDefaultTargetPlatformOverride = null;

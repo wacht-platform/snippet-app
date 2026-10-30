@@ -59,9 +59,8 @@ class _NoConnection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final name = agent.displayName.trim().isEmpty
-        ? agent.id
-        : agent.displayName.trim();
+    final name =
+        agent.displayName.trim().isEmpty ? agent.id : agent.displayName.trim();
     return Material(
       color: AppColors.bg,
       child: Column(
@@ -74,14 +73,12 @@ class _NoConnection extends StatelessWidget {
                 child: Text(name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: sans(kMobile ? 16 : 14, weight: W.title, color: AppColors.fg1)),
+                    style: sans(kMobile ? 16 : 14,
+                        weight: W.title, color: AppColors.fg1)),
               ),
               if (onClose != null)
                 IconBtn('x',
-                    size: 28,
-                    iconSize: 15,
-                    tooltip: 'Close',
-                    onTap: onClose!),
+                    size: 28, iconSize: 15, tooltip: 'Close', onTap: onClose!),
             ]),
           ),
           Divider(height: 1, color: AppColors.border),
@@ -90,8 +87,7 @@ class _NoConnection extends StatelessWidget {
               child: Padding(
                 padding: const EdgeInsets.all(28),
                 child: Text('Connect to a machine to message this agent.',
-                    textAlign: TextAlign.center,
-                    style: TS.meta()),
+                    textAlign: TextAlign.center, style: TS.meta()),
               ),
             ),
           ),

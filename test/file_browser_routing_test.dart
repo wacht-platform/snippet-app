@@ -61,8 +61,8 @@ void main() {
   /// Run [body] as a PHONE or as desktop. Cleared in a `finally` inside the
   /// body: the framework asserts no foundation debug variable survives the body,
   /// which runs before any tearDown.
-  Future<void> asPlatform(TargetPlatform platform,
-      Future<void> Function() body) async {
+  Future<void> asPlatform(
+      TargetPlatform platform, Future<void> Function() body) async {
     debugDefaultTargetPlatformOverride = platform;
     try {
       await body();
@@ -73,7 +73,8 @@ void main() {
 
   /// Pump the explorer and return a sink for the `onOpenFile` callback, so a
   /// test can assert whether the desktop tab path was taken.
-  Future<List<String>> pumpExplorer(WidgetTester tester, {double width = 420}) async {
+  Future<List<String>> pumpExplorer(WidgetTester tester,
+      {double width = 420}) async {
     tester.view.physicalSize = Size(width, 900);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
@@ -116,7 +117,8 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(opened, ['/root/notes.txt'],
-          reason: 'desktop keeps the tab behaviour the mobile fix must not break');
+          reason:
+              'desktop keeps the tab behaviour the mobile fix must not break');
     });
   });
 
@@ -129,7 +131,8 @@ void main() {
       // row under the divider, so the same long string appeared twice within
       // ~40dp and the header read as broken.
       expect(find.text('root'), findsOneWidget,
-          reason: 'the folder is named once: the title, not the breadcrumb too');
+          reason:
+              'the folder is named once: the title, not the breadcrumb too');
     });
   });
 
@@ -187,7 +190,9 @@ void main() {
       ));
 
       final handled = openFileForViewing(ctx,
-          client: _FakeFilesClient(), path: '/root/notes.txt', name: 'notes.txt');
+          client: _FakeFilesClient(),
+          path: '/root/notes.txt',
+          name: 'notes.txt');
       // Settle, not a single pump: the push runs a route transition, and the
       // viewer is only built once that transition starts.
       await tester.pumpAndSettle();
@@ -210,7 +215,9 @@ void main() {
       ));
 
       final handled = openFileForViewing(ctx,
-          client: _FakeFilesClient(), path: '/root/notes.txt', name: 'notes.txt');
+          client: _FakeFilesClient(),
+          path: '/root/notes.txt',
+          name: 'notes.txt');
       await tester.pumpAndSettle();
 
       expect(handled, isFalse,
@@ -219,7 +226,8 @@ void main() {
     });
   });
 
-  testWidgets('mobile standalone FileExplorer provides New chat here action and climbs back cleanly',
+  testWidgets(
+      'mobile standalone FileExplorer provides New chat here action and climbs back cleanly',
       (tester) async {
     await asPlatform(TargetPlatform.android, () async {
       tester.view.physicalSize = const Size(420, 900);
@@ -274,4 +282,3 @@ void main() {
     });
   });
 }
-

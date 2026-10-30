@@ -18,7 +18,8 @@ final _running = LaneInfo(
       .toUtc()
       .subtract(const Duration(seconds: 141))
       .toIso8601String(),
-  activity: 'Heads-up on "nothing persisted before approval". By existing design, every utterance is already written to ambient_events (text, plus FTS when kept) and its audio to disk before any classification.\nSecond line.',
+  activity:
+      'Heads-up on "nothing persisted before approval". By existing design, every utterance is already written to ambient_events (text, plus FTS when kept) and its audio to disk before any classification.\nSecond line.',
   activityKind: 'tool_call',
 );
 final _done = LaneInfo(

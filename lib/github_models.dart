@@ -61,7 +61,11 @@ class PrCheck {
     final conclusion = _s(j['conclusion'] ?? j['state']).toUpperCase();
     final status = _s(j['status']).toUpperCase();
     final state = switch (conclusion) {
-      'FAILURE' || 'ERROR' || 'TIMED_OUT' || 'CANCELLED' || 'ACTION_REQUIRED' ||
+      'FAILURE' ||
+      'ERROR' ||
+      'TIMED_OUT' ||
+      'CANCELLED' ||
+      'ACTION_REQUIRED' ||
       'STARTUP_FAILURE' =>
         ChecksState.failing,
       'SUCCESS' || 'NEUTRAL' || 'SKIPPED' => ChecksState.passing,
@@ -183,7 +187,9 @@ class PrCommit {
       body: _s(j['messageBody']),
       author: first == null
           ? ''
-          : (_s(first['login']).isNotEmpty ? _s(first['login']) : _s(first['name'])),
+          : (_s(first['login']).isNotEmpty
+              ? _s(first['login'])
+              : _s(first['name'])),
       date: _s(j['committedDate'] ?? j['authoredDate']),
     );
   }
@@ -369,7 +375,8 @@ class PendingComment {
         'line': line,
         'side': side,
         if (startLine != null && startLine! < line) 'start_line': startLine,
-        if (startLine != null && startLine! < line) 'start_side': startSide ?? side,
+        if (startLine != null && startLine! < line)
+          'start_side': startSide ?? side,
         'body': body,
       };
 }
@@ -386,8 +393,10 @@ class DiffLine {
   /// Where a review comment on this line anchors: the new file for added and
   /// unchanged lines, the old file for removed ones.
   (String side, int line)? get anchor => switch (kind) {
-        DiffKind.add || DiffKind.context when newLine != null =>
-          ('RIGHT', newLine!),
+        DiffKind.add || DiffKind.context when newLine != null => (
+            'RIGHT',
+            newLine!
+          ),
         DiffKind.del when oldLine != null => ('LEFT', oldLine!),
         _ => null,
       };
@@ -410,14 +419,16 @@ Map<String, List<DiffLine>> parseUnifiedDiff(String diff) {
       if (current == null) break;
       if (line.startsWith('\\')) continue;
       if (line.startsWith('+')) {
-        current.add(DiffLine(DiffKind.add, line.substring(1), newLine: newNo++));
+        current
+            .add(DiffLine(DiffKind.add, line.substring(1), newLine: newNo++));
         newLeft--;
       } else if (line.startsWith('-')) {
-        current.add(DiffLine(DiffKind.del, line.substring(1), oldLine: oldNo++));
+        current
+            .add(DiffLine(DiffKind.del, line.substring(1), oldLine: oldNo++));
         oldLeft--;
       } else {
-        current.add(DiffLine(DiffKind.context,
-            line.startsWith(' ') ? line.substring(1) : line,
+        current.add(DiffLine(
+            DiffKind.context, line.startsWith(' ') ? line.substring(1) : line,
             oldLine: oldNo++, newLine: newNo++));
         oldLeft--;
         newLeft--;

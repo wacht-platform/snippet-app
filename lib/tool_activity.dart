@@ -44,7 +44,15 @@ List<Map<String, dynamic>> normalizeChanges(dynamic args) {
           'path': (c['path'] ?? shared ?? '').toString(),
           'action': action,
           if (find != null) 'find': find.toString(),
-          'with': (pick(c, const ['with', 'new_string', 'new', 'replace', 'replacement']) ?? '').toString(),
+          'with': (pick(c, const [
+                    'with',
+                    'new_string',
+                    'new',
+                    'replace',
+                    'replacement'
+                  ]) ??
+                  '')
+              .toString(),
           if (c['all'] != null) 'all': c['all'],
           if (content != null) 'content': content.toString(),
           if (c['overwrite'] != null) 'overwrite': c['overwrite'],
@@ -84,8 +92,9 @@ class ToolStep {
   List<Map> get changes => normalizeChanges(args);
 }
 
-String toolBaseName(String tool) =>
-    tool.startsWith('mcp__') ? tool.substring(tool.lastIndexOf('__') + 2) : tool;
+String toolBaseName(String tool) => tool.startsWith('mcp__')
+    ? tool.substring(tool.lastIndexOf('__') + 2)
+    : tool;
 
 enum ToolKind { change, run, web, other }
 
@@ -114,7 +123,10 @@ String toolVerb(String tool, {required bool running}) {
     'set_session_title' => ('Titled the chat', 'Titling the chat'),
     'ping_user' => ('Pinged you', 'Pinging you'),
     'update_brief' => ('Updated its brief', 'Updating its brief'),
-    'schedule_wake' || 'schedule_followup' => ('Scheduled a wake-up', 'Scheduling a wake-up'),
+    'schedule_wake' || 'schedule_followup' => (
+        'Scheduled a wake-up',
+        'Scheduling a wake-up'
+      ),
     'search_content' => ('Searched', 'Searching'),
     _ => (
         'Used ${toolTitle(tool).toLowerCase()}',
@@ -167,8 +179,8 @@ String toolObject(ToolStep step) {
   if (name == 'change_files') return _changeParts(step, isRunning);
   // A labelled command already reads as a sentence ("Run the network tests"),
   // so it stands alone; "Ran" is only for a bare command line.
-  final coordination = coordinationSentence(name,
-      step.args is Map ? step.args as Map : null, step.data,
+  final coordination = coordinationSentence(
+      name, step.args is Map ? step.args as Map : null, step.data,
       running: isRunning);
   if (coordination != null) return coordination;
   final label = name == 'bash' && step.args is Map
@@ -222,8 +234,8 @@ List<FileChange> fileChanges(Iterable<ToolStep> steps) {
       if (kind == FileChangeKind.deleted) change.kind = kind;
       switch (action) {
         case 'replace':
-          final (added, removed) =
-              diffCounts(c['find']?.toString() ?? '', c['with']?.toString() ?? '');
+          final (added, removed) = diffCounts(
+              c['find']?.toString() ?? '', c['with']?.toString() ?? '');
           change.added += added;
           change.removed += removed;
         case 'create':
@@ -265,7 +277,8 @@ String activitySummary(List<ToolStep> steps) {
         other++;
     }
   }
-  final changeSteps = steps.where((s) => toolBaseName(s.tool) == 'change_files').length;
+  final changeSteps =
+      steps.where((s) => toolBaseName(s.tool) == 'change_files').length;
   final parts = [
     if (ran > 0) 'ran $ran ${_plural(ran, 'command', 'commands')}',
     if (changeSteps > 0)
@@ -277,7 +290,8 @@ String activitySummary(List<ToolStep> steps) {
       'searched $searched ${_plural(searched, 'time', 'times')}',
     if (pages > 0) 'read $pages ${_plural(pages, 'page', 'pages')}',
     if (other > 0)
-      _otherPhrase(other, hasOthers: ran + changeSteps + read + searched + pages > 0),
+      _otherPhrase(other,
+          hasOthers: ran + changeSteps + read + searched + pages > 0),
   ];
   final sentence = _joinPhrases(parts);
   return '${sentence[0].toUpperCase()}${sentence.substring(1)}';

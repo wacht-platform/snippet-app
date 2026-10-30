@@ -95,7 +95,8 @@ void main() {
       ),
     ));
     await tester.pump(const Duration(milliseconds: 50));
-    await expectGolden(tester, find.byType(MaterialApp), 'goldens/accent_candidates.png');
+    await expectGolden(
+        tester, find.byType(MaterialApp), 'goldens/accent_candidates.png');
   });
 }
 
@@ -123,8 +124,8 @@ Widget _row(String name, Color hex) {
           borderRadius: BorderRadius.circular(99),
           border: Border.all(color: p.accentLine),
         ),
-        child:
-            Text('Send to', style: sans(11.5, weight: W.label, color: p.accent)),
+        child: Text('Send to',
+            style: sans(11.5, weight: W.label, color: p.accent)),
       ),
       const SizedBox(width: 10),
       Container(
@@ -152,7 +153,7 @@ Widget _button(Color fill, Color ink) => Container(
       width: 84,
       height: 28,
       alignment: Alignment.center,
-      decoration:
-          BoxDecoration(color: fill, borderRadius: BorderRadius.circular(R.chip)),
+      decoration: BoxDecoration(
+          color: fill, borderRadius: BorderRadius.circular(R.chip)),
       child: Text('Approve', style: sans(11.5, weight: W.label, color: ink)),
     );

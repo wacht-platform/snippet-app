@@ -7,9 +7,7 @@ extension _DesktopShellTabsExt on _DesktopShellState {
     final ctx = _chipKeys[t.key]?.currentContext;
     if (ctx != null) {
       Scrollable.ensureVisible(ctx,
-          alignment: 0.5,
-          duration: Motion.base,
-          curve: Motion.enter);
+          alignment: 0.5, duration: Motion.base, curve: Motion.enter);
     }
   }
 
@@ -430,9 +428,8 @@ extension _DesktopShellTabsExt on _DesktopShellState {
     if (mains.length < 2) return;
     final active = _activeTab;
     final currentIndex = active != null ? mains.indexOf(active) : -1;
-    final nextIndex = currentIndex >= 0
-        ? (currentIndex + delta) % mains.length
-        : 0;
+    final nextIndex =
+        currentIndex >= 0 ? (currentIndex + delta) % mains.length : 0;
     final target = mains[nextIndex < 0 ? nextIndex + mains.length : nextIndex];
     _activateTabAt(target);
   }
@@ -442,14 +439,16 @@ extension _DesktopShellTabsExt on _DesktopShellState {
     if (root == null || root.sessionId == null) return;
     final existing =
         _tabs.indexWhere((t) => t.isPrs && t.instanceUrl == root.instanceUrl);
-    _openMainTab(existing >= 0
-        ? null
-        : _ShellTab.prs(
-            client: root.client,
-            instanceUrl: root.instanceUrl,
-            session: root.sessionId!,
-            github: status,
-          ), existing);
+    _openMainTab(
+        existing >= 0
+            ? null
+            : _ShellTab.prs(
+                client: root.client,
+                instanceUrl: root.instanceUrl,
+                session: root.sessionId!,
+                github: status,
+              ),
+        existing);
   }
 
   void _openMainTab(_ShellTab? tab, int existing) {

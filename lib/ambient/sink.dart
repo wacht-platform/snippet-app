@@ -38,20 +38,25 @@ class _ChannelSink implements AmbientSink {
   Future<void> warm() => _c.invokeMethod('warm');
   @override
   Future<void> enqueue(int turn, int seq, Uint8List pcm, int silenceMs) =>
-      _c.invokeMethod('enqueue', {'turn': turn, 'seq': seq, 'pcm': pcm, 'silenceMs': silenceMs});
+      _c.invokeMethod('enqueue',
+          {'turn': turn, 'seq': seq, 'pcm': pcm, 'silenceMs': silenceMs});
   @override
-  Future<void> enqueueFrame(int turn, Uint8List pcm) => _c.invokeMethod('enqueueFrame', {'turn': turn, 'pcm': pcm});
+  Future<void> enqueueFrame(int turn, Uint8List pcm) =>
+      _c.invokeMethod('enqueueFrame', {'turn': turn, 'pcm': pcm});
   @override
   Future<Map<String, dynamic>> position() => _map('position');
   @override
   Future<Map<String, dynamic>> streamPosition() => _map('streamPosition');
   @override
-  Future<Map<String, dynamic>> stopStream(int turn, {int fadeMs = 25}) => _map('stopStream', {'turn': turn, 'fadeMs': fadeMs});
+  Future<Map<String, dynamic>> stopStream(int turn, {int fadeMs = 25}) =>
+      _map('stopStream', {'turn': turn, 'fadeMs': fadeMs});
   @override
   Future<void> cancelAfter(int turn, int seq, {int fadeMs = 50}) =>
-      _c.invokeMethod('cancelAfter', {'turn': turn, 'seq': seq, 'fadeMs': fadeMs});
+      _c.invokeMethod(
+          'cancelAfter', {'turn': turn, 'seq': seq, 'fadeMs': fadeMs});
   @override
-  Future<void> volume(double volume) => _c.invokeMethod('volume', {'volume': volume});
+  Future<void> volume(double volume) =>
+      _c.invokeMethod('volume', {'volume': volume});
   @override
   Future<void> pauseTts() async {}
   @override
@@ -59,7 +64,8 @@ class _ChannelSink implements AmbientSink {
   @override
   Future<Map<String, dynamic>> stop() => _map('stop');
   @override
-  Future<bool> mediaActive() async => await _c.invokeMethod<bool>('mediaActive') == true;
+  Future<bool> mediaActive() async =>
+      await _c.invokeMethod<bool>('mediaActive') == true;
   @override
   Future<bool> inCall() async => await _c.invokeMethod<bool>('inCall') == true;
   @override
@@ -67,8 +73,18 @@ class _ChannelSink implements AmbientSink {
 }
 
 class _NullSink implements AmbientSink {
-  static const Map<String, dynamic> _pos = {'seq': -1, 'played_ms': 0, 'turn': -1, 'active': 0};
-  static const Map<String, dynamic> _stream = {'turn': -1, 'played_ms': 0, 'active': 0, 'turns': <int, int>{}};
+  static const Map<String, dynamic> _pos = {
+    'seq': -1,
+    'played_ms': 0,
+    'turn': -1,
+    'active': 0
+  };
+  static const Map<String, dynamic> _stream = {
+    'turn': -1,
+    'played_ms': 0,
+    'active': 0,
+    'turns': <int, int>{}
+  };
 
   @override
   Future<void> warm() async {}
@@ -81,7 +97,8 @@ class _NullSink implements AmbientSink {
   @override
   Future<Map<String, dynamic>> streamPosition() async => _stream;
   @override
-  Future<Map<String, dynamic>> stopStream(int turn, {int fadeMs = 25}) async => _stream;
+  Future<Map<String, dynamic>> stopStream(int turn, {int fadeMs = 25}) async =>
+      _stream;
   @override
   Future<void> cancelAfter(int turn, int seq, {int fadeMs = 50}) async {}
   @override

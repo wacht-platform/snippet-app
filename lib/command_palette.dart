@@ -484,8 +484,7 @@ class _PaletteState extends State<_Palette> {
               child: Text.rich(
                 TextSpan(children: [
                   TextSpan(
-                      text: item.title,
-                      style: sans(13, color: AppColors.fg1)),
+                      text: item.title, style: sans(13, color: AppColors.fg1)),
                   if (item.subtitle.isNotEmpty)
                     TextSpan(
                         text: '   ${item.subtitle}',
@@ -517,8 +516,8 @@ class _PaletteState extends State<_Palette> {
         );
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
-      decoration: BoxDecoration(
-          border: Border(top: BorderSide(color: AppColors.line))),
+      decoration:
+          BoxDecoration(border: Border(top: BorderSide(color: AppColors.line))),
       child: Row(children: [
         hint('↑↓', 'move'),
         hint('enter', 'open'),

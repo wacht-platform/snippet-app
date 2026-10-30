@@ -64,7 +64,10 @@ class _FakeDaemon extends DaemonClient {
 
   @override
   Future<List<CatalogModel>> providerModels(
-          {String? name, String? provider, String? baseUrl, String? apiKey}) async =>
+          {String? name,
+          String? provider,
+          String? baseUrl,
+          String? apiKey}) async =>
       const [];
 
   @override
@@ -83,7 +86,6 @@ class _FakeDaemon extends DaemonClient {
     bool setActive = false,
   }) async =>
       'saved';
-
 
   /// Three socket entry points: the shell/session stream, a coordination thread,
   /// and Mission Control's own.
@@ -281,11 +283,18 @@ void main() {
       try {
         sized(tester);
         final client = _FakeDaemon()
-          ..agents = [_agent('snippet', 'Snippet', ['code', 'shell'])]
+          ..agents = [
+            _agent('snippet', 'Snippet', ['code', 'shell'])
+          ]
           ..thread = [
-            _msg('m1', 'human', 'Can you check the TUI still lists sessions?', 1),
-            _msg('m2', 'agent', 'Running it now — the cached store cut the '
-                'listing from 2.05s to under 100ms.', 2),
+            _msg('m1', 'human', 'Can you check the TUI still lists sessions?',
+                1),
+            _msg(
+                'm2',
+                'agent',
+                'Running it now — the cached store cut the '
+                    'listing from 2.05s to under 100ms.',
+                2),
             _msg('m3', 'human', 'Good. Does it survive a restart?', 3),
           ];
 

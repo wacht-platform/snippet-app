@@ -204,23 +204,23 @@ class VoiceprintGroup extends StatelessWidget {
             spacing: S.s8,
             runSpacing: S.s8,
             children: [
-          Btn(
-            error != null
-                ? 'Retry'
-                : done
-                    ? 'Record another'
-                    : 'Record sample ${n + 1}',
-            small: true,
-            variant: done ? BtnVariant.surface : BtnVariant.primary,
-            disabled: off,
-            onTap: onRecord,
-          ),
-          Btn('Use last turn',
-              small: true,
-              variant: BtnVariant.ghost,
-              disabled: off,
-              onTap: onRecent),
-        ]),
+              Btn(
+                error != null
+                    ? 'Retry'
+                    : done
+                        ? 'Record another'
+                        : 'Record sample ${n + 1}',
+                small: true,
+                variant: done ? BtnVariant.surface : BtnVariant.primary,
+                disabled: off,
+                onTap: onRecord,
+              ),
+              Btn('Use last turn',
+                  small: true,
+                  variant: BtnVariant.ghost,
+                  disabled: off,
+                  onTap: onRecent),
+            ]),
       ],
     );
   }
@@ -254,7 +254,9 @@ class VoiceprintGroup extends StatelessWidget {
             const SizedBox(height: S.s12),
             Wrap(spacing: S.s8, runSpacing: S.s8, children: [
               Btn('Stop',
-                  small: true, disabled: !canStop, onTap: canStop ? onStop : null),
+                  small: true,
+                  disabled: !canStop,
+                  onTap: canStop ? onStop : null),
               Btn('Cancel',
                   small: true, variant: BtnVariant.ghost, onTap: onCancel),
             ]),
@@ -283,7 +285,9 @@ class _Steps extends StatelessWidget {
           decoration: BoxDecoration(
             color: i < done
                 ? fg
-                : (active && i == done ? fg.withValues(alpha: 0.45) : AppColors.hover),
+                : (active && i == done
+                    ? fg.withValues(alpha: 0.45)
+                    : AppColors.hover),
             borderRadius: BorderRadius.circular(R.pill),
           ),
         ),
@@ -356,8 +360,8 @@ class _Bar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(builder: (context, c) {
-      final tick = c.maxWidth * kEnrolMinStop.inMilliseconds /
-          kEnrolMax.inMilliseconds;
+      final tick =
+          c.maxWidth * kEnrolMinStop.inMilliseconds / kEnrolMax.inMilliseconds;
       return SizedBox(
         height: 4,
         child: Stack(children: [

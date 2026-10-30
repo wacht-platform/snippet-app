@@ -41,7 +41,10 @@ void main() {
               const DenseToolRow(
                 tool: 'bash',
                 args: {'command': 'cargo test --lib --offline'},
-                result: {'status': 'ok', 'stdout': 'test result: ok. 193 passed'},
+                result: {
+                  'status': 'ok',
+                  'stdout': 'test result: ok. 193 passed'
+                },
               ),
               const DenseToolRow(
                 tool: 'bash',
@@ -69,7 +72,8 @@ void main() {
       ),
     ));
     await tester.pump(const Duration(milliseconds: 150));
-    await expectGolden(tester, find.byType(MaterialApp), 'goldens/tool_rendering.png');
+    await expectGolden(
+        tester, find.byType(MaterialApp), 'goldens/tool_rendering.png');
   });
 }
 

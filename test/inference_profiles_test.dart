@@ -26,7 +26,8 @@ class _FakeDaemon extends DaemonClient {
 }
 
 void main() {
-  testWidgets('profile card has its provider logo and does not show token or session count',
+  testWidgets(
+      'profile card has its provider logo and does not show token or session count',
       (tester) async {
     final client = _FakeDaemon()
       ..config = {
@@ -92,8 +93,8 @@ void main() {
               children: [
                 Text('Rebuild count: $value'),
                 Expanded(
-                  child: InferenceProfilesScreen(
-                      client: client, embedded: true),
+                  child:
+                      InferenceProfilesScreen(client: client, embedded: true),
                 ),
               ],
             );

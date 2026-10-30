@@ -278,6 +278,7 @@ class _SessionScreenState extends State<SessionScreen>
       widget.onGithubReady?.call(_github != null);
     });
   }
+
   String _liveText = '';
   String _liveThinking = '';
   bool _liveTextVisible = false;
@@ -1223,242 +1224,249 @@ class _SessionScreenState extends State<SessionScreen>
               children: [
                 Expanded(
                   child: _withTermDock(
-                  // The bottom chrome is NON-FLEX, so Flutter lays it out at its
-                  // natural height BEFORE the transcript's Expanded claims what
-                  // is left. A question or approval card carrying a long
-                  // agent-authored body could therefore exceed the pane outright
-                  // and push its own actions off the bottom edge — which is why a
-                  // big question was impossible to answer. Measuring the pane
-                  // here is what lets the cards be capped and scroll instead.
-                  LayoutBuilder(builder: (context, pane) {
-                    final barsCap = pane.maxHeight * 0.6;
-                    return Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          if (widget.readOnly)
-                            _readOnlyHeader(status)
-                          else if (kMobile)
-                            widget.mobileTopBar?.call(() => _openActionsDrawer(s)) ?? _mobileHeader(s),
-                          if (widget.readOnly && widget.banner != null)
-                            _centerWide(widget.banner!),
-                          if (_connError != null) _disconnectedBanner(),
-                          Expanded(
-                            child: Stack(children: [
-                              s == null
-                                  ? Center(child: DelayedSpinner(size: 22))
-                                  : NotificationListener<ScrollNotification>(
-                                      onNotification: _onScroll,
-                                      child: Builder(builder: (context) {
-                                        final timeline = <Widget>[
-                                          if (items.isEmpty &&
-                                              !running &&
-                                              !widget.readOnly)
-                                            Padding(
-                                              padding: const EdgeInsets.only(
-                                                  top: 48, bottom: 24),
-                                              child: Column(children: [
-                                                DottedMochi(
-                                                    width: kMobile ? 220 : 300),
-                                                const SizedBox(height: 14),
-                                                Text('What are we making?',
-                                                    style: sans(
-                                                        kMobile ? 22 : 26,
-                                                        spacing: -0.4,
-                                                        color: AppColors.fg1)),
-                                              ]),
-                                            ),
-                                          if (_transcriptStart > 0 &&
-                                              items.isNotEmpty)
-                                            Padding(
-                                              key: const ValueKey(
-                                                  'load-earlier'),
-                                              padding: const EdgeInsets.only(
-                                                  bottom: S.s12),
-                                              child: Center(
-                                                child: _loadingOlderTranscript
-                                                    ? const SizedBox(
-                                                        height: 28,
-                                                        child: Center(
-                                                            child: Spinner(
-                                                                size: 14)))
-                                                    : TextAction(
-                                                        'Show earlier messages',
-                                                        icon: 'history',
-                                                        onTap:
-                                                            _loadOlderTranscript),
+                    // The bottom chrome is NON-FLEX, so Flutter lays it out at its
+                    // natural height BEFORE the transcript's Expanded claims what
+                    // is left. A question or approval card carrying a long
+                    // agent-authored body could therefore exceed the pane outright
+                    // and push its own actions off the bottom edge — which is why a
+                    // big question was impossible to answer. Measuring the pane
+                    // here is what lets the cards be capped and scroll instead.
+                    LayoutBuilder(builder: (context, pane) {
+                      final barsCap = pane.maxHeight * 0.6;
+                      return Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            if (widget.readOnly)
+                              _readOnlyHeader(status)
+                            else if (kMobile)
+                              widget.mobileTopBar
+                                      ?.call(() => _openActionsDrawer(s)) ??
+                                  _mobileHeader(s),
+                            if (widget.readOnly && widget.banner != null)
+                              _centerWide(widget.banner!),
+                            if (_connError != null) _disconnectedBanner(),
+                            Expanded(
+                              child: Stack(children: [
+                                s == null
+                                    ? Center(child: DelayedSpinner(size: 22))
+                                    : NotificationListener<ScrollNotification>(
+                                        onNotification: _onScroll,
+                                        child: Builder(builder: (context) {
+                                          final timeline = <Widget>[
+                                            if (items.isEmpty &&
+                                                !running &&
+                                                !widget.readOnly)
+                                              Padding(
+                                                padding: const EdgeInsets.only(
+                                                    top: 48, bottom: 24),
+                                                child: Column(children: [
+                                                  DottedMochi(
+                                                      width:
+                                                          kMobile ? 220 : 300),
+                                                  const SizedBox(height: 14),
+                                                  Text('What are we making?',
+                                                      style: sans(
+                                                          kMobile ? 22 : 26,
+                                                          spacing: -0.4,
+                                                          color:
+                                                              AppColors.fg1)),
+                                                ]),
                                               ),
+                                            if (_transcriptStart > 0 &&
+                                                items.isNotEmpty)
+                                              Padding(
+                                                key: const ValueKey(
+                                                    'load-earlier'),
+                                                padding: const EdgeInsets.only(
+                                                    bottom: S.s12),
+                                                child: Center(
+                                                  child: _loadingOlderTranscript
+                                                      ? const SizedBox(
+                                                          height: 28,
+                                                          child: Center(
+                                                              child: Spinner(
+                                                                  size: 14)))
+                                                      : TextAction(
+                                                          'Show earlier messages',
+                                                          icon: 'history',
+                                                          onTap:
+                                                              _loadOlderTranscript),
+                                                ),
+                                              ),
+                                            ...items,
+                                            // Optimistic bubbles for messages sent but not yet echoed.
+                                            for (var pi = 0;
+                                                pi < _pending.length;
+                                                pi++)
+                                              Opacity(
+                                                  key: ValueKey(
+                                                      'pending-$pi-${_pending[pi].hashCode}'),
+                                                  opacity: 0.5,
+                                                  child: Padding(
+                                                      padding:
+                                                          const EdgeInsets.only(
+                                                              bottom: 12),
+                                                      child: Bubble(
+                                                          mine: true,
+                                                          text: _pending[pi],
+                                                          selectable: false,
+                                                          client:
+                                                              widget.client))),
+                                            _LiveStreamRow(
+                                              key: const ValueKey(
+                                                  'live-stream-row'),
+                                              frame: _liveFrame,
+                                              running: running,
+                                              compacting: s.compacting,
+                                              startedAt: s.turnStartedAt,
+                                              hasVisibleAction:
+                                                  _turnHasVisibleAction(events),
+                                              compactionDetail:
+                                                  _latestCompactionDetail(
+                                                      events),
                                             ),
-                                          ...items,
-                                          // Optimistic bubbles for messages sent but not yet echoed.
-                                          for (var pi = 0;
-                                              pi < _pending.length;
-                                              pi++)
-                                            Opacity(
-                                                key: ValueKey(
-                                                    'pending-$pi-${_pending[pi].hashCode}'),
-                                                opacity: 0.5,
-                                                child: Padding(
-                                                    padding:
-                                                        const EdgeInsets.only(
-                                                            bottom: 12),
-                                                    child: Bubble(
-                                                        mine: true,
-                                                        text: _pending[pi],
-                                                        selectable: false,
-                                                        client:
-                                                            widget.client))),
-                                          _LiveStreamRow(
-                                            key: const ValueKey(
-                                                'live-stream-row'),
-                                            frame: _liveFrame,
-                                            running: running,
-                                            compacting: s.compacting,
-                                            startedAt: s.turnStartedAt,
-                                            hasVisibleAction:
-                                                _turnHasVisibleAction(events),
-                                            compactionDetail:
-                                                _latestCompactionDetail(events),
-                                          ),
-                                        ];
-                                        Key rowKey(int i) =>
-                                            timeline[i].key ??
-                                            ValueKey('timeline-$i');
-                                        if (!_rowsSeeded &&
-                                            timeline.length > 1) {
-                                          _rowsSeeded = true;
-                                          for (var i = 0;
-                                              i < timeline.length;
-                                              i++) {
-                                            _shownRows.add(rowKey(i));
+                                          ];
+                                          Key rowKey(int i) =>
+                                              timeline[i].key ??
+                                              ValueKey('timeline-$i');
+                                          if (!_rowsSeeded &&
+                                              timeline.length > 1) {
+                                            _rowsSeeded = true;
+                                            for (var i = 0;
+                                                i < timeline.length;
+                                                i++) {
+                                              _shownRows.add(rowKey(i));
+                                            }
                                           }
-                                        }
-                                        return ScrollConfiguration(
-                                          behavior:
-                                              ScrollConfiguration.of(context)
-                                                  .copyWith(scrollbars: false),
-                                          child: ListView.builder(
-                                            controller: _scroll,
-                                            reverse: true,
-                                            scrollCacheExtent:
-                                                ScrollCacheExtent.pixels(400),
-                                            padding: EdgeInsets.fromLTRB(
-                                                kMobile ? M.gutter : 20,
-                                                16,
-                                                kMobile ? M.gutter : 20,
-                                                24),
-                                            itemCount: timeline.length,
-                                            itemBuilder: (context, index) {
-                                              final at =
-                                                  timeline.length - 1 - index;
-                                              final child = timeline[at];
-                                              final key = rowKey(at);
-                                              final fresh = _rowsSeeded &&
-                                                  _shownRows.add(key);
-                                              return KeyedSubtree(
-                                                key: key,
-                                                child: _centerWide(
-                                                  Align(
-                                                    alignment:
-                                                        Alignment.centerLeft,
-                                                    child: SizedBox(
-                                                      width: double.infinity,
-                                                      child: _RowSizeWatch(
-                                                        onResize: _rowResized,
-                                                        child: Appear(
-                                                          enabled: fresh,
-                                                          child:
-                                                              RepaintBoundary(
-                                                                  child: child),
+                                          return ScrollConfiguration(
+                                            behavior:
+                                                ScrollConfiguration.of(context)
+                                                    .copyWith(
+                                                        scrollbars: false),
+                                            child: ListView.builder(
+                                              controller: _scroll,
+                                              reverse: true,
+                                              scrollCacheExtent:
+                                                  ScrollCacheExtent.pixels(400),
+                                              padding: EdgeInsets.fromLTRB(
+                                                  kMobile ? M.gutter : 20,
+                                                  16,
+                                                  kMobile ? M.gutter : 20,
+                                                  24),
+                                              itemCount: timeline.length,
+                                              itemBuilder: (context, index) {
+                                                final at =
+                                                    timeline.length - 1 - index;
+                                                final child = timeline[at];
+                                                final key = rowKey(at);
+                                                final fresh = _rowsSeeded &&
+                                                    _shownRows.add(key);
+                                                return KeyedSubtree(
+                                                  key: key,
+                                                  child: _centerWide(
+                                                    Align(
+                                                      alignment:
+                                                          Alignment.centerLeft,
+                                                      child: SizedBox(
+                                                        width: double.infinity,
+                                                        child: _RowSizeWatch(
+                                                          onResize: _rowResized,
+                                                          child: Appear(
+                                                            enabled: fresh,
+                                                            child:
+                                                                RepaintBoundary(
+                                                                    child:
+                                                                        child),
+                                                          ),
                                                         ),
                                                       ),
                                                     ),
                                                   ),
-                                                ),
-                                              );
-                                            },
-                                          ),
-                                        );
-                                      })),
-                              if (!_stickToBottom && s != null)
-                                Positioned(
-                                  right: 16,
-                                  bottom: 12,
-                                  child: Material(
-                                    color: AppColors.surface1,
-                                    shape: const CircleBorder(),
-                                    elevation: 0,
-                                    child: InkWell(
-                                      customBorder: const CircleBorder(),
-                                      onTap: () {
-                                        _stickToBottom = true;
-                                        setState(() {});
-                                        _scheduleBottom(
-                                            settle: true, smooth: true);
-                                      },
-                                      child: Padding(
-                                        padding: const EdgeInsets.all(8),
-                                        child: AppIcon('chevron-down',
-                                            size: 16, color: AppColors.fg3),
+                                                );
+                                              },
+                                            ),
+                                          );
+                                        })),
+                                if (!_stickToBottom && s != null)
+                                  Positioned(
+                                    right: 16,
+                                    bottom: 12,
+                                    child: Material(
+                                      color: AppColors.surface1,
+                                      shape: const CircleBorder(),
+                                      elevation: 0,
+                                      child: InkWell(
+                                        customBorder: const CircleBorder(),
+                                        onTap: () {
+                                          _stickToBottom = true;
+                                          setState(() {});
+                                          _scheduleBottom(
+                                              settle: true, smooth: true);
+                                        },
+                                        child: Padding(
+                                          padding: const EdgeInsets.all(8),
+                                          child: AppIcon('chevron-down',
+                                              size: 16, color: AppColors.fg3),
+                                        ),
                                       ),
                                     ),
                                   ),
+                              ]),
+                            ),
+                            // The question/approval bars are PINNED here (not inside the scroll
+                            // list) so a "needs input" request is always visible — buried at the
+                            // bottom of a scrolled-up transcript it read as "the agent is stuck".
+                            if (!widget.readOnly &&
+                                waiting &&
+                                _pendingApproval(events))
+                              _centerWide(ConstrainedBox(
+                                constraints: BoxConstraints(maxHeight: barsCap),
+                                child: Padding(
+                                  padding: EdgeInsets.fromLTRB(
+                                      kMobile
+                                          ? M.gutter
+                                          : (widget.embedded ? 0 : 20),
+                                      6,
+                                      kMobile
+                                          ? M.gutter
+                                          : (widget.embedded ? 0 : 20),
+                                      0),
+                                  child: ApprovalBar(
+                                      events: events,
+                                      onSend: _sendDecision,
+                                      showApproveAll:
+                                          _pendingApprovalTotal(events) > 1),
                                 ),
-                            ]),
-                          ),
-                          // The question/approval bars are PINNED here (not inside the scroll
-                          // list) so a "needs input" request is always visible — buried at the
-                          // bottom of a scrolled-up transcript it read as "the agent is stuck".
-                          if (!widget.readOnly &&
-                              waiting &&
-                              _pendingApproval(events))
-                            _centerWide(ConstrainedBox(
-                              constraints: BoxConstraints(maxHeight: barsCap),
-                              child: Padding(
-                                padding: EdgeInsets.fromLTRB(
-                                    kMobile
-                                        ? M.gutter
-                                        : (widget.embedded ? 0 : 20),
-                                    6,
-                                    kMobile
-                                        ? M.gutter
-                                        : (widget.embedded ? 0 : 20),
-                                    0),
-                                child: ApprovalBar(
-                                    events: events,
-                                    onSend: _sendDecision,
-                                    showApproveAll:
-                                        _pendingApprovalTotal(events) > 1),
-                              ),
-                            )),
-                          if (!widget.readOnly &&
-                              waiting &&
-                              s?.pendingQuestion != null)
-                            _centerWide(ConstrainedBox(
-                              constraints: BoxConstraints(maxHeight: barsCap),
-                              child: Padding(
-                                padding: EdgeInsets.fromLTRB(
-                                    kMobile
-                                        ? M.gutter
-                                        : (widget.embedded ? 0 : 20),
-                                    6,
-                                    kMobile
-                                        ? M.gutter
-                                        : (widget.embedded ? 0 : 20),
-                                    0),
-                                // Keyed by the question set, so a new one
-                                // starts fresh (selection, step, review).
-                                child: QuestionBar(
-                                    key: ValueKey(
-                                        jsonEncode(s!.pendingQuestion!)),
-                                    question: s.pendingQuestion!,
-                                    onSend: _sendDecision),
-                              ),
-                            )),
-                          if (!widget.readOnly &&
-                              !(waiting && s?.pendingQuestion != null))
-                            _centerWide(_inputBar(running)),
-                        ]);
-                  }),
+                              )),
+                            if (!widget.readOnly &&
+                                waiting &&
+                                s?.pendingQuestion != null)
+                              _centerWide(ConstrainedBox(
+                                constraints: BoxConstraints(maxHeight: barsCap),
+                                child: Padding(
+                                  padding: EdgeInsets.fromLTRB(
+                                      kMobile
+                                          ? M.gutter
+                                          : (widget.embedded ? 0 : 20),
+                                      6,
+                                      kMobile
+                                          ? M.gutter
+                                          : (widget.embedded ? 0 : 20),
+                                      0),
+                                  // Keyed by the question set, so a new one
+                                  // starts fresh (selection, step, review).
+                                  child: QuestionBar(
+                                      key: ValueKey(
+                                          jsonEncode(s!.pendingQuestion!)),
+                                      question: s.pendingQuestion!,
+                                      onSend: _sendDecision),
+                                ),
+                              )),
+                            if (!widget.readOnly &&
+                                !(waiting && s?.pendingQuestion != null))
+                              _centerWide(_inputBar(running)),
+                          ]);
+                    }),
                   ),
                 ),
               ],

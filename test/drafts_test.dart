@@ -21,11 +21,15 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     final d = Drafts.instance;
     final k = Drafts.keyFor('https://m1', 's3');
-    d.addAttachment(k,
-        const DraftAttachment(name: 'shot.png', isImage: true, remotePath: '/u/1'));
+    d.addAttachment(
+        k,
+        const DraftAttachment(
+            name: 'shot.png', isImage: true, remotePath: '/u/1'));
     expect(d.has(k), isTrue);
-    d.addAttachment(k, const DraftAttachment(name: 'Pasted text', pastedText: 'x'));
-    expect(d.of(k)?.attachments.map((a) => a.name), ['shot.png', 'Pasted text']);
+    d.addAttachment(
+        k, const DraftAttachment(name: 'Pasted text', pastedText: 'x'));
+    expect(
+        d.of(k)?.attachments.map((a) => a.name), ['shot.png', 'Pasted text']);
   });
 
   test('drafts survive a restart', () async {

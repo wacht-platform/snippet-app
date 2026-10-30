@@ -13,8 +13,9 @@ Future<void> showMochiColorPicker(
   if (kMobile) {
     return showAppSheet<void>(context, title: '$name colour', child: picker);
   }
-  final overlay =
-      Overlay.of(context, rootOverlay: true).context.findRenderObject() as RenderBox?;
+  final overlay = Overlay.of(context, rootOverlay: true)
+      .context
+      .findRenderObject() as RenderBox?;
   final box = context.findRenderObject() as RenderBox?;
   if (overlay == null) return Future.value();
   final screen = overlay.size;
@@ -81,7 +82,8 @@ class _Picker extends StatelessWidget {
       await client.setAgentColor(agentId, hex);
     } catch (_) {
       setRememberedAgentColor(agentId, before);
-      if (context.mounted) toast(context, 'Could not change colour', danger: true);
+      if (context.mounted)
+        toast(context, 'Could not change colour', danger: true);
     }
   }
 
@@ -127,7 +129,8 @@ class _Picker extends StatelessWidget {
               const SizedBox(height: 10),
               Align(
                 alignment: Alignment.centerLeft,
-                child: Btn('Use default', small: true, onTap: () => _pick(context, null)),
+                child: Btn('Use default',
+                    small: true, onTap: () => _pick(context, null)),
               ),
             ],
           ],
@@ -150,8 +153,10 @@ class _Picker extends StatelessWidget {
                 borderRadius: BorderRadius.circular(6),
                 onTap: () => _pick(context, null),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-                  child: Text('Use default', style: sans(12, color: AppColors.fg3)),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+                  child: Text('Use default',
+                      style: sans(12, color: AppColors.fg3)),
                 ),
               ),
             ),

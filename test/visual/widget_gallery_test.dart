@@ -285,8 +285,9 @@ void main() {
           home: Scaffold(
               body: Center(
                   child: IconBtn('x', size: 22, iconSize: 12, onTap: () {})))));
-      final box = tester.getSize(find.descendant(
-          of: find.byType(IconBtn), matching: find.byType(SizedBox)).first);
+      final box = tester.getSize(find
+          .descendant(of: find.byType(IconBtn), matching: find.byType(SizedBox))
+          .first);
       debugDefaultTargetPlatformOverride = null;
       expect(box.width, 22);
     });

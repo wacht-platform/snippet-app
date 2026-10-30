@@ -133,7 +133,6 @@ class SidebarState extends State<Sidebar> {
   final TextEditingController _desktopChatsSearchCtl = TextEditingController();
   final FocusNode _desktopChatsSearchFocus = FocusNode();
 
-
   MobileHome _lastMainHome = MobileHome.chats;
   late final PageController _pageController;
   int? _targetPage;
@@ -164,7 +163,8 @@ class SidebarState extends State<Sidebar> {
         final a = await client.coordinationAgents();
         if (mounted) {
           setState(() => _crew = a
-              .where((x) => x.status != 'archived' && x.kind != 'mission_control')
+              .where(
+                  (x) => x.status != 'archived' && x.kind != 'mission_control')
               .toList());
         }
       } catch (_) {}
@@ -867,18 +867,15 @@ class SidebarState extends State<Sidebar> {
                 style: sans(11, color: AppColors.fg4, spacing: 0.9)),
           ),
           if (hasClient)
-            IconBtn('plus',
-                size: 22,
-                iconSize: 12,
-                tooltip: 'New chat',
+            IconBtn('plus', size: 22, iconSize: 12, tooltip: 'New chat',
                 onTap: () {
-                  final folder = e.value.first.projectFolder.trim();
-                  if (widget.onNewSessionIn != null && folder.isNotEmpty) {
-                    widget.onNewSessionIn!(folder);
-                  } else {
-                    widget.onNewSession();
-                  }
-                }),
+              final folder = e.value.first.projectFolder.trim();
+              if (widget.onNewSessionIn != null && folder.isNotEmpty) {
+                widget.onNewSessionIn!(folder);
+              } else {
+                widget.onNewSession();
+              }
+            }),
         ]),
       ));
       for (final s in e.value) {
@@ -958,41 +955,42 @@ class SidebarState extends State<Sidebar> {
           ),
         )
       else
-      Padding(
-        padding: const EdgeInsets.fromLTRB(8, 10, 8, 4),
-        child: Container(
-          height: 32,
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          decoration: BoxDecoration(
-            color: AppColors.surface1,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: AppColors.line),
-          ),
-          child: Row(children: [
-            AppIcon('search', size: 14, color: AppColors.fg4),
-            const SizedBox(width: 10),
-            Expanded(
-              child: TextField(
-                controller: _desktopChatsSearchCtl,
-                focusNode: _desktopChatsSearchFocus,
-                onChanged: (v) => setState(() => _filterQuery = v),
-                style: sans(13, color: AppColors.fg1),
-                decoration: InputDecoration(
-                  isCollapsed: true,
-                  border: InputBorder.none,
-                  hintText: 'Search chats',
-                  hintStyle: sans(13, color: AppColors.fg4),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(8, 10, 8, 4),
+          child: Container(
+            height: 32,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            decoration: BoxDecoration(
+              color: AppColors.surface1,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppColors.line),
+            ),
+            child: Row(children: [
+              AppIcon('search', size: 14, color: AppColors.fg4),
+              const SizedBox(width: 10),
+              Expanded(
+                child: TextField(
+                  controller: _desktopChatsSearchCtl,
+                  focusNode: _desktopChatsSearchFocus,
+                  onChanged: (v) => setState(() => _filterQuery = v),
+                  style: sans(13, color: AppColors.fg1),
+                  decoration: InputDecoration(
+                    isCollapsed: true,
+                    border: InputBorder.none,
+                    hintText: 'Search chats',
+                    hintStyle: sans(13, color: AppColors.fg4),
+                  ),
                 ),
               ),
-            ),
-            if (_desktopChatsSearchCtl.text.isNotEmpty)
-              IconBtn('x', size: 20, iconSize: 10, tooltip: 'Clear', onTap: () {
-                _desktopChatsSearchCtl.clear();
-                setState(() => _filterQuery = '');
-              }),
-          ]),
+              if (_desktopChatsSearchCtl.text.isNotEmpty)
+                IconBtn('x', size: 20, iconSize: 10, tooltip: 'Clear',
+                    onTap: () {
+                  _desktopChatsSearchCtl.clear();
+                  setState(() => _filterQuery = '');
+                }),
+            ]),
+          ),
         ),
-      ),
       if (_crew.isNotEmpty) ...[
         Padding(
           padding: const EdgeInsets.fromLTRB(18, 14, 12, 4),
@@ -1005,12 +1003,11 @@ class SidebarState extends State<Sidebar> {
               builder: (ctx) => IconBtn('plus',
                   size: 22,
                   iconSize: 12,
-                  tooltip: 'New agent',
-                  onTap: () async {
-                    await _openCreateAgent(ctx);
-                    _crewAt = null;
-                    _loadCrew();
-                  }),
+                  tooltip: 'New agent', onTap: () async {
+                await _openCreateAgent(ctx);
+                _crewAt = null;
+                _loadCrew();
+              }),
             ),
           ]),
         ),
@@ -1581,9 +1578,8 @@ class SidebarState extends State<Sidebar> {
                     const SizedBox(width: 10),
                     Text(stamp,
                         style: sans(13,
-                            weight: running || waiting || draft
-                                ? W.label
-                                : W.body,
+                            weight:
+                                running || waiting || draft ? W.label : W.body,
                             color: stampColor,
                             tabular: true)),
                   ]),
@@ -1616,8 +1612,7 @@ class SidebarState extends State<Sidebar> {
                             size: 13, color: AppColors.fg3),
                         const SizedBox(width: 5),
                       ],
-                      Text(s.profile!,
-                          style: sans(13, color: AppColors.fg3)),
+                      Text(s.profile!, style: sans(13, color: AppColors.fg3)),
                     ],
                   ]),
                 ],

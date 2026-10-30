@@ -14,8 +14,8 @@ class TaskInspector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final full = withFullTask(
-        state, task, (t) => TaskInspector(task: t, state: state));
+    final full =
+        withFullTask(state, task, (t) => TaskInspector(task: t, state: state));
     if (full != null) return full;
     final t = task;
     return Padding(
@@ -52,7 +52,8 @@ class TaskInspector extends StatelessWidget {
                 selectable: true,
                 styleSheet: markdownStyle(context),
                 builders: {'pre': PreBlockBuilder()},
-                onTapLink: (txt, href, title) => openMarkdownLink(href, context)),
+                onTapLink: (txt, href, title) =>
+                    openMarkdownLink(href, context)),
             const SizedBox(height: 12),
           ],
           if (state != null) ...[

@@ -325,8 +325,9 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
   Widget build(BuildContext context) {
     final t = task;
     return Scaffold(
-      backgroundColor:
-          !kMobile && (widget.embedded || widget.pane) ? Colors.transparent : AppColors.bg,
+      backgroundColor: !kMobile && (widget.embedded || widget.pane)
+          ? Colors.transparent
+          : AppColors.bg,
       body: SafeArea(
         bottom: false,
         child: Column(children: [
@@ -336,8 +337,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 840),
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(
-                      S.s40, S.s32, S.s40, S.s8),
+                  padding: const EdgeInsets.fromLTRB(S.s40, S.s32, S.s40, S.s8),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -371,16 +371,14 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                   size: 28,
                   iconSize: 15,
                   tooltip: 'Back',
-                  onTap:
-                      widget.onClose ?? () => Navigator.of(context).pop(),
+                  onTap: widget.onClose ?? () => Navigator.of(context).pop(),
                 ),
                 const SizedBox(width: 4),
                 Expanded(
                   child: Text(t?.title ?? 'Task',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: sans(13,
-                          weight: W.label, color: AppColors.fg1)),
+                      style: sans(13, weight: W.label, color: AppColors.fg1)),
                 ),
               ]),
             )
@@ -480,51 +478,59 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                                   TaskStatus.failed,
                                   TaskStatus.cancelled
                                 }.contains(t.status))))
-                    Padding(
-                      padding: const EdgeInsets.only(right: 6),
-                      child: Material(
-                        color: Colors.transparent,
-                        child: InkWell(
-                          onTap: busy || s == t.status
-                              ? null
-                              : () => _setStatus(s),
-                          borderRadius:
-                              BorderRadius.circular(kMobile ? 18 : R.chip),
-                          child: Container(
-                            padding: EdgeInsets.symmetric(
-                                horizontal: kMobile ? 13 : 10),
-                            alignment: Alignment.center,
-                            decoration: BoxDecoration(
-                              // Same chip rule as the board's filter bar: the
-                              // surface STEP separates, never a hairline.
-                              color: s == t.status
-                                  ? (kMobile ? AppColors.surface3 : AppColors.surface2)
-                                  : (kMobile ? Colors.transparent : AppColors.surface3),
-                              borderRadius:
-                                  BorderRadius.circular(kMobile ? 18 : R.chip),
+                      Padding(
+                        padding: const EdgeInsets.only(right: 6),
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: busy || s == t.status
+                                ? null
+                                : () => _setStatus(s),
+                            borderRadius:
+                                BorderRadius.circular(kMobile ? 18 : R.chip),
+                            child: Container(
+                              padding: EdgeInsets.symmetric(
+                                  horizontal: kMobile ? 13 : 10),
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                // Same chip rule as the board's filter bar: the
+                                // surface STEP separates, never a hairline.
+                                color: s == t.status
+                                    ? (kMobile
+                                        ? AppColors.surface3
+                                        : AppColors.surface2)
+                                    : (kMobile
+                                        ? Colors.transparent
+                                        : AppColors.surface3),
+                                borderRadius: BorderRadius.circular(
+                                    kMobile ? 18 : R.chip),
+                              ),
+                              child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    if (s == t.status) ...[
+                                      Container(
+                                        width: 6,
+                                        height: 6,
+                                        decoration: BoxDecoration(
+                                            color: statusColor(s),
+                                            shape: BoxShape.circle),
+                                      ),
+                                      const SizedBox(width: S.s6),
+                                    ],
+                                    Text(s.label,
+                                        style: sans(kMobile ? 14 : 12,
+                                            weight: s == t.status
+                                                ? W.label
+                                                : W.body,
+                                            color: s == t.status
+                                                ? AppColors.fg1
+                                                : AppColors.fg3)),
+                                  ]),
                             ),
-                            child: Row(mainAxisSize: MainAxisSize.min, children: [
-                              if (s == t.status) ...[
-                                Container(
-                                  width: 6,
-                                  height: 6,
-                                  decoration: BoxDecoration(
-                                      color: statusColor(s),
-                                      shape: BoxShape.circle),
-                                ),
-                                const SizedBox(width: S.s6),
-                              ],
-                              Text(s.label,
-                                  style: sans(kMobile ? 14 : 12,
-                                      weight: s == t.status ? W.label : W.body,
-                                      color: s == t.status
-                                          ? AppColors.fg1
-                                          : AppColors.fg3)),
-                            ]),
                           ),
                         ),
                       ),
-                    ),
                 ],
               ),
             ),
@@ -543,7 +549,8 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                       height: 48,
                       child: Row(children: [
                         a.hasSessionLease
-                            ? WorkingMochi(size: 22, color: mochiColorFor(a.agentId))
+                            ? WorkingMochi(
+                                size: 22, color: mochiColorFor(a.agentId))
                             : AgentMochi(a.agentId, size: 22),
                         const SizedBox(width: 12),
                         Expanded(
@@ -647,7 +654,8 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
         child: Row(children: [
           Text(label.toUpperCase(),
               style: kMobile
-                  ? sans(12, weight: W.label, spacing: 0.7, color: AppColors.fg4)
+                  ? sans(12,
+                      weight: W.label, spacing: 0.7, color: AppColors.fg4)
                   : caps(11, color: AppColors.fg3)),
           const Spacer(),
           GestureDetector(
@@ -710,9 +718,11 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
               final md = MarkdownBody(
                 data: body,
                 selectable: true,
-                styleSheet: mine ? markdownStyle(context) : agentMarkdownStyle(context),
+                styleSheet:
+                    mine ? markdownStyle(context) : agentMarkdownStyle(context),
                 builders: {'pre': PreBlockBuilder()},
-                onTapLink: (txt, href, title) => openMarkdownLink(href, context),
+                onTapLink: (txt, href, title) =>
+                    openMarkdownLink(href, context),
               );
               if (mine) {
                 return Padding(
@@ -744,7 +754,8 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                       AgentMochi(e.actorId, size: 18),
                       const SizedBox(width: 8),
                       Text(e.actorId,
-                          style: sans(13, weight: W.label, color: AppColors.fg2)),
+                          style:
+                              sans(13, weight: W.label, color: AppColors.fg2)),
                     ]),
                     const SizedBox(height: 6),
                     md,
@@ -759,8 +770,8 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                   constraints: const BoxConstraints(maxWidth: 480),
                   child: Container(
                     margin: const EdgeInsets.only(bottom: 10),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 8),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     decoration: BoxDecoration(
                       color: AppColors.surface2,
                       borderRadius: BorderRadius.circular(10),
@@ -787,8 +798,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                     AgentMochi(e.actorId, size: 16),
                     const SizedBox(width: 6),
                     Text(e.actorId,
-                        style: sans(12,
-                            weight: W.label, color: AppColors.fg2)),
+                        style: sans(12, weight: W.label, color: AppColors.fg2)),
                   ]),
                   const SizedBox(height: 5),
                   MarkdownBody(
@@ -931,7 +941,8 @@ class _WorkPlan extends StatelessWidget {
                           shape: BoxShape.circle,
                           color: s.current ? AppColors.accent : null,
                           border: Border.all(
-                              color: s.current ? AppColors.accent : AppColors.fg4,
+                              color:
+                                  s.current ? AppColors.accent : AppColors.fg4,
                               width: 1.5),
                         ),
                       ),

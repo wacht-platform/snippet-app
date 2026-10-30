@@ -152,7 +152,8 @@ class _AutonomyPanelState extends State<AutonomyPanel> {
   void didUpdateWidget(covariant AutonomyPanel oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.client.baseUrl != widget.client.baseUrl) {
-      _autonomy = widget.initial ?? widget.client.cachedMcAutonomy() ?? const {};
+      _autonomy =
+          widget.initial ?? widget.client.cachedMcAutonomy() ?? const {};
       _error = null;
       _load();
     }
@@ -266,8 +267,9 @@ class _AutonomyPanelState extends State<AutonomyPanel> {
   @override
   Widget build(BuildContext context) {
     final on = _autonomy['on'] == true;
-    final wakes = ((_autonomy['wakes'] ?? _autonomy['followups']) as List? ?? const [])
-        .cast<Map>();
+    final wakes =
+        ((_autonomy['wakes'] ?? _autonomy['followups']) as List? ?? const [])
+            .cast<Map>();
     final lastAt = _autonomy['last_round_at'] as int?;
     final summary = _autonomy['last_round_summary'] as String?;
     final held = (_autonomy['held_pings'] as num?)?.toInt() ?? 0;

@@ -118,7 +118,8 @@ class _UsagePopoverState extends State<_UsagePopover> {
                     color: AppColors.line, child: const SizedBox.expand()),
                 FractionallySizedBox(
                   widthFactor: used.toDouble(),
-                  child: ColoredBox(color: color, child: const SizedBox.expand()),
+                  child:
+                      ColoredBox(color: color, child: const SizedBox.expand()),
                 ),
               ]),
             ),

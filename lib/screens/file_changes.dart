@@ -40,7 +40,8 @@ class FileChangesScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppColors.bg,
       body: SafeArea(
-        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        child:
+            Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           MobileBackBar(
             title: 'File changes',
             subtitle:
@@ -91,15 +92,14 @@ class FileChangesScreen extends StatelessWidget {
                                     Text(dir,
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
-                                        style: sans(12.5,
-                                            color: AppColors.fg4)),
+                                        style:
+                                            sans(12.5, color: AppColors.fg4)),
                                 ],
                               ),
                             ),
                             if (c.kind == FileChangeKind.deleted)
                               Text('deleted',
-                                  style:
-                                      sans(13, color: AppColors.danger))
+                                  style: sans(13, color: AppColors.danger))
                             else ...[
                               Text('+${c.added}',
                                   style: mono(12.5, color: AppColors.ok)),
@@ -148,8 +148,7 @@ class FileChangeDetail extends StatelessWidget {
         for (final l in lines)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 10),
-            child: Text('$sign $l',
-                style: mono(12, height: 1.55, color: fg)),
+            child: Text('$sign $l', style: mono(12, height: 1.55, color: fg)),
           ),
       ]),
     );
@@ -205,7 +204,8 @@ class FileChangeDetail extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppColors.bg,
       body: SafeArea(
-        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        child:
+            Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           MobileBackBar(
             title: name,
             subtitle: dir.isEmpty

@@ -176,7 +176,8 @@ class AmbientCapture {
     _voice!.state.addListener(_onAmbientState);
     _voice!.speaking.addListener(_onSpeaking);
     _pollTimer?.cancel();
-    _pollTimer = Timer.periodic(const Duration(milliseconds: 500), (_) => _pollAudioState());
+    _pollTimer = Timer.periodic(
+        const Duration(milliseconds: 500), (_) => _pollAudioState());
     unawaited(_voice!.start());
     _status.add(current);
   }
@@ -199,7 +200,9 @@ class AmbientCapture {
       final call = await _audio.inCall();
       if (call != _callOn) {
         _callOn = call;
-        unawaited(AmbientDiagnostics.log(call ? 'call started: listening paused' : 'call ended: listening resumed'));
+        unawaited(AmbientDiagnostics.log(call
+            ? 'call started: listening paused'
+            : 'call ended: listening resumed'));
       }
     } catch (_) {
     } finally {
@@ -307,7 +310,8 @@ class AmbientCapture {
       _unduck?.cancel();
       _unduck = Timer(const Duration(milliseconds: 700), _restoreVolume);
     }
-    unawaited(voice.localSpeech(voiced, canPause: defaultTargetPlatform == TargetPlatform.macOS && _loud >= 5));
+    unawaited(voice.localSpeech(voiced,
+        canPause: defaultTargetPlatform == TargetPlatform.macOS && _loud >= 5));
   }
 
   void _restoreVolume() {

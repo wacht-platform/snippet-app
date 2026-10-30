@@ -27,7 +27,8 @@ abstract class PcmOut {
 /// speaker output from the microphone at the OS audio-unit level.
 class MacosAecOut implements PcmOut {
   MacosAecOut(this._volume) {
-    _c.invokeMethod<void>('resetPlayer', {'volume': _volume}).catchError((_) {});
+    _c.invokeMethod<void>(
+        'resetPlayer', {'volume': _volume}).catchError((_) {});
   }
 
   static const MethodChannel _c = MethodChannel('snippet/macos_aec');
@@ -45,7 +46,8 @@ class MacosAecOut implements PcmOut {
     final frames = pcm.length ~/ 2;
     _writtenFrames += frames;
     _lastSyncAt ??= DateTime.now();
-    _c.invokeMethod<int>('writeTts', {'pcm': pcm, 'volume': _volume}).then((nativeHead) {
+    _c.invokeMethod<int>('writeTts', {'pcm': pcm, 'volume': _volume}).then(
+        (nativeHead) {
       if (_closed || nativeHead == null) return;
       _playedFrames = nativeHead;
       _lastSyncAt = DateTime.now();
@@ -148,7 +150,8 @@ class SoloudOut implements PcmOut {
 }
 
 class _Chunk {
-  _Chunk(this.turn, this.seq, this.pcm, this.silenceFrames, [this.stream = false]);
+  _Chunk(this.turn, this.seq, this.pcm, this.silenceFrames,
+      [this.stream = false]);
   final int turn, seq, silenceFrames;
   final Uint8List pcm;
   final bool stream;
@@ -189,8 +192,10 @@ class DesktopSink implements AmbientSink {
   final Map<int, int> _streamBase = {};
   final Set<int> _streamStopped = {};
 
-  static Map<String, dynamic> _idlePos() => {'seq': -1, 'played_ms': 0, 'turn': -1, 'active': 0};
-  static Map<String, dynamic> _idleStream() => {'turn': -1, 'played_ms': 0, 'active': 0, 'turns': <int, int>{}};
+  static Map<String, dynamic> _idlePos() =>
+      {'seq': -1, 'played_ms': 0, 'turn': -1, 'active': 0};
+  static Map<String, dynamic> _idleStream() =>
+      {'turn': -1, 'played_ms': 0, 'active': 0, 'turns': <int, int>{}};
 
   Future<_Session> _ensure() {
     final s = _sink;
@@ -218,7 +223,10 @@ class DesktopSink implements AmbientSink {
 
   int _head(_Session s) {
     final h = s.out.head();
-    if (s.queue.isEmpty && s.cur == null && s.curSilence == 0 && s.framesWritten - h < 120) return s.framesWritten;
+    if (s.queue.isEmpty &&
+        s.cur == null &&
+        s.curSilence == 0 &&
+        s.framesWritten - h < 120) return s.framesWritten;
     return h;
   }
 
@@ -238,26 +246,38 @@ class DesktopSink implements AmbientSink {
         if (s.queue.isEmpty) break;
         final item = s.queue.removeFirst();
         if (item.stream && _streamStopped.contains(item.turn)) continue;
-        final pcm = item.pcm.length.isEven ? item.pcm : Uint8List.sublistView(item.pcm, 0, item.pcm.length - 1);
+        final pcm = item.pcm.length.isEven
+            ? item.pcm
+            : Uint8List.sublistView(item.pcm, 0, item.pcm.length - 1);
         final frames = pcm.length ~/ 2;
         final last = s.written.isEmpty ? null : s.written.last;
-        if (item.stream && last != null && last.stream && last.turn == item.turn && last.audioEnd == s.framesWritten) {
+        if (item.stream &&
+            last != null &&
+            last.stream &&
+            last.turn == item.turn &&
+            last.audioEnd == s.framesWritten) {
           last.audioEnd = s.framesWritten + frames;
         } else {
-          s.written.add(_Boundary(item.turn, item.seq, s.framesWritten, s.framesWritten + frames, item.stream));
+          s.written.add(_Boundary(item.turn, item.seq, s.framesWritten,
+              s.framesWritten + frames, item.stream));
         }
         s.cur = pcm;
         s.curOff = 0;
         s.curSilence = item.silenceFrames;
         continue;
       }
-      final n = (cur.length - s.curOff) < _slice * 2 ? cur.length - s.curOff : _slice * 2;
+      final n = (cur.length - s.curOff) < _slice * 2
+          ? cur.length - s.curOff
+          : _slice * 2;
       s.out.write(Uint8List.sublistView(cur, s.curOff, s.curOff + n));
       s.curOff += n;
       s.framesWritten += n ~/ 2;
       if (s.curOff >= cur.length) s.cur = null;
     }
-    if (s.queue.isEmpty && s.cur == null && s.curSilence == 0 && head >= s.framesWritten) {
+    if (s.queue.isEmpty &&
+        s.cur == null &&
+        s.curSilence == 0 &&
+        head >= s.framesWritten) {
       final since = s.idleSince ??= DateTime.now();
       if (DateTime.now().difference(since) >= _idleRelease) {
         _lastPos = {..._positionOf(s), 'active': 0};
@@ -308,9 +328,15 @@ class DesktopSink implements AmbientSink {
     }
     final turns = <int, int>{};
     _streamBase.forEach((turn, frames) => turns[turn] = frames * 1000 ~/ _rate);
-    _streamPlayed(s).forEach((turn, frames) => turns[turn] = ((_streamBase[turn] ?? 0) + frames) * 1000 ~/ _rate);
+    _streamPlayed(s).forEach((turn, frames) =>
+        turns[turn] = ((_streamBase[turn] ?? 0) + frames) * 1000 ~/ _rate);
     if (heard < 0) heard = (_lastStream['turn'] as int?) ?? -1;
-    return {'turn': heard, 'played_ms': turns[heard] ?? 0, 'active': pending ? 1 : 0, 'turns': turns};
+    return {
+      'turn': heard,
+      'played_ms': turns[heard] ?? 0,
+      'active': pending ? 1 : 0,
+      'turns': turns
+    };
   }
 
   void _trim() {
@@ -324,7 +350,8 @@ class DesktopSink implements AmbientSink {
   void _release(_Session s) {
     if (identical(_sink, s)) {
       _lastStream = {..._streamStats(s), 'active': 0};
-      _streamPlayed(s).forEach((turn, frames) => _streamBase[turn] = (_streamBase[turn] ?? 0) + frames);
+      _streamPlayed(s).forEach((turn, frames) =>
+          _streamBase[turn] = (_streamBase[turn] ?? 0) + frames);
       _trim();
       _sink = null;
     }

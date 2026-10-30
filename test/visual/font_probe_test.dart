@@ -20,8 +20,7 @@ void main() {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('sans 400 Body weight 0123456789 Wg',
-                  style: sans(26)),
+              Text('sans 400 Body weight 0123456789 Wg', style: sans(26)),
               Text('sans 500 Label weight 0123456789 Wg',
                   style: sans(26, weight: W.label)),
               Text('sans 600 Strong weight 0123456789 Wg',
@@ -36,6 +35,7 @@ void main() {
       ),
     ));
     await tester.pump(const Duration(milliseconds: 50));
-    await expectGolden(tester, find.byType(MaterialApp), 'goldens/font_probe.png');
+    await expectGolden(
+        tester, find.byType(MaterialApp), 'goldens/font_probe.png');
   });
 }

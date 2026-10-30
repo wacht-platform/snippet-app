@@ -38,8 +38,19 @@ class PresentedFileCard extends StatelessWidget {
         'zip' || 'tar' || 'gz' || 'tgz' || 'apk' || 'dmg' => 'archive',
         'mp4' || 'mov' || 'webm' || 'mkv' => 'film',
         'mp3' || 'wav' || 'm4a' || 'ogg' => 'music',
-        'json' || 'yaml' || 'yml' || 'toml' || 'rs' || 'dart' || 'py' || 'js' ||
-        'ts' || 'tsx' || 'go' || 'sh' || 'sql' =>
+        'json' ||
+        'yaml' ||
+        'yml' ||
+        'toml' ||
+        'rs' ||
+        'dart' ||
+        'py' ||
+        'js' ||
+        'ts' ||
+        'tsx' ||
+        'go' ||
+        'sh' ||
+        'sql' =>
           'file-code',
         _ => 'file',
       };
@@ -150,7 +161,8 @@ class MediaRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final nameStyle = sans(kMobile ? 14 : 13.5, weight: W.label, color: AppColors.fg1);
+    final nameStyle =
+        sans(kMobile ? 14 : 13.5, weight: W.label, color: AppColors.fg1);
     final detailStyle = sans(kMobile ? 13 : 12.5, color: AppColors.fg3);
     return Padding(
       padding: EdgeInsets.symmetric(vertical: kMobile ? 4 : 3),

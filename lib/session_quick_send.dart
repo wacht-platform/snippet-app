@@ -31,7 +31,8 @@ class QuickAnswer extends QuickAction {
 class QuickApprove extends QuickAction {
   const QuickApprove();
   @override
-  Map<String, dynamic> frame(String nonce) => {'kind': 'approve', 'nonce': nonce};
+  Map<String, dynamic> frame(String nonce) =>
+      {'kind': 'approve', 'nonce': nonce};
 }
 
 class QuickDeny extends QuickAction {
@@ -64,8 +65,7 @@ Future<bool> quickSend({
   Duration timeout = const Duration(seconds: 8),
 }) async {
   if (session.isEmpty) return false;
-  final nonce =
-      'q${++_nonceCounter}-${DateTime.now().microsecondsSinceEpoch}';
+  final nonce = 'q${++_nonceCounter}-${DateTime.now().microsecondsSinceEpoch}';
   try {
     final ch = client.attach(session);
     await ch.ready.timeout(timeout);
@@ -85,7 +85,8 @@ Future<bool> quickSendForPayload(
   final instance = await resolveInstanceForPayload(payload);
   if (instance == null) return false;
   final dest = payload['destination'];
-  final session = '${payload['session'] ?? (dest is Map ? dest['session'] ?? dest['id'] : '') ?? ''}';
+  final session =
+      '${payload['session'] ?? (dest is Map ? dest['session'] ?? dest['id'] : '') ?? ''}';
   return quickSend(
     client: DaemonClient(instance.url, instance.token),
     session: session,

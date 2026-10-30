@@ -285,7 +285,9 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
           }
           if (text.trimLeft().startsWith('<ambient_context_alert')) {
             addEvent(
-                key, const NoteLine('Voice classifier flagged out-of-context speech'));
+                key,
+                const NoteLine(
+                    'Voice classifier flagged out-of-context speech'));
             break;
           }
           if (text.trimLeft().startsWith('<ambient_check_in')) {
@@ -387,10 +389,8 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
             }
             break;
           }
-          addEvent(
-              key,
-              NoteLine(msg,
-                  error: true, label: 'Model error', count: count));
+          addEvent(key,
+              NoteLine(msg, error: true, label: 'Model error', count: count));
         case 'profile_switched':
           endTools(key);
           addEvent(

@@ -79,13 +79,12 @@ class _TasksPopoverState extends State<_TasksPopover> {
                       widget.onExpand();
                     },
                     child: Padding(
-                      padding:
-                          const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 5),
                       child: Row(mainAxisSize: MainAxisSize.min, children: [
                         AppIcon('expand', size: 12, color: AppColors.fg3),
                         const SizedBox(width: 6),
-                        Text('Expand',
-                            style: sans(12.5, color: AppColors.fg2)),
+                        Text('Expand', style: sans(12.5, color: AppColors.fg2)),
                       ]),
                     ),
                   ),
@@ -103,8 +102,7 @@ class _TasksPopoverState extends State<_TasksPopover> {
                 }
                 if (snap.hasError) return _note('Could not load tasks.');
                 final open = snap.data!.toList()
-                  ..sort((a, b) =>
-                      _rank(a.status).compareTo(_rank(b.status)));
+                  ..sort((a, b) => _rank(a.status).compareTo(_rank(b.status)));
                 if (open.isEmpty) return _note('No open tasks.');
                 return Column(children: [
                   for (final t in open.take(12)) _row(t),
@@ -147,8 +145,8 @@ class _TasksPopoverState extends State<_TasksPopover> {
               Container(
                 width: 6,
                 height: 6,
-                decoration:
-                    BoxDecoration(shape: BoxShape.circle, color: _dot(t.status)),
+                decoration: BoxDecoration(
+                    shape: BoxShape.circle, color: _dot(t.status)),
               ),
               const SizedBox(width: 10),
               Expanded(

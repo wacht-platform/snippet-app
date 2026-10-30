@@ -74,8 +74,7 @@ class InferenceProfileEditor extends StatefulWidget {
       this.onSaved,
       this.onSubmit});
   @override
-  State<InferenceProfileEditor> createState() =>
-      InferenceProfileEditorState();
+  State<InferenceProfileEditor> createState() => InferenceProfileEditorState();
 }
 
 class InferenceProfileEditorState extends State<InferenceProfileEditor> {
@@ -594,7 +593,8 @@ class InferenceProfileEditorState extends State<InferenceProfileEditor> {
         key: const ValueKey('xai'),
         client: widget.client,
         signedInLabel: 'Signed in to xAI',
-        blurb: 'Grok uses your SuperGrok / X Premium subscription — no API key.',
+        blurb:
+            'Grok uses your SuperGrok / X Premium subscription — no API key.',
         buttonLabel: 'Sign in with SuperGrok / X Premium',
         signedIn: (c) => c.xaiSignedIn(),
         begin: (c) => c.xaiLoginBegin(),
@@ -862,7 +862,8 @@ class InferenceProfileEditorState extends State<InferenceProfileEditor> {
     final title = _isEdit
         ? widget.existing!.name
         : (_name.text.trim().isNotEmpty ? _name.text.trim() : 'New profile');
-    final effortLabel = '${(_reasoning?['label'] as String?) ?? 'Reasoning'} effort';
+    final effortLabel =
+        '${(_reasoning?['label'] as String?) ?? 'Reasoning'} effort';
     final compact = (int.tryParse(_compact.text.trim()) ?? 90).clamp(10, 100);
     Widget providerPicker() => SettingsPopup<String>(
           label: _providerLabel(_provider),
@@ -969,191 +970,196 @@ class InferenceProfileEditorState extends State<InferenceProfileEditor> {
           padding: EdgeInsets.fromLTRB(
               baseH + extra, kMobile ? 4 : 8, baseH + extra, 24),
           children: [
-        header,
-        SettingsGroup(header: 'Model', children: [
-          if (!_isEdit)
-            SettingsRow(
-              label: 'Name',
-              trailing: SettingsField(
-                  controller: _name,
-                  width: 220,
-                  hint: 'Defaults to the provider',
-                  onChanged: (_) => setState(() {})),
-            ),
-          SettingsRow(
-            label: 'Provider',
-            trailing: _isEdit
-                ? Row(mainAxisSize: MainAxisSize.min, children: [
-                    ProviderLogo(_provider, size: 12),
-                    const SizedBox(width: 6),
-                    Text(_providerLabel(_provider),
-                        style: sans(kMobile ? 15 : 12.5, color: AppColors.fg3)),
-                  ])
-                : providerPicker(),
-          ),
-          SettingsRow(
-            label: 'Model',
-            trailing: SettingsField(
-              controller: _model,
-              width: kMobile ? 210 : 240,
-              mono: !kMobile,
-              onChanged: (_) {
-                setState(() {});
-                _scheduleReasoning();
-              },
-              hint: _isChatgpt
-                  ? 'gpt-5.1-codex'
-                  : _isClaudeCode
-                      ? 'sonnet'
-                      : _isAntigravity
-                          ? 'gemini-3.8-flash-high'
-                          : 'claude-sonnet-4.5',
-              suffix: _loadingModels
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: Center(child: Spinner(size: 12)))
-                  : GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onTap: _busy ? null : _browseModels,
-                      child: Padding(
-                        padding: const EdgeInsets.only(left: 2),
-                        child: AppIcon(
-                          _showModelBrowser ? 'x' : 'chevrons-up-down',
-                          size: kMobile ? 14 : 13,
-                          color: AppColors.fg4,
+            header,
+            SettingsGroup(header: 'Model', children: [
+              if (!_isEdit)
+                SettingsRow(
+                  label: 'Name',
+                  trailing: SettingsField(
+                      controller: _name,
+                      width: 220,
+                      hint: 'Defaults to the provider',
+                      onChanged: (_) => setState(() {})),
+                ),
+              SettingsRow(
+                label: 'Provider',
+                trailing: _isEdit
+                    ? Row(mainAxisSize: MainAxisSize.min, children: [
+                        ProviderLogo(_provider, size: 12),
+                        const SizedBox(width: 6),
+                        Text(_providerLabel(_provider),
+                            style: sans(kMobile ? 15 : 12.5,
+                                color: AppColors.fg3)),
+                      ])
+                    : providerPicker(),
+              ),
+              SettingsRow(
+                label: 'Model',
+                trailing: SettingsField(
+                  controller: _model,
+                  width: kMobile ? 210 : 240,
+                  mono: !kMobile,
+                  onChanged: (_) {
+                    setState(() {});
+                    _scheduleReasoning();
+                  },
+                  hint: _isChatgpt
+                      ? 'gpt-5.1-codex'
+                      : _isClaudeCode
+                          ? 'sonnet'
+                          : _isAntigravity
+                              ? 'gemini-3.8-flash-high'
+                              : 'claude-sonnet-4.5',
+                  suffix: _loadingModels
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: Center(child: Spinner(size: 12)))
+                      : GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: _busy ? null : _browseModels,
+                          child: Padding(
+                            padding: const EdgeInsets.only(left: 2),
+                            child: AppIcon(
+                              _showModelBrowser ? 'x' : 'chevrons-up-down',
+                              size: kMobile ? 14 : 13,
+                              color: AppColors.fg4,
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
-            ),
-          ),
-          if (_showModelBrowser && _catalogModels != null)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-              child: _inlineModelBrowser(),
-            ),
-          SettingsRow(
-            label: effortLabel,
-            trailing: _effortAdjustable
-                ? SettingsPopup<String>(
-                    label: _effortItems
-                            .where((i) => i.$1 == _effort)
-                            .firstOrNull
-                            ?.$2 ??
-                        'Default',
-                    items: _effortItems,
-                    selected: _effort,
-                    onSelected: (v) => setState(() => _effort = v),
-                  )
-                : Text(
-                    _reasoning?['control'] == 'model'
-                        ? 'Set by the model'
-                        : 'Not adjustable',
-                    style: sans(kMobile ? 15 : 12.5, color: AppColors.fg3)),
-          ),
-        ]),
-        if (_modelHint != null)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(4, 0, 4, 18),
-            child: Text(_modelHint!,
-                style: sans(12, height: 1.4, color: AppColors.fg4)),
-          ),
-        SettingsGroup(header: 'Context', children: [
-          SettingsRow(
-            label: 'Context window',
-            sub: 'Tokens. Blank keeps the default.',
-            trailing: SettingsField(
-                controller: _ctx,
-                width: 150,
-                mono: true,
-                number: true,
-                hint: '200000'),
-          ),
-          SettingsRow(
-            label: 'Compact at',
-            sub: 'History is summarised when the window is this full.',
-            trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-              SizedBox(
-                width: kMobile ? 110 : 160,
-                child: SliderTheme(
-                  data: SliderTheme.of(context).copyWith(
-                    trackHeight: 3,
-                    activeTrackColor: AppColors.accent,
-                    inactiveTrackColor: AppColors.surface3,
-                    thumbColor: AppColors.fg1,
-                    overlayShape: SliderComponentShape.noOverlay,
-                    thumbShape:
-                        const RoundSliderThumbShape(enabledThumbRadius: 7),
-                  ),
-                  child: Slider(
-                    value: compact.toDouble(),
-                    min: 10,
-                    max: 100,
-                    divisions: 18,
-                    onChanged: (v) =>
-                        setState(() => _compact.text = '${v.round()}'),
-                  ),
                 ),
               ),
-              SizedBox(
-                width: 40,
-                child: Text('$compact%',
-                    textAlign: TextAlign.right,
-                    style: sans(kMobile ? 15 : 12.5, color: AppColors.fg2)),
+              if (_showModelBrowser && _catalogModels != null)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                  child: _inlineModelBrowser(),
+                ),
+              SettingsRow(
+                label: effortLabel,
+                trailing: _effortAdjustable
+                    ? SettingsPopup<String>(
+                        label: _effortItems
+                                .where((i) => i.$1 == _effort)
+                                .firstOrNull
+                                ?.$2 ??
+                            'Default',
+                        items: _effortItems,
+                        selected: _effort,
+                        onSelected: (v) => setState(() => _effort = v),
+                      )
+                    : Text(
+                        _reasoning?['control'] == 'model'
+                            ? 'Set by the model'
+                            : 'Not adjustable',
+                        style: sans(kMobile ? 15 : 12.5, color: AppColors.fg3)),
               ),
             ]),
-          ),
-          if (_usesOpenAiAdapter(_provider))
-            SettingsRow(
-              label: 'Stream responses',
-              sub: 'For models that return nothing otherwise.',
-              trailing: SettingsSwitch(
-                  value: _stream, onChanged: (v) => setState(() => _stream = v)),
+            if (_modelHint != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(4, 0, 4, 18),
+                child: Text(_modelHint!,
+                    style: sans(12, height: 1.4, color: AppColors.fg4)),
+              ),
+            SettingsGroup(header: 'Context', children: [
+              SettingsRow(
+                label: 'Context window',
+                sub: 'Tokens. Blank keeps the default.',
+                trailing: SettingsField(
+                    controller: _ctx,
+                    width: 150,
+                    mono: true,
+                    number: true,
+                    hint: '200000'),
+              ),
+              SettingsRow(
+                label: 'Compact at',
+                sub: 'History is summarised when the window is this full.',
+                trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                  SizedBox(
+                    width: kMobile ? 110 : 160,
+                    child: SliderTheme(
+                      data: SliderTheme.of(context).copyWith(
+                        trackHeight: 3,
+                        activeTrackColor: AppColors.accent,
+                        inactiveTrackColor: AppColors.surface3,
+                        thumbColor: AppColors.fg1,
+                        overlayShape: SliderComponentShape.noOverlay,
+                        thumbShape:
+                            const RoundSliderThumbShape(enabledThumbRadius: 7),
+                      ),
+                      child: Slider(
+                        value: compact.toDouble(),
+                        min: 10,
+                        max: 100,
+                        divisions: 18,
+                        onChanged: (v) =>
+                            setState(() => _compact.text = '${v.round()}'),
+                      ),
+                    ),
+                  ),
+                  SizedBox(
+                    width: 40,
+                    child: Text('$compact%',
+                        textAlign: TextAlign.right,
+                        style: sans(kMobile ? 15 : 12.5, color: AppColors.fg2)),
+                  ),
+                ]),
+              ),
+              if (_usesOpenAiAdapter(_provider))
+                SettingsRow(
+                  label: 'Stream responses',
+                  sub: 'For models that return nothing otherwise.',
+                  trailing: SettingsSwitch(
+                      value: _stream,
+                      onChanged: (v) => setState(() => _stream = v)),
+                ),
+            ]),
+            SettingsGroup(
+              header: 'Connection',
+              footer: 'Keys stay on the machine running snippet.',
+              children: connection,
             ),
-        ]),
-        SettingsGroup(
-          header: 'Connection',
-          footer: 'Keys stay on the machine running snippet.',
-          children: connection,
-        ),
-        SettingsGroup(header: 'Options', children: [
-          SettingsRow(
-            label: 'Supports images',
-            sub: 'Send screenshots and diagrams to this model.',
-            trailing: SettingsSwitch(
-                value: _images, onChanged: (v) => setState(() => _images = v)),
-          ),
-          if (_isXai)
-            SettingsRow(
-              label: 'X search',
-              sub: 'Let Grok search X with xAI’s server-side tool.',
-              trailing: SettingsSwitch(
-                  value: _xSearch,
-                  onChanged: (v) => setState(() => _xSearch = v)),
-            ),
-          SettingsRow(
-            label: 'Use for new sessions',
-            sub: 'Make this the active profile.',
-            trailing: SettingsSwitch(
-                value: _active, onChanged: (v) => setState(() => _active = v)),
-          ),
-        ]),
-        if (_isEdit && widget.onDelete != null && kMobile)
-          SettingsGroup(children: [
-            SettingsRow(
-                label: 'Delete profile', danger: true, onTap: widget.onDelete),
-          ]),
-        if (_error != null)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(4, 0, 4, 12),
-            child: Text(_error!, style: sans(12, color: AppColors.danger)),
-          ),
+            SettingsGroup(header: 'Options', children: [
+              SettingsRow(
+                label: 'Supports images',
+                sub: 'Send screenshots and diagrams to this model.',
+                trailing: SettingsSwitch(
+                    value: _images,
+                    onChanged: (v) => setState(() => _images = v)),
+              ),
+              if (_isXai)
+                SettingsRow(
+                  label: 'X search',
+                  sub: 'Let Grok search X with xAI’s server-side tool.',
+                  trailing: SettingsSwitch(
+                      value: _xSearch,
+                      onChanged: (v) => setState(() => _xSearch = v)),
+                ),
+              SettingsRow(
+                label: 'Use for new sessions',
+                sub: 'Make this the active profile.',
+                trailing: SettingsSwitch(
+                    value: _active,
+                    onChanged: (v) => setState(() => _active = v)),
+              ),
+            ]),
+            if (_isEdit && widget.onDelete != null && kMobile)
+              SettingsGroup(children: [
+                SettingsRow(
+                    label: 'Delete profile',
+                    danger: true,
+                    onTap: widget.onDelete),
+              ]),
+            if (_error != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(4, 0, 4, 12),
+                child: Text(_error!, style: sans(12, color: AppColors.danger)),
+              ),
           ],
         );
       },
     );
   }
-
 }
 
 /// Searchable list over the provider's live model catalog. Rows show the raw

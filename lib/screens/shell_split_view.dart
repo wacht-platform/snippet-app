@@ -178,8 +178,7 @@ class _ShellSplitViewState extends State<ShellSplitView> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             if (p == ShellPane.right
-                ? list.isNotEmpty ||
-                    readouts.any((r) => r != _filesTab)
+                ? list.isNotEmpty || readouts.any((r) => r != _filesTab)
                 : list.length + readouts.length > 1)
               PaneStrip(
                 pane: p,
@@ -213,11 +212,12 @@ class _ShellSplitViewState extends State<ShellSplitView> {
   Widget build(BuildContext context) {
     final showRight = !widget.hideRight &&
         (_dragActive ||
-        widget.rightPanel != null ||
-        (!widget.rightCollapsed &&
-            (widget.rightTabs.isNotEmpty ||
-                (!widget.panelHostsReadouts &&
-                    widget.readouts.any((r) => r.pane == ShellPane.right)))));
+            widget.rightPanel != null ||
+            (!widget.rightCollapsed &&
+                (widget.rightTabs.isNotEmpty ||
+                    (!widget.panelHostsReadouts &&
+                        widget.readouts
+                            .any((r) => r.pane == ShellPane.right)))));
     final showLeft = !(widget.leftCollapsed && widget.leftTabs.isNotEmpty);
 
     final line = BorderSide(color: AppColors.line);
@@ -239,39 +239,42 @@ class _ShellSplitViewState extends State<ShellSplitView> {
           ),
         ),
         Expanded(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             if (widget.mainHeader != null) widget.mainHeader!,
             Expanded(
-              child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                if (showLeft)
-                  Expanded(
-                    child: _dropOn(
-                      ShellPane.left,
-                      _paneView(ShellPane.left, roundRight: !showRight),
-                    ),
-                  )
-                else
-                  Expanded(
-                    child: CollapsedPaneStub(
-                      pane: ShellPane.left,
-                      onExpand: () => widget.onExpandPane(ShellPane.left),
-                    ),
-                  ),
-                if (showRight) ...[
-                  PaneResizeHandle(
-                    joinBaseline: showLeft,
-                    onResize: widget.onPaneResize,
-                  ),
-                  SizedBox(
-                    width:
-                        widget.paneWidth.clamp(kPaneMinWidth, double.infinity),
-                    child: _dropOn(
-                      ShellPane.right,
-                      _paneView(ShellPane.right, roundRight: true),
-                    ),
-                  ),
-                ],
-              ]),
+              child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (showLeft)
+                      Expanded(
+                        child: _dropOn(
+                          ShellPane.left,
+                          _paneView(ShellPane.left, roundRight: !showRight),
+                        ),
+                      )
+                    else
+                      Expanded(
+                        child: CollapsedPaneStub(
+                          pane: ShellPane.left,
+                          onExpand: () => widget.onExpandPane(ShellPane.left),
+                        ),
+                      ),
+                    if (showRight) ...[
+                      PaneResizeHandle(
+                        joinBaseline: showLeft,
+                        onResize: widget.onPaneResize,
+                      ),
+                      SizedBox(
+                        width: widget.paneWidth
+                            .clamp(kPaneMinWidth, double.infinity),
+                        child: _dropOn(
+                          ShellPane.right,
+                          _paneView(ShellPane.right, roundRight: true),
+                        ),
+                      ),
+                    ],
+                  ]),
             ),
           ]),
         ),

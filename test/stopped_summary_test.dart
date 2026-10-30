@@ -6,6 +6,7 @@ void main() {
     expect(stoppedSummary(null), 'Finished · standing by');
     expect(stoppedSummary(['Call tracking daemon']),
         'Paused while a lane works: Call tracking daemon');
-    expect(stoppedSummary(['A', 'B', 'C']), 'Paused while 3 lanes work: A, B +1');
+    expect(
+        stoppedSummary(['A', 'B', 'C']), 'Paused while 3 lanes work: A, B +1');
   });
 }

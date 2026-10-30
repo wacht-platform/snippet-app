@@ -263,22 +263,22 @@ class ShellTab {
   String get key => isReadout
       ? '$instanceUrl|readout|${readout!.key}'
       : isTask
-      ? '$instanceUrl|task|$taskId'
-      : isDraft
-      ? '$instanceUrl|new'
-      : isPrs
-      ? '$instanceUrl|prs'
-      : isBoard
-      ? '$instanceUrl|tasks-board'
-      : isTerminal
-          ? '$instanceUrl|term|${termSessionKey ?? 'global'}|$termId'
-          : isDiff
-              ? '$instanceUrl|diff|$diffPath|$diffStaged'
-              : isFile
-                  ? '$instanceUrl|file|$filePath'
-                  : isMissionControl
-                      ? '$instanceUrl|mission-control'
-                      : '$instanceUrl|$sessionId';
+          ? '$instanceUrl|task|$taskId'
+          : isDraft
+              ? '$instanceUrl|new'
+              : isPrs
+                  ? '$instanceUrl|prs'
+                  : isBoard
+                      ? '$instanceUrl|tasks-board'
+                      : isTerminal
+                          ? '$instanceUrl|term|${termSessionKey ?? 'global'}|$termId'
+                          : isDiff
+                              ? '$instanceUrl|diff|$diffPath|$diffStaged'
+                              : isFile
+                                  ? '$instanceUrl|file|$filePath'
+                                  : isMissionControl
+                                      ? '$instanceUrl|mission-control'
+                                      : '$instanceUrl|$sessionId';
 }
 
 /// Icon for a tab, by kind. One helper so the four call sites that render a
@@ -286,22 +286,22 @@ class ShellTab {
 String tabIconKind(ShellTab t) => t.isReadout
     ? t.readout!.icon
     : t.isTask
-    ? 'task'
-    : t.isDraft
-    ? 'chat-thread'
-    : t.isPrs
-    ? 'pull-request'
-    : t.isBoard
-    ? 'kanban'
-    : t.isMissionControl
-        ? 'layers'
-        : t.isTerminal
-            ? 'terminal'
-            : t.isDiff
-                ? 'git-branch'
-                : t.isFile
-                    ? 'file'
-                    : 'chat-thread';
+        ? 'task'
+        : t.isDraft
+            ? 'chat-thread'
+            : t.isPrs
+                ? 'pull-request'
+                : t.isBoard
+                    ? 'kanban'
+                    : t.isMissionControl
+                        ? 'layers'
+                        : t.isTerminal
+                            ? 'terminal'
+                            : t.isDiff
+                                ? 'git-branch'
+                                : t.isFile
+                                    ? 'file'
+                                    : 'chat-thread';
 
 class MacSessionStatus {
   final HarnessState? state;

@@ -45,7 +45,8 @@ Widget _view(
                 ambient: a,
                 phase: phase,
                 live: ValueNotifier(live ??
-                    const EnrolLive(Duration.zero, [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])),
+                    const EnrolLive(
+                        Duration.zero, [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])),
                 manageOpen: manage,
                 busy: false,
                 error: error,

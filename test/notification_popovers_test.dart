@@ -1,4 +1,3 @@
-import 'package:flutter/gestures.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -132,25 +131,22 @@ void main() {
     expect(payload['session'], 's');
   });
 
-  testWidgets('expiry gives each FIFO item five seconds without haptics',
+  testWidgets('each item expires on its own deadline without haptics',
       (tester) async {
     foregroundNotifications.add({'title': 'First'});
-    foregroundNotifications.add({'title': 'Second'});
     await tester.pumpWidget(
         const MaterialApp(home: NotificationPopovers(child: Scaffold())));
     await tester.pump(const Duration(seconds: 4));
-    foregroundNotifications.add({'title': 'Third'});
+    foregroundNotifications.add({'title': 'Second'});
     await tester.pump();
-    expect(find.text('First'), findsOneWidget);
-    await tester.pump(const Duration(seconds: 1));
+    expect(find.text('Second'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 3));
     await tester.pumpAndSettle();
+    expect(find.text('Second'), findsOneWidget);
     expect(find.text('First'), findsNothing);
-    expect(find.text('Second'), findsOneWidget);
     await tester.pump(const Duration(seconds: 4));
-    expect(find.text('Second'), findsOneWidget);
-    await tester.pump(const Duration(seconds: 1));
     await tester.pumpAndSettle();
-    expect(find.text('Third'), findsOneWidget);
+    expect(find.text('Second'), findsNothing);
     expect(haptics, isEmpty);
     await tester.pumpWidget(const SizedBox());
     await tester.pump(const Duration(seconds: 10));
@@ -187,20 +183,24 @@ void main() {
 
   testWidgets('gesture pauses expiry; reduced motion and suppression clean up',
       (tester) async {
-    foregroundNotifications.add({'title': 'Held', 'url': 'u', 'session': 's'});
     foregroundNotifications.add({'title': 'Next', 'kind': 'waiting'});
+    foregroundNotifications.add({'title': 'Held', 'url': 'u', 'session': 's'});
     await tester.pumpWidget(const MaterialApp(
         home: MediaQuery(
       data: MediaQueryData(disableAnimations: true),
       child: NotificationPopovers(child: Scaffold()),
     )));
     expect(
-        tester.widget<AnimatedSwitcher>(find.byType(AnimatedSwitcher).first).duration,
+        tester
+            .widget<AnimatedSwitcher>(find.byType(AnimatedSwitcher).first)
+            .duration,
         Duration.zero);
     final gesture = await tester.startGesture(
         tester.getTopLeft(find.byType(Dismissible)) + const Offset(1, 1));
-    await tester.pump(const Duration(seconds: 6));
-    expect(find.text('Held'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 16));
+    expect(find.text('Next'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 1));
+    expect(find.text('1 more'), findsOneWidget);
     await gesture.cancel();
     expect(notificationAppForeground, isTrue);
     expect(suppressVisibleNotification({'url': 'u', 'session': 's'}), isFalse);
@@ -208,8 +208,8 @@ void main() {
     expect(suppressVisibleNotification({'url': 'u', 'session': 's'}), isTrue);
     await tester.pumpAndSettle();
     expect(find.text('Held'), findsNothing);
-    expect(find.text('needs you'), findsOneWidget);
-    await tester.pump(const Duration(seconds: 4));
+    expect(find.text('needs you'), findsNothing);
+    await tester.pump(const Duration(seconds: 14));
     expect(find.text('Next'), findsOneWidget);
     await tester.pump(const Duration(seconds: 1));
     await tester.pump();
@@ -278,38 +278,38 @@ void main() {
       ),
     ));
     expect(tester.takeException(), isNull);
-    expect(find.text('failed'), findsOneWidget);
+    expect(find.text('failed'), findsNothing);
     expect(find.textContaining('Brief context'), findsOneWidget);
     await tester.drag(find.byType(Dismissible), const Offset(-500, 0));
     await tester.pumpAndSettle();
     expect(find.text('Tap to open'), findsNothing);
   });
 
-  testWidgets('whole card tap and dismiss advance the FIFO queue',
+  testWidgets('whole card tap and dismiss reveal the next in the stack',
       (tester) async {
     final opened = <Map<String, dynamic>>[];
     onNotifTap = opened.add;
-    final first = <String, dynamic>{'title': 'First', 'notification_id': 'one'};
-    foregroundNotifications.add(first);
+    final third = <String, dynamic>{'title': 'Third', 'notification_id': 'one'};
+    foregroundNotifications.add({'title': 'First'});
     foregroundNotifications.add({'title': 'Second'});
     await tester.pumpWidget(
         const MaterialApp(home: NotificationPopovers(child: Scaffold())));
-    foregroundNotifications.add({'title': 'Third'});
+    foregroundNotifications.add(third);
     await tester.pumpAndSettle();
     expect(find.text('Second'), findsNothing);
     final card = find.byType(InkWell).first;
     await tester.tapAt(tester.getTopLeft(card) + const Offset(24, 24));
     await tester.pumpAndSettle();
-    expect(opened, [same(first)]);
+    expect(opened, [same(third)]);
     expect(haptics, ['HapticFeedbackType.lightImpact']);
     expect(find.text('Second'), findsOneWidget);
     await tester.drag(find.byType(Dismissible), const Offset(-500, 0));
     await tester.pumpAndSettle();
     expect(opened, hasLength(1));
-    expect(find.text('Third'), findsOneWidget);
-    await tester.tap(find.text('Third'));
+    expect(find.text('First'), findsOneWidget);
+    await tester.tap(find.text('First'));
     await tester.pumpAndSettle();
-    expect(opened.last['title'], 'Third');
+    expect(opened.last['title'], 'First');
     expect(find.byType(Dismissible), findsNothing);
   });
 }

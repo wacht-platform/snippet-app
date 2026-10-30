@@ -40,7 +40,9 @@ class ListSearchField extends StatelessWidget {
             : null,
       ),
       child: Row(children: [
-        AppIcon('search', size: kMobile ? 16 : 13, color: kMobile ? AppColors.fg4 : AppColors.fg3),
+        AppIcon('search',
+            size: kMobile ? 16 : 13,
+            color: kMobile ? AppColors.fg4 : AppColors.fg3),
         SizedBox(width: kMobile ? 10 : 6),
         Expanded(
           child: TextField(
@@ -65,11 +67,10 @@ class ListSearchField extends StatelessWidget {
               : IconBtn('x',
                   size: kMobile ? 36 : 22,
                   iconSize: kMobile ? 14 : 10,
-                  tooltip: 'Clear',
-                  onTap: () {
-                    controller.clear();
-                    onChanged('');
-                  }),
+                  tooltip: 'Clear', onTap: () {
+                  controller.clear();
+                  onChanged('');
+                }),
         ),
       ]),
     );

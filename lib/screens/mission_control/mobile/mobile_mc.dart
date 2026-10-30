@@ -24,12 +24,19 @@ Future<void> showMissionControlPanel(
     return presentScreen<void>(
       context,
       style: PanelStyle.drawer,
-      purpose: child is CoordinationAgentDirectory ? ShellPanelPurpose.agents
-          : child is TasksScreen ? ShellPanelPurpose.tasks : ShellPanelPurpose.generic,
+      purpose: child is CoordinationAgentDirectory
+          ? ShellPanelPurpose.agents
+          : child is TasksScreen
+              ? ShellPanelPurpose.tasks
+              : ShellPanelPurpose.generic,
       panelId: child is CoordinationAgentDirectory || child is TasksScreen
-          ? '' : child.runtimeType.toString(),
-      originClient: child is CoordinationAgentDirectory ? child.client
-          : child is TasksScreen ? child.client : null,
+          ? ''
+          : child.runtimeType.toString(),
+      originClient: child is CoordinationAgentDirectory
+          ? child.client
+          : child is TasksScreen
+              ? child.client
+              : null,
       builder: (_, close) => child,
     );
   }
@@ -118,7 +125,9 @@ class MobileMissionControl extends StatelessWidget {
       await presentScreen<void>(
         context,
         style: PanelStyle.drawer,
-        purpose: ShellPanelPurpose.task, panelId: task.id, originClient: state.client,
+        purpose: ShellPanelPurpose.task,
+        panelId: task.id,
+        originClient: state.client,
         builder: (_, close) => TaskDetailSheet(task: task, state: state),
       );
       state.refresh(silent: true);
@@ -220,7 +229,8 @@ Future<void> showNotificationInbox(
     return presentScreen<void>(
       context,
       style: PanelStyle.drawer,
-      purpose: ShellPanelPurpose.inbox, originClient: state.client,
+      purpose: ShellPanelPurpose.inbox,
+      originClient: state.client,
       builder: (_, close) => NotificationInbox(state: state),
     );
   }

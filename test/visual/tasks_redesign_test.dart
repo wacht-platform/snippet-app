@@ -37,7 +37,8 @@ final _tasks = [
   _task('2', 'TUI gets stuck listing sessions', 'blocked',
       'The store is reopened per directory; waiting on the store refactor.',
       age: const Duration(hours: 3)),
-  _task('3', 'Add an APK review build', 'todo', 'Cut a release build for review.',
+  _task(
+      '3', 'Add an APK review build', 'todo', 'Cut a release build for review.',
       age: const Duration(hours: 5)),
   _task('4', 'Remove legacy session sidecars', 'todo', '',
       age: const Duration(days: 1)),

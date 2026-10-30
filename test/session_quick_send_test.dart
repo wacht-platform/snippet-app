@@ -18,7 +18,8 @@ void main() {
     Uri? seen;
     DaemonClient.wsConnector = (uri, {connectTimeout, pingInterval}) {
       seen = uri;
-      Timer(const Duration(milliseconds: 20), () => ch.incoming.add('{"wire":"snapshot"}'));
+      Timer(const Duration(milliseconds: 20),
+          () => ch.incoming.add('{"wire":"snapshot"}'));
       return ch;
     };
     addTearDown(() => DaemonClient.wsConnector = null);

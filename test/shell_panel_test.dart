@@ -100,14 +100,21 @@ void main() {
   testWidgets('centered dialog bypasses desktop host', (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.linux;
     late BuildContext entry;
-    await tester.pumpWidget(MaterialApp(home: ShellPanelScope(
+    await tester.pumpWidget(MaterialApp(
+        home: ShellPanelScope(
       open: (_) => throw StateError('dialog must not dock'),
-      child: Builder(builder: (context) { entry = context; return const SizedBox(); }),
+      child: Builder(builder: (context) {
+        entry = context;
+        return const SizedBox();
+      }),
     )));
-    presentScreen<void>(entry, purpose: ShellPanelPurpose.generic,
-      builder: (_, close) => TextButton(onPressed: close, child: const Text('dialog close')));
+    presentScreen<void>(entry,
+        purpose: ShellPanelPurpose.generic,
+        builder: (_, close) =>
+            TextButton(onPressed: close, child: const Text('dialog close')));
     await tester.pumpAndSettle();
-    expect(find.byWidgetPredicate((w) => w is ModalBarrier && w.dismissible), findsWidgets);
+    expect(find.byWidgetPredicate((w) => w is ModalBarrier && w.dismissible),
+        findsWidgets);
     await tester.tap(find.text('dialog close'));
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);

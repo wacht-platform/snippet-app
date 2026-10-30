@@ -53,24 +53,21 @@ void main() {
             alignment: Alignment.topCenter,
             child: SizedBox(
                 width: width,
-                child: Padding(
-                    padding: const EdgeInsets.all(12), child: child)),
+                child:
+                    Padding(padding: const EdgeInsets.all(12), child: child)),
           ),
         ),
       );
 
   NotificationMessageCard card(Map<String, dynamic> p,
-          {List<Map<String, dynamic>> rest = const [],
-          List<QuickAction>? sent,
+          {List<QuickAction>? sent,
           VoidCallback? onSent,
           bool ok = true,
           bool open = false}) =>
       NotificationMessageCard(
         payload: p,
-        rest: rest,
         onOpen: () {},
         onDismiss: () {},
-        onClearAll: () {},
         onHold: (_) {},
         onSent: onSent ?? () {},
         initiallyExpanded: open,
@@ -103,7 +100,7 @@ void main() {
     var done = false;
     await tester.pumpWidget(
         frame(card(_approval, sent: sent, onSent: () => done = true)));
-    expect(find.text('wants approval'), findsOneWidget);
+    expect(find.text('wants approval'), findsNothing);
     expect(find.textContaining('**'), findsNothing);
     expect(find.text('Approve'), findsNothing);
     await tester.tap(find.text('Fix login redirect'));
@@ -127,8 +124,7 @@ void main() {
     expect(find.text("Couldn't send. Open chat"), findsOneWidget);
   });
 
-  testWidgets('choice question answers with the picked label',
-      (tester) async {
+  testWidgets('choice question answers with the picked label', (tester) async {
     final sent = <QuickAction>[];
     await tester.pumpWidget(frame(card(_choice, sent: sent, open: true)));
     await tester.tap(find.text('Needs tweaks'));
@@ -157,14 +153,6 @@ void main() {
     }
   });
 
-  testWidgets('groups the rest by chat', (tester) async {
-    await tester.pumpWidget(frame(card(_done, rest: [
-      {..._approval, 'url': 'u'},
-      {..._question, 'url': 'u'},
-    ])));
-    expect(find.text('+2 more from 2 chats'), findsOneWidget);
-  });
-
   for (final (name, platform, width) in [
     ('mobile', TargetPlatform.android, 390.0),
     ('desktop', TargetPlatform.macOS, 444.0),
@@ -175,7 +163,7 @@ void main() {
         await tester.binding.setSurfaceSize(Size(width, 620));
         await tester.pumpWidget(frame(
             Column(children: [
-              card(_approval, rest: [_question, _done]),
+              card(_approval),
               const SizedBox(height: 12),
               card(_done),
               const SizedBox(height: 12),

@@ -50,8 +50,8 @@ class _CompactingStatusState extends State<_CompactingStatus> {
           Row(children: [
             SizedBox(
                 width: 22,
-                child: Center(
-                    child: const WorkingMochi(size: 19, squeeze: true))),
+                child:
+                    Center(child: const WorkingMochi(size: 19, squeeze: true))),
             const SizedBox(width: 8),
             Expanded(
               child: Shimmer(
@@ -166,8 +166,7 @@ class _ChurningStatusState extends State<_ChurningStatus> {
               children: [
                 SizedBox(
                     width: 22,
-                    child: Center(
-                        child: const WorkingMochi(size: 19))),
+                    child: Center(child: const WorkingMochi(size: 19))),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Shimmer(

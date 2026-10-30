@@ -71,8 +71,8 @@ class _ShellWelcomeViewState extends State<ShellWelcomeView> {
       color: AppColors.bg,
       child: Center(
         child: SingleChildScrollView(
-          padding: EdgeInsets.symmetric(
-              horizontal: kMobile ? 22 : 28, vertical: 32),
+          padding:
+              EdgeInsets.symmetric(horizontal: kMobile ? 22 : 28, vertical: 32),
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 440),
             child: Column(
@@ -81,7 +81,8 @@ class _ShellWelcomeViewState extends State<ShellWelcomeView> {
               children: [
                 Center(
                     child: MochiIcon(
-                        color: const Color(0xFFB9C6FF), size: kMobile ? 64 : 56)),
+                        color: const Color(0xFFB9C6FF),
+                        size: kMobile ? 64 : 56)),
                 const SizedBox(height: 18),
                 Text(
                   'Connect your computer',
@@ -108,8 +109,11 @@ class _ShellWelcomeViewState extends State<ShellWelcomeView> {
                   title: _localRunning
                       ? 'snippet is already running here. Show its link with'
                       : 'Start it',
-                  command: _localRunning ? 'snippet serve --status' : 'snippet serve',
-                  note: _localRunning ? null : 'It prints a link and a QR code.',
+                  command: _localRunning
+                      ? 'snippet serve --status'
+                      : 'snippet serve',
+                  note:
+                      _localRunning ? null : 'It prints a link and a QR code.',
                 ),
                 const SizedBox(height: 14),
                 _WelcomeStep(
@@ -136,7 +140,8 @@ class _ShellWelcomeViewState extends State<ShellWelcomeView> {
 }
 
 class _WelcomeStep extends StatelessWidget {
-  const _WelcomeStep({required this.n, required this.title, this.command, this.note});
+  const _WelcomeStep(
+      {required this.n, required this.title, this.command, this.note});
   final String n;
   final String title;
   final String? command;
@@ -181,7 +186,8 @@ class _WelcomeStep extends StatelessWidget {
                     child: SelectableText(command!,
                         style: mono(kMobile ? 12 : 11.5, color: AppColors.fg1)),
                   ),
-                  IconBtn('copy', size: 30, iconSize: 13, tooltip: 'Copy', onTap: () {
+                  IconBtn('copy', size: 30, iconSize: 13, tooltip: 'Copy',
+                      onTap: () {
                     Clipboard.setData(ClipboardData(text: command!));
                     toast(context, 'Copied');
                   }),
