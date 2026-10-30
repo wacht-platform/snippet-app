@@ -6,6 +6,8 @@ import 'package:flutter/material.dart';
 import '../api.dart';
 import '../drafts.dart';
 import '../models.dart';
+import '../crew_status.dart';
+import '../crew_widgets.dart';
 import '../platform.dart';
 import '../theme.dart';
 import '../widgets.dart';
@@ -1014,43 +1016,14 @@ class SidebarState extends State<Sidebar> {
             ),
           ]),
         ),
-        SizedBox(
-          height: 40,
-          child: ListView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 14),
-            children: [
-              for (final a in _crew)
-                Padding(
-                  padding: const EdgeInsets.only(right: 6),
-                  child: Tooltip(
-                    message: a.displayName,
-                    child: Material(
-                      color: AppColors.surface1,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(11),
-                        side: BorderSide(
-                            color: (a.taskCounts?['in_progress'] ?? 0) > 0 ||
-                                    a.status == 'working' ||
-                                    a.status == 'busy'
-                                ? AppColors.accent.withValues(alpha: 0.4)
-                                : AppColors.line),
-                      ),
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(11),
-                        onTap: widget.onOpenAgent == null
-                            ? null
-                            : () => widget.onOpenAgent!(a),
-                        child: SizedBox(
-                          width: 38,
-                          height: 38,
-                          child: Center(child: AgentMochi(a.id, size: 22)),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-            ],
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxHeight: 280),
+          child: SingleChildScrollView(
+            child: CrewRoster(
+              entries: crewOrdered(
+                  deriveCrew(_crew, widget.sessions ?? const <SessionInfo>[])),
+              onOpen: (a) => widget.onOpenAgent?.call(a),
+            ),
           ),
         ),
       ],

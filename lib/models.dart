@@ -174,6 +174,12 @@ class SessionInfo {
   /// because dispatch writes the roster, not the session's identity.
   final String? workerAgentId;
 
+  /// What the session is waiting on the user for (`type`, `text`), sent only
+  /// while it is waiting. Null for an approval the daemon could not describe.
+  final Map<String, dynamic>? attention;
+
+  bool get needsInput => status == 'waiting_for_input';
+
   /// Who to name on a session row: whoever is working here, else whoever the
   /// session belongs to. Precedence lives here so every row agrees, and so the
   /// rule is stated once rather than repeated at each call site.
@@ -201,6 +207,9 @@ class SessionInfo {
         profile = j['profile'] as String?,
         agentId = j['agent_id'] as String?,
         workerAgentId = j['worker_agent_id'] as String?,
+        attention = j['attention'] is Map
+            ? (j['attention'] as Map).cast<String, dynamic>()
+            : null,
         originFolder = j['origin_folder'] as String?,
         branch = j['branch'] as String?;
 
@@ -215,6 +224,7 @@ class SessionInfo {
         profile: profile,
         agentId: agentId,
         workerAgentId: workerAgentId,
+        attention: attention,
         originFolder: originFolder,
         branch: branch,
       );
@@ -230,6 +240,7 @@ class SessionInfo {
         profile: profile,
         agentId: agentId,
         workerAgentId: workerAgentId,
+        attention: attention,
         originFolder: originFolder,
         branch: branch,
       );
@@ -245,6 +256,7 @@ class SessionInfo {
     required this.profile,
     this.agentId,
     this.workerAgentId,
+    this.attention,
     this.originFolder,
     this.branch,
   });
