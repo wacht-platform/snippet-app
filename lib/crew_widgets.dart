@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'api.dart';
+import 'dialog_widgets.dart';
 import 'screens/mochi_color_picker.dart';
 import 'crew_status.dart';
 import 'mochi.dart';
@@ -479,6 +480,10 @@ Future<void> showCrewAgentMenu(
     point: point,
     anchor: point == null ? context : null,
     items: [
+      appMenuItem(
+          value: 'nickname',
+          icon: 'pencil',
+          label: agent.nickname == null ? 'Set nickname' : 'Edit nickname'),
       appMenuItem(value: 'color', icon: 'sparkles', label: 'Change colour'),
       appMenuItem(value: 'model', icon: 'cpu', label: 'Change model'),
       appMenuItem(
@@ -486,7 +491,19 @@ Future<void> showCrewAgentMenu(
     ],
   );
   if (!context.mounted) return;
-  if (picked == 'color') {
+  if (picked == 'nickname') {
+    final next = await promptText(context,
+        title: 'Nickname for ${agent.fullName.trim().isEmpty ? agent.id : agent.fullName.trim()}',
+        initial: agent.nickname ?? '',
+        hint: 'Leave empty to use the name');
+    if (next == null || next == (agent.nickname ?? '')) return;
+    try {
+      await client.setAgentNickname(agent.id, next.isEmpty ? null : next);
+      onDeleted?.call();
+    } catch (e) {
+      if (context.mounted) toast(context, '$e', danger: true);
+    }
+  } else if (picked == 'color') {
     await showMochiColorPicker(context, client, agent.id, name, point: point);
   } else if (picked == 'model') {
     await _pickCrewModel(context, client, agent, name, point, onDeleted);

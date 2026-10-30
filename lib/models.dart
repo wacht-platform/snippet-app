@@ -1049,12 +1049,16 @@ class NotificationMarker {
 /// A specialized worker identity in the SQLite coordination directory.
 class CoordinationAgent {
   final String id;
-  final String displayName;
+  final String fullName;
+  final String? nickname;
   final String handle;
   final String kind;
   final String status;
   final String role;
   final List<String> capabilities;
+
+  /// What the UI shows: the nickname when one is set, else the name.
+  String get displayName => nickname ?? fullName;
 
   /// Tasks by status, as the daemon counts them: open work of any age, and
   /// finished work from the last 7 days. Null when the daemon predates it.
@@ -1072,7 +1076,10 @@ class CoordinationAgent {
         profile = (j['profile'] as String?)?.trim().isEmpty ?? true
             ? null
             : (j['profile'] as String).trim(),
-        displayName = j['display_name'] as String? ?? '',
+        fullName = j['display_name'] as String? ?? '',
+        nickname = (j['nickname'] as String?)?.trim().isEmpty ?? true
+            ? null
+            : (j['nickname'] as String).trim(),
         handle = j['handle'] as String? ?? '',
         kind = j['kind'] as String? ?? 'worker',
         status = j['status'] as String? ?? 'active',

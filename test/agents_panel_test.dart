@@ -30,7 +30,7 @@ class _FakeAgentsClient extends DaemonClient {
   String? builtPrompt;
 
   @override
-  Future<void> buildCoordinationAgent(String prompt) async {
+  Future<void> buildCoordinationAgent(String prompt, {String? nickname}) async {
     builtPrompt = prompt;
   }
 
@@ -162,7 +162,7 @@ void main() {
         expect(popup.bottom, lessThanOrEqualTo(scenario.size.height - 20));
         expect(popup.width, lessThanOrEqualTo(340));
         final header = tester.getRect(find.text('Create agent'));
-        final field = tester.getRect(find.byType(TextField));
+        final field = tester.getRect(find.byType(TextField).first);
         final button = tester.getRect(find.byType(Btn));
         expect(popup.contains(header.topLeft), isTrue);
         expect(popup.contains(button.bottomRight), isTrue);
@@ -170,7 +170,7 @@ void main() {
         expect(field.bottom, lessThan(button.top));
         expect(
             tester
-                .widget<TextField>(find.byType(TextField))
+                .widget<TextField>(find.byType(TextField).first)
                 .focusNode!
                 .hasFocus,
             isTrue);
@@ -179,7 +179,7 @@ void main() {
         expect(find.text('Describe the agent you want it to become.'),
             findsOneWidget);
         await tester.enterText(
-            find.byType(TextField), '  Review security issues in repos  ');
+            find.byType(TextField).first, '  Review security issues in repos  ');
         await tester.tap(find.text('Build agent'));
         await tester.pumpAndSettle();
         await tester.pump(const Duration(seconds: 3));

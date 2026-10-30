@@ -26,11 +26,13 @@ class CreateAgentForm extends StatefulWidget {
 
 class _CreateAgentFormState extends State<CreateAgentForm> {
   final _prompt = TextEditingController();
+  final _nickname = TextEditingController();
   bool _busy = false;
   String? _error;
 
   @override
   void dispose() {
+    _nickname.dispose();
     _prompt.dispose();
     super.dispose();
   }
@@ -49,7 +51,8 @@ class _CreateAgentFormState extends State<CreateAgentForm> {
       _error = null;
     });
     try {
-      await widget.client.buildCoordinationAgent(prompt);
+      await widget.client
+          .buildCoordinationAgent(prompt, nickname: _nickname.text.trim());
       if (mounted) Navigator.of(context).pop(true);
     } catch (e) {
       if (mounted) {
@@ -73,6 +76,8 @@ class _CreateAgentFormState extends State<CreateAgentForm> {
             maxLines: 6,
             autofocus: true,
           ),
+          const SizedBox(height: 10),
+          AppField(controller: _nickname, hint: 'Nickname (optional)'),
           if (_error != null) ...[
             const SizedBox(height: 10),
             Text(_error!, style: sans(12, color: AppColors.danger)),

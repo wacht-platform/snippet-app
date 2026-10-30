@@ -1422,6 +1422,15 @@ class DaemonClient {
     setRememberedAgentColor(agentId, color);
   }
 
+  /// POST /agents/{id}/nickname — a short name shown instead of the name, or null to clear it.
+  Future<void> setAgentNickname(String agentId, String? nickname) async {
+    final r = await http.post(
+        _uri('/agents/${Uri.encodeComponent(agentId)}/nickname'),
+        headers: _json,
+        body: jsonEncode({'nickname': nickname}));
+    if (r.statusCode != 200) throw _err('set agent nickname', r);
+  }
+
   /// POST /agents/{id}/profile — the profile the agent works on, or null to use
   /// whatever model the session it takes is already on.
   Future<void> setAgentProfile(String agentId, String? profile) async {
@@ -1458,11 +1467,14 @@ class DaemonClient {
   }
 
   /// POST /agents/build — ask the runtime to research and build an agent from one prompt.
-  Future<void> buildCoordinationAgent(String prompt) async {
+  Future<void> buildCoordinationAgent(String prompt, {String? nickname}) async {
     final r = await http.post(
       _uri('/agents/build'),
       headers: _json,
-      body: jsonEncode({'prompt': prompt}),
+      body: jsonEncode({
+        'prompt': prompt,
+        if (nickname != null && nickname.isNotEmpty) 'nickname': nickname,
+      }),
     );
     if (r.statusCode != 202) throw _err('build coordination agent', r);
   }

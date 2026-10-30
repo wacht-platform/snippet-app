@@ -56,7 +56,7 @@ class _FakeDaemon extends DaemonClient {
   }) async {}
 
   @override
-  Future<void> buildCoordinationAgent(String prompt) async {}
+  Future<void> buildCoordinationAgent(String prompt, {String? nickname}) async {}
 
   @override
   Future<ServerConfig> getConfig({bool force = false}) async =>
