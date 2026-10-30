@@ -402,6 +402,8 @@ Future<void> showTopMachinesPopover({
   final box = anchorKey.currentContext?.findRenderObject() as RenderBox?;
   if (box == null) return;
   final origin = box.localToGlobal(Offset.zero);
+  final size = MediaQuery.of(context).size;
+  final opensUp = origin.dy > size.height / 2;
   await showGeneralDialog(
     context: context,
     barrierDismissible: true,
@@ -410,9 +412,12 @@ Future<void> showTopMachinesPopover({
     transitionDuration: Motion.press,
     pageBuilder: (_, __, ___) => Stack(children: [
       Positioned(
-        right: (MediaQuery.of(context).size.width - origin.dx - box.size.width)
-            .clamp(10.0, 500.0),
-        top: origin.dy + box.size.height + 4,
+        left: opensUp ? origin.dx.clamp(8.0, 600.0) : null,
+        right: opensUp
+            ? null
+            : (size.width - origin.dx - box.size.width).clamp(10.0, 500.0),
+        top: opensUp ? null : origin.dy + box.size.height + 4,
+        bottom: opensUp ? size.height - origin.dy + 6 : null,
         width: 260,
         child: Material(
           color: AppColors.overlay,
