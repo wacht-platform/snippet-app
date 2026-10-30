@@ -334,7 +334,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
             Align(
               alignment: Alignment.topLeft,
               child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 840),
+                constraints: const BoxConstraints(maxWidth: double.infinity),
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(
                       S.s40, S.s32, S.s40, S.s8),
@@ -395,7 +395,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                 ? Align(
                     alignment: Alignment.topLeft,
                     child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 840),
+                      constraints: const BoxConstraints(maxWidth: double.infinity),
                       child: Padding(
                         padding: const EdgeInsets.symmetric(horizontal: S.s24),
                         child: _body(t),

@@ -3464,7 +3464,7 @@ final class NotchHomeController {
     let w: CGFloat
     let h: CGFloat
     if expanded {
-      w = min(max(hw.size.width + 160, 460), panelSize.width)
+      w = max(hw.size.width + 2 * 46, 300)
       h = min(
         NotchHomeView.expandedHeight(
           model: model, detail: detail, topInset: hw.attached ? hw.size.height : 8),
