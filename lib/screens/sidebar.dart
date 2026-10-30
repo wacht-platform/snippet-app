@@ -928,7 +928,7 @@ class SidebarState extends State<Sidebar> {
         child: Material(
           color: mcSelected ? AppColors.surface2 : AppColors.surface1,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(kMobile ? 16 : 12),
             side: BorderSide(
                 color: mcSelected ? AppColors.lineStrong : AppColors.line),
           ),

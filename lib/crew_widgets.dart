@@ -136,7 +136,7 @@ class _Bubble extends StatelessWidget {
       child: Material(
         color: AppColors.surface1,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(kMobile ? 16 : 12),
           side: BorderSide(
               color: idle ? AppColors.line : c.withValues(alpha: .8)),
         ),
