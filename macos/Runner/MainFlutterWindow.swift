@@ -3133,15 +3133,9 @@ final class NotchHomeView: NSView {
     background.isHidden = true
     layer?.backgroundColor = NSColor.black.cgColor
     let radius = min(attached ? 26 : 20, size.height / 2, size.width / 2)
-    let flipped = layer?.isGeometryFlipped ?? true
-    let maskRect: CGRect
-    if attached {
-      maskRect = flipped
-        ? CGRect(x: 0, y: -radius, width: size.width, height: size.height + radius)
-        : CGRect(x: 0, y: 0, width: size.width, height: size.height + radius)
-    } else {
-      maskRect = CGRect(origin: .zero, size: size)
-    }
+    let maskRect = attached
+      ? CGRect(x: 0, y: -radius, width: size.width, height: size.height + radius)
+      : CGRect(origin: .zero, size: size)
     let newPath = CGPath(roundedRect: maskRect, cornerWidth: radius, cornerHeight: radius, transform: nil)
     let mask = (layer?.mask as? CAShapeLayer) ?? CAShapeLayer()
     if layer?.mask !== mask { layer?.mask = mask }
