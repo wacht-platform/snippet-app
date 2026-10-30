@@ -379,7 +379,7 @@ class TasksPanelState extends State<TasksPanel> {
         child: Align(
           alignment: Alignment.topCenter,
           child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 880), child: master),
+              constraints: const BoxConstraints(maxWidth: 1040), child: master),
         ),
       );
     }

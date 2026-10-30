@@ -53,7 +53,10 @@ extension _DesktopShellPanesExt on _DesktopShellState {
     if (t.isBoard) {
       return kMobile
           ? TaskKanban(key: ValueKey('body-${t.key}'), client: t.client)
-          : TasksPanel(key: ValueKey('body-${t.key}'), client: t.client);
+          : TasksPanel(
+              key: ValueKey('body-${t.key}'),
+              client: t.client,
+              onOpenTask: (task) => _openTaskTab(t.client, t.instanceUrl, task));
     }
     if (t.isTerminal) {
       if (t.termSessionKey == null) {
