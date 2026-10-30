@@ -29,14 +29,7 @@ Color? parseHexColor(String? hex) {
 String colorHex(Color c) =>
     '#${(c.toARGB32() & 0xFFFFFF).toRadixString(16).padLeft(6, '0').toUpperCase()}';
 
-Color defaultMochiColor(String agentId) {
-  if (agentId == 'mission-control') return mochiPalette.first.$2;
-  var h = 0;
-  for (final u in agentId.codeUnits) {
-    h = (h * 31 + u) & 0x7fffffff;
-  }
-  return mochiPalette[1 + h % (mochiPalette.length - 1)].$2;
-}
+Color defaultMochiColor(String agentId) => const Color(0xFFEDEDED);
 
 Color mochiColorFor(String agentId) =>
     parseHexColor(agentColors.value[agentId]) ?? defaultMochiColor(agentId);
