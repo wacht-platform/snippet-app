@@ -9,7 +9,7 @@ import '../theme.dart';
 import '../widgets.dart';
 import 'shell_nav.dart';
 
-String _providerTitle(String id) => switch (id.toLowerCase()) {
+String usageProviderTitle(String id) => switch (id.toLowerCase()) {
       'anthropic' => 'Anthropic',
       'claude-code' || 'claude_code' => 'Claude Code',
       'openai' => 'OpenAI',
@@ -21,7 +21,7 @@ String _providerTitle(String id) => switch (id.toLowerCase()) {
       _ => id.isEmpty ? 'Provider' : id,
     };
 
-String _windowTitle(RateWindow r) {
+String usageWindowTitle(RateWindow r) {
   final base = switch (r.windowMinutes) {
     300 => '5-hour window',
     180 => '3-hour window',
@@ -258,7 +258,7 @@ class _ProviderSection extends StatelessWidget {
       children: [
         SettingsRow(
           leading: ProviderLogo(provider.provider, size: kMobile ? 18 : 16),
-          label: _providerTitle(provider.provider),
+          label: usageProviderTitle(provider.provider),
           sub: provider.model.isNotEmpty && models.isEmpty
               ? provider.model
               : null,
@@ -350,7 +350,7 @@ class _RateRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final title = _windowTitle(rate);
+    final title = usageWindowTitle(rate);
     final reset = rateResetLabel(rate.resetsAt);
     if (rate.isExpired) {
       return SettingsRow(

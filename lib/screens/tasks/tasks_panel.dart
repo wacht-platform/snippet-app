@@ -20,11 +20,13 @@ class TasksPanel extends StatefulWidget {
     required this.client,
     this.trailing = const [],
     this.phoneHeader = true,
+    this.initialTaskId,
   });
 
   final DaemonClient client;
   final List<Widget> trailing;
   final bool phoneHeader;
+  final String? initialTaskId;
 
   @override
   State<TasksPanel> createState() => TasksPanelState();
@@ -32,6 +34,13 @@ class TasksPanel extends StatefulWidget {
 
 class TasksPanelState extends State<TasksPanel> {
   late TaskFeed _feed = TaskFeed(widget.client, onChange: _sync);
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedTaskId = widget.initialTaskId;
+  }
+
   final _search = TextEditingController();
   bool _searchOpen = kMobile;
   DateTime? _shownAt;

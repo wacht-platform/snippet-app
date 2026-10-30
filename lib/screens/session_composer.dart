@@ -1,5 +1,7 @@
 part of 'session.dart';
 
+const double kDesktopComposerWidth = 680;
+
 extension _SessionScreenComposerExt on _SessionScreenState {
   void _send(Map<String, dynamic> m, {bool tracked = false}) {
     final kind = m['kind'];
@@ -838,9 +840,6 @@ extension _SessionScreenComposerExt on _SessionScreenState {
   }
 
   Widget _composerStrip(bool running) {
-    final left = _contextLeftPct;
-    final ws = _state?.workspace ?? '';
-    final folder = ws.isEmpty ? '' : lastPathSegment(ws, ifEmpty: ws);
     Widget hit(Widget child, VoidCallback onTap, {String? tip}) {
       final w = Material(
         color: Colors.transparent,
@@ -879,6 +878,30 @@ extension _SessionScreenComposerExt on _SessionScreenState {
             IconBtn('x', size: 22, iconSize: 11, tooltip: 'Clear', onTap: onClear),
         ]);
 
+    Widget low(Widget w, double bottom) =>
+        Padding(padding: EdgeInsets.only(bottom: bottom), child: w);
+
+    Widget modelChip(bool compact) => Builder(
+          key: _modelChipKey,
+          builder: (ctx) => hit(
+              Row(mainAxisSize: MainAxisSize.min, children: [
+                if (_modelProvider != null) ...[
+                  ProviderLogo(_modelProvider, size: 12),
+                  if (!compact) const SizedBox(width: 7),
+                ],
+                if (!compact || _modelProvider == null)
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 140),
+                    child: Text(_modelLabel ?? 'Auto',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: sans(12.5, color: AppColors.fg2)),
+                  ),
+              ]),
+              () => _switchModel(ctx),
+              tip: _modelLabel == null ? 'Model' : 'Model · $_modelLabel'),
+        );
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -886,11 +909,11 @@ extension _SessionScreenComposerExt on _SessionScreenState {
         if (_state?.goal?.ongoing == true) _goalBanner(),
         Container(
           key: _composerCardKey,
-          constraints: const BoxConstraints(minHeight: 40),
-          padding: const EdgeInsets.fromLTRB(12, 0, 8, 8),
+          constraints: const BoxConstraints(minHeight: 44),
+          padding: const EdgeInsets.fromLTRB(6, 0, 7, 0),
           decoration: BoxDecoration(
             color: AppColors.surface1,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(14),
             border: _draggingFiles
                 ? Border.all(color: AppColors.accent, width: 1.5)
                 : Border.all(color: AppColors.line),
@@ -901,109 +924,79 @@ extension _SessionScreenComposerExt on _SessionScreenState {
                   offset: const Offset(0, -18)),
             ],
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(children: [
-              Expanded(
-                child: CallbackShortcuts(
-                  bindings: _composerShortcuts,
-                  child: TextField(
-                    controller: _input,
-                    focusNode: _inputFocus,
-                    minLines: 1,
-                    maxLines: 8,
-                    cursorColor: AppColors.accent,
-                    onSubmitted: (_) => _sendMessage(),
-                    style: TS.body(AppColors.fg1),
-                    decoration: InputDecoration(
-                      isCollapsed: true,
-                      contentPadding: kMobile
-                          ? const EdgeInsets.fromLTRB(0, 10, 8, 10)
-                          : const EdgeInsets.fromLTRB(4, 12, 4, 6),
-                      border: InputBorder.none,
-                      hintText: _isMissionControl
-                          ? 'Reply to Snippet'
-                          : kMobile
-                              ? 'Reply to Snippet, or @ an agent'
+          child: LayoutBuilder(
+            builder: (context, box) {
+              final compact = box.maxWidth < 520;
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  low(icon('plus', 'Attach', _onAttachTap), 9),
+                  const SizedBox(width: 2),
+                  Expanded(
+                    child: CallbackShortcuts(
+                      bindings: _composerShortcuts,
+                      child: TextField(
+                        controller: _input,
+                        focusNode: _inputFocus,
+                        minLines: 1,
+                        maxLines: 8,
+                        cursorColor: AppColors.accent,
+                        onSubmitted: (_) => _sendMessage(),
+                        style: TS.body(AppColors.fg1),
+                        decoration: InputDecoration(
+                          isCollapsed: true,
+                          contentPadding:
+                              const EdgeInsets.fromLTRB(4, 12, 4, 11),
+                          border: InputBorder.none,
+                          hintText: _isMissionControl
+                              ? 'Reply to Snippet'
                               : 'Reply, or @ to bring in an agent',
-                      hintStyle: TS.body(AppColors.fg4),
+                          hintStyle: TS.body(AppColors.fg4),
+                        ),
+                      ),
                     ),
                   ),
-                ),
-              ),
-              ]),
-              Row(children: [
-            icon('plus', 'Attach', _onAttachTap),
-            if (kCanRecord)
-              icon(_isRecording ? 'mic-off' : 'mic', 'Record', _onMicTap,
-                  color: _isRecording ? AppColors.danger : null),
-            const SizedBox(width: 4),
-            Expanded(
-              child: Row(children: [
-                if (!_isMissionControl && _recipientAgentId != null)
-                  Flexible(
-                    child: Builder(
-                      builder: (ctx) => label(
-                          'To ${_recipientAgentName ?? _recipientAgentId!}',
-                          () => _pickRecipient(ctx),
-                          selected: true,
-                          onClear: _clearRecipient),
+                  if (!_isMissionControl && _recipientAgentId != null)
+                    low(
+                        ConstrainedBox(
+                          constraints: BoxConstraints(
+                              maxWidth: compact ? 110 : 160),
+                          child: Builder(
+                            builder: (ctx) => label(
+                                'To ${_recipientAgentName ?? _recipientAgentId!}',
+                                () => _pickRecipient(ctx),
+                                selected: true,
+                                onClear: _clearRecipient),
+                          ),
+                        ),
+                        9),
+                  low(modelChip(compact), 9),
+                  if (kCanRecord)
+                    low(
+                        icon(_isRecording ? 'mic-off' : 'mic', 'Record',
+                            _onMicTap,
+                            color: _isRecording ? AppColors.danger : null),
+                        9),
+                  const SizedBox(width: 4),
+                  low(
+                    ValueListenableBuilder<TextEditingValue>(
+                      valueListenable: _input,
+                      builder: (_, __, ___) {
+                        final queue = running && _canSend;
+                        final stop = running && !queue;
+                        return _SendBtn(
+                            enabled: stop || _canSend,
+                            running: stop,
+                            onTap: stop
+                                ? () => _send({'kind': 'interrupt'})
+                                : (_canSend ? _sendMessage : null));
+                      },
                     ),
+                    7,
                   ),
-              ]),
-            ),
-            Builder(
-              key: _modelChipKey,
-              builder: (ctx) => hit(
-                  Row(mainAxisSize: MainAxisSize.min, children: [
-                    if (_modelProvider != null) ...[
-                      ProviderLogo(_modelProvider, size: 12),
-                      const SizedBox(width: 7),
-                    ],
-                    Text(_modelLabel ?? 'Auto',
-                        style: sans(12.5, color: AppColors.fg2)),
-                  ]),
-                  () => _switchModel(ctx),
-                  tip: 'Model'),
-            ),
-            if (left != null && kMobile)
-              Tooltip(
-                message: folder.isEmpty
-                    ? '$left% context left'
-                    : '$left% context left · $folder',
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 6),
-                  child: SizedBox.square(
-                    dimension: 14,
-                    child: CircularProgressIndicator(
-                      value: (100 - left) / 100,
-                      strokeWidth: 2,
-                      backgroundColor: AppColors.border,
-                      color: left < 15 ? AppColors.danger : AppColors.accent,
-                    ),
-                  ),
-                ),
-              ),
-              Padding(
-                padding: EdgeInsets.zero,
-                child: ValueListenableBuilder<TextEditingValue>(
-                  valueListenable: _input,
-                  builder: (_, __, ___) {
-                    final queue = running && _canSend;
-                    final stop = running && !queue;
-                    return _SendBtn(
-                        enabled: stop || _canSend,
-                        running: stop,
-                        onTap: stop
-                            ? () => _send({'kind': 'interrupt'})
-                            : (_canSend ? _sendMessage : null));
-                  },
-                ),
-              ),
-              ]),
-            ],
+                ],
+              );
+            },
           ),
         ),
       ],
@@ -1017,7 +1010,13 @@ extension _SessionScreenComposerExt on _SessionScreenState {
       duration: Motion.fast,
       curve: Motion.enter,
       padding: EdgeInsets.only(bottom: keyboard),
-      child: Container(
+      child: Align(
+        alignment: Alignment.bottomCenter,
+        heightFactor: 1,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+              maxWidth: kMobile ? double.infinity : kDesktopComposerWidth),
+          child: Container(
         // Inset from the pane on EVERY layout. Embedded used to be 0, which is
         // why the composer stuck to the sides of the shell.
         padding: EdgeInsets.fromLTRB(
@@ -1201,6 +1200,8 @@ extension _SessionScreenComposerExt on _SessionScreenState {
                           ]),
               ),
             ]),
+      ),
+        ),
       ),
     );
   }

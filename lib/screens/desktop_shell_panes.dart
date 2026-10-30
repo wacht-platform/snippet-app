@@ -265,6 +265,7 @@ extension _DesktopShellPanesExt on _DesktopShellState {
         ),
         sidebarTop: _sidebarTop(),
         mainHeader: _macWindowBar(),
+        leftTakeover: _tasksTakeoverView(),
         sidebarHeader: _effectiveSection == ShellSection.sessions ||
                 _effectiveSection == ShellSection.tasks
             ? null
@@ -679,7 +680,6 @@ extension _DesktopShellPanesExt on _DesktopShellState {
   }
 
   Widget _sidebarTop() {
-    final inTasks = _effectiveSection == ShellSection.tasks;
     return SizedBox(
       height: 46,
       child: Row(children: [
@@ -698,31 +698,6 @@ extension _DesktopShellPanesExt on _DesktopShellState {
             iconSize: 16,
             tooltip: 'Forward',
             onTap: _canNavigateForward ? _navigateForward : null),
-        Tooltip(
-          message: inTasks ? 'Chats' : 'Tasks',
-          waitDuration: const Duration(milliseconds: 400),
-          child: Material(
-            color: inTasks ? AppColors.surface2 : Colors.transparent,
-            borderRadius: BorderRadius.circular(R.sm),
-            child: InkWell(
-              borderRadius: BorderRadius.circular(R.sm),
-              onTap: () => _setState(() {
-                _section = inTasks ? ShellSection.sessions : ShellSection.tasks;
-              }),
-              child: SizedBox(
-                width: 28,
-                height: 28,
-                child: Center(
-                  child: AppIcon(
-                    'task',
-                    size: 15,
-                    color: inTasks ? AppColors.fg1 : AppColors.fg3,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
         IconBtn('plus',
             size: 28,
             iconSize: 16,
@@ -736,8 +711,17 @@ extension _DesktopShellPanesExt on _DesktopShellState {
   Widget _sidebarFooter() {
     final healthy = _active == null ? null : _health[_active!.url];
     return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 2, 12, 10),
+      padding: const EdgeInsets.fromLTRB(8, 2, 8, 10),
       child: Row(children: [
+        Builder(
+          builder: (ctx) => IconBtn('gauge',
+              size: 28,
+              iconSize: 16,
+              tooltip: 'Usage',
+              onTap: _client == null
+                  ? null
+                  : () => showUsagePopover(ctx, _client!)),
+        ),
         Expanded(
           child: Material(
             key: _topMachineKey,
@@ -780,12 +764,54 @@ extension _DesktopShellPanesExt on _DesktopShellState {
             ),
           ),
         ),
-        IconBtn('sliders',
+        IconBtn('settings',
             size: 28,
             iconSize: 16,
             tooltip: 'Settings',
             onTap: _openShellSettings),
+        Builder(
+          builder: (ctx) => IconBtn('task',
+              size: 28,
+              iconSize: 16,
+              tooltip: 'Tasks',
+              onTap: _client == null ? null : () => _openTasksPopover(ctx)),
+        ),
       ]),
+    );
+  }
+
+  String _takeoverMark() => '${_activeTab?.key}|${_activeKey[_Pane.left]}';
+
+  Future<void> _openTasksPopover(BuildContext anchor) {
+    final client = _client;
+    if (client == null) return Future.value();
+    return showTasksPopover(anchor, client, onExpand: (taskId) {
+      _setState(() {
+        _tasksTakeover = true;
+        _tasksTakeoverTaskId = taskId;
+        _tasksTakeoverMark = _takeoverMark();
+      });
+    });
+  }
+
+  Widget? _tasksTakeoverView() {
+    if (kMobile || !_tasksTakeover) return null;
+    final client = _client;
+    if (client == null || _tasksTakeoverMark != _takeoverMark()) return null;
+    return Container(
+      color: AppColors.windowBg,
+      child: TasksPanel(
+        key: ValueKey('tasks-main-${_tasksTakeoverTaskId ?? ''}'),
+        client: client,
+        initialTaskId: _tasksTakeoverTaskId,
+        trailing: [
+          IconBtn('x',
+              size: 28,
+              iconSize: 15,
+              tooltip: 'Close task list',
+              onTap: () => _setState(() => _tasksTakeover = false)),
+        ],
+      ),
     );
   }
 

@@ -36,6 +36,8 @@ import 'inbound_share_picker.dart';
 import 'mission_control.dart';
 import 'tasks/task_kanban.dart';
 import 'tasks/tasks_panel.dart';
+import '../tasks_popover.dart';
+import '../usage_popover.dart';
 import 'mobile_chrome.dart';
 import 'mission_control/widgets/ambient_stage.dart';
 import 'mobile_shell.dart';
@@ -250,6 +252,12 @@ class _DesktopShellState extends State<DesktopShell>
   /// stays alive, so re-opening is instant.
   bool _rightCollapsed = false;
   bool _leftCollapsed = false;
+
+  /// The full task list shown over the left pane instead of in a tab. It is
+  /// tied to the tab that was active when it opened, so switching tabs closes it.
+  bool _tasksTakeover = false;
+  String? _tasksTakeoverTaskId;
+  String? _tasksTakeoverMark;
 
   /// Terminal tabs the user dismissed from a pane's strip.
   ///

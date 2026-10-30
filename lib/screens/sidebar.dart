@@ -149,17 +149,16 @@ class SidebarState extends State<Sidebar> {
   Map<String, String> _profileProviders = const {};
   String? _providersFor;
 
-  List<(String, RateWindow)> _meters = const [];
   List<CoordinationAgent> _crew = const [];
-  DateTime? _metersAt;
-  Timer? _metersTimer;
+  DateTime? _crewAt;
+  Timer? _crewTimer;
 
-  Future<void> _loadMeters() async {
+  Future<void> _loadCrew() async {
     final client = widget.client;
     if (client == null || kMobile) return;
     final now = DateTime.now();
-    if (_metersAt != null && now.difference(_metersAt!).inSeconds < 60) return;
-    _metersAt = now;
+    if (_crewAt != null && now.difference(_crewAt!).inSeconds < 60) return;
+    _crewAt = now;
     try {
       try {
         final a = await client.coordinationAgents();
@@ -169,98 +168,11 @@ class SidebarState extends State<Sidebar> {
               .toList());
         }
       } catch (_) {}
-      final u = await client.getUsage();
-      if (!mounted) return;
-      final out = <(String, RateWindow)>[];
-      final seen = <String>{};
-      for (final p in u.providers) {
-        final live = p.rateLimits.where((r) => !r.isExpired).toList()
-          ..sort((a, b) => b.usedPercent.compareTo(a.usedPercent));
-        if (live.isEmpty || !seen.add(p.provider)) continue;
-        out.add((p.provider, live.first));
-      }
-      setState(() => _meters = out.take(3).toList());
     } catch (_) {}
   }
 
-  Widget _meterRow(String provider, RateWindow r) {
-    final used = r.usedPercent.clamp(0, 100) / 100;
-    final lit = used <= 0 ? 0 : (used * 10).round().clamp(1, 10);
-    final color = r.leftPercent < 20
-        ? AppColors.danger
-        : switch (_providerName(provider)) {
-            'Claude' => const Color(0xFFD97757),
-            'Gemini' || 'Antigravity' => const Color(0xFF8AB4F8),
-            'ChatGPT' => AppColors.fg2,
-            _ => AppColors.accent,
-          };
-    final reset = rateResetLabel(r.resetsAt);
-    final shortReset = _shortResetToken(r.resetsAt);
-    return Tooltip(
-      message: '${r.usedPercent.round()}% used${reset == null ? '' : ' · $reset'}',
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4),
-        child: Row(children: [
-          SizedBox(
-            width: 70,
-            child: Text(_providerName(provider),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: sans(11.5, color: AppColors.fg3)),
-          ),
-          for (var i = 0; i < 10; i++)
-            Container(
-              width: 5,
-              height: 5,
-              margin: const EdgeInsets.only(right: 3),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: i < lit ? color : AppColors.line,
-              ),
-            ),
-          const Spacer(),
-          Text('${r.usedPercent.round()}%',
-              textAlign: TextAlign.right,
-              style: mono(10.5, color: AppColors.fg4)),
-          if (shortReset.isNotEmpty) ...[
-            Text(' · ', style: mono(10.5, color: AppColors.fg4)),
-            SizedBox(
-              width: 22,
-              child: Text(shortReset,
-                  textAlign: TextAlign.right,
-                  style: mono(10.5, color: AppColors.fg4)),
-            ),
-          ],
-        ]),
-      ),
-    );
-  }
-
-  String _providerName(String p) {
-    final l = p.toLowerCase();
-    if (l.contains('claude') || l.contains('anthropic')) return 'Claude';
-    if (l.contains('openai') || l.contains('codex') || l.contains('gpt')) {
-      return 'ChatGPT';
-    }
-    if (l.contains('antigravity')) return 'Antigravity';
-    if (l.contains('gemini') || l.contains('google')) return 'Gemini';
-    if (l.contains('xai') || l.contains('grok')) return 'Grok';
-    if (l.contains('openrouter')) return 'OpenRouter';
-    return p.isEmpty ? p : p[0].toUpperCase() + p.substring(1);
-  }
-
-  String _shortResetToken(int at) {
-    if (at <= 0) return '';
-    final d = DateTime.fromMillisecondsSinceEpoch(at * 1000)
-        .difference(DateTime.now());
-    if (d.isNegative) return '';
-    if (d.inDays > 0) return '${d.inDays}d';
-    if (d.inHours > 0) return '${d.inHours}h';
-    return '${d.inMinutes}m';
-  }
-
   Future<void> _loadProviders() async {
-    _loadMeters();
+    _loadCrew();
     final client = widget.client;
     if (client == null) return;
     final key = '${client.baseUrl}|${widget.sessions?.length}';
@@ -281,9 +193,9 @@ class SidebarState extends State<Sidebar> {
     Drafts.instance.addListener(_onDrafts);
     _loadProviders();
     if (!kMobile) {
-      _metersTimer = Timer.periodic(const Duration(seconds: 60), (_) {
-        _metersAt = null;
-        _loadMeters();
+      _crewTimer = Timer.periodic(const Duration(seconds: 60), (_) {
+        _crewAt = null;
+        _loadCrew();
       });
     }
     _pageController = PageController(initialPage: widget.mobileHome.index);
@@ -295,7 +207,7 @@ class SidebarState extends State<Sidebar> {
   @override
   void didUpdateWidget(covariant Sidebar oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.client != widget.client) _metersAt = null;
+    if (oldWidget.client != widget.client) _crewAt = null;
     if (oldWidget.client != widget.client ||
         (widget.sessions ?? const <SessionInfo>[]).any((s) =>
             (s.profile ?? '').isNotEmpty &&
@@ -337,7 +249,7 @@ class SidebarState extends State<Sidebar> {
   @override
   void dispose() {
     Drafts.instance.removeListener(_onDrafts);
-    _metersTimer?.cancel();
+    _crewTimer?.cancel();
     _pageController.dispose();
     _renameCtl.dispose();
     _renameFocus.dispose();
@@ -1096,8 +1008,8 @@ class SidebarState extends State<Sidebar> {
                   tooltip: 'New agent',
                   onTap: () async {
                     await _openCreateAgent(ctx);
-                    _metersAt = null;
-                    _loadMeters();
+                    _crewAt = null;
+                    _loadCrew();
                   }),
             ),
           ]),
@@ -1165,13 +1077,6 @@ class SidebarState extends State<Sidebar> {
         decoration: BoxDecoration(
             border: Border(top: BorderSide(color: AppColors.line))),
         child: Column(children: [
-          if (_meters.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(14, 10, 14, 4),
-              child: Column(children: [
-                for (final (p, r) in _meters) _meterRow(p, r),
-              ]),
-            ),
           if (widget.desktopFooter != null) widget.desktopFooter!,
         ]),
       ),

@@ -14,6 +14,7 @@ class ShellSplitView extends StatefulWidget {
     this.sidebarHeader,
     this.sidebarTop,
     this.mainHeader,
+    this.leftTakeover,
     required this.paneWidth,
     required this.leftCollapsed,
     required this.rightCollapsed,
@@ -45,6 +46,9 @@ class ShellSplitView extends StatefulWidget {
   final Widget? sidebarHeader;
   final Widget? sidebarTop;
   final Widget? mainHeader;
+
+  /// Shown over the left pane's body (its tabs stay alive underneath).
+  final Widget? leftTakeover;
   final double paneWidth;
   final bool leftCollapsed;
   final bool rightCollapsed;
@@ -153,6 +157,13 @@ class _ShellSplitViewState extends State<ShellSplitView> {
                 ? widget.rightPanel!
                 : widget.readoutBodyBuilder(readout),
           ),
+      ]);
+    }
+
+    if (p == ShellPane.left && widget.leftTakeover != null) {
+      content = Stack(children: [
+        Offstage(child: content),
+        Positioned.fill(child: widget.leftTakeover!),
       ]);
     }
 
