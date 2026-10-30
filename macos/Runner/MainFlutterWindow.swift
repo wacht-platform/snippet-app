@@ -3004,6 +3004,7 @@ final class NotchHomeView: NSView {
   var onOpenApp: (() -> Void)?
 
   private var attached = true
+  private var wasExpanded = false
   private let wing: CGFloat = 70
   private let background = NotchHomeBackground(frame: .zero)
 
@@ -3114,7 +3115,19 @@ final class NotchHomeView: NSView {
     size: NSSize
   ) {
     self.attached = attached
-    for v in subviews where v !== background { v.removeFromSuperview() }
+    let collapsing = wasExpanded && !expanded
+    wasExpanded = expanded
+    let leaving = subviews.filter { $0 !== background }
+    for v in leaving {
+      if collapsing {
+        NSAnimationContext.runAnimationGroup({ ctx in
+          ctx.duration = 0.12
+          v.animator().alphaValue = 0
+        }, completionHandler: { v.removeFromSuperview() })
+      } else {
+        v.removeFromSuperview()
+      }
+    }
     background.frame = NSRect(origin: .zero, size: size)
     background.configure(attached: attached, height: size.height)
     let radius = min(attached ? 26 : 20, size.height / 2, size.width / 2)
@@ -3125,12 +3138,15 @@ final class NotchHomeView: NSView {
     mask.path = CGPath(roundedRect: maskRect, cornerWidth: radius, cornerHeight: radius, transform: nil)
     layer?.mask = mask
     defer {
-      for v in subviews where v !== background {
+      let delay: TimeInterval = collapsing ? 0.14 : 0
+      for v in subviews where v !== background && !leaving.contains(where: { $0 === v }) {
         v.alphaValue = 0
-        NSAnimationContext.runAnimationGroup { ctx in
-          ctx.duration = 0.24
-          ctx.allowsImplicitAnimation = true
-          v.animator().alphaValue = 1
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+          NSAnimationContext.runAnimationGroup { ctx in
+            ctx.duration = 0.22
+            ctx.allowsImplicitAnimation = true
+            v.animator().alphaValue = 1
+          }
         }
       }
     }
@@ -3464,7 +3480,7 @@ final class NotchHomeController {
     let w: CGFloat
     let h: CGFloat
     if expanded {
-      w = max(hw.size.width + 2 * 70, 340)
+      w = max(hw.size.width + 2 * 90, 380)
       h = min(
         NotchHomeView.expandedHeight(
           model: model, detail: detail, topInset: hw.attached ? hw.size.height : 8),
@@ -3492,8 +3508,10 @@ final class NotchHomeController {
       size: target.size)
     if animated && view.frame.width > 0 {
       NSAnimationContext.runAnimationGroup { ctx in
-        ctx.duration = expanded ? 0.36 : 0.26
-        ctx.timingFunction = CAMediaTimingFunction(controlPoints: 0.2, 1.0, 0.3, 1.0)
+        ctx.duration = expanded ? 0.36 : 0.34
+        ctx.timingFunction = expanded
+          ? CAMediaTimingFunction(controlPoints: 0.2, 1.0, 0.3, 1.0)
+          : CAMediaTimingFunction(controlPoints: 0.4, 0.0, 0.2, 1.0)
         ctx.allowsImplicitAnimation = true
         view.animator().frame = target
       }
