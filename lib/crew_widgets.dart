@@ -138,18 +138,20 @@ class _Bubble extends StatelessWidget {
           child: Padding(
             padding: const EdgeInsets.fromLTRB(4, 10, 4, 8),
             child: Stack(clipBehavior: Clip.none, children: [
-              Column(mainAxisSize: MainAxisSize.min, children: [
-                Opacity(
-                    opacity: idle ? .75 : 1,
-                    child: AgentMochi(e.agent.id, size: 36)),
-                const SizedBox(height: 6),
-                Text(e.agent.displayName,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.center,
-                    style: sans(11.5,
-                        color: idle ? AppColors.fg3 : AppColors.fg1)),
-              ]),
+              SizedBox(
+                  width: double.infinity,
+                  child: Column(mainAxisSize: MainAxisSize.min, children: [
+                    Opacity(
+                        opacity: idle ? .75 : 1,
+                        child: AgentMochi(e.agent.id, size: 36)),
+                    const SizedBox(height: 6),
+                    Text(e.agent.displayName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                        style: sans(11.5,
+                            color: idle ? AppColors.fg3 : AppColors.fg1)),
+                  ])),
               Positioned(
                 right: 2,
                 top: -4,
