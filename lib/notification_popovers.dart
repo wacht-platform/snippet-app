@@ -71,7 +71,7 @@ class _NotificationPopoversState extends State<NotificationPopovers> {
     // Preserve the daemon-facing subtitle used by the notch.
     final kind = payload['kind']?.toString().split('.').last;
     final label = switch (kind) {
-      'idle' => 'Stopped',
+      'idle' => 'Finished · standing by',
       'waiting' => 'Needs your input',
       'error' || 'failed' => 'Failed',
       'done' || 'completed' => 'Completed',

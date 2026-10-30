@@ -420,7 +420,7 @@ class _NotificationMessageCardState extends State<NotificationMessageCard> {
         ),
       'done' || 'completed' => ('done', AppColors.ok),
       'error' || 'failed' => ('failed', AppColors.danger),
-      'idle' => ('stopped', AppColors.fg3),
+      'idle' => ('standing by', AppColors.fg3),
       _ => ('', AppColors.fg4),
     };
 

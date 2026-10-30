@@ -606,7 +606,7 @@ String stoppedSummary(Object? lanes) {
   final names = lanes is List
       ? lanes.map((l) => l.toString().trim()).where((l) => l.isNotEmpty).toList()
       : const <String>[];
-  if (names.isEmpty) return 'Standing by';
+  if (names.isEmpty) return 'Finished · standing by';
   if (names.length == 1) return 'Paused while a lane works: ${names.first}';
   final shown = names.take(2).join(', ');
   final rest = names.length > 2 ? ' +${names.length - 2}' : '';
