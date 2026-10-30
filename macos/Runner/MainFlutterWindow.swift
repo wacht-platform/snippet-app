@@ -2920,39 +2920,15 @@ final class NotchHomeRowView: NSView {
 }
 
 final class NotchHomeBackground: NSView {
-  private var attached = false
-
-  override var isFlipped: Bool { true }
-
-  override func draw(_ dirtyRect: NSRect) {
-    let w = bounds.width
-    let h = bounds.height
-    let r = min(attached ? 26 : 20, h / 2, w / 2)
-    let path = NSBezierPath()
-    if attached {
-      path.move(to: NSPoint(x: 0, y: 0))
-      path.line(to: NSPoint(x: w, y: 0))
-      path.line(to: NSPoint(x: w, y: h - r))
-      path.appendArc(withCenter: NSPoint(x: w - r, y: h - r), radius: r, startAngle: 0, endAngle: 90)
-      path.line(to: NSPoint(x: r, y: h))
-      path.appendArc(withCenter: NSPoint(x: r, y: h - r), radius: r, startAngle: 90, endAngle: 180)
-      path.close()
-    } else {
-      path.appendRoundedRect(bounds, xRadius: r, yRadius: r)
-    }
-    NSColor.black.setFill()
-    path.fill()
+  override init(frame frameRect: NSRect) {
+    super.init(frame: frameRect)
+    wantsLayer = true
+    layer?.backgroundColor = NSColor.black.cgColor
   }
 
-  func configure(attached: Bool, height: CGFloat) {
-    self.attached = attached
-    needsDisplay = true
-  }
+  required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
 
-  override func setFrameSize(_ newSize: NSSize) {
-    super.setFrameSize(newSize)
-    needsDisplay = true
-  }
+  func configure(attached: Bool, height: CGFloat) {}
 }
 
 /// Fixed-size transparent host so the visible shape can animate smoothly inside
@@ -3141,6 +3117,13 @@ final class NotchHomeView: NSView {
     for v in subviews where v !== background { v.removeFromSuperview() }
     background.frame = NSRect(origin: .zero, size: size)
     background.configure(attached: attached, height: size.height)
+    let radius = min(attached ? 26 : 20, size.height / 2, size.width / 2)
+    let maskRect = attached
+      ? CGRect(x: 0, y: -radius, width: size.width, height: size.height + radius)
+      : CGRect(origin: .zero, size: size)
+    let mask = CAShapeLayer()
+    mask.path = CGPath(roundedRect: maskRect, cornerWidth: radius, cornerHeight: radius, transform: nil)
+    layer?.mask = mask
     defer {
       for v in subviews where v !== background {
         v.alphaValue = 0
