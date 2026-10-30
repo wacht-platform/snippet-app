@@ -127,9 +127,7 @@ String _count(int n, String one, String many) => '$n ${n == 1 ? one : many}';
           done: 'Looked at');
     case 'read_coordination_board':
       return (
-        running
-            ? 'Reading the coordination board'
-            : 'Read the coordination board',
+        running ? 'Reading the coordination board' : 'Read the coordination board',
         ''
       );
     case 'read_coordination_thread':
@@ -140,8 +138,7 @@ String _count(int n, String one, String many) => '$n ${n == 1 ? one : many}';
         ''
       );
     case 'read_agent_thread':
-      final peer =
-          arg('agent_id').isNotEmpty ? arg('agent_id') : arg('peer_id');
+      final peer = arg('agent_id').isNotEmpty ? arg('agent_id') : arg('peer_id');
       return peer.isEmpty
           ? (running ? 'Reading an agent thread' : 'Read an agent thread', '')
           : (running ? 'Reading thread with' : 'Read thread with', peer);
@@ -155,26 +152,15 @@ String _count(int n, String one, String many) => '$n ${n == 1 ? one : many}';
           : (running ? 'Messaging' : 'Messaged', to);
     case 'post_coordination_message':
       return (
-        running
-            ? 'Posting to the coordination thread'
-            : 'Posted to the coordination thread',
+        running ? 'Posting to the coordination thread' : 'Posted to the coordination thread',
         ''
       );
     case 'post_task_coordination':
-      return (
-        running ? 'Posting to the task thread' : 'Posted to the task thread',
-        ''
-      );
+      return (running ? 'Posting to the task thread' : 'Posted to the task thread', '');
     case 'message_mission_control':
-      return (
-        running ? 'Messaging Mission Control' : 'Messaged Mission Control',
-        ''
-      );
+      return (running ? 'Messaging Mission Control' : 'Messaged Mission Control', '');
     case 'record_coordination_note':
-      return (
-        running ? 'Recording a note' : 'Recorded a coordination note',
-        ''
-      );
+      return (running ? 'Recording a note' : 'Recorded a coordination note', '');
     case 'create_recurring_job':
       return (running ? 'Scheduling' : 'Scheduled', arg('title'));
     case 'assign_task_agent':
@@ -300,7 +286,10 @@ List<Widget>? coordinationToolBody(
       return [_Markdown(arg('summary'))];
     case 'create_recurring_job':
       return [
-        _Header(title: '', status: '', meta: arg('schedule')),
+        _Header(
+            title: '',
+            status: '',
+            meta: arg('schedule')),
         if (arg('prompt').isNotEmpty)
           _Section('Prompt', _Markdown(arg('prompt'))),
       ];
@@ -408,36 +397,38 @@ class _Header extends StatelessWidget {
       return Text.rich(TextSpan(children: [
         if (status.isNotEmpty)
           TextSpan(
-              text: _statusLabel(status), style: _label(_statusColor(status))),
+              text: _statusLabel(status),
+              style: _label(_statusColor(status))),
         if (status.isNotEmpty && meta.isNotEmpty)
           TextSpan(text: ' · ', style: _label(AppColors.fg3)),
-        if (meta.isNotEmpty) TextSpan(text: meta, style: _label(AppColors.fg3)),
+        if (meta.isNotEmpty)
+          TextSpan(text: meta, style: _label(AppColors.fg3)),
       ]));
     }
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Expanded(
-            child: Text(title,
-                style: sans(kMobile ? 14 : 13,
-                    weight: W.label, color: AppColors.fg1)),
-          ),
-          if (status.isNotEmpty) ...[
-            const SizedBox(width: 10),
-            Padding(
-              padding: const EdgeInsets.only(top: 3),
-              child: Text(_statusLabel(status),
-                  style: _label(_statusColor(status))),
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Expanded(
+              child: Text(title,
+                  style: sans(kMobile ? 14 : 13,
+                      weight: W.label, color: AppColors.fg1)),
             ),
+            if (status.isNotEmpty) ...[
+              const SizedBox(width: 10),
+              Padding(
+                padding: const EdgeInsets.only(top: 3),
+                child: Text(_statusLabel(status),
+                    style: _label(_statusColor(status))),
+              ),
+            ],
+          ]),
+          if (meta.isNotEmpty) ...[
+            const SizedBox(height: 2),
+            Text(meta, style: _label(AppColors.fg3)),
           ],
-        ]),
-        if (meta.isNotEmpty) ...[
-          const SizedBox(height: 2),
-          Text(meta, style: _label(AppColors.fg3)),
         ],
-      ],
-    );
+      );
   }
 }
 

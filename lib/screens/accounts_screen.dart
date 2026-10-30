@@ -249,9 +249,7 @@ class _AccountsScreenState extends State<AccountsScreen> {
             header: _title(provider),
             footer: _footer(provider),
             children: [
-              for (var i = 0;
-                  i < (_accounts[provider] ?? const <Account>[]).length;
-                  i++)
+              for (var i = 0; i < (_accounts[provider] ?? const <Account>[]).length; i++)
                 _row(provider, _accounts[provider]!, i),
               SettingsRow(
                 label: 'Add account',
@@ -330,8 +328,7 @@ class _AccountsScreenState extends State<AccountsScreen> {
     setState(() => _renaming = false);
     if (label.isEmpty || label == account.label) return;
     await _mutate(
-        () =>
-            widget.client.updateAccount(provider, id: account.id, label: label),
+        () => widget.client.updateAccount(provider, id: account.id, label: label),
         provider);
   }
 
@@ -498,15 +495,13 @@ class _AccountsScreenState extends State<AccountsScreen> {
                 size: 28,
                 iconSize: 15,
                 tooltip: 'Move up',
-                onTap:
-                    _busy ? null : () => _move(provider, accounts, index, -1)),
+                onTap: _busy ? null : () => _move(provider, accounts, index, -1)),
           if (index < accounts.length - 1)
             IconBtn('chevron-down',
                 size: 28,
                 iconSize: 15,
                 tooltip: 'Move down',
-                onTap:
-                    _busy ? null : () => _move(provider, accounts, index, 1)),
+                onTap: _busy ? null : () => _move(provider, accounts, index, 1)),
         ],
       ),
       const SizedBox(height: S.s8),
@@ -530,11 +525,13 @@ class _AccountsScreenState extends State<AccountsScreen> {
               : Row(mainAxisSize: MainAxisSize.min, children: [
                   Text(name, style: sans(13, color: AppColors.fg2)),
                   const SizedBox(width: S.s12),
-                  Btn('Rename', variant: BtnVariant.surface, small: true,
+                  Btn('Rename',
+                      variant: BtnVariant.surface,
+                      small: true,
                       onTap: () {
-                    _nameField.text = account.label;
-                    setState(() => _renaming = true);
-                  }),
+                        _nameField.text = account.label;
+                        setState(() => _renaming = true);
+                      }),
                 ]),
         ),
         SettingsRow(
@@ -554,8 +551,7 @@ class _AccountsScreenState extends State<AccountsScreen> {
                   if (usage?.primary != null)
                     _meter(limitWindowLabel(usage!.primary!), usage.primary!),
                   if (usage?.secondary != null)
-                    _meter(
-                        limitWindowLabel(usage!.secondary!), usage.secondary!),
+                    _meter(limitWindowLabel(usage!.secondary!), usage.secondary!),
                 ]),
           ),
         SettingsRow(
@@ -602,10 +598,8 @@ class _AccountsScreenState extends State<AccountsScreen> {
                   padding: const EdgeInsets.only(top: 2),
                   child: Text('Limit reached, $limitedLabel',
                       style: sans(12.5, color: AppColors.danger))),
-            if (usage?.primary != null)
-              _meter(limitWindowLabel(usage!.primary!), usage.primary!),
-            if (usage?.secondary != null)
-              _meter(limitWindowLabel(usage!.secondary!), usage.secondary!),
+            if (usage?.primary != null) _meter(limitWindowLabel(usage!.primary!), usage.primary!),
+            if (usage?.secondary != null) _meter(limitWindowLabel(usage!.secondary!), usage.secondary!),
           ]),
       trailing: Builder(
           builder: (anchor) => IconBtn('more-horizontal',
@@ -630,7 +624,9 @@ class _AccountsScreenState extends State<AccountsScreen> {
                                   label: 'Move down',
                                   icon: 'chevron-down'),
                             appMenuItem(
-                                value: 'rename', label: 'Rename', icon: 'edit'),
+                                value: 'rename',
+                                label: 'Rename',
+                                icon: 'edit'),
                             if (canRemove)
                               appMenuItem(
                                   value: 'remove',
@@ -659,8 +655,7 @@ class _AccountsScreenState extends State<AccountsScreen> {
         padding: const EdgeInsets.only(top: 8),
         child: Row(children: [
           SizedBox(
-              width: 40,
-              child: Text(label, style: sans(12, color: AppColors.fg4))),
+              width: 40, child: Text(label, style: sans(12, color: AppColors.fg4))),
           Expanded(
               child: ClipRRect(
                   borderRadius: BorderRadius.circular(3),

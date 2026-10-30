@@ -57,8 +57,8 @@ void main() {
   testWidgets('notification session replaces chat history and reuses its tab',
       (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
-    DaemonClient.wsConnector =
-        (uri, {connectTimeout, pingInterval}) => _FakeWebSocketChannel();
+    DaemonClient.wsConnector = (uri, {connectTimeout, pingInterval}) =>
+        _FakeWebSocketChannel();
     addTearDown(() => DaemonClient.wsConnector = null);
     try {
       SharedPreferences.setMockInitialValues({
@@ -88,11 +88,7 @@ void main() {
           });
       notify('http://127.0.0.1:9090');
       await pump();
-      expect(
-          tester
-              .widget<MobileShell>(find.byType(MobileShell))
-              .activeTabBody
-              ?.key,
+      expect(tester.widget<MobileShell>(find.byType(MobileShell)).activeTabBody?.key,
           targetBody?.key);
       notify('http://127.0.0.1:9090');
       await pump();
@@ -110,10 +106,8 @@ void main() {
       expect(shell.activeTabBody?.key, isNot(targetBody?.key));
       await tester.binding.handlePopRoute();
       await pump();
-      expect(tester.widget<MobileShell>(find.byType(MobileShell)).chatsOpen,
-          isTrue);
-      expect(tester.widget<MobileShell>(find.byType(MobileShell)).canPopRoute,
-          isFalse);
+      expect(tester.widget<MobileShell>(find.byType(MobileShell)).chatsOpen, isTrue);
+      expect(tester.widget<MobileShell>(find.byType(MobileShell)).canPopRoute, isFalse);
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.pump();
     } finally {
@@ -124,8 +118,8 @@ void main() {
   testWidgets('back from a session opened on Agents returns to Agents',
       (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
-    DaemonClient.wsConnector =
-        (uri, {connectTimeout, pingInterval}) => _FakeWebSocketChannel();
+    DaemonClient.wsConnector = (uri, {connectTimeout, pingInterval}) =>
+        _FakeWebSocketChannel();
     addTearDown(() => DaemonClient.wsConnector = null);
     try {
       SharedPreferences.setMockInitialValues({

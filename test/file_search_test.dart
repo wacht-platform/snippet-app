@@ -77,11 +77,7 @@ void main() {
       '/root': entries,
       for (var i = 0; i < dirs; i++)
         '/root/d$i': [
-          {
-            'name': 'file$i.txt',
-            'path': '/root/d$i/file$i.txt',
-            'is_dir': false
-          },
+          {'name': 'file$i.txt', 'path': '/root/d$i/file$i.txt', 'is_dir': false},
         ],
     });
   }

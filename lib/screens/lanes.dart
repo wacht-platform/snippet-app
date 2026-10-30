@@ -127,9 +127,7 @@ void openLaneView(BuildContext context, LaneInfo lane,
   final daemon = client ?? DaemonScope.maybeOf(context);
   final live = liveLanes ?? () => [lane];
   final transcript = lane.transcript;
-  Widget screen() => daemon != null &&
-          transcript != null &&
-          transcript.isNotEmpty
+  Widget screen() => daemon != null && transcript != null && transcript.isNotEmpty
       ? LaneTranscriptScreen(client: daemon, laneId: lane.id, liveLanes: live)
       : LaneDetailScreen(laneId: lane.id, liveLanes: live);
   if (!kMobile &&
@@ -271,8 +269,8 @@ class _LaneDetailCardState extends State<LaneDetailCard> {
     );
   }
 
-  void _open(BuildContext context) => openLaneView(context, lane,
-      client: widget.client, liveLanes: widget.liveLanes);
+  void _open(BuildContext context) =>
+      openLaneView(context, lane, client: widget.client, liveLanes: widget.liveLanes);
 
   Widget _details(BuildContext context) {
     final sections = <Widget>[];

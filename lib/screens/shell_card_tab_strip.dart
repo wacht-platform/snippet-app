@@ -79,13 +79,15 @@ void showTabContextMenu({
     context: context,
     backgroundColor: AppColors.surface1,
     shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(R.sheetTop))),
+        borderRadius:
+            BorderRadius.vertical(top: Radius.circular(R.sheetTop))),
     builder: (ctx) => SafeArea(
       child: Column(mainAxisSize: MainAxisSize.min, children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(18, 16, 18, 10),
           child: Row(children: [
-            AppIcon(tabIconKind(tab), size: 15, color: AppColors.fg3),
+            AppIcon(tabIconKind(tab),
+                size: 15, color: AppColors.fg3),
             const SizedBox(width: 10),
             Expanded(
               child: Text(tab.title.isEmpty ? '(untitled)' : tab.title,
@@ -101,7 +103,8 @@ void showTabContextMenu({
         if (hasNonMissionControlTabs)
           tabMenuItem(ctx, 'copy', 'Close other tabs', onCloseOthers),
         if (hasNonMissionControlTabs)
-          tabMenuItem(ctx, 'trash', 'Close all tabs', onCloseAll, danger: true),
+          tabMenuItem(ctx, 'trash', 'Close all tabs', onCloseAll,
+              danger: true),
       ]),
     ),
   );
@@ -242,8 +245,7 @@ class CardTabChip extends StatelessWidget {
                     borderRadius: BorderRadius.circular(R.xs),
                   ),
                   child: AppIcon('x',
-                      size: 10,
-                      color: isActive ? AppColors.fg3 : AppColors.fg4),
+                      size: 10, color: isActive ? AppColors.fg3 : AppColors.fg4),
                 ),
               ),
             ],
@@ -345,7 +347,10 @@ class CardTabStrip extends StatelessWidget {
                 onTap: onDownloadFile),
           if (onEditFile != null)
             IconBtn('edit',
-                size: 32, iconSize: 14, tooltip: 'Edit', onTap: onEditFile),
+                size: 32,
+                iconSize: 14,
+                tooltip: 'Edit',
+                onTap: onEditFile),
         ],
       ]),
     );

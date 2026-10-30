@@ -391,8 +391,7 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
             child: Column(mainAxisSize: MainAxisSize.min, children: [
               const WorkingMochi(size: 15),
               Text('${s.lanes.where((l) => l.running).length}',
-                  style: sans(10.5,
-                      weight: W.label, height: 1.1, color: AppColors.fg2)),
+                  style: sans(10.5, weight: W.label, height: 1.1, color: AppColors.fg2)),
             ]),
           ),
           const SizedBox(width: 8),
@@ -844,7 +843,9 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
         }
         presentScreen(context,
             builder: (_, close) => MemoryScreen(
-                client: widget.client, embedded: true, onBack: close));
+                client: widget.client,
+                embedded: true,
+                onBack: close));
         return;
       case 'recurring':
         _openRecurring();
@@ -953,7 +954,9 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
       onCheckpoints: () => navigate!(_showCheckpoints),
       onMemory: () => navigate!(() => presentScreen(context,
           builder: (_, close) => MemoryScreen(
-              client: widget.client, embedded: true, onBack: close))),
+              client: widget.client,
+              embedded: true,
+              onBack: close))),
     );
   }
 

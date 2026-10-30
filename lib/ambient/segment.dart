@@ -5,6 +5,5 @@ class AmbientSegment {
   final DateTime startedAt;
   final Uint8List pcm;
 
-  Duration get duration =>
-      Duration(milliseconds: pcm.length ~/ 2 * 1000 ~/ 16000);
+  Duration get duration => Duration(milliseconds: pcm.length ~/ 2 * 1000 ~/ 16000);
 }

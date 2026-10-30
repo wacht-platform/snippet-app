@@ -32,10 +32,15 @@ Future<String?> showInboundSharePicker({
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: sans(kMobile ? 16 : 14,
-                    weight: t.isMissionControl ? W.label : W.body,
+                    weight: t.isMissionControl
+                        ? W.label
+                        : W.body,
                     color: AppColors.fg1)),
-            subtitle: Text(t.isMissionControl ? machineLabel : 'Open tab',
-                maxLines: 1, overflow: TextOverflow.ellipsis, style: TS.meta()),
+            subtitle: Text(
+                t.isMissionControl ? machineLabel : 'Open tab',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TS.meta()),
             onTap: () => Navigator.pop(
                 context, t.isMissionControl ? 'mission-control' : t.sessionId),
           ),
@@ -43,7 +48,8 @@ Future<String?> showInboundSharePicker({
           ListTile(
             contentPadding: EdgeInsets.zero,
             leading: AppIcon('layers', size: 18, color: AppColors.accent),
-            title: Text('Mission Control', style: TS.sectionTitle()),
+            title: Text('Mission Control',
+                style: TS.sectionTitle()),
             subtitle: Text(machineLabel, style: TS.meta()),
             onTap: () => Navigator.pop(context, 'mission-control'),
           ),

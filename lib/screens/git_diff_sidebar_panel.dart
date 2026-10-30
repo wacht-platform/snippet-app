@@ -203,63 +203,58 @@ class _GitDiffSidebarPanelState extends State<GitDiffSidebarPanel> {
         widget.onOpenPullRequest != null &&
         (widget.sessionId ?? '').isNotEmpty;
     final showPrs = tabbed && widget.tab == 'prs';
-    final changes = LayoutBuilder(
-        builder: (context, box) => PullToRefresh(
-              onRefresh: refresh,
-              child: Container(
-                color: kMobile ? AppColors.bg : Colors.transparent,
-                child: ListView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: EdgeInsets.only(top: kMobile ? 8 : 0, bottom: 16),
-                  children: [
-                    if (!tabbed)
-                      ShellSectionHeader(
-                        label: 'Git Diff',
-                        leading: widget.header,
-                      ),
-                    if (notRepo)
-                      SizedBox(
-                        height: (box.maxHeight - 80).clamp(260.0, 640.0),
-                        child: _notRepoState(repoName),
-                      )
-                    else ...[
-                      _branchRow(repoName, branch, files.length),
-                      if (_loading && _status == null)
-                        const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 24),
-                          child: Center(
-                            child: Spinner(size: 18),
-                          ),
-                        )
-                      else if (_error != null)
-                        _errorState()
-                      else if (isClean)
-                        SizedBox(
-                          height: (box.maxHeight - 120).clamp(240.0, 640.0),
-                          child: _cleanState(),
-                        )
-                      else ...[
-                        if (!kMobile && (widget.sessionId ?? '').isNotEmpty)
-                          _commitBox(files.length),
-                        if (!kMobile)
-                          _changedHeader()
-                        else
-                          const SizedBox(height: 6),
-                        for (final f in files) _fileRow(f),
-                      ],
-                    ],
-                  ],
-                ),
+    final changes = LayoutBuilder(builder: (context, box) => PullToRefresh(
+      onRefresh: refresh,
+      child: Container(
+        color: kMobile ? AppColors.bg : Colors.transparent,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: EdgeInsets.only(top: kMobile ? 8 : 0, bottom: 16),
+          children: [
+            if (!tabbed)
+              ShellSectionHeader(
+                label: 'Git Diff',
+                leading: widget.header,
               ),
-            ));
+            if (notRepo)
+              SizedBox(
+                height: (box.maxHeight - 80).clamp(260.0, 640.0),
+                child: _notRepoState(repoName),
+              )
+            else ...[
+            _branchRow(repoName, branch, files.length),
+            if (_loading && _status == null)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 24),
+                child: Center(
+                  child: Spinner(size: 18),
+                ),
+              )
+            else if (_error != null)
+              _errorState()
+            else if (isClean)
+              SizedBox(
+                height: (box.maxHeight - 120).clamp(240.0, 640.0),
+                child: _cleanState(),
+              )
+            else ...[
+              if (!kMobile && (widget.sessionId ?? '').isNotEmpty)
+                _commitBox(files.length),
+              if (!kMobile) _changedHeader() else const SizedBox(height: 6),
+              for (final f in files) _fileRow(f),
+            ],
+            ],
+          ],
+        ),
+      ),
+    ));
     if (!tabbed) return changes;
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Container(
         height: 38,
         padding: const EdgeInsets.fromLTRB(10, 2, 8, 2),
         child: Row(children: [
-          _tabChip('changes',
-              files.isEmpty ? 'Changes' : 'Changes  ${files.length}'),
+          _tabChip('changes', files.isEmpty ? 'Changes' : 'Changes  ${files.length}'),
           _tabChip('prs', 'Pull requests'),
         ]),
       ),
@@ -312,8 +307,7 @@ class _GitDiffSidebarPanelState extends State<GitDiffSidebarPanel> {
     if (sid == null) return;
     final ok = await confirmAction(context,
         title: 'Stash changes?',
-        body:
-            'Moves uncommitted changes to the git stash. Bring them back with git stash pop.',
+        body: 'Moves uncommitted changes to the git stash. Bring them back with git stash pop.',
         confirmLabel: 'Stash',
         danger: false);
     if (!ok) return;
@@ -350,8 +344,7 @@ class _GitDiffSidebarPanelState extends State<GitDiffSidebarPanel> {
     setState(() => _opening = true);
     try {
       final url = await widget.client.createPr(sid);
-      if (mounted)
-        toast(context, url.isEmpty ? 'Pull request opened' : 'Opened $url');
+      if (mounted) toast(context, url.isEmpty ? 'Pull request opened' : 'Opened $url');
     } catch (e) {
       if (mounted) toast(context, '$e', danger: true);
     } finally {
@@ -383,8 +376,8 @@ class _GitDiffSidebarPanelState extends State<GitDiffSidebarPanel> {
               hoverColor: Colors.transparent,
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                child:
-                    Text('Discard all', style: sans(12, color: AppColors.fg3)),
+                child: Text('Discard all',
+                    style: sans(12, color: AppColors.fg3)),
               ),
             ),
           ],
@@ -446,8 +439,7 @@ class _GitDiffSidebarPanelState extends State<GitDiffSidebarPanel> {
 
   Widget _commitBox(int count) => Padding(
         padding: const EdgeInsets.fromLTRB(12, 6, 12, 8),
-        child:
-            Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Container(
             decoration: BoxDecoration(
               color: AppColors.surface1,
@@ -485,51 +477,49 @@ class _GitDiffSidebarPanelState extends State<GitDiffSidebarPanel> {
           ),
           const SizedBox(height: 10),
           if (!kMobile)
-            LayoutBuilder(
-                builder: (context, box) => Row(children: [
-                      Expanded(
-                        child: _deskPill(
-                            _committing
-                                ? 'Committing…'
-                                : 'Commit $count file${count == 1 ? '' : 's'}',
-                            light: true,
-                            disabled:
-                                _commitCtl.text.trim().isEmpty || _committing,
-                            onTap: _commit),
-                      ),
-                      const SizedBox(width: 8),
-                      _roundBtn('upload', _pushing ? 'Pushing…' : 'Push',
-                          _pushing ? null : _push),
-                      const SizedBox(width: 6),
-                      box.maxWidth < 300
-                          ? _roundBtn('git-pull-request-arrow', 'Open PR',
-                              _opening ? null : _openPr)
-                          : _deskPill(_opening ? 'Opening…' : 'Open PR',
-                              light: false,
-                              icon: 'git-pull-request-arrow',
-                              disabled: _opening,
-                              onTap: _openPr),
-                    ]))
-          else
-            Row(children: [
+            LayoutBuilder(builder: (context, box) => Row(children: [
               Expanded(
-                child: Btn(
-                  _committing
-                      ? 'Committing…'
-                      : 'Commit $count file${count == 1 ? '' : 's'}',
-                  variant: BtnVariant.primary,
-                  full: true,
-                  disabled: _commitCtl.text.trim().isEmpty || _committing,
-                  onTap: _commit,
-                ),
+                child: _deskPill(
+                    _committing
+                        ? 'Committing…'
+                        : 'Commit $count file${count == 1 ? '' : 's'}',
+                    light: true,
+                    disabled: _commitCtl.text.trim().isEmpty || _committing,
+                    onTap: _commit),
               ),
               const SizedBox(width: 8),
-              Btn(_pushing ? 'Pushing…' : 'Push',
-                  variant: BtnVariant.secondary,
-                  icon: 'upload',
-                  disabled: _pushing,
-                  onTap: _push),
-            ]),
+              _roundBtn('upload', _pushing ? 'Pushing…' : 'Push',
+                  _pushing ? null : _push),
+              const SizedBox(width: 6),
+              box.maxWidth < 300
+                  ? _roundBtn('git-pull-request-arrow', 'Open PR',
+                      _opening ? null : _openPr)
+                  : _deskPill(_opening ? 'Opening…' : 'Open PR',
+                      light: false,
+                      icon: 'git-pull-request-arrow',
+                      disabled: _opening,
+                      onTap: _openPr),
+            ]))
+          else
+          Row(children: [
+            Expanded(
+              child: Btn(
+                _committing
+                    ? 'Committing…'
+                    : 'Commit $count file${count == 1 ? '' : 's'}',
+                variant: BtnVariant.primary,
+                full: true,
+                disabled: _commitCtl.text.trim().isEmpty || _committing,
+                onTap: _commit,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Btn(_pushing ? 'Pushing…' : 'Push',
+                variant: BtnVariant.secondary,
+                icon: 'upload',
+                disabled: _pushing,
+                onTap: _push),
+          ]),
         ]),
       );
 
@@ -556,9 +546,8 @@ class _GitDiffSidebarPanelState extends State<GitDiffSidebarPanel> {
 
   /// Branch + change count on one flat row. Tapping the row opens the same
   /// local/remote branch picker used by the full Git screen.
-  Widget _branchRow(String repoName, String branch, int changes) => kMobile
-      ? _branchRowMobile(repoName, branch, changes)
-      : _branchRowDesk(repoName, branch);
+  Widget _branchRow(String repoName, String branch, int changes) =>
+      kMobile ? _branchRowMobile(repoName, branch, changes) : _branchRowDesk(repoName, branch);
 
   Widget _branchRowDesk(String repoName, String branch) {
     final st = _status;
@@ -590,8 +579,7 @@ class _GitDiffSidebarPanelState extends State<GitDiffSidebarPanel> {
     );
   }
 
-  Widget _branchRowMobile(String repoName, String branch, int changes) =>
-      Padding(
+  Widget _branchRowMobile(String repoName, String branch, int changes) => Padding(
         padding: kMobile
             ? const EdgeInsets.fromLTRB(12, 4, 12, 6)
             : const EdgeInsets.fromLTRB(8, 2, 8, 4),
@@ -606,17 +594,14 @@ class _GitDiffSidebarPanelState extends State<GitDiffSidebarPanel> {
                 height: kMobile ? 36 : 30,
                 padding: const EdgeInsets.symmetric(horizontal: kNavPadH),
                 child: Row(children: [
-                  AppIcon('git-branch',
-                      size: kMobile ? 14 : 13, color: AppColors.accent),
+                  AppIcon('git-branch', size: kMobile ? 14 : 13, color: AppColors.accent),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       branch.isEmpty ? repoName : branch,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: kMobile
-                          ? TS.label(AppColors.fg1)
-                          : sans(13, color: AppColors.fg1),
+                      style: kMobile ? TS.label(AppColors.fg1) : sans(13, color: AppColors.fg1),
                     ),
                   ),
                   if (changes > 0) ...[

@@ -47,42 +47,42 @@ class TerminalsSidebarPanel extends StatelessWidget {
 
     final folder = lastPathSegment(displayPath, ifEmpty: displayPath);
     final head = <Widget>[
-      ShellSectionHeader(
-        label: 'Terminals',
-        actions: [
-          ShellSectionAction(
-            icon: 'plus',
-            tooltip: 'New terminal',
-            onTap: onNewTerminal,
+          ShellSectionHeader(
+            label: 'Terminals',
+            actions: [
+              ShellSectionAction(
+                icon: 'plus',
+                tooltip: 'New terminal',
+                onTap: onNewTerminal,
+              ),
+            ],
           ),
-        ],
-      ),
-      // The session's working directory, same flat 32px row the file tree
-      // and git panels use for their context line.
-      Padding(
-        padding: const EdgeInsets.symmetric(horizontal: kSidebarContentInset),
-        child: Container(
-          height: 32,
-          padding: const EdgeInsets.symmetric(horizontal: kNavPadH),
-          child: Row(children: [
-            AppIcon('folder-open', size: 14, color: AppColors.fg3),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(displayPath,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: mono(11, color: AppColors.fg3)),
+          // The session's working directory, same flat 32px row the file tree
+          // and git panels use for their context line.
+          Padding(
+            padding:
+                const EdgeInsets.symmetric(horizontal: kSidebarContentInset),
+            child: Container(
+              height: 32,
+              padding: const EdgeInsets.symmetric(horizontal: kNavPadH),
+              child: Row(children: [
+                AppIcon('folder-open', size: 14, color: AppColors.fg3),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(displayPath,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: mono(11, color: AppColors.fg3)),
+                ),
+              ]),
             ),
-          ]),
-        ),
-      ),
+          ),
     ];
     if (terminals.isEmpty) {
       return Container(
         color: kMobile ? AppColors.bg : Colors.transparent,
         padding: EdgeInsets.only(top: kMobile ? 8 : 0),
-        child:
-            Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           ...head,
           Expanded(
             child: EmptyState(

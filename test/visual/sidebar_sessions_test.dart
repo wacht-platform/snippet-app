@@ -28,8 +28,7 @@ void main() {
       ),
     ));
     await tester.pump(const Duration(milliseconds: 120));
-    await expectGolden(
-        tester, find.byType(MaterialApp), 'goldens/sidebar_sessions.png');
+    await expectGolden(tester, find.byType(MaterialApp), 'goldens/sidebar_sessions.png');
   });
 }
 

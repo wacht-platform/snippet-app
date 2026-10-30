@@ -358,8 +358,7 @@ String _roundTime(String raw) {
 
 AutonomousRound? parseAutonomousRound(String text) {
   final t = text.trim();
-  if (!t.startsWith('[automated_wake]') &&
-      !t.startsWith('[autonomous_round]')) {
+  if (!t.startsWith('[automated_wake]') && !t.startsWith('[autonomous_round]')) {
     return null;
   }
   final lines = t.split('\n');
@@ -378,7 +377,8 @@ AutonomousRound? parseAutonomousRound(String text) {
       final line = l.trim();
       if (line.startsWith('## ') ||
           line.startsWith('[/automated_wake]') ||
-          line.startsWith('[/autonomous_round]')) break;
+          line.startsWith('[/autonomous_round]'))
+        break;
       if (line.startsWith('- ')) items.add(line.substring(2));
     }
     return items;
@@ -386,9 +386,8 @@ AutonomousRound? parseAutonomousRound(String text) {
 
   return AutonomousRound(
     time: _roundTime(field('time')),
-    firstRound:
-        (field('last wake').isEmpty ? field('last round') : field('last wake'))
-            .startsWith('never'),
+    firstRound: (field('last wake').isEmpty ? field('last round') : field('last wake'))
+        .startsWith('never'),
     quiet: field('quiet hours').startsWith('yes'),
     changed: [
       ...section('Changed since last wake'),
@@ -396,10 +395,7 @@ AutonomousRound? parseAutonomousRound(String text) {
     ].map(_taskLine).toList(),
     open: section('Open work').map(_taskLine).toList(),
     due: [...section('Wake-ups due now'), ...section('Follow-ups due now')],
-    scheduled: [
-      ...section('Wake-ups scheduled'),
-      ...section('Follow-ups scheduled')
-    ],
+    scheduled: [...section('Wake-ups scheduled'), ...section('Follow-ups scheduled')],
   );
 }
 
@@ -679,47 +675,34 @@ class AmbientTurn {
   final String expects;
 }
 
-String _unescapeXml(String s) => s
-    .replaceAll('&lt;', '<')
-    .replaceAll('&gt;', '>')
-    .replaceAll('&quot;', '"')
-    .replaceAll('&amp;', '&');
+String _unescapeXml(String s) =>
+    s.replaceAll('&lt;', '<').replaceAll('&gt;', '>').replaceAll('&quot;', '"').replaceAll('&amp;', '&');
 
 String? voiceClassifierNote(String agentId, String body) {
   if (agentId != 'voice classifier' && agentId != 'ambient mode') return null;
   final text = body.trim();
-  final mode =
-      RegExp(r'^Ambient mode is now (\w+) \((.*)\)\.?$').firstMatch(text);
+  final mode = RegExp(r'^Ambient mode is now (\w+) \((.*)\)\.?$').firstMatch(text);
   if (mode != null) {
-    final reason =
-        (mode.group(2) ?? '').replaceFirst(RegExp(r'^mission_control:\s*'), '');
-    final label = mode.group(1) == 'active'
-        ? 'Voice conversation started'
-        : 'Back to passive listening';
+    final reason = (mode.group(2) ?? '').replaceFirst(RegExp(r'^mission_control:\s*'), '');
+    final label = mode.group(1) == 'active' ? 'Voice conversation started' : 'Back to passive listening';
     return reason.isEmpty ? label : '$label · $reason';
   }
   return 'Noted for later: $text';
 }
 
 AmbientTurn? parseAmbientTurn(String text) {
-  final match =
-      RegExp(r'^\s*<ambient_turn([^>]*)>([\s\S]*?)</ambient_turn>\s*$')
-          .firstMatch(text);
+  final match = RegExp(r'^\s*<ambient_turn([^>]*)>([\s\S]*?)</ambient_turn>\s*$').firstMatch(text);
   if (match == null) return null;
   final attrs = <String, String>{
-    for (final m in RegExp(r'(\w+)="([^"]*)"').allMatches(match.group(1) ?? ''))
-      m.group(1)!: _unescapeXml(m.group(2) ?? ''),
+    for (final m in RegExp(r'(\w+)="([^"]*)"').allMatches(match.group(1) ?? '')) m.group(1)!: _unescapeXml(m.group(2) ?? ''),
   };
   final raw = match.group(2) ?? '';
-  final contextBlock =
-      RegExp(r'<context>([\s\S]*?)</context>').firstMatch(raw)?.group(1) ?? '';
+  final contextBlock = RegExp(r'<context>([\s\S]*?)</context>').firstMatch(raw)?.group(1) ?? '';
   final context = [
     for (final line in _unescapeXml(contextBlock).split('\n'))
-      if (line.trim().isNotEmpty)
-        line.replaceFirst(RegExp(r'^\[earlier, not sent\]\s*'), '').trim(),
+      if (line.trim().isNotEmpty) line.replaceFirst(RegExp(r'^\[earlier, not sent\]\s*'), '').trim(),
   ];
-  final body = _unescapeXml(
-      raw.replaceAll(RegExp(r'<(recent_speech|context)>[\s\S]*?</\1>'), ''));
+  final body = _unescapeXml(raw.replaceAll(RegExp(r'<(recent_speech|context)>[\s\S]*?</\1>'), ''));
   return AmbientTurn(
     device: attrs['device'] ?? '',
     at: DateTime.tryParse(attrs['at'] ?? '')?.toLocal(),
@@ -738,16 +721,11 @@ AmbientTurn? parseAmbientTurn(String text) {
   );
 }
 
-List<String> _idList(String? raw) => [
-      for (final s in (raw ?? '').split(','))
-        if (s.trim().isNotEmpty) s.trim()
-    ];
+List<String> _idList(String? raw) =>
+    [for (final s in (raw ?? '').split(',')) if (s.trim().isNotEmpty) s.trim()];
 
-String _spokenKey(String s) => s
-    .toLowerCase()
-    .replaceAll(RegExp(r'[^a-z0-9 ]'), '')
-    .replaceAll(RegExp(r' +'), ' ')
-    .trim();
+String _spokenKey(String s) =>
+    s.toLowerCase().replaceAll(RegExp(r'[^a-z0-9 ]'), '').replaceAll(RegExp(r' +'), ' ').trim();
 
 /// Ambient turn ids whose words a later continuation repeats in full, so the
 /// earlier bubble can be dropped.
@@ -760,8 +738,7 @@ Set<String> supersededAmbientTurns(Iterable<String> texts) {
     final key = _spokenKey(turn.text);
     for (final parent in turn.continuationOf) {
       final prev = byId[parent];
-      if (prev != null && prev.isNotEmpty && key.startsWith(prev))
-        out.add(parent);
+      if (prev != null && prev.isNotEmpty && key.startsWith(prev)) out.add(parent);
     }
     for (final id in turn.ids) {
       byId[id] = key;
@@ -770,8 +747,7 @@ Set<String> supersededAmbientTurns(Iterable<String> texts) {
   return out;
 }
 
-bool isAmbientResume(String text) =>
-    text.trimLeft().startsWith('<ambient_resume>');
+bool isAmbientResume(String text) => text.trimLeft().startsWith('<ambient_resume>');
 
 /// Project harness events into the Mission Control chat feed.
 List<FeedItem> feedItemsFromEvents(List<Map<String, dynamic>> events) {
@@ -872,8 +848,7 @@ List<FeedItem> feedItemsFromEvents(List<Map<String, dynamic>> events) {
         ));
       case 'agent_message':
         if (e['outbound'] == true) break;
-        final note = voiceClassifierNote(
-            (e['agent_id'] ?? '').toString(), (e['body'] ?? '').toString());
+        final note = voiceClassifierNote((e['agent_id'] ?? '').toString(), (e['body'] ?? '').toString());
         if (note == null) break;
         out.add(SystemNoteItem(id: 'h-n-$i', timestamp: now, text: note));
       case 'model_error':

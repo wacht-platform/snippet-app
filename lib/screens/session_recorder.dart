@@ -2,8 +2,9 @@ part of 'session.dart';
 
 var _maxRecordingDuration = const Duration(minutes: 3);
 
-String _limitLabel(Duration d) =>
-    d.inSeconds % 60 == 0 ? '${d.inMinutes}-minute' : '${d.inSeconds}-second';
+String _limitLabel(Duration d) => d.inSeconds % 60 == 0
+    ? '${d.inMinutes}-minute'
+    : '${d.inSeconds}-second';
 
 extension _SessionScreenRecorderExt on _SessionScreenState {
   Future<void> _onAttachTap() async {
@@ -69,9 +70,10 @@ extension _SessionScreenRecorderExt on _SessionScreenState {
       return;
     }
     try {
-      final voice =
-          (await widget.client.getConfig().timeout(const Duration(seconds: 3)))
-              .voice;
+      final voice = (await widget.client
+              .getConfig()
+              .timeout(const Duration(seconds: 3)))
+          .voice;
       if (!voice.enabled) {
         if (mounted) _setState(() => _isRecording = false);
         _toast('Voice notes are turned off in Settings → Voice.');
@@ -118,8 +120,7 @@ extension _SessionScreenRecorderExt on _SessionScreenState {
         if (next >= _maxRecordingDuration) {
           _setState(() => _recordingElapsed = _maxRecordingDuration);
           unawaited(_stopRecording());
-          _toast(
-              'Recording stopped at the ${_limitLabel(_maxRecordingDuration)} limit.');
+          _toast('Recording stopped at the ${_limitLabel(_maxRecordingDuration)} limit.');
         } else {
           _recordingElapsed = next;
           _recorderTick.value++;
@@ -171,8 +172,7 @@ extension _SessionScreenRecorderExt on _SessionScreenState {
   /// Wait until [path] exists and is non-empty. AVCaptureAudioFileOutput on
   /// macOS writes the container asynchronously after stopRecording().
   Future<Uint8List?> _waitForRecordingFile(String path) async {
-    final file =
-        File(path.startsWith('file://') ? Uri.parse(path).toFilePath() : path);
+    final file = File(path.startsWith('file://') ? Uri.parse(path).toFilePath() : path);
     const attempts = 120; // ~6s
     for (var i = 0; i < attempts; i++) {
       try {
@@ -195,8 +195,7 @@ extension _SessionScreenRecorderExt on _SessionScreenState {
       } else if (_audioPlayer.state == PlayerState.paused) {
         await _audioPlayer.resume();
       } else {
-        await _audioPlayer.play(DeviceFileSource(path),
-            position: _playbackPosition);
+        await _audioPlayer.play(DeviceFileSource(path), position: _playbackPosition);
       }
     } catch (e) {
       _toast('Could not play recording: $e');
@@ -304,8 +303,8 @@ extension _SessionScreenRecorderExt on _SessionScreenState {
     final total = _playbackDuration > Duration.zero
         ? _playbackDuration
         : _recordingElapsed;
-    final showPosition =
-        reviewing && (_isPlayingRecording || _playbackPosition > Duration.zero);
+    final showPosition = reviewing &&
+        (_isPlayingRecording || _playbackPosition > Duration.zero);
     final time = !reviewing
         ? _audioTime(_recordingElapsed)
         : '${_audioTime(showPosition ? _playbackPosition : Duration.zero)} / ${_audioTime(total)}';
@@ -329,8 +328,7 @@ extension _SessionScreenRecorderExt on _SessionScreenState {
 
   Future<void> _seekRecording(double fraction, Duration total) async {
     if (total <= Duration.zero) return;
-    final target =
-        Duration(milliseconds: (total.inMilliseconds * fraction).round());
+    final target = Duration(milliseconds: (total.inMilliseconds * fraction).round());
     try {
       if (_audioPlayer.state == PlayerState.stopped ||
           _audioPlayer.state == PlayerState.completed) {

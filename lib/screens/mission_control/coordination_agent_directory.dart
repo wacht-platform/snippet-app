@@ -174,7 +174,9 @@ class _CoordinationAgentDirectoryState
                         width: 8,
                         height: 8,
                         decoration: BoxDecoration(
-                          color: a.available ? AppColors.ok : AppColors.fg4,
+                          color: a.available
+                              ? AppColors.ok
+                              : AppColors.fg4,
                           shape: BoxShape.circle,
                         ),
                       ),

@@ -10,8 +10,7 @@ class StreamDone {
 }
 
 class AmbientStream {
-  AmbientStream(
-      {required this.baseUrl, required this.token, required this.device});
+  AmbientStream({required this.baseUrl, required this.token, required this.device});
 
   final String baseUrl;
   final String token;
@@ -52,10 +51,7 @@ class AmbientStream {
 
   void _scheduleRetry() {
     if (!_keep || _closed || _retry?.isActive == true) return;
-    _retry = Timer(
-        Duration(
-            milliseconds:
-                (500 * (1 << _failures.clamp(0, 5))).clamp(500, 15000)), () {
+    _retry = Timer(Duration(milliseconds: (500 * (1 << _failures.clamp(0, 5))).clamp(500, 15000)), () {
       _failures++;
       unawaited(_socket());
     });
@@ -70,8 +66,7 @@ class AmbientStream {
         path: '/ambient/stream',
         queryParameters: {'token': token, 'device': device},
       );
-      final ws = await WebSocket.connect(uri.toString())
-          .timeout(const Duration(seconds: 8));
+      final ws = await WebSocket.connect(uri.toString()).timeout(const Duration(seconds: 8));
       ws.pingInterval = const Duration(seconds: 20);
       ws.listen(
         (data) => _onMessage(data),
@@ -99,8 +94,7 @@ class AmbientStream {
     if (data is List<int>) {
       if (data.length < 6) return;
       final bytes = data is Uint8List ? data : Uint8List.fromList(data);
-      final turn =
-          ByteData.sublistView(bytes, 0, 4).getUint32(0, Endian.little);
+      final turn = ByteData.sublistView(bytes, 0, 4).getUint32(0, Endian.little);
       onTtsFrame?.call(turn, Uint8List.sublistView(bytes, 4));
       return;
     }
@@ -146,20 +140,17 @@ class AmbientStream {
     } catch (_) {}
   }
 
-  Future<bool> start(int h, String id, int seq, DateTime startedAt,
-      {bool backlog = false}) async {
+  Future<bool> start(int h, String id, int seq, DateTime startedAt, {bool backlog = false}) async {
     final ws = await _socket();
     if (ws == null) return false;
-    _send(
-        ws,
-        jsonEncode({
-          't': 'start',
-          'h': h,
-          'id': id,
-          'seq': seq,
-          'started_at': startedAt.toUtc().toIso8601String(),
-          if (backlog) 'backlog': true,
-        }));
+    _send(ws, jsonEncode({
+      't': 'start',
+      'h': h,
+      'id': id,
+      'seq': seq,
+      'started_at': startedAt.toUtc().toIso8601String(),
+      if (backlog) 'backlog': true,
+    }));
     return true;
   }
 
@@ -180,22 +171,18 @@ class AmbientStream {
     _send(ws, out);
   }
 
-  Future<StreamDone> end(int h, String id,
-      {required int durationMs, required int bytes}) {
+  Future<StreamDone> end(int h, String id, {required int durationMs, required int bytes}) {
     final ws = _ws;
-    if (ws == null || ws.readyState != WebSocket.open)
-      return Future.value(StreamDone(0, 'connection lost'));
+    if (ws == null || ws.readyState != WebSocket.open) return Future.value(StreamDone(0, 'connection lost'));
     final done = Completer<StreamDone>();
     _waiting[h] = done;
-    _send(
-        ws,
-        jsonEncode({
-          't': 'end',
-          'h': h,
-          'id': id,
-          'duration_ms': durationMs,
-          'bytes': bytes,
-        }));
+    _send(ws, jsonEncode({
+      't': 'end',
+      'h': h,
+      'id': id,
+      'duration_ms': durationMs,
+      'bytes': bytes,
+    }));
     return done.future.timeout(const Duration(seconds: 40), onTimeout: () {
       _waiting.remove(h);
       return StreamDone(0, 'timeout');
@@ -205,57 +192,42 @@ class AmbientStream {
   bool openStream(int h, DateTime startedAt) {
     final ws = _ws;
     if (ws == null || ws.readyState != WebSocket.open) return false;
-    _send(
-        ws,
-        jsonEncode({
-          't': 'open',
-          'h': h,
-          'started_at': startedAt.toUtc().toIso8601String()
-        }));
+    _send(ws, jsonEncode({'t': 'open', 'h': h, 'started_at': startedAt.toUtc().toIso8601String()}));
     return true;
   }
 
   void closeStream(int h) {
     final ws = _ws;
-    if (ws != null && ws.readyState == WebSocket.open)
-      _send(ws, jsonEncode({'t': 'close', 'h': h}));
+    if (ws != null && ws.readyState == WebSocket.open) _send(ws, jsonEncode({'t': 'close', 'h': h}));
   }
 
   void flag(String kind, bool on) {
     final ws = _ws;
-    if (ws != null && ws.readyState == WebSocket.open)
-      _send(ws, jsonEncode({'t': kind, 'on': on}));
+    if (ws != null && ws.readyState == WebSocket.open) _send(ws, jsonEncode({'t': kind, 'on': on}));
   }
 
   void abort(int h) {
     final ws = _ws;
-    if (ws != null && ws.readyState == WebSocket.open)
-      _send(ws, jsonEncode({'t': 'abort', 'h': h}));
+    if (ws != null && ws.readyState == WebSocket.open) _send(ws, jsonEncode({'t': 'abort', 'h': h}));
   }
 
   void stat(Map<String, Object> values) {
     final ws = _ws;
     if (ws != null && ws.readyState == WebSocket.open) {
-      _send(
-          ws,
-          jsonEncode({
-            't': 'stat',
-            ...values,
-            'mic_frame_seq': _micFrameSeq,
-            'mic_send_elapsed_ms': DateTime.now()
-                .difference(_connectedAt ?? DateTime.now())
-                .inMilliseconds,
-            'mic_max_gap_ms': _maxMicGapMs,
-          }));
+      _send(ws, jsonEncode({
+        't': 'stat',
+        ...values,
+        'mic_frame_seq': _micFrameSeq,
+        'mic_send_elapsed_ms': DateTime.now().difference(_connectedAt ?? DateTime.now()).inMilliseconds,
+        'mic_max_gap_ms': _maxMicGapMs,
+      }));
       _maxMicGapMs = 0;
     }
   }
 
   void ttsPos(int turn, int ms, bool done) {
     final ws = _ws;
-    if (ws != null && ws.readyState == WebSocket.open)
-      _send(ws,
-          jsonEncode({'t': 'tts_pos', 'turn': turn, 'ms': ms, 'done': done}));
+    if (ws != null && ws.readyState == WebSocket.open) _send(ws, jsonEncode({'t': 'tts_pos', 'turn': turn, 'ms': ms, 'done': done}));
   }
 
   void close() {

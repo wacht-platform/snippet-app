@@ -51,8 +51,7 @@ Future<(String, String)> ambientDeviceIdentity() async {
 
 class AmbientUploader {
   final http.Client _client = http.Client();
-  late final AmbientStream _stream =
-      AmbientStream(baseUrl: baseUrl, token: token, device: device);
+  late final AmbientStream _stream = AmbientStream(baseUrl: baseUrl, token: token, device: device);
 
   AmbientStream get stream => _stream;
   AmbientUploader({
@@ -94,8 +93,7 @@ class AmbientUploader {
   Future<void> start() async {
     final prefs = await SharedPreferences.getInstance();
     final key = 'ambient_seq_$device';
-    _seqCounter = max(
-        prefs.getInt(key) ?? 0, DateTime.now().millisecondsSinceEpoch ~/ 1000);
+    _seqCounter = max(prefs.getInt(key) ?? 0, DateTime.now().millisecondsSinceEpoch ~/ 1000);
     await _refreshCount();
     _heartbeat = Timer.periodic(const Duration(seconds: 15), (_) => _beat());
     _wire();
@@ -104,12 +102,10 @@ class AmbientUploader {
   }
 
   Future<int> _nextSeq() {
-    final next =
-        max(_seqCounter, DateTime.now().millisecondsSinceEpoch ~/ 1000) + 1;
+    final next = max(_seqCounter, DateTime.now().millisecondsSinceEpoch ~/ 1000) + 1;
     _seqCounter = next;
     final key = 'ambient_seq_$device';
-    unawaited(SharedPreferences.getInstance()
-        .then((prefs) => prefs.setInt(key, next)));
+    unawaited(SharedPreferences.getInstance().then((prefs) => prefs.setInt(key, next)));
     return Future.value(next);
   }
 
@@ -223,16 +219,14 @@ class AmbientUploader {
   Future<void> _beat() async {
     if (_closed || displaced.value) return;
     try {
-      final uri = Uri.parse(baseUrl)
-          .replace(path: '/ambient/lease', queryParameters: {'token': token});
+      final uri = Uri.parse(baseUrl).replace(path: '/ambient/lease', queryParameters: {'token': token});
       final response = await _client
           .post(uri,
               headers: {'content-type': 'application/json'},
               body: jsonEncode({'device': device, 'label': label}))
           .timeout(const Duration(seconds: 10));
       if (response.statusCode == 200 &&
-          (jsonDecode(response.body) as Map<String, dynamic>)['held'] ==
-              false) {
+          (jsonDecode(response.body) as Map<String, dynamic>)['held'] == false) {
         await _giveUp();
       }
     } catch (e) {
@@ -253,8 +247,7 @@ class AmbientUploader {
 
   Future<void> enqueue(AmbientSegment segment) {
     final next = _writes.then((_) => _write(segment)).catchError((Object e) {
-      lastError.value =
-          'Could not save a segment: ${AmbientDiagnostics.redact('$e')}';
+      lastError.value = 'Could not save a segment: ${AmbientDiagnostics.redact('$e')}';
     });
     _writes = next;
     return next;
@@ -264,27 +257,20 @@ class AmbientUploader {
     final id = newSegmentId();
     final seq = await _nextSeq();
     final dir = await _queueDir();
-    await File('${dir.path}/$id.wav')
-        .writeAsBytes(pcm16ToWav(segment.pcm), flush: true);
-    await File('${dir.path}/$id.json').writeAsString(
-        jsonEncode({
-          'id': id,
-          'started_at': segment.startedAt.toUtc().toIso8601String(),
-          'duration_ms': segment.duration.inMilliseconds,
-          'seq': seq,
-        }),
-        flush: true);
+    await File('${dir.path}/$id.wav').writeAsBytes(pcm16ToWav(segment.pcm), flush: true);
+    await File('${dir.path}/$id.json').writeAsString(jsonEncode({
+      'id': id,
+      'started_at': segment.startedAt.toUtc().toIso8601String(),
+      'duration_ms': segment.duration.inMilliseconds,
+      'seq': seq,
+    }), flush: true);
     await _trim(dir);
     await _refreshCount();
     unawaited(_drain(backlog: displaced.value));
   }
 
   Future<void> _trim(Directory dir) async {
-    final files = await dir
-        .list()
-        .where((e) => e is File && e.path.endsWith('.wav'))
-        .cast<File>()
-        .toList();
+    final files = await dir.list().where((e) => e is File && e.path.endsWith('.wav')).cast<File>().toList();
     files.sort((a, b) => a.path.compareTo(b.path));
     final sizes = <int>[];
     var total = 0;
@@ -314,11 +300,7 @@ class AmbientUploader {
 
   Future<List<File>> _metas() async {
     final dir = await _queueDir();
-    final metas = await dir
-        .list()
-        .where((e) => e is File && e.path.endsWith('.json'))
-        .cast<File>()
-        .toList();
+    final metas = await dir.list().where((e) => e is File && e.path.endsWith('.json')).cast<File>().toList();
     metas.sort((a, b) => a.path.compareTo(b.path));
     return metas;
   }
@@ -342,8 +324,7 @@ class AmbientUploader {
       while (!_closed) {
         final metas = await _metas();
         pending.value = metas.length;
-        final next =
-            metas.where((m) => !_inFlight.contains(m.path)).firstOrNull;
+        final next = metas.where((m) => !_inFlight.contains(m.path)).firstOrNull;
         if (next == null) {
           if (metas.isEmpty) _failures = 0;
           break;
@@ -377,44 +358,35 @@ class AmbientUploader {
         await _remove(stem);
         return true;
       }
-      final info =
-          jsonDecode(await meta.readAsString()) as Map<String, dynamic>;
+      final info = jsonDecode(await meta.readAsString()) as Map<String, dynamic>;
       final wav = await audio.readAsBytes();
-      final pcm =
-          wav.length > 44 ? Uint8List.sublistView(wav, 44) : Uint8List(0);
+      final pcm = wav.length > 44 ? Uint8List.sublistView(wav, 44) : Uint8List(0);
       final h = _stream.nextHandle();
       final id = info['id'] as String;
-      final started =
-          DateTime.tryParse(info['started_at'] as String) ?? DateTime.now();
-      final opened = await _stream.start(
-          h, id, (info['seq'] as num).toInt(), started,
-          backlog: backlog);
+      final started = DateTime.tryParse(info['started_at'] as String) ?? DateTime.now();
+      final opened = await _stream.start(h, id, (info['seq'] as num).toInt(), started, backlog: backlog);
       if (!opened) {
         lastError.value = 'Upload failed: no connection';
         return false;
       }
       for (var i = 0; i < pcm.length; i += 16384) {
-        _stream.chunk(
-            h, Uint8List.sublistView(pcm, i, min(i + 16384, pcm.length)));
+        _stream.chunk(h, Uint8List.sublistView(pcm, i, min(i + 16384, pcm.length)));
       }
       final response = await _stream.end(h, id,
-          durationMs: (info['duration_ms'] as num).toInt(), bytes: pcm.length);
+          durationMs: (info['duration_ms'] as num).toInt(),
+          bytes: pcm.length);
       if (response.code == 200) {
         await _remove(stem);
         return true;
       }
       if (response.code == 409) {
-        if (backlog) {
-          await _remove(stem);
-          return true;
-        }
+        if (backlog) { await _remove(stem); return true; }
         await _giveUp();
         final retry = await _upload(meta, backlog: true);
         return retry;
       }
       if (response.code == 400 || response.code == 413) {
-        lastError.value =
-            'Server rejected a segment (${response.code}); dropped it';
+        lastError.value = 'Server rejected a segment (${response.code}); dropped it';
         await _remove(stem);
         return true;
       }

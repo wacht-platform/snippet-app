@@ -131,8 +131,7 @@ class StripIcon extends StatelessWidget {
             child: SizedBox.square(
               dimension: 26,
               child: Center(
-                  child:
-                      AppIcon(icon, size: 16, color: color ?? AppColors.fg3)),
+                  child: AppIcon(icon, size: 16, color: color ?? AppColors.fg3)),
             ),
           ),
         ),
@@ -193,8 +192,7 @@ class DesktopRecorderStrip extends StatelessWidget {
       track = LayoutBuilder(
         builder: (_, c) => GestureDetector(
           behavior: HitTestBehavior.opaque,
-          onTapDown: (d) =>
-              onSeek!((d.localPosition.dx / c.maxWidth).clamp(0.0, 1.0)),
+          onTapDown: (d) => onSeek!((d.localPosition.dx / c.maxWidth).clamp(0.0, 1.0)),
           onHorizontalDragUpdate: (d) =>
               onSeek!((d.localPosition.dx / c.maxWidth).clamp(0.0, 1.0)),
           child: Center(child: bar),

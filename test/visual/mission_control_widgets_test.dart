@@ -39,7 +39,8 @@ class _FakeDaemon extends DaemonClient {
       _tasks.map(MissionControlTask.fromJson).toList();
 
   @override
-  Future<List<ManagedSession>> mcSessions({bool? archived}) async => const [];
+  Future<List<ManagedSession>> mcSessions({bool? archived}) async =>
+      const [];
 
   /// Mission Control watches two sockets: its own, and the shell stream. A fake
   /// has no server, so throwing is the honest stand-in — each caller's own
@@ -147,12 +148,11 @@ void main() {
       debugDefaultTargetPlatformOverride = platform;
       try {
         sized(tester);
-        await tester.pumpWidget(_app(_panel(
-            MissionControlHeader.full(state: (await _state(tasks))),
-            height: 200)));
+        await tester.pumpWidget(
+            _app(_panel(MissionControlHeader.full(state: (await _state(tasks))), height: 200)));
         await tester.pump(const Duration(milliseconds: 120));
-        await expectGolden(
-            tester, find.byType(MaterialApp), 'goldens/mc_header_$density.png');
+        await expectGolden(tester, find.byType(MaterialApp),
+            'goldens/mc_header_$density.png');
         await _teardown(tester);
       } finally {
         debugDefaultTargetPlatformOverride = null;
@@ -201,9 +201,8 @@ void main() {
       debugDefaultTargetPlatformOverride = platform;
       try {
         sized(tester);
-        await tester.pumpWidget(_app(_panel(
-            MissionComposer(state: (await _state(tasks))),
-            height: 220)));
+        await tester.pumpWidget(
+            _app(_panel(MissionComposer(state: (await _state(tasks))), height: 220)));
         await tester.pump(const Duration(milliseconds: 120));
         await expectGolden(tester, find.byType(MaterialApp),
             'goldens/mc_composer_$density.png');

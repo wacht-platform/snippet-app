@@ -173,28 +173,17 @@ class _PullRequestsScreenState extends State<PullRequestsScreen> {
   (String, Color) _stateIcon(PrSummary pr) => switch (pr.state) {
         'MERGED' => ('git-commit', AppColors.accent),
         'CLOSED' => ('x-circle', AppColors.fg4),
-        _ => pr.draft
-            ? ('git-branch', AppColors.fg4)
-            : ('git-branch', AppColors.ok),
+        _ => pr.draft ? ('git-branch', AppColors.fg4) : ('git-branch', AppColors.ok),
       };
 
   Widget _avatar(String login) {
-    const tints = [
-      0xFF7C8CF8,
-      0xFF5BC0A0,
-      0xFFE0A050,
-      0xFFD27AA8,
-      0xFF62A8E0,
-      0xFFB59A6A
-    ];
-    final tint = Color(
-        tints[login.codeUnits.fold<int>(0, (a, b) => a + b) % tints.length]);
+    const tints = [0xFF7C8CF8, 0xFF5BC0A0, 0xFFE0A050, 0xFFD27AA8, 0xFF62A8E0, 0xFFB59A6A];
+    final tint = Color(tints[login.codeUnits.fold<int>(0, (a, b) => a + b) % tints.length]);
     return Container(
       width: 22,
       height: 22,
       alignment: Alignment.center,
-      decoration: BoxDecoration(
-          color: tint.withValues(alpha: 0.18), shape: BoxShape.circle),
+      decoration: BoxDecoration(color: tint.withValues(alpha: 0.18), shape: BoxShape.circle),
       child: Text(login.isEmpty ? '?' : login[0].toUpperCase(),
           style: sans(11, weight: W.strong, color: tint)),
     );
@@ -212,8 +201,7 @@ class _PullRequestsScreenState extends State<PullRequestsScreen> {
             child: Container(
                 width: 7,
                 height: 7,
-                decoration: BoxDecoration(
-                    color: AppColors.run, shape: BoxShape.circle))),
+                decoration: BoxDecoration(color: AppColors.run, shape: BoxShape.circle))),
         ChecksState.none => null,
       };
 
@@ -236,8 +224,7 @@ class _PullRequestsScreenState extends State<PullRequestsScreen> {
     return InkWell(
       onTap: () => _open(pr),
       child: Padding(
-        padding:
-            EdgeInsets.fromLTRB(16, kMobile ? 12 : 9, 14, kMobile ? 12 : 9),
+        padding: EdgeInsets.fromLTRB(16, kMobile ? 12 : 9, 14, kMobile ? 12 : 9),
         child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Padding(
             padding: const EdgeInsets.only(top: 2),
@@ -288,11 +275,9 @@ class _PullRequestsScreenState extends State<PullRequestsScreen> {
   List<Widget> _body(List<PrSummary> prs) {
     if (_filter != 'open') return [for (final p in prs) _row(p)];
     final me = widget.status.viewer;
-    final review =
-        prs.where((p) => p.author != me && p.reviewers.contains(me)).toList();
+    final review = prs.where((p) => p.author != me && p.reviewers.contains(me)).toList();
     final mine = prs.where((p) => p.author == me).toList();
-    final others =
-        prs.where((p) => !review.contains(p) && !mine.contains(p)).toList();
+    final others = prs.where((p) => !review.contains(p) && !mine.contains(p)).toList();
     return [
       for (final (label, list) in [
         ('Needs your review', review),
@@ -339,8 +324,7 @@ class _PullRequestsScreenState extends State<PullRequestsScreen> {
       color: kMobile ? AppColors.bg : Colors.transparent,
       child: SafeArea(
         bottom: false,
-        child:
-            Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Builder(
             builder: (anchor) => MobileBackBar(
               title: switch (_filter) {
@@ -367,9 +351,7 @@ class _PullRequestsScreenState extends State<PullRequestsScreen> {
                             child: _error != null
                                 ? _message(_error!)
                                 : prs == null
-                                    ? Center(
-                                        child: Spinner(
-                                            size: 16, color: AppColors.fg3))
+                                    ? Center(child: Spinner(size: 16, color: AppColors.fg3))
                                     : _empty(),
                           ),
                         ],
@@ -396,3 +378,4 @@ Widget _message(String text) => Center(
             style: sans(13, height: 1.5, color: AppColors.fg3)),
       ),
     );
+

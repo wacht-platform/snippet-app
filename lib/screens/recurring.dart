@@ -733,84 +733,85 @@ class RecurringScreenState extends State<RecurringScreen>
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(S.s16, S.s12, S.s16, S.s12),
-          child:
-              Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Text('Schedule', style: sans(13, color: AppColors.fg1)),
-            const SizedBox(height: S.s8),
-            Wrap(spacing: 6, runSpacing: 6, children: [
-              for (final s in const [
-                'every 5m',
-                'every 15m',
-                'every 1h',
-                'every 1d',
-              ])
-                _chip(s, _mode == 'preset' && _schedule == s, () {
-                  setState(() {
-                    _mode = 'preset';
-                    _schedule = s;
-                  });
-                }),
-              _chip('custom', _mode == 'custom',
-                  () => setState(() => _mode = 'custom')),
-              _chip('daily', _mode == 'daily',
-                  () => setState(() => _mode = 'daily')),
-              _chip('once at', _mode == 'onceAt',
-                  () => setState(() => _mode = 'onceAt')),
-              _chip('once in', _mode == 'onceIn',
-                  () => setState(() => _mode = 'onceIn')),
-            ]),
-            if (_mode == 'custom') ...[
-              const SizedBox(height: S.s8),
-              AppField(
-                  label: 'Every (min 5m)',
-                  controller: _customEveryCtrl,
+          child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text('Schedule', style: sans(13, color: AppColors.fg1)),
+                const SizedBox(height: S.s8),
+                Wrap(spacing: 6, runSpacing: 6, children: [
+                  for (final s in const [
+                    'every 5m',
+                    'every 15m',
+                    'every 1h',
+                    'every 1d',
+                  ])
+                    _chip(s, _mode == 'preset' && _schedule == s, () {
+                      setState(() {
+                        _mode = 'preset';
+                        _schedule = s;
+                      });
+                    }),
+                  _chip('custom', _mode == 'custom',
+                      () => setState(() => _mode = 'custom')),
+                  _chip('daily', _mode == 'daily',
+                      () => setState(() => _mode = 'daily')),
+                  _chip('once at', _mode == 'onceAt',
+                      () => setState(() => _mode = 'onceAt')),
+                  _chip('once in', _mode == 'onceIn',
+                      () => setState(() => _mode = 'onceIn')),
+                ]),
+                if (_mode == 'custom') ...[
+                  const SizedBox(height: S.s8),
+                  AppField(
+                      label: 'Every (min 5m)',
+                      controller: _customEveryCtrl,
+                      mono: true,
+                      hint: '5m  ·  90m  ·  2h  ·  300s'),
+                ],
+                if (_mode == 'daily') ...[
+                  const SizedBox(height: S.s8),
+                  AppField(
+                      label: 'Time (HH:MM)',
+                      controller: _dailyCtrl,
+                      mono: true,
+                      hint: '09:00'),
+                ],
+                if (_mode == 'onceAt') ...[
+                  const SizedBox(height: S.s8),
+                  AppField(
+                      label: 'Time today/tomorrow (HH:MM)',
+                      controller: _dailyCtrl,
+                      mono: true,
+                      hint: '14:30'),
+                ],
+                if (_mode == 'onceIn') ...[
+                  const SizedBox(height: S.s8),
+                  AppField(
+                      label: 'From now (e.g. 30m, 2h)',
+                      controller: _customEveryCtrl,
+                      mono: true,
+                      hint: '30m'),
+                ],
+                const SizedBox(height: S.s12),
+                AppField(
+                    label: 'Goal',
+                    controller: _promptCtrl,
+                    hint: 'The piece of work to complete',
+                    minLines: 3,
+                    maxLines: 6),
+                const SizedBox(height: S.s12),
+                AppField(
+                  label: 'Plan file (optional)',
+                  controller: _planCtrl,
                   mono: true,
-                  hint: '5m  ·  90m  ·  2h  ·  300s'),
-            ],
-            if (_mode == 'daily') ...[
-              const SizedBox(height: S.s8),
-              AppField(
-                  label: 'Time (HH:MM)',
-                  controller: _dailyCtrl,
-                  mono: true,
-                  hint: '09:00'),
-            ],
-            if (_mode == 'onceAt') ...[
-              const SizedBox(height: S.s8),
-              AppField(
-                  label: 'Time today/tomorrow (HH:MM)',
-                  controller: _dailyCtrl,
-                  mono: true,
-                  hint: '14:30'),
-            ],
-            if (_mode == 'onceIn') ...[
-              const SizedBox(height: S.s8),
-              AppField(
-                  label: 'From now (e.g. 30m, 2h)',
-                  controller: _customEveryCtrl,
-                  mono: true,
-                  hint: '30m'),
-            ],
-            const SizedBox(height: S.s12),
-            AppField(
-                label: 'Goal',
-                controller: _promptCtrl,
-                hint: 'The piece of work to complete',
-                minLines: 3,
-                maxLines: 6),
-            const SizedBox(height: S.s12),
-            AppField(
-              label: 'Plan file (optional)',
-              controller: _planCtrl,
-              mono: true,
-              hint: 'notes/plan.md — pick or type a path',
-              rightSlot: IconBtn('folder',
-                  size: 28,
-                  iconSize: 14,
-                  tooltip: 'Pick file',
-                  onTap: _pickPlanInline),
-            ),
-          ]),
+                  hint: 'notes/plan.md — pick or type a path',
+                  rightSlot: IconBtn('folder',
+                      size: 28,
+                      iconSize: 14,
+                      tooltip: 'Pick file',
+                      onTap: _pickPlanInline),
+                ),
+              ]),
         ),
       ],
     );
@@ -833,7 +834,9 @@ class RecurringScreenState extends State<RecurringScreen>
               icon: paused ? 'play' : 'pause',
               onTap: () => _toggle(job)),
           Btn('Save',
-              small: true, disabled: _submitting, onTap: () => _saveEdit(job)),
+              small: true,
+              disabled: _submitting,
+              onTap: () => _saveEdit(job)),
         ],
       ),
       const SizedBox(height: S.s8),
@@ -967,8 +970,9 @@ class RecurringScreenState extends State<RecurringScreen>
         _targetLabel(job),
         if (!paused && next.isNotEmpty) next,
       ].join(' · '),
-      trailing:
-          paused ? const Tag('Paused') : const Tag('Active', tone: Tone.accent),
+      trailing: paused
+          ? const Tag('Paused')
+          : const Tag('Active', tone: Tone.accent),
       chevron: true,
       onTap: () => _selectJob(job),
     );

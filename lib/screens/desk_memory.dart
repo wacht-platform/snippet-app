@@ -39,18 +39,8 @@ String _day(String? ymd) {
   final d = ymd == null ? null : DateTime.tryParse(ymd);
   if (d == null) return '';
   const m = [
-    'Jan',
-    'Feb',
-    'Mar',
-    'Apr',
-    'May',
-    'Jun',
-    'Jul',
-    'Aug',
-    'Sep',
-    'Oct',
-    'Nov',
-    'Dec'
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
   ];
   final now = DateTime.now();
   final days = DateTime(now.year, now.month, now.day)
@@ -163,8 +153,8 @@ class _DeskMemoryViewState extends State<DeskMemoryView> {
     final f = e.file;
     if (f == null) return;
     try {
-      final r = await widget.client
-          .memoryFile(_scope, path: f.contains('.') ? f : '$f.md');
+      final r = await widget.client.memoryFile(_scope,
+          path: f.contains('.') ? f : '$f.md');
       if (mounted && _selected == e) setState(() => _detail = r.content);
     } catch (_) {
       if (mounted && _selected == e) setState(() => _detail = '');
@@ -244,34 +234,31 @@ class _DeskMemoryViewState extends State<DeskMemoryView> {
           onTap: () => _select(e),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-            child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (e.file != null || when.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 5),
-                      child: Row(children: [
-                        if (e.file != null)
-                          Expanded(
-                            child: Text(e.file!,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: mono(11.5, color: AppColors.fg2)),
-                          )
-                        else
-                          const Spacer(),
-                        if (when.isNotEmpty)
-                          Text(when, style: sans(11, color: AppColors.fg4)),
-                        if (e.file != null)
-                          AppIcon('chevron-right',
-                              size: 12, color: AppColors.fg4),
-                      ]),
-                    ),
-                  Text(e.text,
-                      maxLines: wide ? 3 : 6,
-                      overflow: TextOverflow.ellipsis,
-                      style: sans(12.5, height: 1.5, color: AppColors.fg3)),
-                ]),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              if (e.file != null || when.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 5),
+                  child: Row(children: [
+                    if (e.file != null)
+                      Expanded(
+                        child: Text(e.file!,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: mono(11.5, color: AppColors.fg2)),
+                      )
+                    else
+                      const Spacer(),
+                    if (when.isNotEmpty)
+                      Text(when, style: sans(11, color: AppColors.fg4)),
+                    if (e.file != null)
+                      AppIcon('chevron-right', size: 12, color: AppColors.fg4),
+                  ]),
+                ),
+              Text(e.text,
+                  maxLines: wide ? 3 : 6,
+                  overflow: TextOverflow.ellipsis,
+                  style: sans(12.5, height: 1.5, color: AppColors.fg3)),
+            ]),
           ),
         ),
       ),
@@ -356,8 +343,8 @@ class _DeskMemoryViewState extends State<DeskMemoryView> {
         children: [
           Row(children: [
             Expanded(
-              child:
-                  Text(e.file ?? 'Note', style: mono(13, color: AppColors.fg1)),
+              child: Text(e.file ?? 'Note',
+                  style: mono(13, color: AppColors.fg1)),
             ),
             if (_day(e.added).isNotEmpty)
               Text('Added ${_day(e.added)}',
@@ -367,8 +354,7 @@ class _DeskMemoryViewState extends State<DeskMemoryView> {
           ]),
           const SizedBox(height: 16),
           if (body == null)
-            const Align(
-                alignment: Alignment.centerLeft, child: Spinner(size: 14))
+            const Align(alignment: Alignment.centerLeft, child: Spinner(size: 14))
           else
             ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 760),
@@ -390,8 +376,7 @@ class _DeskMemoryViewState extends State<DeskMemoryView> {
     if (h == null) return const Center(child: Spinner(size: 16));
     if (h.isEmpty) {
       return Center(
-          child:
-              Text('No history yet.', style: sans(13, color: AppColors.fg4)));
+          child: Text('No history yet.', style: sans(13, color: AppColors.fg4)));
     }
     return ListView(
       padding: const EdgeInsets.fromLTRB(14, 4, 14, 24),
@@ -443,8 +428,7 @@ class _DeskMemoryViewState extends State<DeskMemoryView> {
     final global = _globalKey;
     return LayoutBuilder(builder: (context, box) {
       final wide = box.maxWidth > 640;
-      final list =
-          Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      final list = Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         if (wide)
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 10),
@@ -514,29 +498,25 @@ class _DeskMemoryViewState extends State<DeskMemoryView> {
       if (!wide) {
         final e = _selected;
         if (e != null) {
-          return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(8, 0, 8, 0),
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: TextButton.icon(
-                      onPressed: () => setState(() => _selected = null),
-                      style: TextButton.styleFrom(
-                        foregroundColor: AppColors.fg3,
-                        minimumSize: const Size(0, 44),
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
-                      ),
-                      icon: AppIcon('chevron-left',
-                          size: 14, color: AppColors.fg3),
-                      label: Text('Memory',
-                          style: sans(12.5, color: AppColors.fg3)),
-                    ),
+          return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(8, 0, 8, 0),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: () => setState(() => _selected = null),
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppColors.fg3,
+                    minimumSize: const Size(0, 44),
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
                   ),
+                  icon: AppIcon('chevron-left', size: 14, color: AppColors.fg3),
+                  label: Text('Memory', style: sans(12.5, color: AppColors.fg3)),
                 ),
-                Expanded(child: _detailView(wide: false)),
-              ]);
+              ),
+            ),
+            Expanded(child: _detailView(wide: false)),
+          ]);
         }
         return list;
       }

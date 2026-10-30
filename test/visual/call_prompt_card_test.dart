@@ -19,8 +19,8 @@ Widget _frame(CallPhase phase) => MaterialApp(
               child: SizedBox(
                 width: 380,
                 child: CallPromptCard(
-                  status:
-                      CallStatus(callId: 'c1', phase: phase, url: 'http://m'),
+                  status: CallStatus(
+                      callId: 'c1', phase: phase, url: 'http://m'),
                   onAction: (_) async => true,
                 ),
               ),
@@ -37,8 +37,8 @@ void main() {
       tester.view.devicePixelRatio = 2;
       addTearDown(tester.view.reset);
       await tester.pumpWidget(_frame(phase));
-      await expectGolden(tester, find.byKey(const ValueKey('card')),
-          'goldens/call_card_${phase.name}.png');
+      await expectGolden(
+          tester, find.byKey(const ValueKey('card')), 'goldens/call_card_${phase.name}.png');
     });
   }
 }

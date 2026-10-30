@@ -68,8 +68,7 @@ class _CreateAgentFormState extends State<CreateAgentForm> {
         children: [
           AppField(
             controller: _prompt,
-            hint:
-                'A security reviewer that inspects repos without changing them.',
+            hint: 'A security reviewer that inspects repos without changing them.',
             minLines: 4,
             maxLines: 6,
             autofocus: true,
@@ -79,10 +78,10 @@ class _CreateAgentFormState extends State<CreateAgentForm> {
             Text(_error!, style: sans(12, color: AppColors.danger)),
           ],
           const SizedBox(height: 14),
-          Btn(
-            _busy ? 'Starting build…' : 'Build agent',
-            small: true,
-            full: true,
+                      Btn(
+              _busy ? 'Starting build…' : 'Build agent',
+              small: true,
+              full: true,
             disabled: _busy,
             icon: 'sparkles',
             onTap: _submit,

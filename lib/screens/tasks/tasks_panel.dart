@@ -263,10 +263,14 @@ class TasksPanelState extends State<TasksPanel> {
             ),
           ),
           if (_query.isNotEmpty)
-            IconBtn('x', size: 20, iconSize: 10, tooltip: 'Clear', onTap: () {
-              _search.clear();
-              setState(() => _query = '');
-            }),
+            IconBtn('x',
+                size: 20,
+                iconSize: 10,
+                tooltip: 'Clear',
+                onTap: () {
+                  _search.clear();
+                  setState(() => _query = '');
+                }),
         ]),
       );
 
@@ -306,10 +310,13 @@ class TasksPanelState extends State<TasksPanel> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Padding(
-                padding: const EdgeInsets.fromLTRB(S.s40, S.s32, S.s40, S.s16),
+                padding: const EdgeInsets.fromLTRB(
+                    S.s40, S.s32, S.s40, S.s16),
                 child: Text('New task',
                     style: sans(20,
-                        weight: W.strong, spacing: -0.2, color: AppColors.fg1)),
+                        weight: W.strong,
+                        spacing: -0.2,
+                        color: AppColors.fg1)),
               ),
               Expanded(
                 child: Padding(
@@ -419,8 +426,8 @@ class TasksPanelState extends State<TasksPanel> {
           if (_searchOpen)
             kMobile
                 ? Padding(
-                    padding:
-                        const EdgeInsets.fromLTRB(M.gutter, 2, M.gutter, 4),
+                    padding: const EdgeInsets.fromLTRB(
+                        M.gutter, 2, M.gutter, 4),
                     child: ListSearchField(
                       controller: _search,
                       hint: 'Search tasks',
@@ -455,11 +462,14 @@ class TasksPanelState extends State<TasksPanel> {
                           ),
                         ),
                         if (_query.isNotEmpty)
-                          IconBtn('x', size: 20, iconSize: 10, tooltip: 'Clear',
+                          IconBtn('x',
+                              size: 20,
+                              iconSize: 10,
+                              tooltip: 'Clear',
                               onTap: () {
-                            _search.clear();
-                            setState(() => _query = '');
-                          }),
+                                _search.clear();
+                                setState(() => _query = '');
+                              }),
                       ]),
                     ),
                   ),

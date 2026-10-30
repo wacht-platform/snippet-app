@@ -12,7 +12,8 @@ import 'package:snippet/screens/mission_control_card.dart';
 import 'package:snippet/theme.dart';
 
 class _FakeTestClient extends DaemonClient {
-  _FakeTestClient(this._agents) : super('https://daemon.invalid', 'test-token');
+  _FakeTestClient(this._agents)
+      : super('https://daemon.invalid', 'test-token');
 
   @override
   late final DeviceEventHub deviceEvents = DeviceEventHub.local();
@@ -48,8 +49,9 @@ class _FakeTestClient extends DaemonClient {
       [];
 }
 
-Finder _field(String hint) => find
-    .byWidgetPredicate((w) => w is TextField && w.decoration?.hintText == hint);
+Finder _field(String hint) => find.byWidgetPredicate(
+    (w) => w is TextField && w.decoration?.hintText == hint);
+
 
 void main() {
   test('agent icon maps to strokeRoundedBot', () {
@@ -57,7 +59,9 @@ void main() {
     expect(hugeIconFor('bot'), HugeIcons.strokeRoundedBot);
   });
 
-  testWidgets('each phone page has its search and its own New', (tester) async {
+  testWidgets(
+      'each phone page has its search and its own New',
+      (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
     try {
       tester.view.devicePixelRatio = 2.0;
@@ -365,4 +369,6 @@ void main() {
     expect(find.text('Agent Mailbox'), findsNothing);
     expect(find.text('inbox-builder'), findsNothing);
   });
+
 }
+

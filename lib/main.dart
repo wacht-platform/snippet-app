@@ -99,8 +99,7 @@ class _SnippetAppState extends State<SnippetApp> with WidgetsBindingObserver {
       title: 'snippet',
       navigatorKey: navigatorKey,
       debugShowCheckedModeBanner: false,
-      scrollBehavior:
-          const MaterialScrollBehavior().copyWith(scrollbars: false),
+      scrollBehavior: const MaterialScrollBehavior().copyWith(scrollbars: false),
       theme: buildAppTheme(),
       // Deliberately NOT wrapped in WithForegroundTask. That widget is a
       // `WillPopScope`, and `Navigator.maybePop` consults WillPopScope callbacks

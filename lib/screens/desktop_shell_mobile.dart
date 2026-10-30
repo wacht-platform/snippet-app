@@ -9,9 +9,8 @@ extension _DesktopShellMobileExt on _DesktopShellState {
     if (_mobileRouteHistory.isNotEmpty && _mobileRouteHistory.last == route) {
       return;
     }
-    final isTopLevel = !route.inSession &&
-        route.agent == null &&
-        route.settingsSection == null;
+    final isTopLevel =
+        !route.inSession && route.agent == null && route.settingsSection == null;
     if (isTopLevel) {
       final existingIndex = _mobileRouteHistory.lastIndexOf(route);
       if (existingIndex >= 0) {
@@ -55,10 +54,11 @@ extension _DesktopShellMobileExt on _DesktopShellState {
     }
   }
 
+
   void _startOnMission() {
     if (!kMobile || _active == null) return;
-    final i = _tabs
-        .indexWhere((t) => t.isMissionControl && t.instanceUrl == _active!.url);
+    final i = _tabs.indexWhere(
+        (t) => t.isMissionControl && t.instanceUrl == _active!.url);
     if (i < 0) return;
     _activateTab(i);
     _setState(() {
@@ -132,13 +132,13 @@ extension _DesktopShellMobileExt on _DesktopShellState {
     );
   }
 
-  Widget _mobileTopBar({required bool mission, VoidCallback? onActions}) =>
-      MobileTopBar(
+  Widget _mobileTopBar({required bool mission, VoidCallback? onActions}) => MobileTopBar(
         mission: mission,
         onActions: onActions,
         sessionsBusy: mission &&
-            (_sessions ?? const <SessionInfo>[]).any(
-                (s) => !isDedicatedMcSession(s.id) && s.status == 'running'),
+            (_sessions ?? const <SessionInfo>[]).any((s) =>
+                !isDedicatedMcSession(s.id) &&
+                s.status == 'running'),
         onMission: _goMission,
         onSessions: () => _goMobileHome(MobileHome.chats),
         onMenu: _openMobileMenu,
@@ -150,15 +150,9 @@ extension _DesktopShellMobileExt on _DesktopShellState {
 
   Widget _mobileShell() {
     final tab = _activeTab;
-    final visible = _appForeground &&
-        !_mobileChatsOpen &&
+    final visible = _appForeground && !_mobileChatsOpen &&
         _mobileHome == _MobileHome.chats &&
-        tab != null &&
-        !tab.isBoard &&
-        !tab.isTask &&
-        !tab.isFile &&
-        !tab.isDiff &&
-        !tab.isTerminal;
+        tab != null && !tab.isBoard && !tab.isTask && !tab.isFile && !tab.isDiff && !tab.isTerminal;
     reportVisibleNotificationSession(
         visible ? tab.instanceUrl : null, visible ? tab.sessionId : null);
     return MobileShell(

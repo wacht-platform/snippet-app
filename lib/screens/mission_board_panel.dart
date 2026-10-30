@@ -137,8 +137,9 @@ class _MissionBoardPanelState extends State<MissionBoardPanel> {
     );
   }
 
-  RightTab? get _readout =>
-      widget.readouts.where((r) => r.key == widget.activeReadout).firstOrNull;
+  RightTab? get _readout => widget.readouts
+      .where((r) => r.key == widget.activeReadout)
+      .firstOrNull;
 
   Widget _seg(String text, bool on, VoidCallback onTap,
       {VoidCallback? onClose}) {
@@ -154,7 +155,8 @@ class _MissionBoardPanelState extends State<MissionBoardPanel> {
             padding: EdgeInsets.fromLTRB(10, 6, onClose != null ? 6 : 10, 6),
             child: Row(mainAxisSize: MainAxisSize.min, children: [
               Text(text,
-                  style: sans(12.5, color: on ? AppColors.fg1 : AppColors.fg3)),
+                  style: sans(12.5,
+                      color: on ? AppColors.fg1 : AppColors.fg3)),
               if (onClose != null) ...[
                 const SizedBox(width: 5),
                 GestureDetector(
@@ -249,13 +251,15 @@ class _MissionBoardPanelState extends State<MissionBoardPanel> {
                     child: Column(children: [
                       const DottedMochi(width: 120),
                       const SizedBox(height: 18),
-                      Text('All quiet', style: sans(15, color: AppColors.fg1)),
+                      Text('All quiet',
+                          style: sans(15, color: AppColors.fg1)),
                       const SizedBox(height: 6),
                       Text(
                           'Work your agents pick up, scheduled runs and '
                           'what finished today land here.',
                           textAlign: TextAlign.center,
-                          style: sans(12.5, height: 1.5, color: AppColors.fg4)),
+                          style: sans(12.5,
+                              height: 1.5, color: AppColors.fg4)),
                     ]),
                   ),
                 if (doing.isNotEmpty) ...[

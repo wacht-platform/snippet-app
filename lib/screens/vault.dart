@@ -211,8 +211,7 @@ class VaultScreenState extends State<VaultScreen> {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          NavBackRow(
-              title: 'Vault', onBack: widget.onBack!, trailing: const []),
+          NavBackRow(title: 'Vault', onBack: widget.onBack!, trailing: const []),
           Expanded(child: body),
         ],
       );
@@ -244,8 +243,7 @@ class VaultScreenState extends State<VaultScreen> {
         SettingsRow(
           label: "Couldn't load secrets",
           sub: _error,
-          trailing: Btn('Retry',
-              small: true, variant: BtnVariant.surface, onTap: _load),
+          trailing: Btn('Retry', small: true, variant: BtnVariant.surface, onTap: _load),
         ),
       ]);
     } else {
@@ -266,8 +264,7 @@ class VaultScreenState extends State<VaultScreen> {
         title: 'Vault',
         subtitle: 'Secrets agents can use as \$NAME without seeing the value.',
         actions: [
-          if (!_adding)
-            Btn('Add secret', small: true, icon: 'plus', onTap: _add),
+          if (!_adding) Btn('Add secret', small: true, icon: 'plus', onTap: _add),
         ],
       ),
       const SizedBox(height: S.s8),

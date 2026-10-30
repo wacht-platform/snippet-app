@@ -16,8 +16,7 @@ import '../../../settings_form.dart';
 import '../../../theme.dart';
 import '../../../widgets.dart';
 
-final ValueNotifier<AmbientStateEvent?> _emptyAmbientState =
-    ValueNotifier(null);
+final ValueNotifier<AmbientStateEvent?> _emptyAmbientState = ValueNotifier(null);
 
 Color _modeColor(String mode) =>
     mode == 'active' ? AppColors.accent : AppColors.ok;
@@ -93,11 +92,13 @@ class _AmbientModel extends ChangeNotifier {
     }
   }
 
-  Future<void> shiftMode(int dir) => setMode(dir > 0 ? 'active' : 'passive');
+  Future<void> shiftMode(int dir) =>
+      setMode(dir > 0 ? 'active' : 'passive');
 
   Future<void> setMode(String mode) async {
     final before = settings;
-    if (before == null || (before.mode == mode && before.shownMode == mode)) {
+    if (before == null ||
+        (before.mode == mode && before.shownMode == mode)) {
       return;
     }
     settings = before.withMode(mode);
@@ -129,23 +130,15 @@ class _OrbDots {
   static final Map<(int, bool, bool), _OrbDots> _cache = {};
 
   static _OrbDots of(double shortestSide, bool alive, bool blink) =>
-      _cache.putIfAbsent((shortestSide.round(), alive, blink),
-          () => _build(shortestSide, alive, blink));
+      _cache.putIfAbsent((shortestSide.round(), alive, blink), () => _build(shortestSide, alive, blink));
 
   static _OrbDots _build(double shortestSide, bool alive, bool blink) {
     final radius = shortestSide / 2 * 0.9;
     final step = math.max(shortestSide / 40, 2.3);
     final eyeH = blink ? 0.18 : 1.0;
-    final eyes = [
-      Offset(-radius * 0.34, radius * 0.06),
-      Offset(radius * 0.34, radius * 0.06)
-    ];
+    final eyes = [Offset(-radius * 0.34, radius * 0.06), Offset(radius * 0.34, radius * 0.06)];
     final eyeRx = radius * 0.085, eyeRy = radius * 0.13 * eyeH;
-    final xs = <double>[],
-        ys = <double>[],
-        sizes = <double>[],
-        alphas = <double>[],
-        depths = <double>[];
+    final xs = <double>[], ys = <double>[], sizes = <double>[], alphas = <double>[], depths = <double>[];
     final rows = (radius * 2 / step).ceil() + 2;
     for (var j = 0; j < rows; j++) {
       final y = -radius + j * step * 0.866;
@@ -155,8 +148,7 @@ class _OrbDots {
         if (d > 1) continue;
         var skip = false;
         for (final e in eyes) {
-          final ex = (x - e.dx) / eyeRx,
-              ey = (y - e.dy) / math.max(eyeRy, 0.01);
+          final ex = (x - e.dx) / eyeRx, ey = (y - e.dy) / math.max(eyeRy, 0.01);
           if (ex * ex + ey * ey < 1) skip = true;
         }
         if (!alive && (y - eyes[0].dy).abs() < step * 0.5) {
@@ -175,12 +167,8 @@ class _OrbDots {
         depths.add(d);
       }
     }
-    return _OrbDots(
-        Float32List.fromList(xs),
-        Float32List.fromList(ys),
-        Float32List.fromList(sizes),
-        Float32List.fromList(alphas),
-        Float32List.fromList(depths));
+    return _OrbDots(Float32List.fromList(xs), Float32List.fromList(ys), Float32List.fromList(sizes),
+        Float32List.fromList(alphas), Float32List.fromList(depths));
   }
 }
 
@@ -206,8 +194,7 @@ class _OrbPainter extends CustomPainter {
               color.withValues(alpha: 0),
             ]).createShader(Rect.fromCircle(center: c, radius: r)));
     }
-    final dots =
-        _OrbDots.of(size.shortestSide, alive, alive && t > 0.86 && t < 0.92);
+    final dots = _OrbDots.of(size.shortestSide, alive, alive && t > 0.86 && t < 0.92);
     final amp = alive ? 0.12 + level * 0.22 : 0.0;
     final rgb = color.toARGB32() & 0xFFFFFF;
     final paint = Paint();
@@ -223,18 +210,14 @@ class _OrbPainter extends CustomPainter {
         a = (a + w * 0.12).clamp(0.2, 1.0);
       }
       paint.color = Color(((a * 255).round() << 24) | rgb);
-      canvas.drawCircle(
-          Offset(dots.x[i], dots.y[i]), math.max(s / 2, 0.3), paint);
+      canvas.drawCircle(Offset(dots.x[i], dots.y[i]), math.max(s / 2, 0.3), paint);
     }
     canvas.restore();
   }
 
   @override
   bool shouldRepaint(covariant _OrbPainter old) =>
-      old.t != t ||
-      old.level != level ||
-      old.color != color ||
-      old.alive != alive;
+      old.t != t || old.level != level || old.color != color || old.alive != alive;
 }
 
 class _Orb extends StatefulWidget {
@@ -276,8 +259,7 @@ class _OrbState extends State<_Orb> with SingleTickerProviderStateMixin {
         animation: _c,
         builder: (_, __) => CustomPaint(
           size: Size.square(widget.size),
-          painter: _OrbPainter((_c.value * frames).floor() / frames,
-              widget.level, widget.color, widget.alive),
+          painter: _OrbPainter((_c.value * frames).floor() / frames, widget.level, widget.color, widget.alive),
         ),
       ),
     );
@@ -628,8 +610,7 @@ class _AmbientStageState extends State<AmbientStage> {
     final panel = ConstrainedBox(
       constraints: BoxConstraints(
         maxHeight: anchor != null
-            ? (size.height - anchor.bottom - 24)
-                .clamp(260.0, size.height * 0.86)
+            ? (size.height - anchor.bottom - 24).clamp(260.0, size.height * 0.86)
             : size.height * 0.92,
       ),
       child: SingleChildScrollView(child: _panel(wide, orb)),
@@ -637,8 +618,8 @@ class _AmbientStageState extends State<AmbientStage> {
     final Widget placed = anchor != null
         ? Builder(builder: (_) {
             const width = 296.0;
-            final left = (anchor.center.dx - width + 24)
-                .clamp(12.0, size.width - width - 12);
+            final left =
+                (anchor.center.dx - width + 24).clamp(12.0, size.width - width - 12);
             final top = (anchor.bottom + 8).clamp(12.0, size.height - 320.0);
             final alignX =
                 (((anchor.center.dx - left) / width) * 2 - 1).clamp(-0.9, 0.9);
@@ -670,35 +651,34 @@ class _AmbientStageState extends State<AmbientStage> {
                 ),
               )
             : Align(
-                alignment: Alignment.bottomCenter,
-                child: AnimatedBuilder(
-                  animation: _a,
-                  builder: (_, child) => Opacity(
-                    opacity: still ? _a.value : 1,
-                    child: Transform.translate(
-                      offset:
-                          Offset(0, (still ? 0 : (1 - _a.value) * 360) + _drag),
-                      child: child,
-                    ),
-                  ),
-                  child: GestureDetector(
-                    onVerticalDragUpdate: (d) =>
-                        setState(() => _drag = math.max(0, _drag + d.delta.dy)),
-                    onVerticalDragEnd: (d) {
-                      if (_drag > 90 || (d.primaryVelocity ?? 0) > 700) {
-                        _close();
-                      } else {
-                        setState(() => _drag = 0);
-                      }
-                    },
-                    child: SafeArea(
-                      top: false,
-                      minimum: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-                      child: panel,
-                    ),
-                  ),
+            alignment: Alignment.bottomCenter,
+            child: AnimatedBuilder(
+              animation: _a,
+              builder: (_, child) => Opacity(
+                opacity: still ? _a.value : 1,
+                child: Transform.translate(
+                  offset: Offset(0, (still ? 0 : (1 - _a.value) * 360) + _drag),
+                  child: child,
                 ),
-              );
+              ),
+              child: GestureDetector(
+                onVerticalDragUpdate: (d) =>
+                    setState(() => _drag = math.max(0, _drag + d.delta.dy)),
+                onVerticalDragEnd: (d) {
+                  if (_drag > 90 || (d.primaryVelocity ?? 0) > 700) {
+                    _close();
+                  } else {
+                    setState(() => _drag = 0);
+                  }
+                },
+                child: SafeArea(
+                  top: false,
+                  minimum: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+                  child: panel,
+                ),
+              ),
+            ),
+          );
     return CallbackShortcuts(
       bindings: {
         const SingleActivator(LogicalKeyboardKey.escape): _close,
@@ -726,8 +706,7 @@ class _AmbientStageState extends State<AmbientStage> {
                           color: Colors.black.withValues(alpha: 0.14 * v));
                     }
                     return BackdropFilter(
-                      filter:
-                          ui.ImageFilter.blur(sigmaX: 14 * v, sigmaY: 14 * v),
+                      filter: ui.ImageFilter.blur(sigmaX: 14 * v, sigmaY: 14 * v),
                       child: ColoredBox(
                           color: Colors.black.withValues(alpha: 0.4 * v)),
                     );

@@ -161,24 +161,24 @@ class TaskStatusHeader extends StatelessWidget {
                   weight: W.label, spacing: 0.7, color: AppColors.fg4)),
         )
       : Padding(
-          padding: const EdgeInsets.fromLTRB(12, 14, 12, 6),
-          child: Row(children: [
-            Container(
-              width: 6,
-              height: 6,
-              decoration: BoxDecoration(
-                  color: statusColor(status), shape: BoxShape.circle),
-            ),
-            const SizedBox(width: S.s8),
-            Text(status.label,
-                style: kMobile ? sans(13, color: AppColors.fg2) : TS.label()),
-            const SizedBox(width: S.s8),
-            if (kMobile)
-              Text('$count', style: sans(13, color: AppColors.fg4))
-            else
-              CountBadge(count),
-          ]),
-        );
+        padding: const EdgeInsets.fromLTRB(12, 14, 12, 6),
+        child: Row(children: [
+          Container(
+            width: 6,
+            height: 6,
+            decoration: BoxDecoration(
+                color: statusColor(status), shape: BoxShape.circle),
+          ),
+          const SizedBox(width: S.s8),
+          Text(status.label,
+              style: kMobile ? sans(13, color: AppColors.fg2) : TS.label()),
+          const SizedBox(width: S.s8),
+          if (kMobile)
+            Text('$count', style: sans(13, color: AppColors.fg4))
+          else
+            CountBadge(count),
+        ]),
+      );
 }
 
 /// One task. Desktop gets a single dense line; a phone adds the first line of
@@ -191,8 +191,7 @@ String? workPlanLine(TaskItem task) {
     return null;
   }
   final done = task.workPlan.where((s) => s.done).length;
-  final now =
-      task.workPlan.where((s) => s.current).map((s) => s.step).firstOrNull;
+  final now = task.workPlan.where((s) => s.current).map((s) => s.step).firstOrNull;
   return 'Plan $done/${task.workPlan.length}${now == null ? '' : ' · now: $now'}';
 }
 
@@ -212,20 +211,17 @@ class TaskRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final detail =
-        workPlanLine(task) ?? task.description.trim().split('\n').first;
+    final detail = workPlanLine(task) ?? task.description.trim().split('\n').first;
     final age = taskAge(task);
     if (kMobile) {
       final Widget glyph = switch (task.status) {
         TaskStatus.inProgress =>
           WorkingMochi(size: 18, color: mochiPalette.first.$2),
         TaskStatus.blocked => MochiIcon(color: AppColors.run, size: 18),
-        TaskStatus.done =>
-          AppIcon('check-circle', size: 18, color: AppColors.ok),
+        TaskStatus.done => AppIcon('check-circle', size: 18, color: AppColors.ok),
         TaskStatus.failed =>
           AppIcon('alert-triangle', size: 17, color: AppColors.danger),
-        TaskStatus.cancelled =>
-          AppIcon('x-circle', size: 18, color: AppColors.fg4),
+        TaskStatus.cancelled => AppIcon('x-circle', size: 18, color: AppColors.fg4),
         TaskStatus.todo => Container(
             width: 16,
             height: 16,
@@ -235,8 +231,8 @@ class TaskRow extends StatelessWidget {
             ),
           ),
       };
-      final finished =
-          const {TaskStatus.done, TaskStatus.cancelled}.contains(task.status);
+      final finished = const {TaskStatus.done, TaskStatus.cancelled}
+          .contains(task.status);
       return InkWell(
         onTap: onTap,
         child: Container(
@@ -269,7 +265,8 @@ class TaskRow extends StatelessWidget {
                     if (age.isNotEmpty) ...[
                       const SizedBox(width: 10),
                       Text(age,
-                          style: sans(13, color: AppColors.fg4, tabular: true)),
+                          style:
+                              sans(13, color: AppColors.fg4, tabular: true)),
                     ],
                   ]),
                   if (detail.isNotEmpty || task.priority > 0) ...[
@@ -296,8 +293,8 @@ class TaskRow extends StatelessWidget {
       );
     }
     if (!kMobile) {
-      final done =
-          task.status == TaskStatus.done || task.status == TaskStatus.cancelled;
+      final done = task.status == TaskStatus.done ||
+          task.status == TaskStatus.cancelled;
       return Material(
         color: selected ? AppColors.accentBg : Colors.transparent,
         borderRadius: BorderRadius.circular(7),
@@ -350,7 +347,8 @@ class TaskRow extends StatelessWidget {
                 ),
                 if (age.isNotEmpty) ...[
                   const SizedBox(width: 8),
-                  Text(age, style: mono(11, color: AppColors.fg4)),
+                  Text(age,
+                      style: mono(11, color: AppColors.fg4)),
                 ],
               ],
             ),

@@ -147,8 +147,7 @@ class _AddMachineDialogState extends State<_AddMachineDialog> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text('Connect a machine',
-                              style: display(kMobile ? 16 : 14)),
+                          Text('Connect a machine', style: display(kMobile ? 16 : 14)),
                           const SizedBox(height: 2),
                           Text('Link this app to a computer running snippet',
                               style: TS.caption()),
@@ -402,7 +401,9 @@ class _AddInstanceScreenState extends State<AddInstanceScreen>
                       borderRadius: BorderRadius.circular(R.card)),
                   child: AppIcon('camera-off', size: 26, color: AppColors.fg3)),
               const SizedBox(height: 12),
-              Text('Camera access needed', style: TS.sectionTitle()),
+              Text('Camera access needed',
+                  style:
+                      TS.sectionTitle()),
               const SizedBox(height: 8),
               ConstrainedBox(
                   constraints: BoxConstraints(maxWidth: 250),

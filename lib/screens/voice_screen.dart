@@ -57,8 +57,8 @@ class _VoiceScreenState extends State<VoiceScreen> {
     super.dispose();
   }
 
-  void _resetLive() => _live.value =
-      const EnrolLive(Duration.zero, [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+  void _resetLive() => _live.value = const EnrolLive(
+      Duration.zero, [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
 
   Future<void> _teardownRecorder() async {
     _tick?.cancel();

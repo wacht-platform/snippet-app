@@ -25,8 +25,9 @@ void main() {
         body: Align(
           alignment: Alignment.bottomCenter,
           child: ConstrainedBox(
-            constraints:
-                BoxConstraints(maxHeight: paneHeight * 0.6, maxWidth: 700),
+            constraints: BoxConstraints(
+                maxHeight: paneHeight * 0.6,
+                maxWidth: 700),
             child: bar,
           ),
         ),

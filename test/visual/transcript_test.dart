@@ -94,10 +94,7 @@ void main() {
                           DenseToolRow(
                             tool: 'bash',
                             args: {'command': 'flutter analyze lib/'},
-                            result: {
-                              'status': 'error',
-                              'stderr': 'exit status 1'
-                            },
+                            result: {'status': 'error', 'stderr': 'exit status 1'},
                           ),
                         ],
                         running: false,
@@ -115,8 +112,7 @@ void main() {
         ));
         // Fixed pump: the fixture has a spinner-free tree, but keep the habit.
         await tester.pump(const Duration(milliseconds: 120));
-        await expectGolden(tester, find.byType(MaterialApp),
-            'goldens/transcript_$density.png');
+        await expectGolden(tester, find.byType(MaterialApp), 'goldens/transcript_$density.png');
       } finally {
         debugDefaultTargetPlatformOverride = null;
       }

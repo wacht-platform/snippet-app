@@ -147,8 +147,7 @@ class _LeftRail extends StatelessWidget {
                     onTap: () => presentScreen(
                           context,
                           style: PanelStyle.drawer,
-                          purpose: ShellPanelPurpose.agents,
-                          originClient: state.client,
+                          purpose: ShellPanelPurpose.agents, originClient: state.client,
                           builder: (_, close) =>
                               CoordinationAgentDirectory(client: state.client),
                         )),

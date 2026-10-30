@@ -19,8 +19,8 @@ class _Daemon extends DaemonClient {
   }
 }
 
-CallEvent _prompt(int expires) =>
-    CallEvent(type: callPromptType, callId: 'c1', expiresAtMs: expires);
+CallEvent _prompt(int expires) => CallEvent(
+    type: callPromptType, callId: 'c1', expiresAtMs: expires);
 
 void main() {
   const url = 'http://127.0.0.1:9090';
@@ -52,8 +52,11 @@ void main() {
     });
 
     test('call_state and non-call events', () {
-      final s = parseCallEvent(
-          {'type': 'call_state', 'call_id': 'c1', 'state': 'declined'})!;
+      final s = parseCallEvent({
+        'type': 'call_state',
+        'call_id': 'c1',
+        'state': 'declined'
+      })!;
       expect(s.isPrompt, isFalse);
       expect(s.state, 'declined');
       expect(parseCallEvent({'kind': 'waiting', 'session': 's'}), isNull);
@@ -113,8 +116,8 @@ void main() {
     test('call_state cancels the pending prompt', () {
       final tracker = CallTracker()..apply(url, _prompt(far));
       expect(tracker.state.value!.phase, CallPhase.pending);
-      final other =
-          CallEvent(type: callStateType, callId: 'other', state: 'declined');
+      final other = CallEvent(
+          type: callStateType, callId: 'other', state: 'declined');
       expect(tracker.apply(url, other), isFalse);
       expect(tracker.state.value, isNotNull);
       for (final s in ['declined', 'expired']) {

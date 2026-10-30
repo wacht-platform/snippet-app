@@ -93,8 +93,9 @@ class _SessionSidePanelState extends State<SessionSidePanel> {
     super.dispose();
   }
 
-  RightTab? get _readout =>
-      widget.readouts.where((r) => r.key == widget.activeReadout).firstOrNull;
+  RightTab? get _readout => widget.readouts
+      .where((r) => r.key == widget.activeReadout)
+      .firstOrNull;
 
   String _short(String label) =>
       label.startsWith('Artifacts') ? 'Artifacts' : label;
@@ -229,7 +230,8 @@ class _SessionSidePanelState extends State<SessionSidePanel> {
                               size: 28,
                               iconSize: 14,
                               tooltip: 'Open as tab',
-                              onTap: () => widget.onExpandReadout!(_readout!)),
+                              onTap: () =>
+                                  widget.onExpandReadout!(_readout!)),
                       ]),
                     ),
                     Expanded(
@@ -241,23 +243,23 @@ class _SessionSidePanelState extends State<SessionSidePanel> {
                   ],
                 )
               : widget.workspacePath.isEmpty
-                  ? const SizedBox()
-                  : _changes
-                      ? GitDiffSidebarPanel(
-                          key: ValueKey('git-${widget.workspacePath}'),
-                          client: widget.client,
-                          workspacePath: widget.workspacePath,
-                          sessionId: widget.sessionId,
-                          onOpenDiff: widget.onOpenDiff,
-                          header: _segs(),
-                        )
-                      : FileTreeSidebarPanel(
-                          key: ValueKey('files-${widget.workspacePath}'),
-                          client: widget.client,
-                          workspacePath: widget.workspacePath,
-                          onOpenFile: widget.onOpenFile,
-                          header: _segs(),
-                        ),
+              ? const SizedBox()
+              : _changes
+              ? GitDiffSidebarPanel(
+                  key: ValueKey('git-${widget.workspacePath}'),
+                  client: widget.client,
+                  workspacePath: widget.workspacePath,
+                  sessionId: widget.sessionId,
+                  onOpenDiff: widget.onOpenDiff,
+                  header: _segs(),
+                )
+              : FileTreeSidebarPanel(
+                  key: ValueKey('files-${widget.workspacePath}'),
+                  client: widget.client,
+                  workspacePath: widget.workspacePath,
+                  onOpenFile: widget.onOpenFile,
+                  header: _segs(),
+                ),
         ),
         Container(height: 1, color: AppColors.border),
         header,

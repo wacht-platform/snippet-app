@@ -20,7 +20,8 @@ class NewSessionDraft extends StatefulWidget {
   final String machineLabel;
   final String? folder;
   final Future<void> Function(
-      String folder, WorkspaceMode mode, String? profile, String text) onStart;
+          String folder, WorkspaceMode mode, String? profile, String text)
+      onStart;
 
   @override
   State<NewSessionDraft> createState() => _NewSessionDraftState();
@@ -63,8 +64,8 @@ class _NewSessionDraftState extends State<NewSessionDraft> {
       if (!mounted) return;
       setState(() {
         _profiles = cfg.profiles;
-        _profile =
-            cfg.active ?? cfg.profiles.where((p) => p.active).firstOrNull?.name;
+        _profile = cfg.active ??
+            cfg.profiles.where((p) => p.active).firstOrNull?.name;
       });
     } catch (_) {}
   }
@@ -180,8 +181,8 @@ class _NewSessionDraftState extends State<NewSessionDraft> {
       borderRadius: BorderRadius.circular(13),
       child: InkWell(
         borderRadius: BorderRadius.circular(13),
-        onTap: () => setState(
-            () => _mode = on ? WorkspaceMode.folder : WorkspaceMode.worktree),
+        onTap: () => setState(() => _mode =
+            on ? WorkspaceMode.folder : WorkspaceMode.worktree),
         child: Container(
           height: 26,
           padding: const EdgeInsets.symmetric(horizontal: 9),
@@ -274,15 +275,16 @@ class _NewSessionDraftState extends State<NewSessionDraft> {
                               focusNode: _focus,
                               minLines: 2,
                               maxLines: 10,
-                              style:
-                                  sans(14.5, height: 1.5, color: AppColors.fg1),
+                              style: sans(14.5,
+                                  height: 1.5, color: AppColors.fg1),
                               decoration: InputDecoration(
                                 isCollapsed: true,
                                 border: InputBorder.none,
                                 contentPadding:
                                     const EdgeInsets.fromLTRB(18, 12, 18, 6),
                                 hintText: 'Ask, build, or type / for commands',
-                                hintStyle: sans(14.5, color: AppColors.fg4),
+                                hintStyle:
+                                    sans(14.5, color: AppColors.fg4),
                               ),
                             ),
                           ),
@@ -367,8 +369,8 @@ Future<String?> _showFolderPopover(
   final box = anchor?.findRenderObject() as RenderBox?;
   if (box != null) {
     final origin = box.localToGlobal(Offset.zero);
-    left = origin.dx
-        .clamp(12.0, (screen.width - width - 12).clamp(12.0, double.infinity));
+    left = origin.dx.clamp(
+        12.0, (screen.width - width - 12).clamp(12.0, double.infinity));
     top = origin.dy + box.size.height + 6;
   }
   final maxHeight = (screen.height - top - 16).clamp(220.0, 360.0);
@@ -445,9 +447,8 @@ class _FolderPopoverState extends State<_FolderPopover> {
     try {
       final res = await widget.client.fs(path);
       if (!mounted || id != _run) return;
-      final learnHome = _homePath == null &&
-          (path == null || path.isEmpty) &&
-          res.path.isNotEmpty;
+      final learnHome =
+          _homePath == null && (path == null || path.isEmpty) && res.path.isNotEmpty;
       setState(() {
         if (learnHome) _homePath = res.path;
         _listing = res;
@@ -492,8 +493,7 @@ class _FolderPopoverState extends State<_FolderPopover> {
     final home = _homePath;
     if (home != null && home.isNotEmpty) {
       if (_here == home) return '~';
-      if (_here.startsWith('$home/'))
-        return '~/${_here.substring(home.length + 1)}';
+      if (_here.startsWith('$home/')) return '~/${_here.substring(home.length + 1)}';
     }
     return _here;
   }
@@ -512,9 +512,7 @@ class _FolderPopoverState extends State<_FolderPopover> {
     final home = _homePath;
     final here = _here;
     if (here.isEmpty) return const [];
-    if (home != null &&
-        home.isNotEmpty &&
-        (here == home || here.startsWith('$home/'))) {
+    if (home != null && home.isNotEmpty && (here == home || here.startsWith('$home/'))) {
       final out = <({String label, String path})>[(label: '~', path: home)];
       if (here == home) return out;
       var acc = home;
@@ -731,38 +729,38 @@ class _FolderPopoverState extends State<_FolderPopover> {
                                       32.0) +
                                   12,
                               child: ListView.builder(
-                                padding: const EdgeInsets.all(6),
-                                itemExtent: 32,
-                                itemCount: dirs.length,
-                                itemBuilder: (ctx, i) {
-                                  final e = dirs[i];
-                                  return InkWell(
-                                    borderRadius: BorderRadius.circular(7),
-                                    onTap: () => _go(e.path),
-                                    child: Container(
-                                      height: 32,
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 8),
-                                      child: Row(children: [
-                                        AppIcon('folder',
-                                            size: 15, color: AppColors.fg3),
-                                        const SizedBox(width: 9),
-                                        Expanded(
-                                          child: Text(
-                                            e.name,
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                            style:
-                                                sans(13, color: AppColors.fg1),
-                                          ),
+                              padding: const EdgeInsets.all(6),
+                              itemExtent: 32,
+                              itemCount: dirs.length,
+                              itemBuilder: (ctx, i) {
+                                final e = dirs[i];
+                                return InkWell(
+                                  borderRadius: BorderRadius.circular(7),
+                                  onTap: () => _go(e.path),
+                                  child: Container(
+                                    height: 32,
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 8),
+                                    child: Row(children: [
+                                      AppIcon('folder',
+                                          size: 15, color: AppColors.fg3),
+                                      const SizedBox(width: 9),
+                                      Expanded(
+                                        child: Text(
+                                          e.name,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style:
+                                              sans(13, color: AppColors.fg1),
                                         ),
-                                        AppIcon('chevron-right',
-                                            size: 14, color: AppColors.fg4),
-                                      ]),
-                                    ),
-                                  );
-                                },
-                              ),
+                                      ),
+                                      AppIcon('chevron-right',
+                                          size: 14, color: AppColors.fg4),
+                                    ]),
+                                  ),
+                                );
+                              },
+                            ),
                             ),
             ),
             Container(
@@ -799,8 +797,9 @@ class _FolderPopoverState extends State<_FolderPopover> {
                         overflow: TextOverflow.ellipsis,
                         style: sans(12,
                             weight: FontWeight.w500,
-                            color:
-                                _here.isEmpty ? AppColors.fg4 : AppColors.bg),
+                            color: _here.isEmpty
+                                ? AppColors.fg4
+                                : AppColors.bg),
                       ),
                     ),
                   ),

@@ -102,8 +102,9 @@ class MobileShell extends StatelessWidget {
             child: AnimatedSlide(
               duration: Motion.base,
               curve: Motion.enter,
-              offset:
-                  chatsVisible ? Offset.zero : Offset(missionPair ? 1 : -1, 0),
+              offset: chatsVisible
+                  ? Offset.zero
+                  : Offset(missionPair ? 1 : -1, 0),
               child: Material(
                 color: AppColors.bg,
                 child: SafeArea(

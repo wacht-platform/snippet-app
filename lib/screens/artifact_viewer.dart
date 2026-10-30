@@ -17,69 +17,15 @@ import 'file_viewer.dart';
 import 'presented_file_card.dart';
 
 const _textExts = {
-  'txt',
-  'log',
-  'md',
-  'json',
-  'yaml',
-  'yml',
-  'toml',
-  'ini',
-  'cfg',
-  'conf',
-  'env',
-  'xml',
-  'css',
-  'scss',
-  'js',
-  'ts',
-  'tsx',
-  'jsx',
-  'dart',
-  'rs',
-  'py',
-  'go',
-  'c',
-  'h',
-  'cpp',
-  'hpp',
-  'java',
-  'kt',
-  'swift',
-  'rb',
-  'lua',
-  'sh',
-  'sql',
-  'diff',
-  'patch',
-  'lock',
-  'vue',
-  'svelte',
-  'gradle',
-  'properties',
+  'txt', 'log', 'md', 'json', 'yaml', 'yml', 'toml', 'ini', 'cfg', 'conf',
+  'env', 'xml', 'css', 'scss', 'js', 'ts', 'tsx', 'jsx', 'dart', 'rs', 'py',
+  'go', 'c', 'h', 'cpp', 'hpp', 'java', 'kt', 'swift', 'rb', 'lua', 'sh',
+  'sql', 'diff', 'patch', 'lock', 'vue', 'svelte', 'gradle', 'properties',
 };
 
 const _webExts = {
-  'html',
-  'htm',
-  'svg',
-  'png',
-  'jpg',
-  'jpeg',
-  'gif',
-  'webp',
-  'avif',
-  'css',
-  'js',
-  'mjs',
-  'json',
-  'txt',
-  'md',
-  'woff',
-  'woff2',
-  'ttf',
-  'otf',
-  'ico',
+  'html', 'htm', 'svg', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'avif', 'css',
+  'js', 'mjs', 'json', 'txt', 'md', 'woff', 'woff2', 'ttf', 'otf', 'ico',
 };
 
 String _ext(String path) {
@@ -168,8 +114,8 @@ class _HeaderDragSheetState extends State<_HeaderDragSheet> {
           child: GestureDetector(
             behavior: HitTestBehavior.translucent,
             onVerticalDragStart: (_) => setState(() => _dragging = true),
-            onVerticalDragUpdate: (d) => setState(
-                () => _dy = (_dy + d.delta.dy).clamp(0.0, double.infinity)),
+            onVerticalDragUpdate: (d) =>
+                setState(() => _dy = (_dy + d.delta.dy).clamp(0.0, double.infinity)),
             onVerticalDragEnd: (d) {
               final flick = (d.primaryVelocity ?? 0) > 700;
               if (flick || _dy > 140) {
@@ -276,8 +222,7 @@ class ArtifactRow extends StatelessWidget {
 
 bool artifactShowsInline(String kind, String? display) {
   final wanted = display == 'inline' ||
-      (display == null &&
-          (kind == 'markdown' || kind == 'csv' || kind == 'image'));
+      (display == null && (kind == 'markdown' || kind == 'csv' || kind == 'image'));
   if (!wanted) return false;
   return switch (kind) {
     'markdown' || 'csv' || 'code' || 'image' => true,
@@ -403,18 +348,18 @@ class _ArtifactInlineState extends State<ArtifactInline>
   Widget build(BuildContext context) {
     super.build(context);
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: FutureBuilder<ArtifactVersion?>(
-        future: _version,
-        builder: (context, snap) {
-          if (snap.hasError) return _note('${snap.error}');
-          if (snap.connectionState != ConnectionState.done) return _loading();
-          final v = snap.data;
-          if (v == null) return _note('This artifact is no longer available.');
-          return _body(v);
-        },
-      ),
-    );
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: FutureBuilder<ArtifactVersion?>(
+          future: _version,
+          builder: (context, snap) {
+            if (snap.hasError) return _note('${snap.error}');
+            if (snap.connectionState != ConnectionState.done) return _loading();
+            final v = snap.data;
+            if (v == null) return _note('This artifact is no longer available.');
+            return _body(v);
+          },
+        ),
+      );
   }
 }
 
@@ -459,8 +404,7 @@ String snippetPageTheme(bool dark, String bg) {
     '--sn-font': "'Inter', -apple-system, system-ui, sans-serif",
     '--sn-mono': "'JetBrains Mono', ui-monospace, monospace",
   };
-  final css =
-      ':root{${vars.entries.map((e) => '${e.key}:${e.value}').join(';')}}';
+  final css = ':root{${vars.entries.map((e) => '${e.key}:${e.value}').join(';')}}';
   return '''
 (function () {
   var d = document, h = d.head || d.documentElement;
@@ -529,9 +473,7 @@ class _ArtifactSkeletonState extends State<ArtifactSkeleton>
         if (widget.fill)
           Expanded(
               child: Skeleton(
-                  height: double.infinity,
-                  radius: 12,
-                  color: AppColors.surface1))
+                  height: double.infinity, radius: 12, color: AppColors.surface1))
         else
           Skeleton(height: 96, radius: 12, color: AppColors.surface1),
       ],
@@ -539,8 +481,8 @@ class _ArtifactSkeletonState extends State<ArtifactSkeleton>
     return Semantics(
       label: 'Loading',
       child: FadeTransition(
-        opacity: Tween(begin: 0.55, end: 1.0)
-            .animate(CurvedAnimation(parent: _pulse, curve: Curves.easeInOut)),
+        opacity: Tween(begin: 0.55, end: 1.0).animate(
+            CurvedAnimation(parent: _pulse, curve: Curves.easeInOut)),
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 8),
           child: ClipRect(child: body),
@@ -587,8 +529,7 @@ class MermaidDiagram extends StatelessWidget {
 <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
 <script>mermaid.initialize({startOnLoad:true,securityLevel:'strict',theme:'base',themeVariables:$vars});</script>
 </body></html>''';
-    return _InlineWebPage(
-        key: ValueKey('mermaid:${code.hashCode}'), html: html);
+    return _InlineWebPage(key: ValueKey('mermaid:${code.hashCode}'), html: html);
   }
 }
 
@@ -657,7 +598,8 @@ class _InlineWebPageState extends State<_InlineWebPage> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final position = Scrollable.maybeOf(context, axis: Axis.vertical)?.position;
+    final position =
+        Scrollable.maybeOf(context, axis: Axis.vertical)?.position;
     if (!identical(position, _position)) {
       _position?.removeListener(_checkOnScreen);
       _position = position;
@@ -668,10 +610,7 @@ class _InlineWebPageState extends State<_InlineWebPage> {
   void _checkOnScreen() {
     final box = context.findRenderObject();
     final viewport = _position?.context.notificationContext?.findRenderObject();
-    if (box is! RenderBox ||
-        viewport is! RenderBox ||
-        !box.attached ||
-        !viewport.attached) return;
+    if (box is! RenderBox || viewport is! RenderBox || !box.attached || !viewport.attached) return;
     final top = box.localToGlobal(Offset.zero).dy;
     final viewTop = viewport.localToGlobal(Offset.zero).dy;
     const margin = 600.0;
@@ -679,7 +618,6 @@ class _InlineWebPageState extends State<_InlineWebPage> {
         top < viewTop + viewport.size.height + margin;
     if (visible != _onScreen) setState(() => _onScreen = visible);
   }
-
   String _bg = '#000000';
   bool _dark = true;
 
@@ -832,8 +770,7 @@ class _ArtifactViewerState extends State<ArtifactViewer> {
     super.initState();
     _n = widget.version;
     _load();
-    _poll =
-        Timer.periodic(const Duration(seconds: 5), (_) => _load(quiet: true));
+    _poll = Timer.periodic(const Duration(seconds: 5), (_) => _load(quiet: true));
   }
 
   @override
@@ -879,8 +816,7 @@ class _ArtifactViewerState extends State<ArtifactViewer> {
     }
     try {
       toast(context, 'Preparing ${a.title}…');
-      final path =
-          await widget.client.zipArtifact(widget.session, a.id, version: v.n);
+      final path = await widget.client.zipArtifact(widget.session, a.id, version: v.n);
       if (!mounted) return;
       final msg = await downloadRemoteFileWithCancel(context, widget.client,
           path: path, name: '${a.id}-v${v.n}.zip');
@@ -1054,8 +990,7 @@ class _ArtifactViewerState extends State<ArtifactViewer> {
         if (a != null)
           Padding(
             padding: const EdgeInsets.only(right: 10),
-            child: AppIcon(artifactIcon(a.kind),
-                size: 16, color: AppColors.accent),
+            child: AppIcon(artifactIcon(a.kind), size: 16, color: AppColors.accent),
           ),
         Expanded(
           child: Text(a?.title ?? 'Artifact',
@@ -1170,8 +1105,7 @@ class _ArtifactViewerState extends State<ArtifactViewer> {
         future: _textOf(v),
         builder: (context, snap) {
           if (snap.hasError) return _centered('${snap.error}');
-          if (!snap.hasData)
-            return Center(child: Spinner(size: 16, color: AppColors.fg3));
+          if (!snap.hasData) return Center(child: Spinner(size: 16, color: AppColors.fg3));
           return render(snap.data!);
         },
       );
@@ -1224,8 +1158,7 @@ class _ArtifactViewerState extends State<ArtifactViewer> {
         if (!_canEmbedWeb) {
           return _centered('This page opens in your browser.',
               action: TextButton(
-                  onPressed: _openInBrowser,
-                  child: const Text('Open in browser')));
+                  onPressed: _openInBrowser, child: const Text('Open in browser')));
         }
         return _WebPreview(key: ValueKey(v.url), uri: uri);
     }
@@ -1239,8 +1172,7 @@ class _ArtifactViewerState extends State<ArtifactViewer> {
       color: AppColors.bg,
       child: SafeArea(
         bottom: false,
-        child:
-            Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           _header(),
           Expanded(
             child: _error != null
@@ -1504,8 +1436,7 @@ class _SessionDeliverablesState extends State<SessionDeliverables> {
       color: AppColors.bg,
       child: SafeArea(
         bottom: false,
-        child:
-            Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           if (kMobile)
             Center(
               child: Container(
@@ -1519,73 +1450,68 @@ class _SessionDeliverablesState extends State<SessionDeliverables> {
               ),
             ),
           if (!ShellPanelRoot.inPanel(context))
-            Container(
-              padding: EdgeInsets.fromLTRB(16, kMobile ? 8 : 12, 8, 10),
-              child: Row(children: [
-                Expanded(
-                  child: Text('Artifacts & files',
-                      style: sans(15, weight: W.label, color: AppColors.fg1)),
-                ),
-                if (widget.onClose != null)
-                  IconBtn('x',
-                      size: 32,
-                      iconSize: 15,
-                      tooltip: 'Close',
-                      onTap: widget.onClose),
-              ]),
-            ),
+          Container(
+            padding: EdgeInsets.fromLTRB(16, kMobile ? 8 : 12, 8, 10),
+            child: Row(children: [
+              Expanded(
+                child: Text('Artifacts & files',
+                    style: sans(15, weight: W.label, color: AppColors.fg1)),
+              ),
+              if (widget.onClose != null)
+                IconBtn('x',
+                    size: 32,
+                    iconSize: 15,
+                    tooltip: 'Close',
+                    onTap: widget.onClose),
+            ]),
+          ),
           Expanded(
             child: _error != null
-                ? EmptyState(
-                    icon: 'alert-triangle',
-                    title: 'Couldn\'t load artifacts',
-                    body: _error)
+                ? EmptyState(icon: 'alert-triangle', title: 'Couldn\'t load artifacts', body: _error)
                 : artifacts == null
                     ? Center(child: Spinner(size: 16, color: AppColors.fg3))
                     : artifacts.isEmpty && files.isEmpty
                         ? const EmptyState(
                             icon: 'layers',
                             title: 'Nothing shared yet',
-                            body:
-                                'Artifacts and files the agent hands over in this chat collect here.',
+                            body: 'Artifacts and files the agent hands over in this chat collect here.',
                           )
                         : !kMobile
-                            ? ArtifactGrid(
-                                client: widget.client,
-                                session: widget.session,
-                                artifacts: artifacts,
-                                files: files,
-                                onOpenFileTab: widget.onOpenFileTab,
-                              )
-                            : ListView(
-                                padding:
-                                    const EdgeInsets.fromLTRB(16, 0, 16, 32),
-                                children: [
-                                  if (artifacts.isNotEmpty) ...[
-                                    _section('Artifacts · ${artifacts.length}'),
-                                    for (final a in artifacts)
-                                      ArtifactRow(
-                                        client: widget.client,
-                                        session: widget.session,
-                                        id: a.id,
-                                        version: a.latest?.n ?? 1,
-                                        title: a.title,
-                                        kind: a.kind,
-                                        caption: a.caption,
-                                      ),
-                                  ],
-                                  if (files.isNotEmpty) ...[
-                                    _section('Files · ${files.length}'),
-                                    for (final f in files)
-                                      PresentedFileCard(
-                                        client: widget.client,
-                                        path: f.path,
-                                        caption: f.caption,
-                                        onOpenFileTab: widget.onOpenFileTab,
-                                      ),
-                                  ],
-                                ],
-                              ),
+                        ? ArtifactGrid(
+                            client: widget.client,
+                            session: widget.session,
+                            artifacts: artifacts,
+                            files: files,
+                            onOpenFileTab: widget.onOpenFileTab,
+                          )
+                        : ListView(
+                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+                            children: [
+                              if (artifacts.isNotEmpty) ...[
+                                _section('Artifacts · ${artifacts.length}'),
+                                for (final a in artifacts)
+                                  ArtifactRow(
+                                    client: widget.client,
+                                    session: widget.session,
+                                    id: a.id,
+                                    version: a.latest?.n ?? 1,
+                                    title: a.title,
+                                    kind: a.kind,
+                                    caption: a.caption,
+                                  ),
+                              ],
+                              if (files.isNotEmpty) ...[
+                                _section('Files · ${files.length}'),
+                                for (final f in files)
+                                  PresentedFileCard(
+                                    client: widget.client,
+                                    path: f.path,
+                                    caption: f.caption,
+                                    onOpenFileTab: widget.onOpenFileTab,
+                                  ),
+                              ],
+                            ],
+                          ),
           ),
         ]),
       ),

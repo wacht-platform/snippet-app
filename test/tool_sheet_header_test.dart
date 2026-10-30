@@ -15,24 +15,20 @@ void main() {
         await tester.binding.setSurfaceSize(const Size(390, 844));
         addTearDown(() => tester.binding.setSurfaceSize(null));
         final batch = ValueNotifier(const ToolBatch([
-          ToolStep(
-              tool: 'bash', args: {'command': 'echo hello'}, result: 'hello'),
+          ToolStep(tool: 'bash', args: {'command': 'echo hello'}, result: 'hello'),
         ]));
         addTearDown(batch.dispose);
         await tester.pumpWidget(MaterialApp(
           theme: buildAppTheme(),
           builder: (context, child) => MediaQuery(
-            data: MediaQuery.of(context)
-                .copyWith(textScaler: TextScaler.linear(scale)),
+            data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(scale)),
             child: child!,
           ),
-          home: Scaffold(
-              body: Builder(
-                  builder: (context) => TextButton(
-                        onPressed: () => showToolBatchSheet(context,
-                            batch: batch, initialStep: detail ? 0 : null),
-                        child: const Text('Open'),
-                      ))),
+          home: Scaffold(body: Builder(builder: (context) => TextButton(
+            onPressed: () => showToolBatchSheet(context, batch: batch,
+                initialStep: detail ? 0 : null),
+            child: const Text('Open'),
+          ))),
         ));
         await tester.tap(find.text('Open'));
         await tester.pumpAndSettle();
@@ -41,8 +37,8 @@ void main() {
           final title = find.text('Activity');
           expect(tester.widget<Text>(title).style!.fontSize, 20);
           final sheetTop = tester.getRect(find.byType(ToolBatchView)).top;
-          final close = find.byWidgetPredicate(
-              (widget) => widget is IconBtn && widget.tooltip == 'Close');
+          final close = find.byWidgetPredicate((widget) =>
+              widget is IconBtn && widget.tooltip == 'Close');
           final closeBounds = tester.getRect(close);
           expect(closeBounds.width, greaterThanOrEqualTo(44));
           expect(closeBounds.height, greaterThanOrEqualTo(44));
@@ -53,19 +49,16 @@ void main() {
           expect(handle, findsOneWidget);
           expect(tester.getRect(handle).top - sheetTop, lessThanOrEqualTo(10));
           expect(tester.takeException(), isNull);
-          await tester
-              .tapAt(Offset(closeBounds.left + 2, closeBounds.center.dy));
+          await tester.tapAt(Offset(closeBounds.left + 2, closeBounds.center.dy));
           await tester.pumpAndSettle();
           expect(find.byType(ToolBatchView), findsNothing);
           debugDefaultTargetPlatformOverride = null;
           return;
         }
         final title = find.text(detail ? 'Command' : 'Activity');
-        final header = find.ancestor(
-            of: title,
-            matching: find.byWidgetPredicate(
-              (widget) => widget.runtimeType.toString() == '_SheetHeader',
-            ));
+        final header = find.ancestor(of: title, matching: find.byWidgetPredicate(
+          (widget) => widget.runtimeType.toString() == '_SheetHeader',
+        ));
         final bounds = tester.getRect(header);
         final sheetBounds = tester.getRect(find.byType(ToolBatchView));
         expect(bounds.top, sheetBounds.top);
@@ -76,21 +69,17 @@ void main() {
         }
         final titleWidget = tester.widget<Text>(title);
         expect(titleWidget.style!.fontSize, detail ? 13 : 15);
-        final close = find.byWidgetPredicate(
-            (widget) => widget is IconBtn && widget.tooltip == 'Close');
+        final close = find.byWidgetPredicate((widget) =>
+            widget is IconBtn && widget.tooltip == 'Close');
         final closeBounds = tester.getRect(close);
         expect(closeBounds.width, greaterThanOrEqualTo(44));
         expect(closeBounds.height, greaterThanOrEqualTo(44));
         expect(bounds.contains(closeBounds.topLeft), isTrue);
         expect(closeBounds.bottom, lessThanOrEqualTo(bounds.bottom));
-        final handle = find.descendant(
-            of: header,
-            matching: find.byWidgetPredicate(
-              (widget) =>
-                  widget is Container &&
-                  widget.constraints?.maxWidth == 36 &&
-                  widget.constraints?.maxHeight == 4,
-            ));
+        final handle = find.descendant(of: header, matching: find.byWidgetPredicate(
+          (widget) => widget is Container && widget.constraints?.maxWidth == 36
+              && widget.constraints?.maxHeight == 4,
+        ));
         expect(handle, findsOneWidget);
         expect(tester.getRect(handle).top - bounds.top, 4);
         expect(tester.takeException(), isNull);

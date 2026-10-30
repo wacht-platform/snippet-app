@@ -33,12 +33,7 @@ class _FakeFsClient extends DaemonClient {
             'is_dir': false,
             'git': true,
           },
-          {
-            'name': 'lib',
-            'path': '/workspace/lib',
-            'is_dir': true,
-            'git': true
-          },
+          {'name': 'lib', 'path': '/workspace/lib', 'is_dir': true, 'git': true},
         ],
       });
 }

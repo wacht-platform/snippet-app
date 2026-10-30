@@ -11,8 +11,7 @@ BoxDecoration _floating(double radius) => BoxDecoration(
       color: AppColors.surface1,
       borderRadius: BorderRadius.circular(radius),
       boxShadow: [
-        BoxShadow(
-            color: AppColors.fg1.withValues(alpha: 0.08), spreadRadius: 1),
+        BoxShadow(color: AppColors.fg1.withValues(alpha: 0.08), spreadRadius: 1),
       ],
     );
 
@@ -331,11 +330,14 @@ class FloatingSearch extends StatelessWidget {
             listenable: controller,
             builder: (_, __) => controller.text.isEmpty
                 ? const SizedBox(width: 8)
-                : IconBtn('x', size: 36, iconSize: 16, tooltip: 'Clear',
+                : IconBtn('x',
+                    size: 36,
+                    iconSize: 16,
+                    tooltip: 'Clear',
                     onTap: () {
-                    controller.clear();
-                    onChanged('');
-                  }),
+                      controller.clear();
+                      onChanged('');
+                    }),
           ),
         ]),
       );
@@ -343,10 +345,7 @@ class FloatingSearch extends StatelessWidget {
 
 class AccentFab extends StatelessWidget {
   const AccentFab(
-      {super.key,
-      required this.tooltip,
-      required this.onTap,
-      this.icon = 'plus'});
+      {super.key, required this.tooltip, required this.onTap, this.icon = 'plus'});
 
   final String tooltip;
   final VoidCallback onTap;
@@ -455,8 +454,8 @@ class _MobileMenuState extends State<_MobileMenu> {
     if (c != null) {
       c.coordinationAgents().then((a) {
         if (mounted) {
-          setState(
-              () => _agents = a.where((x) => !x.isMissionControl).toList());
+          setState(() => _agents =
+              a.where((x) => !x.isMissionControl).toList());
         }
       }).catchError((_) {
         if (mounted) setState(() => _agents = const []);
@@ -562,7 +561,9 @@ class _MobileMenuState extends State<_MobileMenu> {
                   alignment: Alignment.centerLeft,
                   child: Text('AGENTS',
                       style: sans(12,
-                          weight: W.label, spacing: 0.7, color: AppColors.fg4)),
+                          weight: W.label,
+                          spacing: 0.7,
+                          color: AppColors.fg4)),
                 ),
               ),
               SizedBox(

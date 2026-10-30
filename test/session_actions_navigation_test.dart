@@ -24,8 +24,7 @@ Future<void> _openActions(WidgetTester tester, TargetPlatform platform) async {
   DaemonClient.wsConnector = (uri, {connectTimeout, pingInterval}) => _Socket();
   addTearDown(() => DaemonClient.wsConnector = null);
   SharedPreferences.setMockInitialValues({
-    'instances':
-        '[{"name":"Local","url":"http://127.0.0.1:9090","token":"tok"}]',
+    'instances': '[{"name":"Local","url":"http://127.0.0.1:9090","token":"tok"}]',
   });
   tester.view.devicePixelRatio = 1;
   tester.view.physicalSize = const Size(390, 844);
@@ -35,9 +34,7 @@ Future<void> _openActions(WidgetTester tester, TargetPlatform platform) async {
     home: const DesktopShell(),
   ));
   await _pump(tester);
-  tester
-      .widget<Sidebar>(find.byType(Sidebar))
-      .onOpenSession('actions-test', 'Action session', null);
+  tester.widget<Sidebar>(find.byType(Sidebar)).onOpenSession('actions-test', 'Action session', null);
   await _pump(tester);
   await tester.tap(find.text('Action session').first);
   await _pump(tester);
@@ -52,12 +49,8 @@ void _sessionUnchanged(WidgetTester tester) {
 
 void main() {
   for (final desktop in [false, true]) {
-    for (final sessionId in [
-      'mission-control',
-      'mission-control/session.json'
-    ]) {
-      testWidgets(
-          'MC chat $sessionId has no Tasks entry (${desktop ? 'desktop' : 'mobile'})',
+    for (final sessionId in ['mission-control', 'mission-control/session.json']) {
+      testWidgets('MC chat $sessionId has no Tasks entry (${desktop ? 'desktop' : 'mobile'})',
           (tester) async {
         debugDefaultTargetPlatformOverride =
             desktop ? TargetPlatform.linux : TargetPlatform.android;
@@ -99,9 +92,7 @@ void main() {
     }
   }
 
-  testWidgets(
-      'Android back closes root actions without consuming session history',
-      (tester) async {
+  testWidgets('Android back closes root actions without consuming session history', (tester) async {
     await _openActions(tester, TargetPlatform.android);
     await tester.binding.handlePopRoute();
     await _pump(tester);
@@ -119,9 +110,7 @@ void main() {
   });
 
   for (final platform in [TargetPlatform.android, TargetPlatform.iOS]) {
-    testWidgets(
-        '${platform.name} nested action returns to parent before closing',
-        (tester) async {
+    testWidgets('${platform.name} nested action returns to parent before closing', (tester) async {
       await _openActions(tester, platform);
       await tester.ensureVisible(find.text('Processes'));
       await tester.tap(find.text('Processes'));

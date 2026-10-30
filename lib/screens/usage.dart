@@ -115,8 +115,7 @@ class _UsageScreenState extends State<UsageScreen> {
               padding: EdgeInsets.symmetric(vertical: 48),
               child: Center(child: Spinner(size: 18)),
             )
-          : const SettingsGroup(
-              children: [SettingsRow(label: 'Loading usage…')]);
+          : const SettingsGroup(children: [SettingsRow(label: 'Loading usage…')]);
     } else if (data == null) {
       content = kMobile
           ? Padding(
@@ -150,8 +149,9 @@ class _UsageScreenState extends State<UsageScreen> {
               child: Text('No model calls in this period.',
                   textAlign: TextAlign.center, style: TS.meta()),
             )
-          : const SettingsGroup(
-              children: [SettingsRow(label: 'No model calls in this period.')]);
+          : const SettingsGroup(children: [
+              SettingsRow(label: 'No model calls in this period.')
+            ]);
     } else {
       content = Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -440,7 +440,8 @@ class _PeriodTabs extends StatelessWidget {
                     p.label,
                     style: sans(
                       13,
-                      weight: p == value ? FontWeight.w500 : FontWeight.w400,
+                      weight:
+                          p == value ? FontWeight.w500 : FontWeight.w400,
                       color: p == value ? AppColors.fg1 : AppColors.fg3,
                     ),
                   ),

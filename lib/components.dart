@@ -210,64 +210,65 @@ class SheetHeader extends StatelessWidget {
   Widget build(BuildContext context) => ShellPanelRoot.inPanel(context)
       ? const SizedBox.shrink()
       : Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const SizedBox(height: S.s8),
-            Center(
-              child: Container(
-                width: 36,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: AppColors.lineStrong,
-                  borderRadius: BorderRadius.circular(R.pill),
-                ),
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const SizedBox(height: S.s8),
+          Center(
+            child: Container(
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppColors.lineStrong,
+                borderRadius: BorderRadius.circular(R.pill),
               ),
             ),
-            Padding(
-              padding: kMobile
-                  ? const EdgeInsets.fromLTRB(20, 10, 8, 6)
-                  : const EdgeInsets.fromLTRB(S.s16, S.s4, S.s6, S.s2),
-              child: Row(children: [
-                Expanded(
-                  child: Text(title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: kMobile
-                          ? sans(20,
-                              weight: FontWeight.w700,
-                              spacing: -0.4,
-                              height: 26 / 20,
-                              color: AppColors.fg1)
-                          : TS.rowTitle(AppColors.fg1).copyWith(
-                              fontWeight: weightFor(FontWeight.w600))),
-                ),
-                Tooltip(
-                  message: 'Close',
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: onClose,
-                    child: SizedBox.square(
-                      dimension: 40,
-                      child: Center(
-                        child: Container(
-                          width: 26,
-                          height: 26,
-                          decoration: BoxDecoration(
-                            color: AppColors.overlay,
-                            shape: BoxShape.circle,
-                          ),
-                          alignment: Alignment.center,
-                          child: AppIcon('x', size: 13, color: AppColors.fg3),
+          ),
+          Padding(
+            padding: kMobile
+                ? const EdgeInsets.fromLTRB(20, 10, 8, 6)
+                : const EdgeInsets.fromLTRB(S.s16, S.s4, S.s6, S.s2),
+            child: Row(children: [
+              Expanded(
+                child: Text(title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: kMobile
+                        ? sans(20,
+                            weight: FontWeight.w700,
+                            spacing: -0.4,
+                            height: 26 / 20,
+                            color: AppColors.fg1)
+                        : TS
+                            .rowTitle(AppColors.fg1)
+                            .copyWith(fontWeight: weightFor(FontWeight.w600))),
+              ),
+              Tooltip(
+                message: 'Close',
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: onClose,
+                  child: SizedBox.square(
+                    dimension: 40,
+                    child: Center(
+                      child: Container(
+                        width: 26,
+                        height: 26,
+                        decoration: BoxDecoration(
+                          color: AppColors.overlay,
+                          shape: BoxShape.circle,
                         ),
+                        alignment: Alignment.center,
+                        child: AppIcon('x', size: 13, color: AppColors.fg3),
                       ),
                     ),
                   ),
                 ),
-              ]),
-            ),
-          ],
-        );
+              ),
+            ]),
+          ),
+        ],
+      );
 }
 
 class SheetAction {
@@ -562,7 +563,8 @@ class IconTile extends StatelessWidget {
         height: 24,
         child: Center(
             child: AppIcon(icon,
-                size: 19, color: tone == Tone.neutral ? AppColors.fg3 : fg)),
+                size: 19,
+                color: tone == Tone.neutral ? AppColors.fg3 : fg)),
       );
     }
     final size = this.size;

@@ -51,63 +51,61 @@ void main() {
       (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
     try {
-      final client = _FakeDaemon();
-      var openedMissionControl = false;
-      Widget sidebar(MobileHome home) => MaterialApp(
-            home: Scaffold(
-              body: Sidebar(
-                instances: const [],
-                active: null,
-                client: client,
-                selectedSessionId: null,
-                sessions: [
-                  SessionInfo.fromJson({'id': 'mission-control'})
-                ],
-                sessionsLoading: false,
-                onRefreshSessions: () {},
-                onNewSession: () {},
-                onSelectInstance: (_) {},
-                onOpenMissionControl: () => openedMissionControl = true,
-                onOpenSession: (_, __, ___) {},
-                onAddInstance: () {},
-                onRenameInstance: (_, __) {},
-                onRemoveInstance: (_) {},
-                onSessionDeleted: (_) {},
-                health: const {},
-                onRefreshHealth: () {},
-                topInset: false,
-                mobileHome: home,
-                onMobileHome: (_) {},
-                settingsSection: null,
-                onSettingsSection: (_) {},
-                agent: null,
-                onAgent: (_) {},
-              ),
+    final client = _FakeDaemon();
+    var openedMissionControl = false;
+    Widget sidebar(MobileHome home) => MaterialApp(
+          home: Scaffold(
+            body: Sidebar(
+              instances: const [],
+              active: null,
+              client: client,
+              selectedSessionId: null,
+              sessions: [SessionInfo.fromJson({'id': 'mission-control'})],
+              sessionsLoading: false,
+              onRefreshSessions: () {},
+              onNewSession: () {},
+              onSelectInstance: (_) {},
+              onOpenMissionControl: () => openedMissionControl = true,
+              onOpenSession: (_, __, ___) {},
+              onAddInstance: () {},
+              onRenameInstance: (_, __) {},
+              onRemoveInstance: (_) {},
+              onSessionDeleted: (_) {},
+              health: const {},
+              onRefreshHealth: () {},
+              topInset: false,
+              mobileHome: home,
+              onMobileHome: (_) {},
+              settingsSection: null,
+              onSettingsSection: (_) {},
+              agent: null,
+              onAgent: (_) {},
             ),
-          );
-      await tester.pumpWidget(sidebar(MobileHome.tasks));
-      await tester.pumpAndSettle();
-      expect(find.byTooltip('Mission Control'), findsNothing);
-      expect(find.byTooltip('Add machine'), findsNothing);
+          ),
+        );
+    await tester.pumpWidget(sidebar(MobileHome.tasks));
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('Mission Control'), findsNothing);
+    expect(find.byTooltip('Add machine'), findsNothing);
 
-      await tester.pumpWidget(sidebar(MobileHome.chats));
-      await tester.pumpAndSettle();
-      expect(find.byType(MissionControlCard), findsNothing);
-      await tester.pumpWidget(sidebar(MobileHome.agents));
-      await tester.pumpAndSettle();
-      expect(find.byType(MissionControlCard), findsOneWidget);
-      await tester.tap(find.byType(MissionControlCard));
-      expect(openedMissionControl, isTrue);
-      await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpWidget(sidebar(MobileHome.chats));
+    await tester.pumpAndSettle();
+    expect(find.byType(MissionControlCard), findsNothing);
+    await tester.pumpWidget(sidebar(MobileHome.agents));
+    await tester.pumpAndSettle();
+    expect(find.byType(MissionControlCard), findsOneWidget);
+    await tester.tap(find.byType(MissionControlCard));
+    expect(openedMissionControl, isTrue);
+    await tester.pumpWidget(const SizedBox.shrink());
     } finally {
       debugDefaultTargetPlatformOverride = null;
     }
   });
 
-  testWidgets(
-      'a background revalidation updates silently — no spinner, no error state',
+  testWidgets('a background revalidation updates silently — no spinner, no error state',
       (tester) async {
-    final client = _FakeDaemon()..items = [_task('1', 'First task', 'todo')];
+    final client = _FakeDaemon()
+      ..items = [_task('1', 'First task', 'todo')];
     await _pump(tester, client);
     expect(find.text('First task'), findsOneWidget);
 

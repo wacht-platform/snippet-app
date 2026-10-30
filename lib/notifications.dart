@@ -384,8 +384,8 @@ Future<void> notifyCallPrompt({
   FlutterLocalNotificationsPlugin? plugin,
 }) async {
   if (!kMobile || !kCanNotify) return;
-  final remaining =
-      event.expiresAtMs - (nowMs ?? DateTime.now().millisecondsSinceEpoch);
+  final remaining = event.expiresAtMs -
+      (nowMs ?? DateTime.now().millisecondsSinceEpoch);
   if (event.expiresAtMs > 0 && remaining <= 0) return;
   await (plugin ?? _mainNotif).show(
     id: callNotificationId(event.callId),
@@ -578,10 +578,7 @@ Future<void> initNotifications() async {
     'waiting' => ('${inst.label} needs your input', title),
     'done' => ('${inst.label} finished', title),
     'error' => ('${inst.label} hit an error', title),
-    'idle' => (
-        title.isEmpty ? 'Session' : title,
-        stoppedSummary(e['lanes_running'])
-      ),
+    'idle' => (title.isEmpty ? 'Session' : title, stoppedSummary(e['lanes_running'])),
     'ping' => (title.isEmpty ? 'Mission Control' : title, message),
     'term' => (
         message.isEmpty ? '${inst.label} · $title' : message,
@@ -607,10 +604,7 @@ Future<void> initNotifications() async {
 
 String stoppedSummary(Object? lanes) {
   final names = lanes is List
-      ? lanes
-          .map((l) => l.toString().trim())
-          .where((l) => l.isNotEmpty)
-          .toList()
+      ? lanes.map((l) => l.toString().trim()).where((l) => l.isNotEmpty).toList()
       : const <String>[];
   if (names.isEmpty) return 'Finished · standing by';
   if (names.length == 1) return 'Paused while a lane works: ${names.first}';

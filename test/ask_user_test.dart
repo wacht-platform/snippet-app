@@ -5,8 +5,7 @@ import 'package:snippet/screens/session.dart';
 import 'package:snippet/theme.dart';
 
 void main() {
-  testWidgets(
-      'ask_user: recommended preselected, multi-choice, review, answer text',
+  testWidgets('ask_user: recommended preselected, multi-choice, review, answer text',
       (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
     try {
@@ -26,11 +25,7 @@ void main() {
                       'kind': 'multi_choice',
                       'choices': [
                         {'value': 'macos', 'label': 'macOS'},
-                        {
-                          'value': 'android',
-                          'label': 'Android',
-                          'recommended': true
-                        },
+                        {'value': 'android', 'label': 'Android', 'recommended': true},
                       ]
                     }
                   },
@@ -38,11 +33,7 @@ void main() {
                     'id': 'ship',
                     'header': 'Ship',
                     'text': 'Publish now?',
-                    'answer_kind': {
-                      'kind': 'confirm',
-                      'confirm_label': 'Publish',
-                      'cancel_label': 'Hold'
-                    }
+                    'answer_kind': {'kind': 'confirm', 'confirm_label': 'Publish', 'cancel_label': 'Hold'}
                   }
                 ]
               },

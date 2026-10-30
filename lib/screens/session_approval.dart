@@ -96,8 +96,7 @@ class _QuestionRecord extends StatelessWidget {
               children: [
                 for (final (q, a) in rows) ...[
                   Text(q,
-                      style:
-                          sans(14.5, height: 20 / 14.5, color: AppColors.fg2)),
+                      style: sans(14.5, height: 20 / 14.5, color: AppColors.fg2)),
                   const SizedBox(height: 3),
                   Text(a == null || a.isEmpty ? 'Not answered' : a,
                       style: sans(14.5,
@@ -154,8 +153,7 @@ class _QuestionRecord extends StatelessWidget {
               Text(answered ? 'answered' : 'no answer',
                   style: kMobile
                       ? sans(13, color: answered ? AppColors.ok : AppColors.fg4)
-                      : mono(10,
-                          color: answered ? AppColors.ok : AppColors.fg3)),
+                      : mono(10, color: answered ? AppColors.ok : AppColors.fg3)),
             ]),
             if (ctx != null) ...[
               const SizedBox(height: 5),
@@ -407,8 +405,7 @@ class _PlanCard extends StatelessWidget {
                     Padding(
                       padding: const EdgeInsets.only(top: 3),
                       child: switch (step['status']?.toString()) {
-                        'done' ||
-                        'completed' =>
+                        'done' || 'completed' =>
                           AppIcon('check', size: 14, color: AppColors.ok),
                         'in_progress' => Container(
                             width: 14,
@@ -422,8 +419,8 @@ class _PlanCard extends StatelessWidget {
                             height: 14,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              border:
-                                  Border.all(color: AppColors.fg4, width: 1.5),
+                              border: Border.all(
+                                  color: AppColors.fg4, width: 1.5),
                             ),
                           ),
                       },
@@ -872,10 +869,7 @@ class QuestionBarState extends State<QuestionBar> {
             ),
             if (!kMobile && index < 9) ...[
               const SizedBox(width: 8),
-              Text('${index + 1}',
-                  style: (kMobile
-                      ? sans(13, color: AppColors.fg4)
-                      : mono(10, color: AppColors.fg4))),
+              Text('${index + 1}', style: (kMobile ? sans(13, color: AppColors.fg4) : mono(10, color: AppColors.fg4))),
             ],
           ]),
         ),
@@ -976,8 +970,8 @@ class QuestionBarState extends State<QuestionBar> {
   List<Widget> _reviewRows() => [
         const SizedBox(height: 8),
         Text('Check your answers',
-            style: sans(kMobile ? 15 : 14,
-                weight: W.strong, color: AppColors.fg1)),
+            style:
+                sans(kMobile ? 15 : 14, weight: W.strong, color: AppColors.fg1)),
         const SizedBox(height: 6),
         for (var i = 0; i < _questions.length; i++)
           InkWell(
@@ -999,10 +993,7 @@ class QuestionBarState extends State<QuestionBar> {
                       style: sans(13, height: 1.4, color: AppColors.fg1)),
                 ),
                 const SizedBox(width: 8),
-                Text('Edit',
-                    style: (kMobile
-                        ? sans(13, color: AppColors.accent)
-                        : mono(10, color: AppColors.accent))),
+                Text('Edit', style: (kMobile ? sans(13, color: AppColors.accent) : mono(10, color: AppColors.accent))),
               ]),
             ),
           ),
@@ -1033,8 +1024,7 @@ class QuestionBarState extends State<QuestionBar> {
           decoration: BoxDecoration(
             color: AppColors.surface1,
             border: Border.all(
-                color:
-                    AppColors.accent.withValues(alpha: kMobile ? 0.3 : 0.45)),
+                color: AppColors.accent.withValues(alpha: kMobile ? 0.3 : 0.45)),
             borderRadius: BorderRadius.circular(kMobile ? 22 : R.md),
           ),
           child: Column(
@@ -1064,28 +1054,24 @@ class QuestionBarState extends State<QuestionBar> {
                       ),
                   ])
                 else
-                  Row(children: [
-                    AppIcon('message', size: 12, color: AppColors.accent),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                          _sent
-                              ? 'Sending…'
-                              : total > 1
-                                  ? 'Questions'
-                                  : 'Question',
-                          style: (kMobile
-                              ? sans(13, color: AppColors.fg3)
-                              : mono(10, color: AppColors.fg3))),
-                    ),
-                    Text(
-                        total > 1
-                            ? (_review ? 'review' : '${_step + 1} of $total')
-                            : 'waiting on you',
-                        style: (kMobile
-                            ? sans(13, color: AppColors.accent)
-                            : mono(10, color: AppColors.accent))),
-                  ]),
+                Row(children: [
+                  AppIcon('message', size: 12, color: AppColors.accent),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                        _sent
+                            ? 'Sending…'
+                            : total > 1
+                                ? 'Questions'
+                                : 'Question',
+                        style: (kMobile ? sans(13, color: AppColors.fg3) : mono(10, color: AppColors.fg3))),
+                  ),
+                  Text(
+                      total > 1
+                          ? (_review ? 'review' : '${_step + 1} of $total')
+                          : 'waiting on you',
+                      style: (kMobile ? sans(13, color: AppColors.accent) : mono(10, color: AppColors.accent))),
+                ]),
                 if (total > 1) ...[
                   const SizedBox(height: 8),
                   _tabs(),
@@ -1409,7 +1395,8 @@ class _SessionActionsPanelState extends State<_SessionActionsPanel> {
               padding: EdgeInsets.symmetric(
                   horizontal: kMobile ? 4 : 14, vertical: kMobile ? 11 : 0),
               child: Row(children: [
-                AppIcon(icon, size: kMobile ? 19 : 17, color: AppColors.fg3),
+                AppIcon(icon,
+                    size: kMobile ? 19 : 17, color: AppColors.fg3),
                 SizedBox(width: kMobile ? 14 : 12),
                 Expanded(
                   child: Column(
@@ -1419,7 +1406,8 @@ class _SessionActionsPanelState extends State<_SessionActionsPanel> {
                       Text(label,
                           style: kMobile
                               ? sans(15.5,
-                                  height: 20 / 15.5, color: AppColors.fg1)
+                                  height: 20 / 15.5,
+                                  color: AppColors.fg1)
                               : sans(13,
                                   weight: W.label, color: AppColors.fg1)),
                       if (detail != null) ...[
@@ -1479,8 +1467,8 @@ class _SessionActionsPanelState extends State<_SessionActionsPanel> {
                 decoration: BoxDecoration(
                   color: AppColors.surface1,
                   shape: BoxShape.circle,
-                  border:
-                      Border.all(color: AppColors.fg1.withValues(alpha: 0.08)),
+                  border: Border.all(
+                      color: AppColors.fg1.withValues(alpha: 0.08)),
                 ),
                 alignment: Alignment.center,
                 child: AppIcon(icon, size: 21, color: AppColors.fg1),

@@ -25,8 +25,7 @@ class _FakeDaemon extends DaemonClient {
       });
 
   @override
-  Future<RepoWorktrees> worktrees(String folder) async =>
-      RepoWorktrees.fromJson(
+  Future<RepoWorktrees> worktrees(String folder) async => RepoWorktrees.fromJson(
         repo
             ? {
                 'repo': '/code/app',

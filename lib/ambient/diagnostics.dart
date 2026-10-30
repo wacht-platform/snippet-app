@@ -17,17 +17,12 @@ class AmbientDiagnostics {
 
   static Future<void> log(String line) async {
     try {
-      final stamp = DateTime.now()
-          .toIso8601String()
-          .substring(0, 19)
-          .replaceFirst('T', ' ');
+      final stamp = DateTime.now().toIso8601String().substring(0, 19).replaceFirst('T', ' ');
       final file = await _file();
-      await file.writeAsString('$stamp ${redact(line)}\n',
-          mode: FileMode.append, flush: true);
+      await file.writeAsString('$stamp ${redact(line)}\n', mode: FileMode.append, flush: true);
       if (++_writes % 50 == 0 && await file.length() > _maxBytes) {
         final bytes = await file.readAsBytes();
-        await file.writeAsBytes(bytes.sublist(bytes.length - _keepBytes),
-            flush: true);
+        await file.writeAsBytes(bytes.sublist(bytes.length - _keepBytes), flush: true);
       }
     } catch (_) {}
   }

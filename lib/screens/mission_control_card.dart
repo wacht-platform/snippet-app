@@ -78,9 +78,7 @@ class _MissionControlCardState extends State<MissionControlCard> {
         final sign = offset < 0 ? '−' : '+';
         final oh = offset.abs() ~/ 60;
         final om = offset.abs() % 60;
-        final tz = om == 0
-            ? 'UTC$sign$oh'
-            : 'UTC$sign$oh:${om.toString().padLeft(2, '0')}';
+        final tz = om == 0 ? 'UTC$sign$oh' : 'UTC$sign$oh:${om.toString().padLeft(2, '0')}';
         return 'Next wake $hh:$mm $tz';
       }
       return 'Wakes on';
@@ -131,8 +129,9 @@ class _MissionControlCardState extends State<MissionControlCard> {
         child: InkWell(
           onTap: widget.onOpen,
           child: Padding(
-            padding: EdgeInsets.fromLTRB(kMobile ? 18 : 14, kMobile ? 14 : 11,
-                kMobile ? 12 : 10, kMobile ? 14 : 11),
+            padding: EdgeInsets.fromLTRB(
+                kMobile ? 18 : 14, kMobile ? 14 : 11, kMobile ? 12 : 10,
+                kMobile ? 14 : 11),
             child: Row(children: [
               const AgentMochi('mission-control', size: 30),
               const SizedBox(width: 12),

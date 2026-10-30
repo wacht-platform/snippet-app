@@ -374,22 +374,22 @@ class _NewSessionPickerState extends State<NewSessionPicker> {
           onBack: widget.onClose ?? () => Navigator.maybePop(context),
         )
       : Padding(
-          padding: EdgeInsets.fromLTRB(kMobile ? M.gutter : 16, 12, 10, 8),
-          child: Row(children: [
-            Expanded(
-              child: Text('New chat',
-                  style: kMobile
-                      ? sans(22, spacing: -0.5, color: AppColors.fg1)
-                      : TS.sectionTitle()),
-            ),
-            if (widget.onClose != null)
-              IconBtn('x',
-                  size: kMobile ? M.minTarget : 30,
-                  iconSize: kMobile ? 19 : 15,
-                  tooltip: 'Close',
-                  onTap: widget.onClose),
-          ]),
-        );
+        padding: EdgeInsets.fromLTRB(kMobile ? M.gutter : 16, 12, 10, 8),
+        child: Row(children: [
+          Expanded(
+            child: Text('New chat',
+                style: kMobile
+                    ? sans(22, spacing: -0.5, color: AppColors.fg1)
+                    : TS.sectionTitle()),
+          ),
+          if (widget.onClose != null)
+            IconBtn('x',
+                size: kMobile ? M.minTarget : 30,
+                iconSize: kMobile ? 19 : 15,
+                tooltip: 'Close',
+                onTap: widget.onClose),
+        ]),
+      );
 
   /// Breadcrumb + home, in place of a raw path field: it shows where you are and
   /// jumps up several levels in one tap, instead of asking you to edit text.
@@ -399,8 +399,7 @@ class _NewSessionPickerState extends State<NewSessionPicker> {
       margin: kMobile
           ? const EdgeInsets.fromLTRB(M.gutter, 4, M.gutter, 8)
           : EdgeInsets.zero,
-      padding:
-          EdgeInsets.only(left: kMobile ? 14 : 16, right: kMobile ? 4 : 16),
+      padding: EdgeInsets.only(left: kMobile ? 14 : 16, right: kMobile ? 4 : 16),
       decoration: kMobile
           ? BoxDecoration(
               color: AppColors.surface1,

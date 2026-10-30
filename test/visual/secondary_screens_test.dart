@@ -138,8 +138,7 @@ void main() {
 
         await tester.pumpWidget(_app(LanesScreen(liveLanes: () => lanes)));
         await tester.pump(const Duration(milliseconds: 120));
-        await expectGolden(
-            tester, find.byType(MaterialApp), 'goldens/lanes_$density.png');
+        await expectGolden(tester, find.byType(MaterialApp), 'goldens/lanes_$density.png');
       } finally {
         debugDefaultTargetPlatformOverride = null;
       }
@@ -163,8 +162,7 @@ void main() {
 
         await tester.pumpWidget(_app(VaultScreen(client: client)));
         await tester.pump(const Duration(milliseconds: 120));
-        await expectGolden(
-            tester, find.byType(MaterialApp), 'goldens/vault_$density.png');
+        await expectGolden(tester, find.byType(MaterialApp), 'goldens/vault_$density.png');
       } finally {
         debugDefaultTargetPlatformOverride = null;
       }
@@ -217,11 +215,10 @@ void main() {
             },
           ];
 
-        await tester
-            .pumpWidget(_app(ProcessesScreen(client: client, sessionId: 's1')));
+        await tester.pumpWidget(
+            _app(ProcessesScreen(client: client, sessionId: 's1')));
         await tester.pump(const Duration(milliseconds: 120));
-        await expectGolden(
-            tester, find.byType(MaterialApp), 'goldens/processes_$density.png');
+        await expectGolden(tester, find.byType(MaterialApp), 'goldens/processes_$density.png');
       } finally {
         debugDefaultTargetPlatformOverride = null;
       }
@@ -239,7 +236,8 @@ void main() {
           ..jobs = [
             // Relative, so "next in" stays meaningful as the clock moves; a
             // fixed epoch drifts into the past and renders "due now".
-            _job('j1', 'Board sweep', 'interval', nextRun: _inMinutes(6)),
+            _job('j1', 'Board sweep', 'interval',
+                nextRun: _inMinutes(6)),
             _job('j2', 'Morning brief', 'daily', nextRun: _inMinutes(940)),
             _job('j3', 'Stale report', 'interval',
                 enabled: false,
@@ -249,8 +247,7 @@ void main() {
 
         await tester.pumpWidget(_app(RecurringScreen(client: client)));
         await tester.pump(const Duration(milliseconds: 120));
-        await expectGolden(
-            tester, find.byType(MaterialApp), 'goldens/recurring_$density.png');
+        await expectGolden(tester, find.byType(MaterialApp), 'goldens/recurring_$density.png');
         // `RecurringScreen` watches `client.events()`. The fake throws, which the
         // screen catches and answers by scheduling a 3s reconnect timer. That
         // timer must not outlive the test, so unmount the tree — `dispose`
@@ -317,8 +314,7 @@ void main() {
 
         await tester.pumpWidget(_app(UsageScreen(client: client)));
         await tester.pump(const Duration(milliseconds: 120));
-        await expectGolden(
-            tester, find.byType(MaterialApp), 'goldens/usage_$density.png');
+        await expectGolden(tester, find.byType(MaterialApp), 'goldens/usage_$density.png');
       } finally {
         debugDefaultTargetPlatformOverride = null;
       }

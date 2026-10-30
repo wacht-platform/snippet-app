@@ -579,7 +579,8 @@ extension on _FileTreeRow {
                 child: entry.isDir
                     ? (loading
                         ? const Center(child: Spinner(size: 10))
-                        : AppIcon(expanded ? 'chevron-down' : 'chevron-right',
+                        : AppIcon(
+                            expanded ? 'chevron-down' : 'chevron-right',
                             size: 11,
                             color: hasError ? AppColors.danger : AppColors.fg4))
                     : null,

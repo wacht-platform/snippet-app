@@ -5,8 +5,7 @@ import '../../models.dart';
 import '../../platform.dart';
 import '../../theme.dart';
 import '../../widgets.dart';
-import '../mission_control/mission_control_state.dart'
-    show isDedicatedMcSession;
+import '../mission_control/mission_control_state.dart' show isDedicatedMcSession;
 
 class CreateTaskForm extends StatefulWidget {
   const CreateTaskForm({
@@ -41,8 +40,8 @@ class _CreateTaskFormState extends State<CreateTaskForm> {
       final all = await widget.client.sessions();
       if (!mounted) return;
       final usable = all
-          .where(
-              (s) => !isDedicatedMcSession(s.id) && s.id != 'mission-control')
+          .where((s) =>
+              !isDedicatedMcSession(s.id) && s.id != 'mission-control')
           .toList()
         ..sort((a, b) => b.lastActive.compareTo(a.lastActive));
       setState(() => _sessions = usable);
@@ -151,15 +150,14 @@ class _CreateTaskFormState extends State<CreateTaskForm> {
 
   @override
   Widget build(BuildContext context) => SingleChildScrollView(
-        padding:
-            EdgeInsets.fromLTRB(kMobile ? 16 : 12, 4, kMobile ? 16 : 12, 20),
+        padding: EdgeInsets.fromLTRB(
+            kMobile ? 16 : 12, 4, kMobile ? 16 : 12, 20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
               'What needs doing, and which session should do it? The task is routed there and reports back.',
-              style:
-                  sans(kMobile ? 13 : 12, color: AppColors.fg3, height: 1.45),
+              style: sans(kMobile ? 13 : 12, color: AppColors.fg3, height: 1.45),
             ),
             const SizedBox(height: 14),
             AppField(
@@ -183,8 +181,8 @@ class _CreateTaskFormState extends State<CreateTaskForm> {
                   onTap: _busy ? null : () => _pickSession(ctx),
                   borderRadius: BorderRadius.circular(8),
                   child: Padding(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 9),
                     child: Row(children: [
                       AppIcon('chat', size: 14, color: AppColors.fg3),
                       const SizedBox(width: 8),

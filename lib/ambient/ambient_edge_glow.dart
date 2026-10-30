@@ -209,8 +209,7 @@ class _AmbientEdgeGlowState extends State<AmbientEdgeGlow>
           child: IgnorePointer(
             child: RepaintBoundary(
               child: AnimatedBuilder(
-                animation:
-                    Listenable.merge([_cycleController, _fadeController]),
+                animation: Listenable.merge([_cycleController, _fadeController]),
                 builder: (context, _) {
                   final fadeVal = _fadeController.value;
                   if (fadeVal <= 0.001) {
@@ -265,8 +264,9 @@ class _AmbientEdgeGlowPainter extends CustomPainter {
 
     final tau = math.pi * 2;
     final breath = reducedMotion ? 0.5 : (0.5 + 0.5 * math.sin(t * tau));
-    final harmonic =
-        reducedMotion ? 0.0 : (0.25 * math.sin(t * 2 * tau + math.pi / 4));
+    final harmonic = reducedMotion
+        ? 0.0
+        : (0.25 * math.sin(t * 2 * tau + math.pi / 4));
 
     final double baseSpread = isMobile ? 20.0 : 26.0;
     double spread;
@@ -396,8 +396,7 @@ class _AmbientEdgeGlowPainter extends CustomPainter {
       ],
     );
     canvas.drawRect(
-      Rect.fromLTWH(
-          w - cornerRadius, h - cornerRadius, cornerRadius, cornerRadius),
+      Rect.fromLTWH(w - cornerRadius, h - cornerRadius, cornerRadius, cornerRadius),
       edgePaint,
     );
 
@@ -422,8 +421,7 @@ class _AmbientEdgeGlowPainter extends CustomPainter {
         Offset(0, h - bloomSpread),
         [bloomColor, bloomEnd],
       );
-      canvas.drawRect(
-          Rect.fromLTWH(0, h - bloomSpread, w, bloomSpread), edgePaint);
+      canvas.drawRect(Rect.fromLTWH(0, h - bloomSpread, w, bloomSpread), edgePaint);
 
       // Left bloom
       edgePaint.shader = ui.Gradient.linear(
@@ -439,8 +437,7 @@ class _AmbientEdgeGlowPainter extends CustomPainter {
         Offset(w - bloomSpread, 0),
         [bloomColor, bloomEnd],
       );
-      canvas.drawRect(
-          Rect.fromLTWH(w - bloomSpread, 0, bloomSpread, h), edgePaint);
+      canvas.drawRect(Rect.fromLTWH(w - bloomSpread, 0, bloomSpread, h), edgePaint);
     }
   }
 

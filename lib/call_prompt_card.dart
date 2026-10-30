@@ -7,8 +7,7 @@ import 'widgets.dart';
 
 /// In-app surface for a pending call prompt, or the tracking state with Stop.
 class CallPromptCard extends StatefulWidget {
-  const CallPromptCard(
-      {super.key, required this.status, required this.onAction});
+  const CallPromptCard({super.key, required this.status, required this.onAction});
   final CallStatus status;
   final Future<bool> Function(String action) onAction;
 

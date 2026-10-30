@@ -74,8 +74,7 @@ void main() {
     expect(find.byType(CustomPaint), findsNothing);
   });
 
-  testWidgets('AmbientEdgeGlow renders CustomPaint when active',
-      (tester) async {
+  testWidgets('AmbientEdgeGlow renders CustomPaint when active', (tester) async {
     await tester.pumpWidget(
       testFrame(
         child: const AmbientEdgeGlow(
@@ -137,8 +136,8 @@ void main() {
       ),
     );
     await tester.pump(const Duration(milliseconds: 400));
-    await expectGolden(tester, find.byType(MaterialApp),
-        'goldens/ambient_edge_glow_mobile_listening.png');
+    await expectGolden(
+        tester, find.byType(MaterialApp), 'goldens/ambient_edge_glow_mobile_listening.png');
 
     // 2. Mobile Phone - Snippet Speaking
     await tester.pumpWidget(
@@ -162,8 +161,8 @@ void main() {
       ),
     );
     await tester.pump(const Duration(milliseconds: 400));
-    await expectGolden(tester, find.byType(MaterialApp),
-        'goldens/ambient_edge_glow_mobile_speaking.png');
+    await expectGolden(
+        tester, find.byType(MaterialApp), 'goldens/ambient_edge_glow_mobile_speaking.png');
 
     // 3. Desktop Mac Window - Listening
     await tester.binding.setSurfaceSize(const Size(800, 600));
@@ -188,8 +187,8 @@ void main() {
       ),
     );
     await tester.pump(const Duration(milliseconds: 400));
-    await expectGolden(tester, find.byType(MaterialApp),
-        'goldens/ambient_edge_glow_desktop_listening.png');
+    await expectGolden(
+        tester, find.byType(MaterialApp), 'goldens/ambient_edge_glow_desktop_listening.png');
 
     // 4. Desktop Mac Window - Snippet Speaking
     await tester.pumpWidget(
@@ -213,8 +212,8 @@ void main() {
       ),
     );
     await tester.pump(const Duration(milliseconds: 400));
-    await expectGolden(tester, find.byType(MaterialApp),
-        'goldens/ambient_edge_glow_desktop_speaking.png');
+    await expectGolden(
+        tester, find.byType(MaterialApp), 'goldens/ambient_edge_glow_desktop_speaking.png');
 
     await tester.binding.setSurfaceSize(null);
   });

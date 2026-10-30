@@ -269,8 +269,7 @@ class InferenceProfilesScreenState extends State<InferenceProfilesScreen>
                       if (!p.usable) const WarnChip(),
                       if (p.active)
                         Text('Active',
-                            style:
-                                sans(kMobile ? 14 : 12, color: AppColors.fg3)),
+                            style: sans(kMobile ? 14 : 12, color: AppColors.fg3)),
                     ]),
                   ),
               ],
@@ -296,9 +295,12 @@ class InferenceProfilesScreenState extends State<InferenceProfilesScreen>
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          NavBackRow(title: 'Profiles', onBack: widget.onBack!, trailing: [
-            HeaderAction('Add profile', onTap: () => _edit(null)),
-          ]),
+          NavBackRow(
+              title: 'Profiles',
+              onBack: widget.onBack!,
+              trailing: [
+                HeaderAction('Add profile', onTap: () => _edit(null)),
+              ]),
           Expanded(child: body),
         ],
       );
@@ -387,8 +389,7 @@ class InferenceProfilesScreenState extends State<InferenceProfilesScreen>
             SettingsGroup(children: [
               SettingsRow(
                 label: 'No inference profiles yet',
-                sub:
-                    'Add an API key or a local model provider to start sessions.',
+                sub: 'Add an API key or a local model provider to start sessions.',
                 trailing: Btn('Add profile',
                     small: true,
                     variant: BtnVariant.secondary,
