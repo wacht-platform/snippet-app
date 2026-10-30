@@ -3,6 +3,7 @@ import 'package:url_launcher/url_launcher.dart';
 export 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 
 import 'package:flutter/material.dart';
+import 'package:markdown/markdown.dart' as md;
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter/services.dart';
 import 'package:hugeicons/hugeicons.dart';
@@ -146,6 +147,8 @@ class Pills<T> extends StatelessWidget {
         ]);
 }
 
+const _linkColor = Color(0xFF8AB4FF);
+
 final _codedLink = RegExp(r'`(\[[^\]`]+\]\((?:session|artifact):[^)\s`]+\))`');
 
 String unwrapCodedLinks(String md) =>
@@ -221,7 +224,8 @@ MarkdownStyleSheet markdownStyle(BuildContext context) {
     pPadding: EdgeInsets.zero,
     strong: TS.body(AppColors.fg1).copyWith(fontWeight: weightFor(W.strong)),
     em: TS.body().copyWith(fontStyle: FontStyle.italic),
-    a: TS.body(AppColors.accent),
+    a: TS.body(_linkColor).copyWith(
+        decoration: TextDecoration.underline, decorationColor: _linkColor.withValues(alpha: 0.5)),
     h1: TS.sectionTitle(),
     h1Padding: const EdgeInsets.only(top: S.s12, bottom: S.s4),
     h2: TS.rowTitle().copyWith(fontWeight: weightFor(W.strong)),
@@ -271,7 +275,9 @@ MarkdownStyleSheet agentMarkdownStyle(BuildContext context) {
     p: prose,
     strong: prose.copyWith(fontWeight: weightFor(W.strong)),
     em: prose.copyWith(fontStyle: FontStyle.italic),
-    a: prose.copyWith(color: AppColors.accent),
+    a: prose.copyWith(
+        color: _linkColor,
+        decoration: TextDecoration.underline, decorationColor: _linkColor.withValues(alpha: 0.5)),
     listBullet: prose.copyWith(color: AppColors.fg3),
     blockquote:
         prose.copyWith(color: AppColors.fg3, fontStyle: FontStyle.italic),
@@ -317,7 +323,8 @@ MarkdownStyleSheet thinkingMarkdownStyle(BuildContext context) {
     em: sans(13, height: 1.45, color: dim)
         .copyWith(fontStyle: FontStyle.italic),
     strong: sans(13, height: 1.45, color: dim, weight: W.label),
-    a: sans(13, height: 1.45, color: AppColors.accent),
+    a: sans(13, height: 1.45, color: _linkColor).copyWith(
+        decoration: TextDecoration.underline, decorationColor: _linkColor.withValues(alpha: 0.5)),
     h1: sans(kMobile ? 16 : 14, weight: W.label, height: 1.3, color: dim),
     h1Padding: const EdgeInsets.only(top: 4, bottom: 2),
     h2: sans(kMobile ? 14 : 13, weight: W.label, height: 1.3, color: dim),
@@ -1282,6 +1289,7 @@ class Bubble extends StatelessWidget {
     final agentContent = MarkdownBody(
       data: unwrapCodedLinks(shown),
       selectable: false,
+      extensionSet: md.ExtensionSet.gitHubFlavored,
       styleSheet: agentMarkdownStyle(context),
       builders: {'pre': PreBlockBuilder()},
       onTapLink: (txt, href, title) => openMarkdownLink(href, context, txt),
