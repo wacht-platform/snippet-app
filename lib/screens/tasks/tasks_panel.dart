@@ -355,6 +355,7 @@ class TasksPanelState extends State<TasksPanel> {
                 onTap: _toggleSearch),
             const SizedBox(width: S.s4),
             HeaderAction('New task', onTap: create),
+            ...widget.trailing,
           ],
           search: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,

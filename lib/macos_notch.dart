@@ -8,6 +8,7 @@ import 'ambient/controller.dart';
 import 'api.dart';
 import 'call_tracking.dart';
 import 'models.dart';
+import 'notch_home.dart';
 import 'notifications.dart';
 import 'platform.dart';
 import 'screens/mission_control/mission_control_state.dart'
@@ -104,6 +105,9 @@ class MacosNotch {
           _closeActiveConversation();
         case 'toggleAmbient':
           await _toggleAmbient();
+        case 'homeAction':
+          final home = call.arguments;
+          if (home is Map) await NotchHome.handleAction(home);
         case 'callAction':
           final args = call.arguments;
           if (args is Map) {
@@ -177,6 +181,7 @@ class MacosNotch {
         _mcSocket != null) {
       return;
     }
+    NotchHome.bind(client);
     _stopMcWatch();
     _defaultClient = client;
     if (client != null) {

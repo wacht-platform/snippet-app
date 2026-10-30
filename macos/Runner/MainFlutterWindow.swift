@@ -330,6 +330,7 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
   private var statusItem: NSStatusItem?
   private var ambientMenuItem: NSMenuItem?
   private var notchHUD: NotchHUDController?
+  private var notchHome: NotchHomeController?
   private var notchChannel: FlutterMethodChannel?
   private var aecEngine: MacosVoiceProcessingEngine?
   private var blurView: NSVisualEffectView?
@@ -430,12 +431,23 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
     }
     self.notchHUD = hud
 
+    let home = NotchHomeController(hudBusy: { [weak hud] in hud?.isShowing ?? false })
+    home.onAction = { [weak self] id, action in
+      if action.hasPrefix("open") { self?.restoreFromMenuBar() }
+      self?.notchChannel?.invokeMethod("homeAction", arguments: ["id": id, "action": action])
+    }
+    home.onOpenApp = { [weak self] in self?.restoreFromMenuBar() }
+    self.notchHome = home
+
     notchChan.setMethodCallHandler { [weak self] call, result in
       guard let self = self else {
         result(nil)
         return
       }
       switch call.method {
+      case "homeUpdate":
+        if let json = call.arguments as? String { self.notchHome?.update(json: json) }
+        result(nil)
       case "updateAmbient":
         if let args = call.arguments as? [String: Any] {
           let active = args["active"] as? Bool ?? false
@@ -1526,6 +1538,8 @@ final class NotchHUDController {
 
   private var conversationExpanded = false
   private var activePayload: String = ""
+
+  var isShowing: Bool { panel.isVisible }
 
   init(
     onActivateWindow: @escaping () -> Void,
@@ -2724,4 +2738,533 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
     return path
   }
 
+}
+
+// MARK: - Notch Home (resident pill, hover overview, row details)
+
+struct NotchHomeAction {
+  let label: String
+  let action: String
+  let primary: Bool
+}
+
+struct NotchHomeItem {
+  let id: String
+  let section: String
+  let title: String
+  let line: String
+  let tone: String
+  let actions: [NotchHomeAction]
+  let details: [String]
+}
+
+struct NotchHomeModel {
+  var state = "idle"
+  var title = ""
+  var subtitle = ""
+  var badge = 0
+  var items: [NotchHomeItem] = []
+
+  static func parse(_ json: String) -> NotchHomeModel? {
+    guard let data = json.data(using: .utf8),
+      let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+    else { return nil }
+    var m = NotchHomeModel()
+    m.state = root["state"] as? String ?? "idle"
+    m.title = root["title"] as? String ?? ""
+    m.subtitle = root["subtitle"] as? String ?? ""
+    m.badge = root["badge"] as? Int ?? 0
+    for raw in (root["items"] as? [[String: Any]]) ?? [] {
+      var actions: [NotchHomeAction] = []
+      for a in (raw["actions"] as? [[String: Any]]) ?? [] {
+        actions.append(
+          NotchHomeAction(
+            label: a["label"] as? String ?? "",
+            action: a["action"] as? String ?? "",
+            primary: a["primary"] as? Bool ?? false))
+      }
+      m.items.append(
+        NotchHomeItem(
+          id: raw["id"] as? String ?? "",
+          section: raw["section"] as? String ?? "",
+          title: raw["title"] as? String ?? "",
+          line: raw["line"] as? String ?? "",
+          tone: raw["tone"] as? String ?? "idle",
+          actions: actions,
+          details: raw["details"] as? [String] ?? []))
+    }
+    return m
+  }
+}
+
+enum NotchHomePalette {
+  static let amber = NSColor(srgbRed: 0.83, green: 0.57, blue: 0.24, alpha: 1)
+  static let accent = NSColor(srgbRed: 0.62, green: 0.69, blue: 1.0, alpha: 1)
+  static let ok = NSColor(srgbRed: 0.50, green: 0.72, blue: 0.56, alpha: 1)
+  static let danger = NSColor(srgbRed: 0.90, green: 0.45, blue: 0.37, alpha: 1)
+  static let idle = NSColor(srgbRed: 0.48, green: 0.45, blue: 0.41, alpha: 1)
+  static let text = NSColor(srgbRed: 0.93, green: 0.91, blue: 0.87, alpha: 1)
+  static let muted = NSColor(srgbRed: 0.64, green: 0.61, blue: 0.56, alpha: 1)
+  static let row = NSColor(white: 1, alpha: 0.06)
+
+  static func tone(_ name: String) -> NSColor {
+    switch name {
+    case "run": return amber
+    case "accent": return accent
+    case "ok": return ok
+    case "danger": return danger
+    default: return idle
+    }
+  }
+
+  static func state(_ name: String) -> NSColor {
+    switch name {
+    case "needs": return amber
+    case "working": return accent
+    default: return idle
+    }
+  }
+}
+
+final class NotchHomeButton: NSButton {
+  var onPress: (() -> Void)?
+
+  convenience init(title: String, primary: Bool, onPress: @escaping () -> Void) {
+    self.init(frame: .zero)
+    self.onPress = onPress
+    isBordered = false
+    wantsLayer = true
+    layer?.cornerRadius = 8
+    layer?.backgroundColor =
+      (primary ? NotchHomePalette.accent : NSColor(white: 1, alpha: 0.12)).cgColor
+    attributedTitle = NSAttributedString(
+      string: title,
+      attributes: [
+        .font: SnippetTheme.sans(12, weight: .semibold),
+        .foregroundColor: primary
+          ? NSColor(srgbRed: 0.06, green: 0.08, blue: 0.16, alpha: 1) : NotchHomePalette.text,
+      ])
+    target = self
+    action = #selector(pressed)
+    sizeToFit()
+    frame.size = NSSize(width: max(frame.width + 16, 52), height: 26)
+  }
+
+  @objc private func pressed() { onPress?() }
+}
+
+final class NotchHomeRowView: NSView {
+  var onSelect: (() -> Void)?
+  private var hovering = false
+
+  override var isFlipped: Bool { true }
+  override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+  override func updateTrackingAreas() {
+    super.updateTrackingAreas()
+    for area in trackingAreas { removeTrackingArea(area) }
+    addTrackingArea(
+      NSTrackingArea(
+        rect: bounds, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect],
+        owner: self, userInfo: nil))
+  }
+
+  override func mouseEntered(with event: NSEvent) {
+    hovering = true
+    needsDisplay = true
+  }
+
+  override func mouseExited(with event: NSEvent) {
+    hovering = false
+    needsDisplay = true
+  }
+
+  override func mouseDown(with event: NSEvent) { onSelect?() }
+
+  override func draw(_ dirtyRect: NSRect) {
+    guard hovering else { return }
+    NotchHomePalette.row.setFill()
+    NSBezierPath(roundedRect: bounds, xRadius: 10, yRadius: 10).fill()
+  }
+}
+
+final class NotchHomeView: NSView {
+  var onHoverChanged: ((Bool) -> Void)?
+  var onSelect: ((String?) -> Void)?
+  var onAction: ((String, String) -> Void)?
+  var onOpenApp: (() -> Void)?
+
+  private var attached = true
+  private let wing: CGFloat = 70
+
+  override var isFlipped: Bool { true }
+  override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+  override func updateTrackingAreas() {
+    super.updateTrackingAreas()
+    for area in trackingAreas { removeTrackingArea(area) }
+    addTrackingArea(
+      NSTrackingArea(
+        rect: bounds, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect],
+        owner: self, userInfo: nil))
+  }
+
+  override func mouseEntered(with event: NSEvent) { onHoverChanged?(true) }
+  override func mouseExited(with event: NSEvent) { onHoverChanged?(false) }
+
+  override func draw(_ dirtyRect: NSRect) {
+    NSColor.black.setFill()
+    let r: CGFloat = attached ? 16 : min(bounds.height / 2, 18)
+    if attached {
+      let path = NSBezierPath()
+      path.move(to: NSPoint(x: 0, y: 0))
+      path.line(to: NSPoint(x: bounds.width, y: 0))
+      path.line(to: NSPoint(x: bounds.width, y: bounds.height - r))
+      path.curve(
+        to: NSPoint(x: bounds.width - r, y: bounds.height),
+        controlPoint1: NSPoint(x: bounds.width, y: bounds.height - r / 2),
+        controlPoint2: NSPoint(x: bounds.width - r / 2, y: bounds.height))
+      path.line(to: NSPoint(x: r, y: bounds.height))
+      path.curve(
+        to: NSPoint(x: 0, y: bounds.height - r),
+        controlPoint1: NSPoint(x: r / 2, y: bounds.height),
+        controlPoint2: NSPoint(x: 0, y: bounds.height - r / 2))
+      path.close()
+      path.fill()
+    } else {
+      NSBezierPath(roundedRect: bounds, xRadius: r, yRadius: r).fill()
+    }
+  }
+
+  private func label(
+    _ text: String, size: CGFloat, weight: NSFont.Weight = .regular, color: NSColor,
+    mono: Bool = false
+  ) -> NSTextField {
+    let f = NSTextField(labelWithString: text)
+    f.font = mono ? SnippetTheme.mono(size, weight: weight) : SnippetTheme.sans(size, weight: weight)
+    f.textColor = color
+    f.lineBreakMode = .byTruncatingTail
+    f.maximumNumberOfLines = 1
+    f.cell?.usesSingleLineMode = true
+    return f
+  }
+
+  private func dot(_ color: NSColor, size: CGFloat) -> NSView {
+    let v = NSView(frame: NSRect(x: 0, y: 0, width: size, height: size))
+    v.wantsLayer = true
+    v.layer?.backgroundColor = color.cgColor
+    v.layer?.cornerRadius = size / 2
+    return v
+  }
+
+  /// Content height for the expanded state, so the controller can size the panel.
+  static func expandedHeight(model: NotchHomeModel, detail: NotchHomeItem?, topInset: CGFloat) -> CGFloat {
+    if let d = detail {
+      let lines = CGFloat(min(d.details.count, 8))
+      return topInset + 64 + 40 + lines * 22 + (d.actions.isEmpty ? 0 : 48) + 16
+    }
+    var h = topInset + 62
+    var last = ""
+    for item in model.items.prefix(NotchHomeView.maxRows) {
+      if item.section != last {
+        h += 26
+        last = item.section
+      }
+      h += 48
+    }
+    if model.items.count > NotchHomeView.maxRows { h += 24 }
+    if model.items.isEmpty { h += 36 }
+    return min(h + 12, 520)
+  }
+
+  static let maxRows = 9
+
+  func configure(
+    model: NotchHomeModel, expanded: Bool, detail: NotchHomeItem?, hw: NSSize, attached: Bool
+  ) {
+    self.attached = attached
+    subviews.forEach { $0.removeFromSuperview() }
+    needsDisplay = true
+    let w = bounds.width
+    let topInset: CGFloat = attached ? hw.height : 8
+    let stateColor = NotchHomePalette.state(model.state)
+
+    if !expanded {
+      let h = bounds.height
+      let d = dot(stateColor, size: 10)
+      let count = model.badge > 0 ? "\(model.badge)" : ""
+      let left = label(count, size: 12, weight: .semibold, color: NotchHomePalette.text, mono: true)
+      let rightText = model.state == "needs" ? "needs you" : (model.state == "working" ? "working" : "")
+      let right = label(rightText, size: 11, color: NotchHomePalette.muted, mono: true)
+      if attached {
+        d.frame.origin = NSPoint(x: 18, y: (h - 10) / 2)
+        left.frame = NSRect(x: 34, y: (h - 16) / 2, width: wing - 36, height: 16)
+        right.alignment = .right
+        right.frame = NSRect(x: w - wing - 2, y: (h - 16) / 2, width: wing - 14, height: 16)
+      } else {
+        d.frame.origin = NSPoint(x: 14, y: (h - 10) / 2)
+        left.frame = NSRect(x: 30, y: (h - 16) / 2, width: 24, height: 16)
+        right.frame = NSRect(x: 54, y: (h - 16) / 2, width: w - 66, height: 16)
+      }
+      addSubview(d)
+      if !count.isEmpty { addSubview(left) }
+      if !rightText.isEmpty { addSubview(right) }
+      return
+    }
+
+    let pad: CGFloat = 16
+    if let item = detail {
+      let back = NotchHomeButton(title: "\u{2039} Back", primary: false) { [weak self] in
+        self?.onSelect?(nil)
+      }
+      back.frame.origin = NSPoint(x: pad, y: topInset + 8)
+      addSubview(back)
+      let title = label(item.title, size: 15, weight: .semibold, color: NotchHomePalette.text)
+      title.frame = NSRect(x: pad, y: topInset + 44, width: w - pad * 2, height: 20)
+      addSubview(title)
+      let line = label(item.line, size: 12.5, color: NotchHomePalette.tone(item.tone))
+      line.frame = NSRect(x: pad, y: topInset + 66, width: w - pad * 2, height: 18)
+      addSubview(line)
+      var y = topInset + 96
+      for text in item.details.prefix(8) {
+        let l = label(text, size: 12, color: NotchHomePalette.muted)
+        l.frame = NSRect(x: pad, y: y, width: w - pad * 2, height: 18)
+        addSubview(l)
+        y += 22
+      }
+      var x = pad
+      for a in item.actions {
+        let b = NotchHomeButton(title: a.label, primary: a.primary) { [weak self] in
+          self?.onAction?(item.id, a.action)
+        }
+        b.frame.origin = NSPoint(x: x, y: y + 12)
+        addSubview(b)
+        x += b.frame.width + 8
+      }
+      return
+    }
+
+    let headDot = dot(stateColor, size: 10)
+    headDot.frame.origin = NSPoint(x: pad, y: topInset + 12)
+    addSubview(headDot)
+    let title = label(
+      model.title, size: 14, weight: .semibold, color: NotchHomePalette.text)
+    title.frame = NSRect(x: pad + 18, y: topInset + 6, width: w - 150, height: 18)
+    addSubview(title)
+    let sub = label(model.subtitle, size: 12, color: NotchHomePalette.muted)
+    sub.frame = NSRect(x: pad + 18, y: topInset + 25, width: w - 150, height: 16)
+    addSubview(sub)
+    let open = NotchHomeButton(title: "Open Snippet", primary: false) { [weak self] in
+      self?.onOpenApp?()
+    }
+    open.frame.origin = NSPoint(x: w - pad - open.frame.width, y: topInset + 10)
+    addSubview(open)
+
+    var y = topInset + 52
+    if model.items.isEmpty {
+      let empty = label("Nothing needs attention", size: 12.5, color: NotchHomePalette.muted)
+      empty.frame = NSRect(x: pad, y: y + 4, width: w - pad * 2, height: 18)
+      addSubview(empty)
+      return
+    }
+    var lastSection = ""
+    for item in model.items.prefix(NotchHomeView.maxRows) {
+      if item.section != lastSection {
+        lastSection = item.section
+        let s = label(item.section.uppercased(), size: 10.5, weight: .medium, color: NotchHomePalette.idle, mono: true)
+        s.frame = NSRect(x: pad, y: y + 6, width: w - pad * 2, height: 14)
+        addSubview(s)
+        y += 26
+      }
+      let row = NotchHomeRowView(frame: NSRect(x: 8, y: y, width: w - 16, height: 46))
+      row.onSelect = { [weak self] in self?.onSelect?(item.id) }
+      let d = dot(NotchHomePalette.tone(item.tone), size: 8)
+      d.frame.origin = NSPoint(x: 8, y: 19)
+      row.addSubview(d)
+      var buttonsWidth: CGFloat = 0
+      var buttons: [NotchHomeButton] = []
+      for a in item.actions.prefix(2) {
+        let b = NotchHomeButton(title: a.label, primary: a.primary) { [weak self] in
+          self?.onAction?(item.id, a.action)
+        }
+        buttons.append(b)
+        buttonsWidth += b.frame.width + 6
+      }
+      var bx = row.bounds.width - 8 - buttonsWidth + 6
+      for b in buttons {
+        b.frame.origin = NSPoint(x: bx, y: 10)
+        row.addSubview(b)
+        bx += b.frame.width + 6
+      }
+      let textWidth = row.bounds.width - 28 - buttonsWidth - 8
+      let t = label(item.title, size: 13, weight: .medium, color: NotchHomePalette.text)
+      t.frame = NSRect(x: 24, y: 6, width: textWidth, height: 17)
+      row.addSubview(t)
+      let l = label(item.line, size: 12, color: item.tone == "run" ? NotchHomePalette.amber : NotchHomePalette.muted)
+      l.frame = NSRect(x: 24, y: 24, width: textWidth, height: 16)
+      row.addSubview(l)
+      addSubview(row)
+      y += 48
+    }
+    if model.items.count > NotchHomeView.maxRows {
+      let more = label(
+        "+\(model.items.count - NotchHomeView.maxRows) more in Snippet", size: 11.5,
+        color: NotchHomePalette.muted)
+      more.frame = NSRect(x: pad, y: y + 4, width: w - pad * 2, height: 16)
+      addSubview(more)
+    }
+  }
+}
+
+final class NotchHomeController {
+  private let panel: NotchPanel
+  private let view: NotchHomeView
+  private var model = NotchHomeModel()
+  private var expanded = false
+  private var detailId: String?
+  private var collapseTimer: Timer?
+  private var visibilityTimer: Timer?
+  private var hudBusy: () -> Bool
+  var onAction: ((String, String) -> Void)?
+  var onOpenApp: (() -> Void)?
+
+  init(hudBusy: @escaping () -> Bool) {
+    self.hudBusy = hudBusy
+    let rect = NSRect(x: 0, y: 0, width: 260, height: 32)
+    let p = NotchPanel(
+      contentRect: rect, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered,
+      defer: false)
+    p.isFloatingPanel = true
+    p.becomesKeyOnlyIfNeeded = true
+    p.level = NSWindow.Level.statusBar
+    p.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
+    p.isOpaque = false
+    p.backgroundColor = .clear
+    p.hasShadow = false
+    p.hidesOnDeactivate = false
+    let v = NotchHomeView(frame: rect)
+    p.contentView = v
+    panel = p
+    view = v
+
+    v.onHoverChanged = { [weak self] inside in self?.hover(inside) }
+    v.onSelect = { [weak self] id in
+      self?.detailId = id
+      self?.refresh(animated: true)
+    }
+    v.onAction = { [weak self] id, action in self?.onAction?(id, action) }
+    v.onOpenApp = { [weak self] in self?.onOpenApp?() }
+
+    NotificationCenter.default.addObserver(
+      self, selector: #selector(screensChanged),
+      name: NSApplication.didChangeScreenParametersNotification, object: nil)
+    let t = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
+      self?.syncVisibility()
+    }
+    RunLoop.main.add(t, forMode: .common)
+    visibilityTimer = t
+  }
+
+  deinit {
+    NotificationCenter.default.removeObserver(self)
+    visibilityTimer?.invalidate()
+    collapseTimer?.invalidate()
+  }
+
+  @objc private func screensChanged() { refresh(animated: false) }
+
+  func update(json: String) {
+    guard let m = NotchHomeModel.parse(json) else { return }
+    model = m
+    if let d = detailId, !m.items.contains(where: { $0.id == d }) { detailId = nil }
+    refresh(animated: true)
+  }
+
+  private func syncVisibility() {
+    let busy = hudBusy()
+    if busy && panel.isVisible {
+      panel.orderOut(nil)
+    } else if !busy && !panel.isVisible {
+      refresh(animated: false)
+    }
+  }
+
+  private func hover(_ inside: Bool) {
+    collapseTimer?.invalidate()
+    if inside {
+      if !expanded {
+        expanded = true
+        refresh(animated: true)
+      }
+    } else if expanded {
+      collapseTimer = Timer.scheduledTimer(withTimeInterval: 0.4, repeats: false) {
+        [weak self] _ in
+        guard let self = self else { return }
+        if self.panel.frame.contains(NSEvent.mouseLocation) { return }
+        self.expanded = false
+        self.detailId = nil
+        self.refresh(animated: true)
+      }
+    }
+  }
+
+  private func measure(_ screen: NSScreen) -> (size: NSSize, attached: Bool) {
+    var width: CGFloat = 185
+    var height: CGFloat = 32
+    var attached = false
+    if #available(macOS 12.0, *) {
+      let inset = screen.safeAreaInsets.top
+      if inset > 0 {
+        attached = true
+        height = max(inset, 32)
+        if let l = screen.auxiliaryTopLeftArea, let r = screen.auxiliaryTopRightArea {
+          let gap = screen.frame.width - l.width - r.width
+          if gap > 80 && gap < 340 { width = gap }
+        }
+      }
+    }
+    return (NSSize(width: width, height: height), attached)
+  }
+
+  private func refresh(animated: Bool) {
+    if hudBusy() { return }
+    guard let screen = NSScreen.main ?? NSScreen.screens.first else { return }
+    let hw = measure(screen)
+    let detail = detailId.flatMap { id in model.items.first { $0.id == id } }
+    let w: CGFloat
+    let h: CGFloat
+    if expanded {
+      w = max(hw.size.width + 150, 400)
+      h = NotchHomeView.expandedHeight(
+        model: model, detail: detail, topInset: hw.attached ? hw.size.height : 8)
+    } else if hw.attached {
+      w = hw.size.width + 2 * 70
+      h = hw.size.height
+    } else {
+      w = model.badge > 0 ? 150 : 56
+      h = 28
+    }
+    let x = round(screen.frame.midX - w / 2)
+    let y = hw.attached
+      ? round(screen.frame.maxY - h)
+      : round(screen.visibleFrame.maxY - h - 4)
+    let target = NSRect(x: x, y: y, width: w, height: h)
+
+    if !panel.isVisible {
+      panel.setFrame(target, display: false)
+      panel.orderFrontRegardless()
+    }
+    view.frame = NSRect(origin: .zero, size: target.size)
+    view.configure(
+      model: model, expanded: expanded, detail: detail, hw: hw.size, attached: hw.attached)
+    if animated {
+      NSAnimationContext.runAnimationGroup { ctx in
+        ctx.duration = 0.24
+        ctx.timingFunction = CAMediaTimingFunction(controlPoints: 0.22, 1.0, 0.36, 1.0)
+        panel.animator().setFrame(target, display: true)
+      }
+    } else {
+      panel.setFrame(target, display: true)
+    }
+  }
 }

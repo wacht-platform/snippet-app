@@ -344,6 +344,7 @@ extension _DesktopShellTabsExt on _DesktopShellState {
     if (i < 0 || i >= _tabs.length) return;
     FocusManager.instance.primaryFocus?.unfocus();
     _setState(() {
+      _tasksTakeover = false;
       _activeIndex = i;
       final tab = _tabs[i];
       _activePane = tab.pane;
