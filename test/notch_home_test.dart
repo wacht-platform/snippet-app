@@ -54,4 +54,28 @@ void main() {
     expect(m['title'], 'Team status');
     expect(m['subtitle'], '0 working \u00b7 1 standing by');
   });
+
+  test('recent notifications appear last and open their payload', () {
+    final targets = <String, NotchTarget>{};
+    final now = DateTime(2026, 1, 1, 12);
+    final m = buildModel(
+        sessions: const [],
+        agents: const [],
+        jobs: const [],
+        tasks: const [],
+        now: now,
+        targets: targets,
+        recent: [
+          NotchNote(
+              title: 'Rust PR',
+              subtitle: 'Approve?',
+              kind: 'waiting',
+              payload: {'session': 's1'},
+              at: now.millisecondsSinceEpoch ~/ 1000 - 300),
+        ]);
+    final item = (m['items'] as List).single as Map;
+    expect(item['section'], 'Recent');
+    expect(item['meta'], '5m');
+    expect(targets['note:0']!.payload, {'session': 's1'});
+  });
 }

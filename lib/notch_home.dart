@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'api.dart';
 import 'crew_status.dart';
@@ -21,6 +22,50 @@ class NotchHome {
   static Timer? _timer;
   static String _last = '';
   static final Map<String, NotchTarget> _targets = {};
+  static final List<NotchNote> _recent = [];
+  static bool _loaded = false;
+  static const _prefsKey = 'notch_recent_notifications';
+
+  static Future<void> _loadRecent() async {
+    if (_loaded) return;
+    _loaded = true;
+    try {
+      final raw = (await SharedPreferences.getInstance()).getString(_prefsKey);
+      if (raw == null) return;
+      final list = jsonDecode(raw) as List;
+      _recent
+        ..clear()
+        ..addAll(list
+            .whereType<Map>()
+            .map((m) => NotchNote.fromJson(Map<String, dynamic>.from(m))));
+    } catch (_) {}
+  }
+
+  /// Keeps the last few notifications so the overview can show what was missed.
+  static Future<void> remember({
+    required String title,
+    required String subtitle,
+    required String kind,
+    required Map<String, dynamic> payload,
+  }) async {
+    if (!kMacOS) return;
+    await _loadRecent();
+    _recent.removeWhere((n) => n.title == title && n.subtitle == subtitle);
+    _recent.insert(
+        0,
+        NotchNote(
+            title: title,
+            subtitle: subtitle,
+            kind: kind,
+            payload: payload,
+            at: DateTime.now().millisecondsSinceEpoch ~/ 1000));
+    if (_recent.length > 5) _recent.removeRange(5, _recent.length);
+    try {
+      (await SharedPreferences.getInstance()).setString(
+          _prefsKey, jsonEncode(_recent.map((n) => n.toJson()).toList()));
+    } catch (_) {}
+    _push();
+  }
 
   static void bind(DaemonClient? client) {
     if (!kMacOS) return;
@@ -40,6 +85,7 @@ class NotchHome {
     final client = _client;
     if (client == null) return;
     try {
+      await _loadRecent();
       final results = await Future.wait([
         client.sessions(),
         client.coordinationAgents(),
@@ -61,6 +107,7 @@ class NotchHome {
         ],
         now: DateTime.now(),
         targets: _targets,
+        recent: _recent,
       );
       final encoded = jsonEncode(json);
       if (encoded == _last) return;
@@ -85,7 +132,9 @@ class NotchHome {
             client: client, session: target.session, action: const QuickDeny());
         _push();
       case 'open':
-        if (target.taskId != null) {
+        if (target.payload != null) {
+          onNotifTap?.call(target.payload!);
+        } else if (target.taskId != null) {
           openTaskInTab?.call(client, target.taskId!);
         } else {
           onNotifTap?.call({
@@ -99,9 +148,49 @@ class NotchHome {
 }
 
 class NotchTarget {
-  const NotchTarget({this.session = '', this.taskId});
+  const NotchTarget({this.session = '', this.taskId, this.payload});
   final String session;
   final String? taskId;
+  final Map<String, dynamic>? payload;
+}
+
+class NotchNote {
+  const NotchNote({
+    required this.title,
+    required this.subtitle,
+    required this.kind,
+    required this.payload,
+    required this.at,
+  });
+  final String title;
+  final String subtitle;
+  final String kind;
+  final Map<String, dynamic> payload;
+  final int at;
+
+  factory NotchNote.fromJson(Map<String, dynamic> j) => NotchNote(
+        title: '${j['title'] ?? ''}',
+        subtitle: '${j['subtitle'] ?? ''}',
+        kind: '${j['kind'] ?? ''}',
+        payload: Map<String, dynamic>.from(j['payload'] as Map? ?? const {}),
+        at: (j['at'] as num?)?.toInt() ?? 0,
+      );
+
+  Map<String, dynamic> toJson() => {
+        'title': title,
+        'subtitle': subtitle,
+        'kind': kind,
+        'payload': payload,
+        'at': at,
+      };
+}
+
+String _ago(int unix, DateTime now) {
+  final d = now.difference(DateTime.fromMillisecondsSinceEpoch(unix * 1000));
+  if (d.inMinutes < 1) return 'now';
+  if (d.inHours < 1) return '${d.inMinutes}m';
+  if (d.inDays < 1) return '${d.inHours}h';
+  return '${d.inDays}d';
 }
 
 String _when(int unix, DateTime now) {
@@ -131,6 +220,7 @@ Map<String, dynamic> buildModel({
   required List<TaskItem> tasks,
   required DateTime now,
   required Map<String, NotchTarget> targets,
+  List<NotchNote> recent = const [],
 }) {
   targets.clear();
   final crew = deriveCrew(
@@ -225,6 +315,25 @@ Map<String, dynamic> buildModel({
         {'label': 'Open', 'action': 'open', 'primary': false},
       ],
       'details': ['Status\t${t.status.label}'],
+    });
+  }
+
+  for (var i = 0; i < recent.length; i++) {
+    final n = recent[i];
+    final id = 'note:$i';
+    targets[id] = NotchTarget(payload: n.payload);
+    items.add({
+      'id': id,
+      'section': 'Recent',
+      'title': n.title.trim().isEmpty ? 'Notification' : n.title.trim(),
+      'line': n.subtitle.trim(),
+      'tag': '',
+      'meta': _ago(n.at, now),
+      'tone': 'idle',
+      'actions': [
+        {'label': 'Open', 'action': 'open', 'primary': false},
+      ],
+      'details': [],
     });
   }
 

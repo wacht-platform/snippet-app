@@ -3070,7 +3070,7 @@ final class NotchHomeView: NSView {
     return v
   }
 
-  static let maxRows = 8
+  static let maxRows = 10
   static let headerHeight: CGFloat = 46
 
   static func isFeatured(_ item: NotchHomeItem, _ model: NotchHomeModel) -> Bool {

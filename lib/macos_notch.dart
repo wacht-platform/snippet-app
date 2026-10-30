@@ -800,6 +800,8 @@ class MacosNotch {
     Future<void>.delayed(const Duration(seconds: 2), () {
       if (_lastNotifiedKey == dedupeKey) _lastNotifiedKey = '';
     });
+    NotchHome.remember(
+        title: title, subtitle: subtitle, kind: kind, payload: payload);
     _channel.invokeMethod<void>('showNotification', <String, Object?>{
       'title': title,
       'subtitle': subtitle,
