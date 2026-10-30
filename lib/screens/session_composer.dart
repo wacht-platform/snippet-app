@@ -1,6 +1,6 @@
 part of 'session.dart';
 
-const double kDesktopComposerWidth = 680;
+const double kDesktopComposerWidth = 780;
 
 extension _SessionScreenComposerExt on _SessionScreenState {
   void _send(Map<String, dynamic> m, {bool tracked = false}) {
@@ -607,8 +607,8 @@ extension _SessionScreenComposerExt on _SessionScreenState {
   Widget _goalBanner() => Container(
   margin:
       const EdgeInsets.only(bottom: 10),
-  padding: const EdgeInsets.fromLTRB(
-      10, 8, 8, 8),
+  padding: EdgeInsets.fromLTRB(
+      10, kMobile ? 4 : 8, kMobile ? 4 : 8, kMobile ? 4 : 8),
   decoration: BoxDecoration(
     color: AppColors.surface2,
     borderRadius:
@@ -633,11 +633,20 @@ extension _SessionScreenComposerExt on _SessionScreenState {
         style: mono(10,
             color: AppColors.accent)),
     const SizedBox(width: 5),
-    IconBtn('x',
-        size: 26,
-        iconSize: 13,
-        tooltip: 'Cancel goal',
-        onTap: _cancelGoal),
+    kMobile
+        ? GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: _cancelGoal,
+            child: SizedBox(
+                width: 32,
+                height: 28,
+                child: Center(
+                    child: AppIcon('x', size: 14, color: AppColors.fg3))))
+        : IconBtn('x',
+            size: 26,
+            iconSize: 13,
+            tooltip: 'Cancel goal',
+            onTap: _cancelGoal),
   ]),
 );
 

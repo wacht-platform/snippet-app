@@ -259,10 +259,10 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
 
   // On desktop, keep chat content to a comfortable reading width (centered),
   // rather than stretching across the whole pane.
-  Widget _centerWide(Widget child) => widget.embedded
+  Widget _centerWide(Widget child, {double extra = 0}) => widget.embedded
       ? Center(
           child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 740), child: child))
+              constraints: BoxConstraints(maxWidth: 740 + extra), child: child))
       : child;
 
   // Mobile chat header: a back button that returns to the session list, the

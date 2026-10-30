@@ -1456,7 +1456,7 @@ class _SessionScreenState extends State<SessionScreen>
                             )),
                           if (!widget.readOnly &&
                               !(waiting && s?.pendingQuestion != null))
-                            _centerWide(_inputBar(running)),
+                            _centerWide(_inputBar(running), extra: 2 * kComposerGutter),
                         ]);
                   }),
                   ),
