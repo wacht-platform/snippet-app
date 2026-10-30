@@ -32,7 +32,8 @@ void main() {
       targets: targets,
     );
     expect(m['state'], 'needs');
-    expect(m['title'], '1 needs you');
+    expect(m['title'], 'Team status');
+    expect(m['subtitle'], startsWith('1 needs you'));
     final items = m['items'] as List;
     expect(items.first['section'], 'Needs you');
     expect((items.first['actions'] as List).first['action'], 'approve');
@@ -50,6 +51,7 @@ void main() {
         now: DateTime(2026),
         targets: {});
     expect(m['state'], 'idle');
-    expect(m['title'], 'All good');
+    expect(m['title'], 'Team status');
+    expect(m['subtitle'], '0 working \u00b7 1 standing by');
   });
 }

@@ -212,18 +212,16 @@ Map<String, dynamic> buildModel({
     });
   }
 
-  final title = needs > 0
-      ? '$needs need${needs == 1 ? 's' : ''} you'
-      : failedJobs > 0
-          ? '$failedJobs job${failedJobs == 1 ? '' : 's'} failed'
-          : working > 0
-              ? '$working working'
-              : 'All good';
+  final summary = [
+    if (needs > 0) '$needs need${needs == 1 ? 's' : ''} you',
+    if (failedJobs > 0) '$failedJobs job${failedJobs == 1 ? '' : 's'} failed',
+    '$working working',
+    '${crewCount(crew, CrewState.standingBy)} standing by',
+  ].join(' · ');
   return {
     'state': state,
-    'title': title,
-    'subtitle':
-        '$working working · ${crewCount(crew, CrewState.standingBy)} standing by',
+    'title': 'Team status',
+    'subtitle': summary,
     'badge': needs + failedJobs,
     'items': items,
   };

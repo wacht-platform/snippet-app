@@ -2888,6 +2888,40 @@ final class NotchHomeRowView: NSView {
   }
 }
 
+final class NotchHomeBackground: NSView {
+  override init(frame frameRect: NSRect) {
+    super.init(frame: frameRect)
+    wantsLayer = true
+    layer?.backgroundColor = NSColor.black.cgColor
+  }
+
+  required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
+
+  func configure(attached: Bool, height: CGFloat) {
+    guard let l = layer else { return }
+    l.cornerRadius = attached ? min(18, height / 2) : min(height / 2, 18)
+    if attached {
+      // Unflipped layer: MinY is the bottom edge, so only the lower corners round.
+      l.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
+    } else {
+      l.maskedCorners = [
+        .layerMinXMinYCorner, .layerMaxXMinYCorner, .layerMinXMaxYCorner, .layerMaxXMaxYCorner,
+      ]
+    }
+  }
+}
+
+/// Fixed-size transparent host so the visible shape can animate smoothly inside
+/// a window that never resizes. Clicks outside the shape fall through.
+final class NotchHomeHost: NSView {
+  override var isFlipped: Bool { true }
+
+  override func hitTest(_ point: NSPoint) -> NSView? {
+    let hit = super.hitTest(point)
+    return hit === self ? nil : hit
+  }
+}
+
 final class NotchHomeView: NSView {
   var onHoverChanged: ((Bool) -> Void)?
   var onSelect: ((String?) -> Void)?
@@ -2912,29 +2946,17 @@ final class NotchHomeView: NSView {
   override func mouseEntered(with event: NSEvent) { onHoverChanged?(true) }
   override func mouseExited(with event: NSEvent) { onHoverChanged?(false) }
 
-  override func draw(_ dirtyRect: NSRect) {
-    NSColor.black.setFill()
-    let r: CGFloat = attached ? 16 : min(bounds.height / 2, 18)
-    if attached {
-      let path = NSBezierPath()
-      path.move(to: NSPoint(x: 0, y: 0))
-      path.line(to: NSPoint(x: bounds.width, y: 0))
-      path.line(to: NSPoint(x: bounds.width, y: bounds.height - r))
-      path.curve(
-        to: NSPoint(x: bounds.width - r, y: bounds.height),
-        controlPoint1: NSPoint(x: bounds.width, y: bounds.height - r / 2),
-        controlPoint2: NSPoint(x: bounds.width - r / 2, y: bounds.height))
-      path.line(to: NSPoint(x: r, y: bounds.height))
-      path.curve(
-        to: NSPoint(x: 0, y: bounds.height - r),
-        controlPoint1: NSPoint(x: r / 2, y: bounds.height),
-        controlPoint2: NSPoint(x: 0, y: bounds.height - r / 2))
-      path.close()
-      path.fill()
-    } else {
-      NSBezierPath(roundedRect: bounds, xRadius: r, yRadius: r).fill()
-    }
+  private let background = NotchHomeBackground(frame: .zero)
+
+  override init(frame frameRect: NSRect) {
+    super.init(frame: frameRect)
+    wantsLayer = true
+    layer?.masksToBounds = true
+    background.autoresizingMask = [.width, .height]
+    addSubview(background)
   }
+
+  required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
 
   private func label(
     _ text: String, size: CGFloat, weight: NSFont.Weight = .regular, color: NSColor,
@@ -2980,17 +3002,29 @@ final class NotchHomeView: NSView {
   static let maxRows = 9
 
   func configure(
-    model: NotchHomeModel, expanded: Bool, detail: NotchHomeItem?, hw: NSSize, attached: Bool
+    model: NotchHomeModel, expanded: Bool, detail: NotchHomeItem?, hw: NSSize, attached: Bool,
+    size: NSSize
   ) {
     self.attached = attached
-    subviews.forEach { $0.removeFromSuperview() }
-    needsDisplay = true
-    let w = bounds.width
+    for v in subviews where v !== background { v.removeFromSuperview() }
+    background.frame = NSRect(origin: .zero, size: size)
+    background.configure(attached: attached, height: size.height)
+    defer {
+      for v in subviews where v !== background {
+        v.alphaValue = 0
+        NSAnimationContext.runAnimationGroup { ctx in
+          ctx.duration = 0.22
+          ctx.allowsImplicitAnimation = true
+          v.animator().alphaValue = 1
+        }
+      }
+    }
+    let w = size.width
     let topInset: CGFloat = attached ? hw.height : 8
     let stateColor = NotchHomePalette.state(model.state)
 
     if !expanded {
-      let h = bounds.height
+      let h = size.height
       let d = dot(stateColor, size: 10)
       let count = model.badge > 0 ? "\(model.badge)" : ""
       let left = label(count, size: 12, weight: .semibold, color: NotchHomePalette.text, mono: true)
@@ -3118,8 +3152,11 @@ final class NotchHomeView: NSView {
 
 final class NotchHomeController {
   private let panel: NotchPanel
+  private let host: NotchHomeHost
   private let view: NotchHomeView
   private var model = NotchHomeModel()
+  private var hoverTimer: Timer?
+  private let panelSize = NSSize(width: 520, height: 540)
   private var expanded = false
   private var detailId: String?
   private var collapseTimer: Timer?
@@ -3142,9 +3179,12 @@ final class NotchHomeController {
     p.backgroundColor = .clear
     p.hasShadow = false
     p.hidesOnDeactivate = false
+    let h = NotchHomeHost(frame: NSRect(origin: .zero, size: NSSize(width: 520, height: 540)))
     let v = NotchHomeView(frame: rect)
-    p.contentView = v
+    h.addSubview(v)
+    p.contentView = h
     panel = p
+    host = h
     view = v
 
     v.onHoverChanged = { [weak self] inside in self?.hover(inside) }
@@ -3169,6 +3209,7 @@ final class NotchHomeController {
     NotificationCenter.default.removeObserver(self)
     visibilityTimer?.invalidate()
     collapseTimer?.invalidate()
+    hoverTimer?.invalidate()
   }
 
   @objc private func screensChanged() { refresh(animated: false) }
@@ -3191,16 +3232,22 @@ final class NotchHomeController {
 
   private func hover(_ inside: Bool) {
     collapseTimer?.invalidate()
+    hoverTimer?.invalidate()
     if inside {
       if !expanded {
-        expanded = true
-        refresh(animated: true)
+        hoverTimer = Timer.scheduledTimer(withTimeInterval: 0.08, repeats: false) { [weak self] _ in
+          guard let self = self else { return }
+          self.expanded = true
+          self.refresh(animated: true)
+        }
       }
     } else if expanded {
-      collapseTimer = Timer.scheduledTimer(withTimeInterval: 0.4, repeats: false) {
+      collapseTimer = Timer.scheduledTimer(withTimeInterval: 0.45, repeats: false) {
         [weak self] _ in
         guard let self = self else { return }
-        if self.panel.frame.contains(NSEvent.mouseLocation) { return }
+        let shape = self.view.convert(self.view.bounds, to: nil)
+        let onScreen = self.panel.convertToScreen(shape).insetBy(dx: -6, dy: -6)
+        if onScreen.contains(NSEvent.mouseLocation) { return }
         self.expanded = false
         self.detailId = nil
         self.refresh(animated: true)
@@ -3235,8 +3282,10 @@ final class NotchHomeController {
     let h: CGFloat
     if expanded {
       w = max(hw.size.width + 150, 400)
-      h = NotchHomeView.expandedHeight(
-        model: model, detail: detail, topInset: hw.attached ? hw.size.height : 8)
+      h = min(
+        NotchHomeView.expandedHeight(
+          model: model, detail: detail, topInset: hw.attached ? hw.size.height : 8),
+        panelSize.height)
     } else if hw.attached {
       w = hw.size.width + 2 * 70
       h = hw.size.height
@@ -3244,27 +3293,29 @@ final class NotchHomeController {
       w = model.badge > 0 ? 150 : 56
       h = 28
     }
-    let x = round(screen.frame.midX - w / 2)
-    let y = hw.attached
-      ? round(screen.frame.maxY - h)
-      : round(screen.visibleFrame.maxY - h - 4)
-    let target = NSRect(x: x, y: y, width: w, height: h)
 
-    if !panel.isVisible {
-      panel.setFrame(target, display: false)
-      panel.orderFrontRegardless()
-    }
-    view.frame = NSRect(origin: .zero, size: target.size)
+    let top = hw.attached ? screen.frame.maxY : screen.visibleFrame.maxY - 4
+    let panelFrame = NSRect(
+      x: round(screen.frame.midX - panelSize.width / 2),
+      y: round(top - panelSize.height),
+      width: panelSize.width, height: panelSize.height)
+    if panel.frame != panelFrame { panel.setFrame(panelFrame, display: false) }
+    if !panel.isVisible { panel.orderFrontRegardless() }
+
+    let target = NSRect(
+      x: round((panelSize.width - w) / 2), y: 0, width: w, height: h)
     view.configure(
-      model: model, expanded: expanded, detail: detail, hw: hw.size, attached: hw.attached)
-    if animated {
+      model: model, expanded: expanded, detail: detail, hw: hw.size, attached: hw.attached,
+      size: target.size)
+    if animated && view.frame.width > 0 {
       NSAnimationContext.runAnimationGroup { ctx in
-        ctx.duration = 0.24
-        ctx.timingFunction = CAMediaTimingFunction(controlPoints: 0.22, 1.0, 0.36, 1.0)
-        panel.animator().setFrame(target, display: true)
+        ctx.duration = expanded ? 0.36 : 0.26
+        ctx.timingFunction = CAMediaTimingFunction(controlPoints: 0.2, 1.0, 0.3, 1.0)
+        ctx.allowsImplicitAnimation = true
+        view.animator().frame = target
       }
     } else {
-      panel.setFrame(target, display: true)
+      view.frame = target
     }
   }
 }
