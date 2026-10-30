@@ -108,6 +108,11 @@ class MacosNotch {
         case 'homeAction':
           final home = call.arguments;
           if (home is Map) await NotchHome.handleAction(home);
+        case 'bannerAction':
+          final args = call.arguments;
+          if (args is Map) {
+            await _bannerAction('${args['action'] ?? ''}', '${args['payload'] ?? ''}');
+          }
         case 'callAction':
           final args = call.arguments;
           if (args is Map) {
@@ -116,6 +121,27 @@ class MacosNotch {
       }
     });
     callTracker.state.addListener(_syncCall);
+  }
+
+  static Future<void> _bannerAction(String action, String payload) async {
+    Map<String, dynamic> data;
+    try {
+      data = jsonDecode(payload) as Map<String, dynamic>;
+    } catch (_) {
+      return;
+    }
+    final attn = data['attention'];
+    final QuickAction? send = switch (action) {
+      'approve' => const QuickApprove(),
+      'deny' => const QuickDeny(),
+      final a when a.startsWith('choice:') => () {
+          final value = a.substring(7);
+          final q = attn is Map ? '${attn['text'] ?? ''}'.trim() : '';
+          return QuickAnswer(q.isEmpty ? value : '$q\n→ $value');
+        }(),
+      _ => null,
+    };
+    if (send != null) await quickSendForPayload(data, send);
   }
 
   static String? _notchCallKey;

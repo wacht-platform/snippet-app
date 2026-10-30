@@ -429,6 +429,9 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
     hud.onCallAction = { [weak self] action in
       self?.notchChannel?.invokeMethod("callAction", arguments: ["action": action])
     }
+    hud.onBannerAction = { [weak self] action, payload in
+      self?.notchChannel?.invokeMethod("bannerAction", arguments: ["action": action, "payload": payload])
+    }
     self.notchHUD = hud
 
     let home = NotchHomeController(hudBusy: { [weak hud] in hud?.isShowing ?? false })
@@ -1506,6 +1509,28 @@ enum NotchMarkdown {
 // MARK: - DynamicNotchKit / boring.notch Style Notch HUD Controller
 
 final class NotchHUDController {
+  static func bannerActions(from payload: String?) -> [(String, String, Bool)] {
+    guard let payload = payload, !payload.isEmpty,
+      let data = payload.data(using: .utf8),
+      let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+      let attn = root["attention"] as? [String: Any],
+      let type = attn["type"] as? String
+    else { return [] }
+    if type == "approval" {
+      return [("Approve", "approve", true), ("Deny", "deny", false)]
+    }
+    if type == "question", (attn["more"] as? Int ?? 0) == 0, let choices = attn["choices"] as? [[String: Any]] {
+      return choices.prefix(3).enumerated().compactMap { index, c in
+        let value = c["value"] as? String ?? c["label"] as? String ?? ""
+        let label = c["label"] as? String ?? value
+        if value.isEmpty { return nil }
+        let short = label.count > 14 ? String(label.prefix(13)) + "\u{2026}" : label
+        return (short, "choice:" + value, index == 0)
+      }
+    }
+    return []
+  }
+
   private let panel: NotchPanel
   private let hudView: NotchHUDView
   private let onActivateWindow: () -> Void
@@ -1514,6 +1539,7 @@ final class NotchHUDController {
   private let onSendReply: (String) -> Void
   var onNotchAction: ((String, String) -> Void)?
   var onCallAction: ((String) -> Void)?
+  var onBannerAction: ((String, String) -> Void)?
   private let onCloseConversation: () -> Void
 
   private var callMode: String?
@@ -1598,6 +1624,12 @@ final class NotchHUDController {
     v.onCallAction = { [weak self] action in
       self?.onCallAction?(action)
     }
+    v.onBannerAction = { [weak self] action in
+      guard let self = self else { return }
+      let payload = self.notifPayload ?? ""
+      self.onBannerAction?(action, payload)
+      self.clearNotification()
+    }
 
     NotificationCenter.default.addObserver(
       self,
@@ -1674,7 +1706,8 @@ final class NotchHUDController {
 
     notifDismissTimer?.invalidate()
     if !conversationExpanded {
-      notifDismissTimer = Timer.scheduledTimer(withTimeInterval: notifDuration, repeats: false) { [weak self] _ in
+      let hasActions = callMode != "prompt" && !NotchHUDController.bannerActions(from: payload).isEmpty
+      notifDismissTimer = Timer.scheduledTimer(withTimeInterval: hasActions ? notifDuration * 3 : notifDuration, repeats: false) { [weak self] _ in
         self?.clearNotification()
       }
     }
@@ -1857,7 +1890,8 @@ final class NotchHUDController {
       topCornerRadius = 6
       bottomCornerRadius = 18
       targetWidth = hw.width + 120 + topCornerRadius * 2
-      targetHeight = hw.height + (callMode == "prompt" ? 80 : 48)
+      let hasBannerActions = callMode != "prompt" && !NotchHUDController.bannerActions(from: notifPayload).isEmpty
+      targetHeight = hw.height + (callMode == "prompt" ? 80 : (hasBannerActions ? 82 : 48))
     } else if callMode == "tracking" {
       topCornerRadius = 6
       bottomCornerRadius = 16
@@ -1893,8 +1927,9 @@ final class NotchHUDController {
       bottomCornerRadius: bottomCornerRadius,
       hasUnreadNotification: hasUnreadNotification,
       notifStartedAt: notifStartedAt,
-      notifDuration: callMode == "prompt" ? callDuration : notifDuration,
-      callMode: callMode
+      notifDuration: callMode == "prompt" ? callDuration : notifDuration * (NotchHUDController.bannerActions(from: notifPayload).isEmpty ? 1 : 3),
+      callMode: callMode,
+      bannerActions: callMode == "prompt" ? [] : NotchHUDController.bannerActions(from: notifPayload)
     )
 
     if !panel.isVisible {
@@ -1965,6 +2000,10 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
   private var hasUnreadNotification = false
   private var notifStartedAt: TimeInterval = 0
   private var notifDuration: TimeInterval = 3.5
+  private var bannerActions: [(String, String, Bool)] = []
+  private var bannerButtons: [NSButton] = []
+  private var bannerSignature = ""
+  var onBannerAction: ((String) -> Void)?
 
   private var conversationExpanded = false
   private var convTitle = "Conversation"
@@ -2089,6 +2128,10 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
     addSubview(button)
   }
 
+  @objc private func handleBannerTap(_ sender: NSButton) {
+    onBannerAction?(sender.identifier?.rawValue ?? "")
+  }
+
   @objc private func handleTrackTap() { onCallAction?("track") }
   @objc private func handleIgnoreTap() { onCallAction?("ignore") }
   @objc private func handleStopTap() { onCallAction?("stop") }
@@ -2101,6 +2144,26 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
     ignoreButton.isHidden = !showPrompt
     stopButton.isHidden = !showStop
     let left = b.minX + topCornerRadius + 16
+    let wantBanner = notifTitle != nil && !conversationExpanded && callMode != "prompt" ? bannerActions : []
+    let signature = wantBanner.map { $0.0 + $0.1 }.joined(separator: "|")
+    if signature != bannerSignature {
+      bannerSignature = signature
+      for old in bannerButtons { old.removeFromSuperview() }
+      bannerButtons = wantBanner.map { item in
+        let button = NSButton(title: item.0, target: self, action: #selector(handleBannerTap(_:)))
+        button.identifier = NSUserInterfaceItemIdentifier(item.1)
+        styleCallButton(button, action: #selector(handleBannerTap(_:)), filled: item.2)
+        button.isHidden = false
+        addSubview(button)
+        return button
+      }
+    }
+    var bx = left
+    for button in bannerButtons {
+      let w = max(60, ceil(button.attributedTitle.size().width) + 24)
+      button.frame = NSRect(x: bx, y: b.minY + 10, width: w, height: 26)
+      bx += w + 8
+    }
     trackButton.frame = NSRect(x: left, y: b.minY + 10, width: 84, height: 24)
     ignoreButton.frame = NSRect(x: left + 92, y: b.minY + 10, width: 64, height: 24)
     stopButton.frame = NSRect(x: b.maxX - topCornerRadius - 16 - 56, y: b.minY + 6, width: 56, height: 22)
@@ -2483,8 +2546,10 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
     hasUnreadNotification: Bool,
     notifStartedAt: TimeInterval,
     notifDuration: TimeInterval,
-    callMode: String?
+    callMode: String?,
+    bannerActions: [(String, String, Bool)]
   ) {
+    self.bannerActions = bannerActions
     self.callMode = callMode
     self.notifTitle = notifTitle
     self.notifSubtitle = notifSubtitle
@@ -2869,14 +2934,14 @@ final class NotchHomeButton: NSButton {
     attributedTitle = NSAttributedString(
       string: title,
       attributes: [
-        .font: NotchHomeType.sans(12.5, weight: .medium),
+        .font: NotchHomeType.sans(12, weight: .medium),
         .foregroundColor: primary ? NSColor.black : NotchHomePalette.text,
       ])
     target = self
     action = #selector(pressed)
     sizeToFit()
     layer?.cornerRadius = 8
-    frame.size = NSSize(width: max(frame.width + 20, 56), height: 28)
+    frame.size = NSSize(width: max(frame.width + 18, 52), height: 26)
   }
 
   @objc private func pressed() { onPress?() }
@@ -3085,13 +3150,22 @@ final class NotchHomeView: NSView {
   }
 
   /// Content height for the expanded state, so the controller can size the shape.
-  static func expandedHeight(model: NotchHomeModel, detail: NotchHomeItem?, topInset: CGFloat) -> CGFloat {
+  static func detailBodyHeight(_ item: NotchHomeItem, width: CGFloat) -> CGFloat {
+    if item.line.isEmpty { return 0 }
+    let rect = (item.line as NSString).boundingRect(
+      with: NSSize(width: width, height: .greatestFiniteMagnitude),
+      options: [.usesLineFragmentOrigin],
+      attributes: [.font: NotchHomeType.sans(12)])
+    return min(ceil(rect.height), 80) + 6
+  }
+
+  static func expandedHeight(model: NotchHomeModel, detail: NotchHomeItem?, topInset: CGFloat, width: CGFloat) -> CGFloat {
     if let d = detail {
-      var h = topInset + 8 + 44 + 30
-      if d.tone == "run" && !d.line.isEmpty { h += 74 }
-      h += CGFloat(min(d.details.count, 8)) * 30
-      if !d.actions.isEmpty { h += 52 }
-      return h + 14
+      var h = topInset + 8 + 28 + 10
+      h += detailBodyHeight(d, width: width - 40)
+      h += CGFloat(min(d.details.count, 8)) * 26
+      if !d.actions.isEmpty { h += 46 }
+      return h + 12
     }
     var h = topInset + 2 + headerHeight + 4
     if let f = model.items.first(where: { isFeatured($0, model) }) {
@@ -3192,58 +3266,51 @@ final class NotchHomeView: NSView {
     let pad: CGFloat = 20
 
     if let item = detail {
-      let back = NotchHomeRoundButton(symbol: "chevron.left", fallback: "\u{2039}", size: 32) { [weak self] in
+      let back = NotchHomeRoundButton(symbol: "chevron.left", fallback: "\u{2039}", size: 26) { [weak self] in
         self?.onSelect?(nil)
       }
-      back.frame.origin = NSPoint(x: pad, y: topInset + 8)
+      back.frame.origin = NSPoint(x: pad, y: topInset + 6)
       addSubview(back)
-      let title = label(item.title, size: 17, weight: .medium, color: NotchHomePalette.text)
+      let title = label(item.title, size: 13.5, weight: .medium, color: NotchHomePalette.text)
       title.sizeToFit()
-      title.frame = NSRect(x: pad + 44, y: topInset + 6, width: min(title.frame.width, w - 200), height: 22)
+      title.frame = NSRect(x: pad + 36, y: topInset + 9, width: min(title.frame.width, w - pad * 2 - 36 - 70), height: 18)
       addSubview(title)
       if !item.tag.isEmpty {
         let c = chip(item.tag)
-        c.frame.origin = NSPoint(x: title.frame.maxX + 8, y: topInset + 9)
+        c.frame.origin = NSPoint(x: title.frame.maxX + 8, y: topInset + 10)
         addSubview(c)
       }
-      let line = label(item.line, size: 12.5, color: NotchHomePalette.tone(item.tone))
-      line.frame = NSRect(x: pad + 44, y: topInset + 28, width: w - pad * 2 - 44, height: 18)
-      var y = topInset + 8 + 44 + 30
-      if item.tone == "run" && !item.line.isEmpty {
-        line.isHidden = true
-        let card = NSView(frame: NSRect(x: 12, y: y - 18, width: w - 24, height: 66))
-        card.wantsLayer = true
-        card.layer?.backgroundColor = NotchHomePalette.card.cgColor
-        card.layer?.cornerRadius = 12
+      var y = topInset + 8 + 28 + 10
+      let bodyH = NotchHomeView.detailBodyHeight(item, width: w - pad * 2)
+      if bodyH > 0 {
         let body = NSTextField(wrappingLabelWithString: item.line)
-        body.font = NotchHomeType.sans(13)
-        body.textColor = NotchHomePalette.amber
-        body.maximumNumberOfLines = 3
-        body.frame = NSRect(x: 14, y: 10, width: card.frame.width - 28, height: 48)
-        card.addSubview(body)
-        addSubview(card)
-        y += 56
+        body.font = NotchHomeType.sans(12)
+        body.textColor = item.tone == "run" ? NotchHomePalette.amber : NotchHomePalette.muted
+        body.maximumNumberOfLines = 5
+        body.lineBreakMode = .byTruncatingTail
+        body.frame = NSRect(x: pad, y: y, width: w - pad * 2, height: bodyH - 6)
+        addSubview(body)
+        y += bodyH
       }
-      addSubview(line)
       for text in item.details.prefix(8) {
         let parts = text.components(separatedBy: "\t")
-        let l = label(parts[0], size: 13, color: NotchHomePalette.muted)
-        l.frame = NSRect(x: pad, y: y, width: 120, height: 18)
+        let l = label(parts[0], size: 11.5, color: NotchHomePalette.muted)
+        l.frame = NSRect(x: pad, y: y, width: 110, height: 16)
         addSubview(l)
         if parts.count > 1 {
-          let r = label(parts[1], size: 13, color: NotchHomePalette.text)
+          let r = label(parts[1], size: 11.5, color: NotchHomePalette.text)
           r.alignment = .right
-          r.frame = NSRect(x: pad + 120, y: y, width: w - pad * 2 - 120, height: 18)
+          r.frame = NSRect(x: pad + 110, y: y, width: w - pad * 2 - 110, height: 16)
           addSubview(r)
         }
-        y += 30
+        y += 26
       }
       var x = pad
-      for a in item.actions {
+      for a in item.actions.prefix(4) {
         let b = NotchHomeButton(title: a.label, primary: a.primary) { [weak self] in
           self?.onAction?(item.id, a.action)
         }
-        b.frame.origin = NSPoint(x: x, y: y + 10)
+        b.frame.origin = NSPoint(x: x, y: y + 6)
         addSubview(b)
         x += b.frame.width + 8
       }
@@ -3494,7 +3561,7 @@ final class NotchHomeController {
       w = min(max(hw.size.width + 2 * 110, 440), panelSize.width)
       h = min(
         NotchHomeView.expandedHeight(
-          model: model, detail: detail, topInset: hw.attached ? hw.size.height : 8),
+          model: model, detail: detail, topInset: hw.attached ? hw.size.height : 8, width: w),
         panelSize.height)
     } else if hw.attached {
       w = hw.size.width + 2 * 46

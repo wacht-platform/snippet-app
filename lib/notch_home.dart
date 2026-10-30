@@ -131,6 +131,14 @@ class NotchHome {
         await quickSend(
             client: client, session: target.session, action: const QuickDeny());
         _push();
+      case final a when a.startsWith('choice:'):
+        final value = a.substring(7);
+        final q = target.question;
+        await quickSend(
+            client: client,
+            session: target.session,
+            action: QuickAnswer(q.isEmpty || target.more > 0 ? value : '$q\n→ $value'));
+        _push();
       case 'open':
         if (target.payload != null) {
           onNotifTap?.call(target.payload!);
@@ -148,8 +156,16 @@ class NotchHome {
 }
 
 class NotchTarget {
-  const NotchTarget({this.session = '', this.taskId, this.payload});
+  const NotchTarget({
+    this.session = '',
+    this.taskId,
+    this.payload,
+    this.question = '',
+    this.more = 0,
+  });
   final String session;
+  final String question;
+  final int more;
   final String? taskId;
   final Map<String, dynamic>? payload;
 }
@@ -184,6 +200,38 @@ class NotchNote {
         'at': at,
       };
 }
+
+List<Map<String, dynamic>> _askActions(Map? attn) {
+  final type = attn?['type'];
+  if (type == 'approval') {
+    return [
+      {'label': 'Approve', 'action': 'approve', 'primary': true},
+      {'label': 'Deny', 'action': 'deny', 'primary': false},
+    ];
+  }
+  if (type == 'question' && (attn?['more'] is! int || attn?['more'] == 0)) {
+    final choices = attn?['choices'];
+    if (choices is List && choices.isNotEmpty) {
+      return [
+        for (final (i, c) in choices.whereType<Map>().take(3).indexed)
+          {
+            'label': '${c['label'] ?? c['value'] ?? ''}',
+            'action': 'choice:${c['value'] ?? c['label'] ?? ''}',
+            'primary': i == 0,
+          },
+      ];
+    }
+  }
+  return [
+    {'label': 'Answer', 'action': 'open', 'primary': true},
+  ];
+}
+
+NotchTarget _askTarget(String session, Map? attn) => NotchTarget(
+      session: session,
+      question: '${attn?['text'] ?? ''}'.trim(),
+      more: attn?['more'] is int ? attn!['more'] as int : 0,
+    );
 
 String _ago(int unix, DateTime now) {
   final d = now.difference(DateTime.fromMillisecondsSinceEpoch(unix * 1000));
@@ -228,7 +276,12 @@ Map<String, dynamic> buildModel({
           .where((a) => !a.isMissionControl && a.status != 'archived')
           .toList(),
       sessions);
-  final needs = crewCount(crew, CrewState.needsYou);
+  final asked = {
+    for (final e in crew.where((e) => e.state == CrewState.needsYou))
+      if (e.lead != null) e.lead!.id
+  };
+  final loose = sessions.where((s) => s.needsInput && !asked.contains(s.id)).toList();
+  final needs = crewCount(crew, CrewState.needsYou) + loose.length;
   final working = crewCount(crew, CrewState.working);
   final failedJobs = jobs.where((j) => (j.lastError ?? '').isNotEmpty).length;
   final state = needs > 0
@@ -243,7 +296,7 @@ Map<String, dynamic> buildModel({
   for (final e in crew.where((e) => e.state != CrewState.standingBy)) {
     final id = 'crew:${e.agent.id}';
     final session = e.lead?.id ?? '';
-    targets[id] = NotchTarget(session: session);
+    targets[id] = _askTarget(session, e.attention);
     final asking = e.state == CrewState.needsYou;
     items.add({
       'id': id,
@@ -253,20 +306,33 @@ Map<String, dynamic> buildModel({
       'tone': asking ? 'run' : 'accent',
       'tag': e.agent.role.trim(),
       'meta': e.sessions.length > 1 ? '${e.sessions.length} sessions' : '',
-      'actions': [
-        if (asking && e.isApproval) ...[
-          {'label': 'Approve', 'action': 'approve', 'primary': true},
-          {'label': 'Deny', 'action': 'deny', 'primary': false},
-        ] else if (asking)
-          {'label': 'Answer', 'action': 'open', 'primary': true}
-        else
-          {'label': 'Open', 'action': 'open', 'primary': false},
-      ],
+      'actions': asking
+          ? _askActions(e.attention)
+          : [
+              {'label': 'Open', 'action': 'open', 'primary': false},
+            ],
       'details': [
         if (e.agent.role.trim().isNotEmpty) 'Role\t${e.agent.role.trim()}',
         'Sessions\t${e.sessions.length}',
         if (e.agent.profile != null) 'Model\t${e.agent.profile}',
       ],
+    });
+  }
+
+  for (final s in loose) {
+    final id = 'ask:${s.id}';
+    targets[id] = _askTarget(s.id, s.attention);
+    final text = '${s.attention?['text'] ?? ''}'.trim();
+    items.add({
+      'id': id,
+      'section': 'Needs you',
+      'title': s.title.trim().isEmpty ? 'Untitled session' : s.title.trim(),
+      'line': text.isEmpty ? 'Waiting for you' : text,
+      'tone': 'run',
+      'tag': '',
+      'meta': '',
+      'actions': _askActions(s.attention),
+      'details': [],
     });
   }
 
@@ -321,7 +387,22 @@ Map<String, dynamic> buildModel({
   for (var i = 0; i < recent.length; i++) {
     final n = recent[i];
     final id = 'note:$i';
-    targets[id] = NotchTarget(payload: n.payload);
+    final noteAttn = n.payload['attention'];
+    final live = noteAttn is Map
+        ? sessions
+            .where((s) =>
+                s.id == '${n.payload['session']}' &&
+                s.needsInput &&
+                s.attention?['id'] == noteAttn['id'])
+            .firstOrNull
+        : null;
+    targets[id] = live == null
+        ? NotchTarget(payload: n.payload)
+        : NotchTarget(
+            session: live.id,
+            payload: n.payload,
+            question: '${noteAttn?['text'] ?? ''}'.trim(),
+            more: noteAttn?['more'] is int ? noteAttn!['more'] as int : 0);
     items.add({
       'id': id,
       'section': 'Recent',
@@ -329,10 +410,12 @@ Map<String, dynamic> buildModel({
       'line': n.subtitle.trim(),
       'tag': '',
       'meta': _ago(n.at, now),
-      'tone': 'idle',
-      'actions': [
-        {'label': 'Open', 'action': 'open', 'primary': false},
-      ],
+      'tone': live == null ? 'idle' : 'run',
+      'actions': live == null
+          ? [
+              {'label': 'Open', 'action': 'open', 'primary': false},
+            ]
+          : _askActions(noteAttn as Map),
       'details': [],
     });
   }
