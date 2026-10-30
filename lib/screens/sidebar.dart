@@ -893,6 +893,11 @@ class SidebarState extends State<Sidebar> {
       }
     }
     final mcSelected = mc != null && mc.id == widget.selectedSessionId;
+    final mcWaiting = mc != null && mc.status == 'waiting_for_input';
+    final crewLine = _crew.isEmpty
+        ? 'Standing by'
+        : crewSummary(
+            deriveCrew(_crew, widget.sessions ?? const <SessionInfo>[]));
     final mcBusy = mc != null &&
         (sessionIsActive(mc.status) || mc.status == 'waiting_for_input');
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -904,12 +909,6 @@ class SidebarState extends State<Sidebar> {
               child: Text('CREW',
                   style: sans(11, color: AppColors.fg4, spacing: 0.9)),
             ),
-            if (widget.onOpenPalette != null)
-              IconBtn('search',
-                  size: 22,
-                  iconSize: 13,
-                  tooltip: 'Search or jump (⌘K)',
-                  onTap: widget.onOpenPalette),
             Builder(
               builder: (ctx) => IconBtn('plus',
                   size: 22,
@@ -933,16 +932,38 @@ class SidebarState extends State<Sidebar> {
             borderRadius: BorderRadius.circular(8),
             onTap: hasClient ? widget.onOpenMissionControl : null,
             child: SizedBox(
-              height: 32,
+              height: 40,
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 8),
                 child: Row(children: [
-                  MochiIcon(color: AppColors.accent, size: 17),
+                  MochiIcon(color: AppColors.accent, size: 20),
                   const SizedBox(width: 10),
                   Expanded(
-                    child: Text('Mission Control',
-                        style: sans(13,
-                            color: mcSelected ? AppColors.fg1 : AppColors.fg2)),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Mission Control',
+                            style: sans(13,
+                                color: mcSelected
+                                    ? AppColors.fg1
+                                    : AppColors.fg2)),
+                        Text(
+                            mcWaiting
+                                ? 'Waiting on you'
+                                : mcBusy
+                                    ? 'Working'
+                                    : crewLine,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: sans(12,
+                                color: mcWaiting
+                                    ? AppColors.run
+                                    : mcBusy
+                                        ? AppColors.accent
+                                        : AppColors.fg3)),
+                      ],
+                    ),
                   ),
                   if (mcBusy)
                     Container(
@@ -1028,6 +1049,36 @@ class SidebarState extends State<Sidebar> {
         decoration: BoxDecoration(
             border: Border(top: BorderSide(color: AppColors.line))),
         child: Column(children: [
+          if (widget.onOpenPalette != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(10, 8, 10, 4),
+              child: Material(
+                color: AppColors.surface1,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  side: BorderSide(color: AppColors.line),
+                ),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(8),
+                  onTap: widget.onOpenPalette,
+                  child: SizedBox(
+                    height: 30,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      child: Row(children: [
+                        AppIcon('search', size: 14, color: AppColors.fg4),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text('Search or jump',
+                              style: sans(13, color: AppColors.fg4)),
+                        ),
+                        Text('⌘K', style: mono(11, color: AppColors.fg4)),
+                      ]),
+                    ),
+                  ),
+                ),
+              ),
+            ),
           if (widget.desktopFooter != null) widget.desktopFooter!,
         ]),
       ),
