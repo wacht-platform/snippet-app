@@ -1026,6 +1026,18 @@ class SidebarState extends State<Sidebar> {
               entries: crewOrdered(
                   deriveCrew(_crew, widget.sessions ?? const <SessionInfo>[])),
               onOpen: (a) => widget.onOpenAgent?.call(a),
+              onMenu: (ctx, agent, point) {
+                final c = widget.client;
+                if (c == null) return;
+                showCrewAgentMenu(ctx,
+                    client: c,
+                    agent: agent,
+                    point: point,
+                    onDeleted: () {
+                      _crewAt = null;
+                      _loadCrew();
+                    });
+              },
             ),
           ),
         ),

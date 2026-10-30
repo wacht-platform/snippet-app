@@ -210,6 +210,7 @@ class _CoordinationAgentDirectoryState
                 : CrewBoard(
                     entries: _crew,
                     client: widget.client,
+                    onDeleted: refresh,
                     padding:
                         const EdgeInsets.fromLTRB(S.s32, S.s24, S.s32, S.s32),
                     onOpen: (a) => setState(() => _selectedId = a.id)))
@@ -245,6 +246,7 @@ class _CoordinationAgentDirectoryState
                   : CrewBoard(
                       entries: _crew,
                       client: widget.client,
+                      onDeleted: refresh,
                       onOpen: (a) => presentScreen(
                         context,
                         style: PanelStyle.drawer,

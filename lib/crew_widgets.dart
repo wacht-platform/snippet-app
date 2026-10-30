@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 
 import 'api.dart';
+import 'dialog_widgets.dart';
+import 'menu_widgets.dart';
+import 'screens/mochi_color_picker.dart';
 import 'crew_status.dart';
 import 'mochi.dart';
 import 'models.dart';
@@ -84,11 +87,13 @@ class CrewRoster extends StatelessWidget {
     super.key,
     required this.entries,
     required this.onOpen,
+    this.onMenu,
     this.columns = 3,
   });
 
   final List<CrewEntry> entries;
   final ValueChanged<CoordinationAgent> onOpen;
+  final void Function(BuildContext, CoordinationAgent, Offset)? onMenu;
   final int columns;
 
   @override
@@ -101,7 +106,9 @@ class CrewRoster extends StatelessWidget {
         final w = (box.maxWidth - gap * (columns - 1)) / columns;
         return Wrap(spacing: gap, runSpacing: gap, children: [
           for (final e in list)
-            SizedBox(width: w, child: _Bubble(e, () => onOpen(e.agent))),
+            SizedBox(
+                width: w,
+                child: _Bubble(e, () => onOpen(e.agent), onMenu)),
         ]);
       }),
     );
@@ -109,9 +116,10 @@ class CrewRoster extends StatelessWidget {
 }
 
 class _Bubble extends StatelessWidget {
-  const _Bubble(this.e, this.onTap);
+  const _Bubble(this.e, this.onTap, this.onMenu);
   final CrewEntry e;
   final VoidCallback onTap;
+  final void Function(BuildContext, CoordinationAgent, Offset)? onMenu;
 
   @override
   Widget build(BuildContext context) {
@@ -135,6 +143,16 @@ class _Bubble extends StatelessWidget {
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: onTap,
+          onSecondaryTapDown: onMenu == null
+              ? null
+              : (d) => onMenu!(context, e.agent, d.globalPosition),
+          onLongPress: onMenu == null
+              ? null
+              : () {
+                  final box = context.findRenderObject() as RenderBox;
+                  onMenu!(context, e.agent,
+                      box.localToGlobal(box.size.center(Offset.zero)));
+                },
           child: Padding(
             padding: const EdgeInsets.fromLTRB(4, 10, 4, 8),
             child: Stack(clipBehavior: Clip.none, children: [
@@ -175,12 +193,14 @@ class CrewBoard extends StatefulWidget {
     required this.entries,
     required this.client,
     required this.onOpen,
+    this.onDeleted,
     this.padding = const EdgeInsets.fromLTRB(16, 16, 16, 96),
   });
 
   final List<CrewEntry> entries;
   final DaemonClient client;
   final ValueChanged<CoordinationAgent> onOpen;
+  final VoidCallback? onDeleted;
   final EdgeInsets padding;
 
   @override
@@ -271,6 +291,7 @@ class _CrewBoardState extends State<CrewBoard> {
                   key: ValueKey('crew-${e.agent.id}'),
                   entry: e,
                   client: widget.client,
+                  onDeleted: widget.onDeleted,
                   onOpen: () => widget.onOpen(e.agent)),
             ),
         ]),
@@ -291,10 +312,12 @@ class _CrewCard extends StatefulWidget {
       {super.key,
       required this.entry,
       required this.client,
-      required this.onOpen});
+      required this.onOpen,
+      this.onDeleted});
   final CrewEntry entry;
   final DaemonClient client;
   final VoidCallback onOpen;
+  final VoidCallback? onDeleted;
 
   @override
   State<_CrewCard> createState() => _CrewCardState();
@@ -346,6 +369,11 @@ class _CrewCardState extends State<_CrewCard> {
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: widget.onOpen,
+        onSecondaryTapDown: (d) => showCrewAgentMenu(context,
+            client: widget.client,
+            agent: widget.entry.agent,
+            point: d.globalPosition,
+            onDeleted: widget.onDeleted),
         child: Padding(
           padding: EdgeInsets.all(kMobile ? 14 : 12),
           child: Column(
@@ -370,6 +398,16 @@ class _CrewCardState extends State<_CrewCard> {
                             style: sans(12.5, color: AppColors.fg3)),
                     ],
                   ),
+                ),
+                Builder(
+                  builder: (ctx) => IconBtn('more-horizontal',
+                      size: kMobile ? 36 : 28,
+                      iconSize: 16,
+                      tooltip: 'Agent actions',
+                      onTap: () => showCrewAgentMenu(ctx,
+                          client: widget.client,
+                          agent: e.agent,
+                          onDeleted: widget.onDeleted)),
                 ),
               ]),
               const SizedBox(height: 10),
@@ -420,5 +458,48 @@ class _CrewCardState extends State<_CrewCard> {
         ),
       ),
     );
+  }
+}
+
+
+/// Colour and delete for one agent, from a right-click, long-press or the
+/// card's more button. Deleting is refused by the daemon while the agent is
+/// still on an unfinished task, and its message is shown as is.
+Future<void> showCrewAgentMenu(
+  BuildContext context, {
+  required DaemonClient client,
+  required CoordinationAgent agent,
+  Offset? point,
+  VoidCallback? onDeleted,
+}) async {
+  final name =
+      agent.displayName.trim().isEmpty ? agent.id : agent.displayName.trim();
+  final picked = await showAppMenu<String>(
+    context,
+    point: point,
+    anchor: point == null ? context : null,
+    items: [
+      appMenuItem(value: 'color', icon: 'sparkles', label: 'Change colour'),
+      appMenuItem(
+          value: 'delete', icon: 'trash', label: 'Delete agent', danger: true),
+    ],
+  );
+  if (!context.mounted) return;
+  if (picked == 'color') {
+    await showMochiColorPicker(context, client, agent.id, name, point: point);
+  } else if (picked == 'delete') {
+    final ok = await confirmAction(context,
+        title: 'Delete $name?',
+        body:
+            "This removes the agent, its identity and its notes. Its past task history loses it too. This can't be undone.",
+        confirmLabel: 'Delete agent');
+    if (!ok || !context.mounted) return;
+    try {
+      await client.deleteAgent(agent.id);
+      if (context.mounted) toast(context, 'Deleted $name');
+      onDeleted?.call();
+    } catch (e) {
+      if (context.mounted) toast(context, '$e', danger: true);
+    }
   }
 }
