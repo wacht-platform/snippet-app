@@ -896,6 +896,34 @@ class SidebarState extends State<Sidebar> {
     final mcBusy = mc != null &&
         (sessionIsActive(mc.status) || mc.status == 'waiting_for_input');
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      if (hasClient || _crew.isNotEmpty) ...[
+        Padding(
+          padding: const EdgeInsets.fromLTRB(18, 4, 12, 4),
+          child: Row(children: [
+            Expanded(
+              child: Text('CREW',
+                  style: sans(11, color: AppColors.fg4, spacing: 0.9)),
+            ),
+            if (widget.onOpenPalette != null)
+              IconBtn('search',
+                  size: 22,
+                  iconSize: 13,
+                  tooltip: 'Search or jump (⌘K)',
+                  onTap: widget.onOpenPalette),
+            Builder(
+              builder: (ctx) => IconBtn('plus',
+                  size: 22,
+                  iconSize: 12,
+                  tooltip: 'New agent',
+                  onTap: () async {
+                    await _openCreateAgent(ctx);
+                    _crewAt = null;
+                    _loadCrew();
+                  }),
+            ),
+          ]),
+        ),
+
       Padding(
         padding: const EdgeInsets.fromLTRB(10, 0, 10, 0),
         child: Material(
@@ -923,12 +951,6 @@ class SidebarState extends State<Sidebar> {
                       decoration: BoxDecoration(
                           color: AppColors.accent, shape: BoxShape.circle),
                     ),
-                  if (widget.onOpenPalette != null)
-                    IconBtn('search',
-                        size: 24,
-                        iconSize: 14,
-                        tooltip: 'Search or jump (⌘K)',
-                        onTap: widget.onOpenPalette),
                 ]),
               ),
             ),
@@ -971,27 +993,7 @@ class SidebarState extends State<Sidebar> {
           ]),
         ),
       ),
-      if (_crew.isNotEmpty) ...[
-        Padding(
-          padding: const EdgeInsets.fromLTRB(18, 14, 12, 4),
-          child: Row(children: [
-            Expanded(
-              child: Text('CREW',
-                  style: sans(11, color: AppColors.fg4, spacing: 0.9)),
-            ),
-            Builder(
-              builder: (ctx) => IconBtn('plus',
-                  size: 22,
-                  iconSize: 12,
-                  tooltip: 'New agent',
-                  onTap: () async {
-                    await _openCreateAgent(ctx);
-                    _crewAt = null;
-                    _loadCrew();
-                  }),
-            ),
-          ]),
-        ),
+        if (_crew.isNotEmpty)
         ConstrainedBox(
           constraints: const BoxConstraints(maxHeight: 280),
           child: SingleChildScrollView(

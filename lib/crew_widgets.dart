@@ -91,7 +91,7 @@ List<CrewEntry> crewOrdered(List<CrewEntry> c) => [
       for (final s in CrewState.values) ...c.where((e) => e.state == s),
     ];
 
-class CrewRoster extends StatelessWidget {
+class CrewRoster extends StatefulWidget {
   const CrewRoster({
     super.key,
     required this.entries,
@@ -104,19 +104,49 @@ class CrewRoster extends StatelessWidget {
   final VoidCallback? onBoard;
 
   @override
+  State<CrewRoster> createState() => _CrewRosterState();
+}
+
+class _CrewRosterState extends State<CrewRoster> {
+  bool _showIdle = false;
+
+  @override
   Widget build(BuildContext context) {
-    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+    final entries = widget.entries;
+    final states = [
       for (final s in CrewState.values)
-        if (entries.any((e) => e.state == s)) ...[
-          Padding(
-            padding: const EdgeInsets.fromLTRB(18, 8, 12, 2),
-            child: Text(
-                '${_crewGroup(s).toUpperCase()} · ${crewCount(entries, s)}',
-                style: sans(10.5, color: AppColors.fg4, spacing: 0.8)),
-          ),
+        if (entries.any((e) => e.state == s)) s
+    ];
+    // One state only: a plain list. Several: grouped, with standing-by folded.
+    final single = states.length <= 1;
+    final idle = crewCount(entries, CrewState.standingBy);
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      for (final s in states)
+        if (single || s != CrewState.standingBy || _showIdle) ...[
+          if (!single)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 8, 12, 2),
+              child: Text(
+                  '${_crewGroup(s).toUpperCase()} · ${crewCount(entries, s)}',
+                  style: sans(10.5, color: AppColors.fg4, spacing: 0.8)),
+            ),
           for (final e in entries.where((e) => e.state == s))
-            _RosterRow(e, () => onOpen(e.agent)),
+            _RosterRow(e, () => widget.onOpen(e.agent)),
         ],
+      if (!single && idle > 0)
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(R.md - 2),
+            onTap: () => setState(() => _showIdle = !_showIdle),
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(
+                  10, kMobile ? 10 : 6, 10, kMobile ? 10 : 6),
+              child: Text(_showIdle ? 'Hide standing by' : '$idle standing by',
+                  style: sans(12, color: AppColors.fg4)),
+            ),
+          ),
+        ),
     ]);
   }
 }
