@@ -273,7 +273,6 @@ extension _DesktopShellPanesExt on _DesktopShellState {
         ),
         sidebarTop: _sidebarTop(),
         mainHeader: _macWindowBar(),
-        leftTakeover: _tasksTakeoverView(),
         sidebarHeader: _effectiveSection == ShellSection.sessions ||
                 _effectiveSection == ShellSection.tasks
             ? null
@@ -793,40 +792,14 @@ extension _DesktopShellPanesExt on _DesktopShellState {
     );
   }
 
-  String _takeoverMark() => '${_activeTab?.key}|${_activeKey[_Pane.left]}';
-
   Future<void> _openTasksPopover(BuildContext anchor) {
     final client = _client;
     if (client == null) return Future.value();
     return showTasksPopover(
       anchor,
       client,
-      onExpand: () => _setState(() {
-        _tasksTakeover = true;
-        _tasksTakeoverMark = _takeoverMark();
-      }),
+      onExpand: () => _openTasksTab(client, _active?.url ?? ''),
       onOpenTask: (task) => _openTaskTab(client, _active?.url ?? '', task),
-    );
-  }
-
-  Widget? _tasksTakeoverView() {
-    if (kMobile || !_tasksTakeover) return null;
-    final client = _client;
-    if (client == null || _tasksTakeoverMark != _takeoverMark()) return null;
-    return Container(
-      color: AppColors.windowBg,
-      child: TasksPanel(
-        key: const ValueKey('tasks-main'),
-        client: client,
-        onOpenTask: (task) => _openTaskTab(client, _active?.url ?? '', task),
-        trailing: [
-          IconBtn('x',
-              size: 28,
-              iconSize: 15,
-              tooltip: 'Close task list',
-              onTap: () => _setState(() => _tasksTakeover = false)),
-        ],
-      ),
     );
   }
 

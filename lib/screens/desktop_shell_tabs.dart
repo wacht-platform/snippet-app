@@ -344,7 +344,6 @@ extension _DesktopShellTabsExt on _DesktopShellState {
     if (i < 0 || i >= _tabs.length) return;
     FocusManager.instance.primaryFocus?.unfocus();
     _setState(() {
-      _tasksTakeover = false;
       _activeIndex = i;
       final tab = _tabs[i];
       _activePane = tab.pane;
@@ -511,6 +510,33 @@ extension _DesktopShellTabsExt on _DesktopShellState {
     });
     _persistTabs();
     _syncPage();
+  }
+
+  void _openTasksTab(DaemonClient client, String url) {
+    final pane = _focusedPane;
+    final group = _activeGroupKeyFor(pane) ?? _activeTab?.key;
+    if (group == null) return;
+    final existing =
+        _tabs.indexWhere((t) => t.isBoard && t.instanceUrl == url);
+    _setState(() {
+      if (existing >= 0) {
+        final t = _tabs[existing];
+        t
+          ..pane = pane
+          ..groupSessionKey = group;
+        _dockAux(pane, t.key);
+      } else {
+        _tabs.add(_ShellTab.board(
+          client: client,
+          instanceUrl: url,
+          pane: pane,
+          groupSessionKey: group,
+        ));
+        _dockAux(pane, _tabs.last.key);
+      }
+    });
+    _syncPage();
+    _persistTabs();
   }
 
   Future<void> _openTaskTabById(DaemonClient client, String taskId) async {

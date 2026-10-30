@@ -256,8 +256,6 @@ class _DesktopShellState extends State<DesktopShell>
 
   /// The full task list shown over the left pane instead of in a tab. It is
   /// tied to the tab that was active when it opened, so switching tabs closes it.
-  bool _tasksTakeover = false;
-  String? _tasksTakeoverMark;
 
   /// Terminal tabs the user dismissed from a pane's strip.
   ///
