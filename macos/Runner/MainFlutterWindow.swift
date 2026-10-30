@@ -2807,17 +2807,34 @@ struct NotchHomeModel {
   }
 }
 
+/// The app's own faces: Inter at 400/500/600 and JetBrains Mono, never heavier.
+enum NotchHomeType {
+  static func sans(_ size: CGFloat, weight: NSFont.Weight = .regular) -> NSFont {
+    SnippetTheme.ensureFontsRegistered()
+    let name: String
+    if weight.rawValue >= NSFont.Weight.semibold.rawValue {
+      name = "Inter-SemiBold"
+    } else if weight.rawValue >= NSFont.Weight.medium.rawValue {
+      name = "Inter-Medium"
+    } else {
+      name = "Inter-Regular"
+    }
+    return NSFont(name: name, size: size) ?? NSFont.systemFont(ofSize: size, weight: weight)
+  }
+}
+
 enum NotchHomePalette {
-  static let amber = NSColor(srgbRed: 0.83, green: 0.57, blue: 0.24, alpha: 1)
-  static let accent = NSColor(srgbRed: 0.62, green: 0.69, blue: 1.0, alpha: 1)
-  static let ok = NSColor(srgbRed: 0.50, green: 0.72, blue: 0.56, alpha: 1)
-  static let danger = NSColor(srgbRed: 0.90, green: 0.45, blue: 0.37, alpha: 1)
-  static let idle = NSColor(srgbRed: 0.48, green: 0.45, blue: 0.41, alpha: 1)
-  static let text = NSColor(srgbRed: 0.93, green: 0.91, blue: 0.87, alpha: 1)
-  static let muted = NSColor(srgbRed: 0.64, green: 0.61, blue: 0.56, alpha: 1)
-  static let row = NSColor(white: 1, alpha: 0.06)
-  static let card = NSColor(white: 1, alpha: 0.07)
-  static let chip = NSColor(white: 1, alpha: 0.10)
+  static let amber = SnippetTheme.run
+  static let accent = SnippetTheme.accent
+  static let ok = SnippetTheme.ok
+  static let danger = NSColor(srgbRed: 0xEB / 255.0, green: 0x57 / 255.0, blue: 0x57 / 255.0, alpha: 1)
+  static let idle = SnippetTheme.fg4
+  static let text = SnippetTheme.fg1
+  static let muted = SnippetTheme.fg3
+  static let row = SnippetTheme.surface1
+  static let card = SnippetTheme.surface2
+  static let chip = SnippetTheme.surface3
+  static let primary = SnippetTheme.accentFill
 
   static func tone(_ name: String) -> NSColor {
     switch name {
@@ -2848,19 +2865,17 @@ final class NotchHomeButton: NSButton {
     isBordered = false
     wantsLayer = true
     layer?.cornerRadius = 8
-    layer?.backgroundColor =
-      (primary ? NotchHomePalette.accent : NSColor(white: 1, alpha: 0.12)).cgColor
+    layer?.backgroundColor = (primary ? NotchHomePalette.primary : NotchHomePalette.chip).cgColor
     attributedTitle = NSAttributedString(
       string: title,
       attributes: [
-        .font: SnippetTheme.sans(12.5, weight: .semibold),
-        .foregroundColor: primary
-          ? NSColor(srgbRed: 0.06, green: 0.08, blue: 0.16, alpha: 1) : NotchHomePalette.text,
+        .font: NotchHomeType.sans(12.5, weight: .medium),
+        .foregroundColor: NotchHomePalette.text,
       ])
     target = self
     action = #selector(pressed)
     sizeToFit()
-    layer?.cornerRadius = 9
+    layer?.cornerRadius = 8
     frame.size = NSSize(width: max(frame.width + 20, 56), height: 28)
   }
 
@@ -2899,7 +2914,7 @@ final class NotchHomeRowView: NSView {
   override func draw(_ dirtyRect: NSRect) {
     guard hovering || fillsAlways else { return }
     (fillsAlways ? NotchHomePalette.card : NotchHomePalette.row).setFill()
-    let r: CGFloat = fillsAlways ? 16 : 12
+    let r: CGFloat = fillsAlways ? 12 : 10
     NSBezierPath(roundedRect: bounds, xRadius: r, yRadius: r).fill()
   }
 }
@@ -2946,9 +2961,9 @@ final class NotchHomeRoundButton: NSButton {
     self.onPress = onPress
     isBordered = false
     wantsLayer = true
-    layer?.cornerRadius = size / 2
+    layer?.cornerRadius = 8
     layer?.backgroundColor = NotchHomePalette.chip.cgColor
-    if let img = SnippetTheme.symbol(symbol, fallback, size: 12, weight: .semibold) {
+    if let img = SnippetTheme.symbol(symbol, fallback, size: 12, weight: .medium) {
       image = img
       imagePosition = .imageOnly
       contentTintColor = NotchHomePalette.text
@@ -2956,7 +2971,7 @@ final class NotchHomeRoundButton: NSButton {
       attributedTitle = NSAttributedString(
         string: fallback,
         attributes: [
-          .font: SnippetTheme.sans(13, weight: .semibold),
+          .font: NotchHomeType.sans(13, weight: .medium),
           .foregroundColor: NotchHomePalette.text,
         ])
     }
@@ -2975,13 +2990,18 @@ final class NotchHomeMochi: NSView {
 
   override func draw(_ dirtyRect: NSRect) {
     if onDisc {
-      fill.setFill()
-      NSBezierPath(ovalIn: bounds).fill()
+      let r = bounds.width * 0.29
+      let tile = NSBezierPath(roundedRect: bounds.insetBy(dx: 0.5, dy: 0.5), xRadius: r, yRadius: r)
+      NotchHomePalette.card.setFill()
+      tile.fill()
+      fill.withAlphaComponent(0.8).setStroke()
+      tile.lineWidth = 1
+      tile.stroke()
     }
-    let inset = onDisc ? bounds.width * 0.2 : 0
+    let inset = onDisc ? bounds.width * 0.21 : 0
     MochiRenderer.drawMochi(
       in: bounds.insetBy(dx: inset, dy: inset),
-      bodyColor: onDisc ? NSColor(srgbRed: 0.99, green: 0.95, blue: 0.88, alpha: 1) : fill,
+      bodyColor: onDisc ? NSColor(srgbRed: 0.98, green: 0.80, blue: 0.65, alpha: 1) : fill,
       leafColor: NSColor(srgbRed: 0.50, green: 0.82, blue: 0.65, alpha: 1),
       eyeColor: NSColor(srgbRed: 0.08, green: 0.09, blue: 0.11, alpha: 1),
       blushColor: nil)
@@ -3025,11 +3045,16 @@ final class NotchHomeView: NSView {
 
   private func label(
     _ text: String, size: CGFloat, weight: NSFont.Weight = .regular, color: NSColor,
-    mono: Bool = false
+    mono: Bool = false, kern: CGFloat = 0
   ) -> NSTextField {
     let f = NSTextField(labelWithString: text)
-    f.font = mono ? SnippetTheme.mono(size, weight: weight) : SnippetTheme.sans(size, weight: weight)
+    let font = mono ? SnippetTheme.mono(size, weight: weight) : NotchHomeType.sans(size, weight: weight)
+    f.font = font
     f.textColor = color
+    if kern != 0 {
+      f.attributedStringValue = NSAttributedString(
+        string: text, attributes: [.font: font, .foregroundColor: color, .kern: kern])
+    }
     f.lineBreakMode = .byTruncatingTail
     f.maximumNumberOfLines = 1
     f.cell?.usesSingleLineMode = true
@@ -3050,7 +3075,7 @@ final class NotchHomeView: NSView {
     let v = NSView(frame: NSRect(x: 0, y: 0, width: l.frame.width + 12, height: 16))
     v.wantsLayer = true
     v.layer?.backgroundColor = NotchHomePalette.chip.cgColor
-    v.layer?.cornerRadius = 5
+    v.layer?.cornerRadius = 6
     l.frame = NSRect(x: 6, y: 1, width: l.frame.width, height: 14)
     v.addSubview(l)
     return v
@@ -3127,7 +3152,7 @@ final class NotchHomeView: NSView {
         b.wantsLayer = true
         b.layer?.backgroundColor = stateColor.cgColor
         b.layer?.cornerRadius = 10
-        let t = label("\(model.badge)", size: 11.5, weight: .semibold, color: NSColor(white: 0.08, alpha: 1), mono: true)
+        let t = label("\(model.badge)", size: 11.5, weight: .medium, color: NSColor(white: 0.08, alpha: 1), mono: true)
         t.alignment = .center
         t.frame = NSRect(x: 0, y: 2, width: 20, height: 16)
         b.addSubview(t)
@@ -3149,7 +3174,7 @@ final class NotchHomeView: NSView {
       }
       back.frame.origin = NSPoint(x: pad, y: topInset + 8)
       addSubview(back)
-      let title = label(item.title, size: 17, weight: .semibold, color: NotchHomePalette.text)
+      let title = label(item.title, size: 17, weight: .medium, color: NotchHomePalette.text)
       title.sizeToFit()
       title.frame = NSRect(x: pad + 44, y: topInset + 6, width: min(title.frame.width, w - 200), height: 22)
       addSubview(title)
@@ -3166,9 +3191,9 @@ final class NotchHomeView: NSView {
         let card = NSView(frame: NSRect(x: 12, y: y - 18, width: w - 24, height: 66))
         card.wantsLayer = true
         card.layer?.backgroundColor = NotchHomePalette.card.cgColor
-        card.layer?.cornerRadius = 14
+        card.layer?.cornerRadius = 12
         let body = NSTextField(wrappingLabelWithString: item.line)
-        body.font = SnippetTheme.sans(13)
+        body.font = NotchHomeType.sans(13)
         body.textColor = NotchHomePalette.amber
         body.maximumNumberOfLines = 3
         body.frame = NSRect(x: 14, y: 10, width: card.frame.width - 28, height: 48)
@@ -3207,7 +3232,7 @@ final class NotchHomeView: NSView {
     avatar.onDisc = true
     avatar.fill = stateColor
     addSubview(avatar)
-    let title = label(model.title, size: 15, weight: .semibold, color: NotchHomePalette.text)
+    let title = label(model.title, size: 15, weight: .medium, color: NotchHomePalette.text)
     title.frame = NSRect(x: pad + 52, y: topInset + 7, width: w - 160, height: 20)
     addSubview(title)
     let sub = label(model.subtitle, size: 12.5, color: NotchHomePalette.muted)
@@ -3228,10 +3253,10 @@ final class NotchHomeView: NSView {
       card.onSelect = { [weak self] in self?.onSelect?(f.id) }
       let asking = f.section == "Needs you"
       let lab = label(asking ? "NEEDS YOU" : "UP NEXT", size: 10.5, weight: .medium,
-                      color: asking ? NotchHomePalette.amber : NotchHomePalette.muted, mono: true)
+                      color: asking ? NotchHomePalette.amber : NotchHomePalette.idle, kern: 0.8)
       lab.frame = NSRect(x: 16, y: 12, width: 160, height: 14)
       card.addSubview(lab)
-      let t = label(f.title, size: 15, weight: .semibold, color: NotchHomePalette.text)
+      let t = label(f.title, size: 15, weight: .medium, color: NotchHomePalette.text)
       t.frame = NSRect(x: 16, y: 28, width: card.frame.width - 130, height: 20)
       card.addSubview(t)
       if !f.meta.isEmpty {
@@ -3262,7 +3287,7 @@ final class NotchHomeView: NSView {
       if shown >= NotchHomeView.maxRows { break }
       if item.section != lastSection {
         lastSection = item.section
-        let s = label(item.section.uppercased(), size: 10.5, weight: .medium, color: NotchHomePalette.idle, mono: true)
+        let s = label(item.section.uppercased(), size: 10.5, weight: .medium, color: NotchHomePalette.idle, kern: 0.8)
         s.frame = NSRect(x: pad, y: y + 10, width: w - pad * 2, height: 14)
         addSubview(s)
         y += 28
@@ -3274,7 +3299,7 @@ final class NotchHomeView: NSView {
       row.addSubview(d)
       var rightWidth: CGFloat = 0
       if !item.status.isEmpty {
-        let st = label(item.status, size: 12, weight: .semibold, color: NotchHomePalette.tone(item.tone))
+        let st = label(item.status, size: 12, weight: .medium, color: NotchHomePalette.tone(item.tone))
         st.alignment = .right
         st.frame = NSRect(x: row.frame.width - 14 - 90, y: 10, width: 90, height: 16)
         row.addSubview(st)
