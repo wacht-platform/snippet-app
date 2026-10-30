@@ -386,6 +386,75 @@ extension _SessionScreenRecorderExt on _SessionScreenState {
         .toList());
   }
 
+  /// Images and files on the system clipboard (desktop). Returns false when
+  /// the clipboard holds neither, so the caller falls back to a text paste.
+  Future<bool> _pasteMedia() async {
+    if (kMobile) return false;
+    try {
+      final files = await Pasteboard.files();
+      if (files.isNotEmpty) {
+        await _ingest([
+          for (final path in files)
+            (
+              name: path.split(RegExp(r'[\\/]')).last,
+              localPath: path,
+              readBytes: () => File(path).readAsBytes(),
+            )
+        ]);
+        return true;
+      }
+      final image = await Pasteboard.image;
+      if (image != null && image.isNotEmpty) {
+        final name = 'pasted-${DateTime.now().millisecondsSinceEpoch}.png';
+        await _ingest([(name: name, localPath: null, readBytes: () async => image)]);
+        return true;
+      }
+    } catch (_) {}
+    return false;
+  }
+
+  Future<void> _pasteFromShortcut() async {
+    if (await _pasteMedia()) return;
+    final text = (await Clipboard.getData(Clipboard.kTextPlain))?.text;
+    if (text == null || text.isEmpty || !mounted) return;
+    final v = _input.value;
+    final sel = v.selection;
+    final start = sel.isValid ? sel.start : v.text.length;
+    final end = sel.isValid ? sel.end : v.text.length;
+    _input.value = v.copyWith(
+        text: v.text.replaceRange(start, end, text),
+        selection: TextSelection.collapsed(offset: start + text.length));
+  }
+
+  /// Images from the Android keyboard (Gboard's clipboard and screenshot
+  /// suggestions, stickers, GIFs).
+  ContentInsertionConfiguration get _keyboardContent =>
+      ContentInsertionConfiguration(
+        allowedMimeTypes: const [
+          'image/png',
+          'image/jpeg',
+          'image/gif',
+          'image/webp',
+        ],
+        onContentInserted: (content) async {
+          final data = content.data;
+          if (data == null || data.isEmpty) return;
+          final ext = switch (content.mimeType) {
+            'image/jpeg' => 'jpg',
+            'image/gif' => 'gif',
+            'image/webp' => 'webp',
+            _ => 'png',
+          };
+          await _ingest([
+            (
+              name: 'keyboard-${DateTime.now().millisecondsSinceEpoch}.$ext',
+              localPath: null,
+              readBytes: () async => data,
+            )
+          ]);
+        },
+      );
+
   Future<void> _pickPhotos() async {
     final xs =
         await ImagePicker().pickMultiImage(imageQuality: 85, maxWidth: 2200);

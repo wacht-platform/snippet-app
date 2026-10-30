@@ -671,6 +671,9 @@ extension _SessionScreenComposerExt on _SessionScreenState {
         if (_mentionQuery != null)
           const SingleActivator(LogicalKeyboardKey.escape): () =>
               _setState(() => _mentionQuery = null),
+        if (!kMobile)
+          SingleActivator(LogicalKeyboardKey.keyV,
+              meta: kMacOS, control: !kMacOS): _pasteFromShortcut,
         const SingleActivator(
             LogicalKeyboardKey.enter,
             meta: true): () {
@@ -947,6 +950,7 @@ extension _SessionScreenComposerExt on _SessionScreenState {
                       child: TextField(
                         controller: _input,
                         focusNode: _inputFocus,
+                        contentInsertionConfiguration: _keyboardContent,
                         minLines: 1,
                         maxLines: 8,
                         cursorColor: AppColors.accent,
@@ -1084,6 +1088,7 @@ extension _SessionScreenComposerExt on _SessionScreenState {
                                       child: TextField(
                                         controller: _input,
                                         focusNode: _inputFocus,
+                                        contentInsertionConfiguration: _keyboardContent,
                                         // Two lines minimum: a single-line field read as a
                                         // cramped search box, and it hid the fact that the
                                         // composer accepts multi-line prose.
