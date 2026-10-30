@@ -5,53 +5,6 @@ import 'settings_form.dart';
 import 'theme.dart';
 import 'widgets.dart';
 
-class SettingsAccordion extends StatelessWidget {
-  const SettingsAccordion({
-    super.key,
-    required this.title,
-    required this.summary,
-    required this.open,
-    required this.onToggle,
-    required this.children,
-    this.footer,
-    this.warn = false,
-  });
-  final String title;
-  final String summary;
-  final bool open;
-  final VoidCallback onToggle;
-  final List<Widget> children;
-  final String? footer;
-  final bool warn;
-
-  @override
-  Widget build(BuildContext context) {
-    final header = SettingsRow(
-      label: title,
-      onTap: onToggle,
-      trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-        Flexible(
-          child: Text(summary,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: sans(kMobile ? 14 : 12.5,
-                  color: warn ? AppColors.danger : AppColors.fg4)),
-        ),
-        const SizedBox(width: 8),
-        AnimatedRotation(
-          turns: open ? 0.25 : 0,
-          duration: const Duration(milliseconds: 160),
-          child: AppIcon('chevron-right', size: 13, color: AppColors.fg4),
-        ),
-      ]),
-    );
-    return SettingsGroup(
-      footer: open ? footer : null,
-      children: [header, if (open) ...children],
-    );
-  }
-}
-
 class InlineKeyRow extends StatefulWidget {
   const InlineKeyRow({
     super.key,
@@ -60,12 +13,14 @@ class InlineKeyRow extends StatefulWidget {
     required this.hint,
     required this.onSave,
     this.busy = false,
+    this.optional = false,
   });
   final String label;
   final bool keySet;
   final String hint;
   final Future<void> Function(String key) onSave;
   final bool busy;
+  final bool optional;
 
   @override
   State<InlineKeyRow> createState() => _InlineKeyRowState();
@@ -96,7 +51,9 @@ class _InlineKeyRowState extends State<InlineKeyRow> {
     if (!_editing) {
       final status = Text(widget.keySet ? 'Set' : 'Not set',
           style: sans(kMobile ? 15 : 13,
-              color: widget.keySet ? AppColors.fg3 : AppColors.danger));
+              color: widget.keySet || widget.optional
+                  ? AppColors.fg3
+                  : AppColors.danger));
       return SettingsRow(
         label: widget.label,
         onTap: widget.busy ? null : () => setState(() => _editing = true),
