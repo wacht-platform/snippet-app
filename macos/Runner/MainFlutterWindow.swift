@@ -104,8 +104,8 @@ enum SnippetTheme {
   static let surface1 = NSColor(srgbRed: 0x15 / 255.0, green: 0x15 / 255.0, blue: 0x15 / 255.0, alpha: 1.0)
   static let surface2 = NSColor(srgbRed: 0x1F / 255.0, green: 0x1F / 255.0, blue: 0x1F / 255.0, alpha: 1.0)
   static let surface3 = NSColor(srgbRed: 0x2B / 255.0, green: 0x2B / 255.0, blue: 0x2B / 255.0, alpha: 1.0)
-  static let border = NSColor(srgbRed: 0x2A / 255.0, green: 0x2A / 255.0, blue: 0x2A / 255.0, alpha: 1.0)
-  static let border2 = NSColor(srgbRed: 0x3B / 255.0, green: 0x3B / 255.0, blue: 0x3B / 255.0, alpha: 1.0)
+  static let border = NSColor(srgbRed: 0x22 / 255.0, green: 0x22 / 255.0, blue: 0x22 / 255.0, alpha: 1.0)
+  static let border2 = NSColor(srgbRed: 0x30 / 255.0, green: 0x30 / 255.0, blue: 0x30 / 255.0, alpha: 1.0)
   static let fg1 = NSColor(srgbRed: 0xFF / 255.0, green: 0xFF / 255.0, blue: 0xFF / 255.0, alpha: 1.0)
   static let fg2 = NSColor(srgbRed: 0xDC / 255.0, green: 0xDC / 255.0, blue: 0xDC / 255.0, alpha: 1.0)
   static let fg3 = NSColor(srgbRed: 0xAB / 255.0, green: 0xAB / 255.0, blue: 0xAB / 255.0, alpha: 1.0)
@@ -2831,9 +2831,9 @@ enum NotchHomePalette {
   static let idle = SnippetTheme.fg4
   static let text = SnippetTheme.fg1
   static let muted = SnippetTheme.fg3
-  static let row = SnippetTheme.surface1
-  static let card = SnippetTheme.surface2
-  static let chip = SnippetTheme.surface3
+  static let row = NSColor(white: 0.07, alpha: 1)
+  static let card = NSColor(white: 0.09, alpha: 1)
+  static let chip = NSColor(white: 0.13, alpha: 1)
   static let primary = SnippetTheme.accentFill
 
   static func tone(_ name: String) -> NSColor {
@@ -2920,25 +2920,38 @@ final class NotchHomeRowView: NSView {
 }
 
 final class NotchHomeBackground: NSView {
-  override init(frame frameRect: NSRect) {
-    super.init(frame: frameRect)
-    wantsLayer = true
-    layer?.backgroundColor = NSColor.black.cgColor
+  private var attached = false
+
+  override var isFlipped: Bool { true }
+
+  override func draw(_ dirtyRect: NSRect) {
+    let w = bounds.width
+    let h = bounds.height
+    let r = min(attached ? 26 : 20, h / 2, w / 2)
+    let path = NSBezierPath()
+    if attached {
+      path.move(to: NSPoint(x: 0, y: 0))
+      path.line(to: NSPoint(x: w, y: 0))
+      path.line(to: NSPoint(x: w, y: h - r))
+      path.appendArc(withCenter: NSPoint(x: w - r, y: h - r), radius: r, startAngle: 0, endAngle: 90)
+      path.line(to: NSPoint(x: r, y: h))
+      path.appendArc(withCenter: NSPoint(x: r, y: h - r), radius: r, startAngle: 90, endAngle: 180)
+      path.close()
+    } else {
+      path.appendRoundedRect(bounds, xRadius: r, yRadius: r)
+    }
+    NSColor.black.setFill()
+    path.fill()
   }
 
-  required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
-
   func configure(attached: Bool, height: CGFloat) {
-    guard let l = layer else { return }
-    l.cornerRadius = attached ? min(18, height / 2) : min(height / 2, 18)
-    if attached {
-      // Unflipped layer: MinY is the bottom edge, so only the lower corners round.
-      l.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
-    } else {
-      l.maskedCorners = [
-        .layerMinXMinYCorner, .layerMaxXMinYCorner, .layerMinXMaxYCorner, .layerMaxXMaxYCorner,
-      ]
-    }
+    self.attached = attached
+    needsDisplay = true
+  }
+
+  override func setFrameSize(_ newSize: NSSize) {
+    super.setFrameSize(newSize)
+    needsDisplay = true
   }
 }
 
@@ -2994,7 +3007,7 @@ final class NotchHomeMochi: NSView {
       let tile = NSBezierPath(roundedRect: bounds.insetBy(dx: 0.5, dy: 0.5), xRadius: r, yRadius: r)
       NotchHomePalette.card.setFill()
       tile.fill()
-      fill.withAlphaComponent(0.8).setStroke()
+      SnippetTheme.border2.setStroke()
       tile.lineWidth = 1
       tile.stroke()
     }

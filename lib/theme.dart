@@ -132,8 +132,8 @@ ThemePreset _dark({
     fg2: inkMuted,
     fg3: inkSubtle,
     fg4: inkFaint,
-    border: const Color(0xFF2A2A2A),
-    border2: const Color(0xFF3B3B3B),
+    border: const Color(0xFF222222),
+    border2: const Color(0xFF303030),
     accent: accent,
     accentHover: _lighten(accent, 0.06),
     accentFg: const Color(0xFF000000),
@@ -152,7 +152,7 @@ ThemePreset _dark({
     diffDelBg: _withAlpha(danger, 0.10),
     diffAddFg: _lighten(success, 0.14),
     diffDelFg: _lighten(danger, 0.14),
-    diffGutter: const Color(0xFF3B3B3B),
+    diffGutter: const Color(0xFF303030),
   );
 }
 
@@ -188,8 +188,8 @@ final _ember = ThemePreset(
   fg2: const Color(0xFFDCDCDC),
   fg3: const Color(0xFFABABAB),
   fg4: const Color(0xFF7A7A7A),
-  border: const Color(0xFF2A2A2A),
-  border2: const Color(0xFF3B3B3B),
+  border: const Color(0xFF222222),
+  border2: const Color(0xFF303030),
   accent: const Color(0xFFFFFFFF),
   accentHover: const Color(0xFFE0E0E0),
   accentFg: const Color(0xFF000000),
@@ -208,7 +208,7 @@ final _ember = ThemePreset(
   diffDelBg: const Color(0xFFFF5C5C).withValues(alpha: 0.10),
   diffAddFg: const Color(0xFF6EE7B7),
   diffDelFg: const Color(0xFFFF8A8A),
-  diffGutter: const Color(0xFF3B3B3B),
+  diffGutter: const Color(0xFF303030),
 );
 
 final List<ThemePreset> allPresets = [_amoled];
