@@ -839,6 +839,7 @@ extension _DesktopShellPanesExt on _DesktopShellState {
         onSelect: _selectInstance,
         onAdd: _addInstanceFlow,
         onManage: _manageMachine,
+        switchOnly: true,
       ),
     );
   }

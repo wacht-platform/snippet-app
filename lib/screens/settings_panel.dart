@@ -35,6 +35,7 @@ class MachineList extends StatefulWidget {
   final void Function(Instance) onSelect;
   final VoidCallback onAdd;
   final void Function(Instance) onManage;
+  final bool switchOnly;
 
   const MachineList({
     super.key,
@@ -44,6 +45,7 @@ class MachineList extends StatefulWidget {
     required this.onSelect,
     required this.onAdd,
     required this.onManage,
+    this.switchOnly = false,
   });
 
   @override
@@ -74,8 +76,10 @@ class _MachineListState extends State<MachineList> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         ...widget.instances.map(_row),
-        Divider(height: 13, thickness: 1, color: AppColors.border),
-        _addRow(),
+        if (!widget.switchOnly) ...[
+          Divider(height: 13, thickness: 1, color: AppColors.border),
+          _addRow(),
+        ],
       ],
     );
   }
@@ -88,10 +92,12 @@ class _MachineListState extends State<MachineList> {
         Navigator.pop(context);
         widget.onSelect(i);
       },
-      onLongPress: () {
-        Navigator.pop(context);
-        widget.onManage(i);
-      },
+      onLongPress: widget.switchOnly
+          ? null
+          : () {
+              Navigator.pop(context);
+              widget.onManage(i);
+            },
       child: Padding(
         padding: EdgeInsets.fromLTRB(
             S.s12, kMobile ? S.s8 : S.s6, S.s2, kMobile ? S.s8 : S.s6),
@@ -122,11 +128,12 @@ class _MachineListState extends State<MachineList> {
             ]),
           ),
           if (selected) AppIcon('check', size: 16, color: AppColors.accent),
-          IconBtn('more-vertical', size: 32, iconSize: 16, tooltip: 'Manage',
-              onTap: () {
-            Navigator.pop(context);
-            widget.onManage(i);
-          }),
+          if (!widget.switchOnly)
+            IconBtn('more-vertical', size: 32, iconSize: 16, tooltip: 'Manage',
+                onTap: () {
+              Navigator.pop(context);
+              widget.onManage(i);
+            }),
         ]),
       ),
     );
@@ -266,8 +273,6 @@ class SettingsPanelState extends State<SettingsPanel> {
 
   bool _modelsEditing = false;
   bool _recurringAdding = false;
-
-
 
   String? _renamingUrl;
   final TextEditingController _renameController = TextEditingController();
@@ -1027,20 +1032,19 @@ class SettingsPanelState extends State<SettingsPanel> {
         builder: (anchor) => IconBtn('more-horizontal',
             size: 28,
             iconSize: 15,
-            tooltip: 'Machine actions',
-            onTap: () async {
-              final picked = await showAppMenu<String>(context,
-                  anchor: anchor,
-                  below: true,
-                  alignEnd: true,
-                  minWidth: 160,
-                  items: [
-                    appMenuItem(value: 'rename', label: 'Rename'),
-                    appMenuItem(value: 'remove', label: 'Remove', danger: true),
-                  ]);
-              if (picked == 'rename') _startRename(i);
-              if (picked == 'remove') _confirmRemove(i);
-            }),
+            tooltip: 'Machine actions', onTap: () async {
+          final picked = await showAppMenu<String>(context,
+              anchor: anchor,
+              below: true,
+              alignEnd: true,
+              minWidth: 160,
+              items: [
+                appMenuItem(value: 'rename', label: 'Rename'),
+                appMenuItem(value: 'remove', label: 'Remove', danger: true),
+              ]);
+          if (picked == 'rename') _startRename(i);
+          if (picked == 'remove') _confirmRemove(i);
+        }),
       );
 
   Widget _machineRow(Instance i) {
@@ -1131,7 +1135,8 @@ class SettingsPanelState extends State<SettingsPanel> {
             onTap: _addMachineBusy ? null : _closeAddMachine),
         const SizedBox(width: S.s8),
         Btn(_addMachineBusy ? 'Connecting…' : 'Connect',
-            disabled: !canConnect, onTap: canConnect ? _submitAddMachine : null),
+            disabled: !canConnect,
+            onTap: canConnect ? _submitAddMachine : null),
       ]),
     ];
   }
@@ -1176,8 +1181,7 @@ class SettingsPanelState extends State<SettingsPanel> {
                 label: 'Notifications',
                 sub: 'When a session needs you or finishes.',
                 trailing: SettingsSwitch(
-                    value: _notif,
-                    onChanged: _notifBusy ? null : _toggleNotif),
+                    value: _notif, onChanged: _notifBusy ? null : _toggleNotif),
               ),
           ],
         ),
