@@ -317,7 +317,7 @@ class _NotificationMessageCardState extends State<NotificationMessageCard> {
       return Align(
         alignment: widget.embedded
             ? Alignment.topLeft
-            : kMobile && _expandable
+            : kMobile
                 ? Alignment.topCenter
                 : Alignment.topRight,
         heightFactor: 1,

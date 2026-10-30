@@ -70,10 +70,18 @@ String taskAge(TaskItem task) {
   return at == null ? '' : relativeTime(at.millisecondsSinceEpoch ~/ 1000);
 }
 
-/// Open a task's detail: a sheet on a phone, a drawer on desktop.
+/// Set by the desktop shell so a task opened from anywhere lands in its own
+/// tab beside the session, rather than a panel over it.
+void Function(DaemonClient client, String taskId)? openTaskInTab;
+
+/// Open a task's detail: a sheet on a phone, a tab on desktop.
 Future<void> openTaskDetail(
     BuildContext context, DaemonClient client, String taskId) {
   if (taskId.startsWith('pending-')) return Future.value();
+  if (!kMobile && openTaskInTab != null) {
+    openTaskInTab!(client, taskId);
+    return Future.value();
+  }
   if (kMobile) {
     return showModalBottomSheet<void>(
       sheetAnimationStyle: sheetMotion,

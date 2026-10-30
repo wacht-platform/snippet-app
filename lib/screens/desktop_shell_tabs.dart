@@ -512,6 +512,14 @@ extension _DesktopShellTabsExt on _DesktopShellState {
     _syncPage();
   }
 
+  Future<void> _openTaskTabById(DaemonClient client, String taskId) async {
+    final url = _active?.url ?? '';
+    try {
+      final task = await client.getTask(taskId);
+      if (mounted) _openTaskTab(client, url, task);
+    } catch (_) {}
+  }
+
   void _openTaskTab(DaemonClient client, String url, TaskItem task) {
     final pane = _focusedPane;
     final group = _activeGroupKeyFor(pane) ?? _activeTab?.key;

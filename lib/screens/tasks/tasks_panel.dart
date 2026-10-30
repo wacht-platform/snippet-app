@@ -344,11 +344,7 @@ class TasksPanelState extends State<TasksPanel> {
     } else {
       detail = const DetailEmpty('Select a task');
     }
-    return ColoredBox(
-      color: AppColors.windowBg,
-      child: MasterDetail(
-        masterWidth: 380,
-        master: MasterPane(
+    final master = MasterPane(
           title: 'Tasks',
           actions: [
             IconBtn('search',
@@ -373,9 +369,22 @@ class TasksPanelState extends State<TasksPanel> {
           ),
           empty: empty,
           children: rows,
+        );
+    // Tasks open in their own tab, so a detail pane would stay empty: give
+    // the list the room instead.
+    if (widget.onOpenTask != null) {
+      return ColoredBox(
+        color: AppColors.windowBg,
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 880), child: master),
         ),
-        detail: detail,
-      ),
+      );
+    }
+    return ColoredBox(
+      color: AppColors.windowBg,
+      child: MasterDetail(masterWidth: 380, master: master, detail: detail),
     );
   }
 
