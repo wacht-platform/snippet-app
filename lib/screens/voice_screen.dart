@@ -244,6 +244,10 @@ class _VoiceScreenState extends State<VoiceScreen> {
     List<String>? phrases,
     String? assemblyaiKey,
     String? deepgramKey,
+    String? rimeKey,
+    String? ttsProvider,
+    String? rimeModel,
+    String? rimeVoice,
     String? typesafeKey,
     String? deepgramHost,
     String? ttsVoice,
@@ -259,6 +263,10 @@ class _VoiceScreenState extends State<VoiceScreen> {
           wakePhrases: phrases,
           assemblyaiKey: assemblyaiKey,
           deepgramKey: deepgramKey,
+          rimeKey: rimeKey,
+          ttsProvider: ttsProvider,
+          rimeModel: rimeModel,
+          rimeVoice: rimeVoice,
           typesafeKey: typesafeKey,
           deepgramHost: deepgramHost,
           ttsVoice: ttsVoice,
@@ -368,6 +376,27 @@ class _VoiceScreenState extends State<VoiceScreen> {
                   (k) => _saveAmbient(
                       deepgramKey: k, done: 'Deepgram key saved'))),
           _keyRow(
+              'Rime key',
+              a.rimeKeySet,
+              () => _editKey(
+                  'Rime',
+                  a.rimeKeySet,
+                  'Paste the key from rime.ai',
+                  (k) => _saveAmbient(rimeKey: k, done: 'Rime key saved'))),
+          SettingsRow(
+            label: 'Reply voice',
+            trailing: SettingsPopup<String>(
+              label: a.ttsProvider == 'rime' ? 'Rime' : 'Deepgram',
+              selected: a.ttsProvider,
+              items: const [('deepgram', 'Deepgram'), ('rime', 'Rime')],
+              onSelected: (v) => _saveAmbient(
+                  ttsProvider: v,
+                  done: v == 'rime'
+                      ? 'Replies now use Rime'
+                      : 'Replies now use Deepgram'),
+            ),
+          ),
+          _keyRow(
               'Typesafe key',
               a.watcherKeySet,
               () => _editKey(
@@ -386,7 +415,33 @@ class _VoiceScreenState extends State<VoiceScreen> {
                   _saveAmbient(deepgramHost: h, done: 'Region saved'),
             ),
           ),
-          if (a.ttsVoices.isNotEmpty)
+          if (a.ttsProvider == 'rime') ...[
+            SettingsRow(
+              label: 'Rime model',
+              trailing: SettingsPopup<String>(
+                label: a.rimeModel == 'coda' ? 'Coda' : 'Mist v3 (fastest)',
+                selected: a.rimeModel,
+                items: const [('mistv3', 'Mist v3 (fastest)'), ('coda', 'Coda')],
+                onSelected: (m) => _saveAmbient(
+                    rimeModel: m,
+                    rimeVoice: m == 'coda' ? 'lyra' : 'cove',
+                    done: 'Rime model saved'),
+              ),
+            ),
+            SettingsRow(
+              label: 'Rime voice',
+              sub: a.rimeVoice,
+              chevron: true,
+              onTap: () async {
+                final v = await promptText(context,
+                    title: 'Rime voice',
+                    initial: a.rimeVoice,
+                    hint: a.rimeModel == 'coda' ? 'e.g. lyra' : 'e.g. cove');
+                if (v == null || v.trim().isEmpty || !mounted) return;
+                await _saveAmbient(rimeVoice: v.trim(), done: 'Voice saved');
+              },
+            ),
+          ] else if (a.ttsVoices.isNotEmpty)
             SettingsRow(
               label: 'Voice',
               trailing: SettingsPopup<String>(

@@ -1720,6 +1720,10 @@ class AmbientSettings {
   final List<String> wakePhrases;
   final bool assemblyaiKeySet;
   final bool deepgramKeySet;
+  final bool rimeKeySet;
+  final String ttsProvider;
+  final String rimeModel;
+  final String rimeVoice;
   final String deepgramHost;
   final List<(String, String)> deepgramHosts;
   final String ttsVoice;
@@ -1746,6 +1750,10 @@ class AmbientSettings {
       this.wakePhrases = const [],
       this.assemblyaiKeySet = false,
       this.deepgramKeySet = false,
+      this.rimeKeySet = false,
+      this.ttsProvider = 'deepgram',
+      this.rimeModel = 'mistv3',
+      this.rimeVoice = 'cove',
       this.deepgramHost = 'api.deepgram.com',
       this.deepgramHosts = const [],
       this.ttsVoice = '',
@@ -1775,6 +1783,10 @@ class AmbientSettings {
       wakePhrases: wakePhrases,
       assemblyaiKeySet: assemblyaiKeySet,
       deepgramKeySet: deepgramKeySet,
+      rimeKeySet: rimeKeySet,
+      ttsProvider: ttsProvider,
+      rimeModel: rimeModel,
+      rimeVoice: rimeVoice,
       deepgramHost: deepgramHost,
       deepgramHosts: deepgramHosts,
       ttsVoice: ttsVoice,
@@ -1805,6 +1817,10 @@ class AmbientSettings {
         ],
         assemblyaiKeySet = j['assemblyai_key_set'] == true,
         deepgramKeySet = j['deepgram_key_set'] == true,
+        rimeKeySet = j['rime_key_set'] == true,
+        ttsProvider = j['tts_provider'] as String? ?? 'deepgram',
+        rimeModel = j['rime_model'] as String? ?? 'mistv3',
+        rimeVoice = j['rime_voice'] as String? ?? 'cove',
         deepgramHost = j['deepgram_host'] as String? ?? 'api.deepgram.com',
         deepgramHosts = [
           for (final h in (j['deepgram_hosts'] as List? ?? const []))
