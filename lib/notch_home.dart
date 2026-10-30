@@ -114,6 +114,15 @@ String _when(int unix, DateTime now) {
   return 'in ${d.inDays}d';
 }
 
+String _short(int unix, DateTime now) {
+  final d = DateTime.fromMillisecondsSinceEpoch(unix * 1000).difference(now);
+  if (d.isNegative) return 'due';
+  if (d.inMinutes < 1) return '<1m';
+  if (d.inHours < 1) return '${d.inMinutes}m';
+  if (d.inDays < 1) return '${d.inHours}h';
+  return '${d.inDays}d';
+}
+
 /// Pure so it can be tested: the same session-derived crew rule as the sidebar.
 Map<String, dynamic> buildModel({
   required List<SessionInfo> sessions,
@@ -132,11 +141,13 @@ Map<String, dynamic> buildModel({
   final needs = crewCount(crew, CrewState.needsYou);
   final working = crewCount(crew, CrewState.working);
   final failedJobs = jobs.where((j) => (j.lastError ?? '').isNotEmpty).length;
-  final state = needs > 0 || failedJobs > 0
+  final state = needs > 0
       ? 'needs'
-      : working > 0
-          ? 'working'
-          : 'idle';
+      : failedJobs > 0
+          ? 'failed'
+          : working > 0
+              ? 'working'
+              : 'idle';
   final items = <Map<String, dynamic>>[];
 
   for (final e in crew.where((e) => e.state != CrewState.standingBy)) {
@@ -150,6 +161,8 @@ Map<String, dynamic> buildModel({
       'title': e.agent.displayName,
       'line': e.line,
       'tone': asking ? 'run' : 'accent',
+      'tag': e.agent.role.trim(),
+      'meta': e.sessions.length > 1 ? '${e.sessions.length} sessions' : '',
       'actions': [
         if (asking && e.isApproval) ...[
           {'label': 'Approve', 'action': 'approve', 'primary': true},
@@ -160,9 +173,9 @@ Map<String, dynamic> buildModel({
           {'label': 'Open', 'action': 'open', 'primary': false},
       ],
       'details': [
-        if (e.agent.role.trim().isNotEmpty) e.agent.role.trim(),
-        '${e.sessions.length} session${e.sessions.length == 1 ? '' : 's'}',
-        if (e.agent.profile != null) 'Model: ${e.agent.profile}',
+        if (e.agent.role.trim().isNotEmpty) 'Role\t${e.agent.role.trim()}',
+        'Sessions\t${e.sessions.length}',
+        if (e.agent.profile != null) 'Model\t${e.agent.profile}',
       ],
     });
   }
@@ -180,17 +193,18 @@ Map<String, dynamic> buildModel({
       'id': id,
       'section': 'Recurring',
       'title': j.title,
-      'line': failed
-          ? 'Last run failed'
-          : '${j.scheduleLabel} · next ${_when(j.nextRunAt, now)}',
+      'line': j.scheduleLabel,
       'tone': failed ? 'danger' : 'idle',
+      'tag': '',
+      'status': failed ? 'Failed' : '',
+      'meta': failed ? '' : _when(j.nextRunAt, now),
       'actions': [
         {'label': 'Open', 'action': 'open', 'primary': false},
       ],
       'details': [
-        j.scheduleLabel,
-        'Next run ${_when(j.nextRunAt, now)}',
-        if (failed) j.lastError!,
+        'Schedule\t${j.scheduleLabel}',
+        'Next run\t${_when(j.nextRunAt, now)}',
+        if (failed) 'Last error\t${j.lastError!}',
       ],
     });
   }
@@ -204,11 +218,13 @@ Map<String, dynamic> buildModel({
       'section': 'Tasks',
       'title': t.title.trim().isEmpty ? 'Task' : t.title.trim(),
       'line': t.status.label,
+      'tag': '',
+      'meta': '',
       'tone': blocked ? 'run' : 'accent',
       'actions': [
         {'label': 'Open', 'action': 'open', 'primary': false},
       ],
-      'details': [t.status.label],
+      'details': ['Status\t${t.status.label}'],
     });
   }
 
@@ -218,7 +234,17 @@ Map<String, dynamic> buildModel({
     '$working working',
     '${crewCount(crew, CrewState.standingBy)} standing by',
   ].join(' · ');
+  final upNext = sortedJobs
+      .where((j) => (j.lastError ?? '').isEmpty && j.nextRunAt > 0)
+      .firstOrNull;
+  final featured =
+      items.where((i) => i['section'] == 'Needs you').firstOrNull ??
+          (upNext == null
+              ? null
+              : items.firstWhere((i) => i['id'] == 'job:${upNext.id}'));
   return {
+    'featuredId': featured?['id'] ?? '',
+    'pill': upNext == null ? '' : _short(upNext.nextRunAt, now),
     'state': state,
     'title': 'Team status',
     'subtitle': summary,
