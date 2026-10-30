@@ -19,7 +19,7 @@ extension _DesktopShellTabsExt on _DesktopShellState {
       if (!mounted) return;
       _store.saveOpenTabs(
         _tabs
-            .where((t) => !t.isPrs && !t.isDraft && !t.isReadout)
+            .where((t) => !t.isPrs && !t.isDraft && !t.isReadout && !t.isTask)
             .map((t) => OpenTabDescriptor(
                   instanceUrl: t.instanceUrl,
                   sessionId: t.sessionId,
@@ -509,6 +509,34 @@ extension _DesktopShellTabsExt on _DesktopShellState {
       }
     });
     _persistTabs();
+    _syncPage();
+  }
+
+  void _openTaskTab(DaemonClient client, String url, TaskItem task) {
+    final pane = _focusedPane;
+    final group = _activeGroupKeyFor(pane) ?? _activeTab?.key;
+    if (group == null) return;
+    final existing = _tabs.indexWhere(
+        (t) => t.isTask && t.instanceUrl == url && t.taskId == task.id);
+    _setState(() {
+      if (existing >= 0) {
+        final t = _tabs[existing];
+        t
+          ..pane = pane
+          ..groupSessionKey = group;
+        _dockAux(pane, t.key);
+      } else {
+        _tabs.add(_ShellTab.task(
+          client: client,
+          instanceUrl: url,
+          taskId: task.id,
+          title: task.title.trim().isEmpty ? 'Task' : task.title.trim(),
+          pane: pane,
+          groupSessionKey: group,
+        ));
+        _dockAux(pane, _tabs.last.key);
+      }
+    });
     _syncPage();
   }
 

@@ -5,13 +5,14 @@ import 'models.dart';
 import 'theme.dart';
 import 'widgets.dart';
 
-/// Opens the open-task list above [anchor]. [onExpand] receives the task the
-/// user picked, or null for "Expand task list", and shows the full list in the
-/// main pane.
+/// Opens the open-task list above [anchor]. "Expand" calls [onExpand] to show
+/// the full list in the main pane; picking a task calls [onOpenTask], which
+/// opens it in a tab.
 Future<void> showTasksPopover(
   BuildContext anchor,
   DaemonClient client, {
-  required void Function(String? taskId) onExpand,
+  required VoidCallback onExpand,
+  required void Function(TaskItem task) onOpenTask,
 }) =>
     showAnchoredPanel<void>(
       anchor,
@@ -19,14 +20,17 @@ Future<void> showTasksPopover(
       maxHeight: 440,
       above: true,
       alignRight: true,
-      child: _TasksPopover(client: client, onExpand: onExpand),
+      child: _TasksPopover(
+          client: client, onExpand: onExpand, onOpenTask: onOpenTask),
     );
 
 class _TasksPopover extends StatefulWidget {
-  const _TasksPopover({required this.client, required this.onExpand});
+  const _TasksPopover(
+      {required this.client, required this.onExpand, required this.onOpenTask});
 
   final DaemonClient client;
-  final void Function(String? taskId) onExpand;
+  final VoidCallback onExpand;
+  final void Function(TaskItem task) onOpenTask;
 
   @override
   State<_TasksPopover> createState() => _TasksPopoverState();
@@ -50,10 +54,7 @@ class _TasksPopoverState extends State<_TasksPopover> {
         _ => AppColors.fg4,
       };
 
-  void _expand(String? id) {
-    Navigator.of(context, rootNavigator: true).pop();
-    widget.onExpand(id);
-  }
+  void _close() => Navigator.of(context, rootNavigator: true).pop();
 
   @override
   Widget build(BuildContext context) => Padding(
@@ -73,7 +74,10 @@ class _TasksPopoverState extends State<_TasksPopover> {
                   message: 'Expand task list',
                   child: InkWell(
                     borderRadius: BorderRadius.circular(R.sm),
-                    onTap: () => _expand(null),
+                    onTap: () {
+                      _close();
+                      widget.onExpand();
+                    },
                     child: Padding(
                       padding:
                           const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
@@ -133,7 +137,10 @@ class _TasksPopoverState extends State<_TasksPopover> {
         borderRadius: BorderRadius.circular(R.sm),
         child: InkWell(
           borderRadius: BorderRadius.circular(R.sm),
-          onTap: () => _expand(t.id),
+          onTap: () {
+            _close();
+            widget.onOpenTask(t);
+          },
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
             child: Row(children: [

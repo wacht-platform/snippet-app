@@ -79,6 +79,9 @@ class ShellTab {
   final String? prSession;
   final GithubStatus? github;
 
+  /// Set only for a task tab: the task whose detail it shows.
+  String? taskId;
+
   bool isDraft = false;
   String? draftFolder;
   RightTab? readout;
@@ -204,6 +207,25 @@ class ShellTab {
         prSession = null,
         github = null;
 
+  ShellTab.task({
+    required this.client,
+    required this.instanceUrl,
+    required String this.taskId,
+    required this.title,
+    this.pane = ShellPane.left,
+    this.groupSessionKey,
+  })  : sessionId = null,
+        filePath = null,
+        profile = null,
+        diffPath = null,
+        diffStaged = false,
+        diffUntracked = false,
+        termId = null,
+        termSessionKey = null,
+        isBoard = false,
+        prSession = null,
+        github = null;
+
   ShellTab.prs({
     required this.client,
     required this.instanceUrl,
@@ -223,6 +245,7 @@ class ShellTab {
         termSessionKey = null,
         isBoard = false;
 
+  bool get isTask => taskId != null;
   bool get isPrs => prSession != null;
   bool get isFile => filePath != null;
   bool get isDiff => diffPath != null;
@@ -230,6 +253,7 @@ class ShellTab {
   bool get isMissionControl =>
       !isDraft &&
       !isReadout &&
+      !isTask &&
       !isBoard &&
       !isPrs &&
       !isFile &&
@@ -238,6 +262,8 @@ class ShellTab {
       isMissionControlTab(sessionId: sessionId, title: title);
   String get key => isReadout
       ? '$instanceUrl|readout|${readout!.key}'
+      : isTask
+      ? '$instanceUrl|task|$taskId'
       : isDraft
       ? '$instanceUrl|new'
       : isPrs
@@ -259,6 +285,8 @@ class ShellTab {
 /// tab (top bar, desktop strip, split header, tab menu) cannot drift.
 String tabIconKind(ShellTab t) => t.isReadout
     ? t.readout!.icon
+    : t.isTask
+    ? 'task'
     : t.isDraft
     ? 'chat-thread'
     : t.isPrs

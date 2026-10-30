@@ -20,13 +20,15 @@ class TasksPanel extends StatefulWidget {
     required this.client,
     this.trailing = const [],
     this.phoneHeader = true,
-    this.initialTaskId,
+    this.onOpenTask,
   });
 
   final DaemonClient client;
   final List<Widget> trailing;
   final bool phoneHeader;
-  final String? initialTaskId;
+
+  /// Desktop: open a picked task elsewhere (a tab) instead of in the panel.
+  final void Function(TaskItem task)? onOpenTask;
 
   @override
   State<TasksPanel> createState() => TasksPanelState();
@@ -34,12 +36,6 @@ class TasksPanel extends StatefulWidget {
 
 class TasksPanelState extends State<TasksPanel> {
   late TaskFeed _feed = TaskFeed(widget.client, onChange: _sync);
-
-  @override
-  void initState() {
-    super.initState();
-    _selectedTaskId = widget.initialTaskId;
-  }
 
   final _search = TextEditingController();
   bool _searchOpen = kMobile;
@@ -83,6 +79,10 @@ class TasksPanelState extends State<TasksPanel> {
   }
 
   Future<void> _open(TaskItem task) async {
+    if (!kMobile && widget.onOpenTask != null) {
+      widget.onOpenTask!(task);
+      return;
+    }
     if (!kMobile) {
       setState(() {
         _selectedTaskId = task.id;

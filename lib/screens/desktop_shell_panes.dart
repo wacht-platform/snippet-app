@@ -42,6 +42,14 @@ extension _DesktopShellPanesExt on _DesktopShellState {
         onClose: () => _closePaneTab(t),
       );
     }
+    if (t.isTask) {
+      return TaskDetailScreen(
+        key: ValueKey('body-${t.key}'),
+        client: t.client,
+        taskId: t.taskId!,
+        pane: true,
+      );
+    }
     if (t.isBoard) {
       return kMobile
           ? TaskKanban(key: ValueKey('body-${t.key}'), client: t.client)
@@ -131,7 +139,7 @@ extension _DesktopShellPanesExt on _DesktopShellState {
   }
 
   bool _isAuxiliary(_ShellTab t) =>
-      t.isTerminal || t.isFile || t.isDiff || t.isBoard;
+      t.isTerminal || t.isFile || t.isDiff || t.isBoard || t.isTask;
 
   List<_ShellTab> get _mainTabs => [
         for (final t in _tabs)
@@ -785,13 +793,15 @@ extension _DesktopShellPanesExt on _DesktopShellState {
   Future<void> _openTasksPopover(BuildContext anchor) {
     final client = _client;
     if (client == null) return Future.value();
-    return showTasksPopover(anchor, client, onExpand: (taskId) {
-      _setState(() {
+    return showTasksPopover(
+      anchor,
+      client,
+      onExpand: () => _setState(() {
         _tasksTakeover = true;
-        _tasksTakeoverTaskId = taskId;
         _tasksTakeoverMark = _takeoverMark();
-      });
-    });
+      }),
+      onOpenTask: (task) => _openTaskTab(client, _active?.url ?? '', task),
+    );
   }
 
   Widget? _tasksTakeoverView() {
@@ -801,9 +811,9 @@ extension _DesktopShellPanesExt on _DesktopShellState {
     return Container(
       color: AppColors.windowBg,
       child: TasksPanel(
-        key: ValueKey('tasks-main-${_tasksTakeoverTaskId ?? ''}'),
+        key: const ValueKey('tasks-main'),
         client: client,
-        initialTaskId: _tasksTakeoverTaskId,
+        onOpenTask: (task) => _openTaskTab(client, _active?.url ?? '', task),
         trailing: [
           IconBtn('x',
               size: 28,

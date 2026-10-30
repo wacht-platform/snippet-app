@@ -18,6 +18,7 @@ import '../notification_sync.dart';
 import '../notification_inbox.dart';
 import '../notification_conversation.dart';
 import 'tasks/task_common.dart';
+import 'tasks/task_detail_screen.dart';
 import '../panel.dart';
 import '../shell_panel.dart';
 import '../platform.dart';
@@ -256,7 +257,6 @@ class _DesktopShellState extends State<DesktopShell>
   /// The full task list shown over the left pane instead of in a tab. It is
   /// tied to the tab that was active when it opened, so switching tabs closes it.
   bool _tasksTakeover = false;
-  String? _tasksTakeoverTaskId;
   String? _tasksTakeoverMark;
 
   /// Terminal tabs the user dismissed from a pane's strip.

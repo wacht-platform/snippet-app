@@ -946,7 +946,7 @@ extension _SessionScreenComposerExt on _SessionScreenState {
                         decoration: InputDecoration(
                           isCollapsed: true,
                           contentPadding:
-                              const EdgeInsets.fromLTRB(4, 12, 4, 11),
+                              const EdgeInsets.fromLTRB(4, 9, 4, 14),
                           border: InputBorder.none,
                           hintText: _isMissionControl
                               ? 'Reply to Snippet'
