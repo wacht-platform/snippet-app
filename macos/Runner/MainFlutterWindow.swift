@@ -3082,14 +3082,14 @@ final class NotchHomeView: NSView {
   }
 
   static let maxRows = 8
-  static let headerHeight: CGFloat = 58
+  static let headerHeight: CGFloat = 46
 
   static func isFeatured(_ item: NotchHomeItem, _ model: NotchHomeModel) -> Bool {
     return !model.featuredId.isEmpty && item.id == model.featuredId
   }
 
   static func featuredHeight(_ item: NotchHomeItem) -> CGFloat {
-    return 84 + (item.actions.isEmpty ? 0 : 40)
+    return 64 + (item.actions.isEmpty ? 0 : 36)
   }
 
   /// Content height for the expanded state, so the controller can size the shape.
@@ -3101,7 +3101,7 @@ final class NotchHomeView: NSView {
       if !d.actions.isEmpty { h += 52 }
       return h + 14
     }
-    var h = topInset + 4 + headerHeight + 6
+    var h = topInset + 2 + headerHeight + 4
     if let f = model.items.first(where: { isFeatured($0, model) }) {
       h += featuredHeight(f) + 6
     }
@@ -3110,10 +3110,10 @@ final class NotchHomeView: NSView {
     for item in model.items where !isFeatured(item, model) {
       if shown >= maxRows { break }
       if item.section != last {
-        h += 28
+        h += 24
         last = item.section
       }
-      h += 54
+      h += 44
       shown += 1
     }
     if model.items.isEmpty { h += 40 }
@@ -3228,23 +3228,23 @@ final class NotchHomeView: NSView {
     }
 
     // Header
-    let avatar = NotchHomeMochi(frame: NSRect(x: pad, y: topInset + 6, width: 40, height: 40))
+    let avatar = NotchHomeMochi(frame: NSRect(x: pad, y: topInset + 5, width: 32, height: 32))
     avatar.onDisc = true
     avatar.fill = stateColor
     addSubview(avatar)
-    let title = label(model.title, size: 15, weight: .medium, color: NotchHomePalette.text)
-    title.frame = NSRect(x: pad + 52, y: topInset + 7, width: w - 160, height: 20)
+    let title = label(model.title, size: 13, weight: .medium, color: NotchHomePalette.text)
+    title.frame = NSRect(x: pad + 42, y: topInset + 5, width: w - 160, height: 20)
     addSubview(title)
-    let sub = label(model.subtitle, size: 12.5, color: NotchHomePalette.muted)
-    sub.frame = NSRect(x: pad + 52, y: topInset + 27, width: w - 160, height: 18)
+    let sub = label(model.subtitle, size: 11.5, color: NotchHomePalette.muted)
+    sub.frame = NSRect(x: pad + 42, y: topInset + 22, width: w - 160, height: 18)
     addSubview(sub)
-    let open = NotchHomeRoundButton(symbol: "arrow.up.forward", fallback: "\u{2197}", size: 30) { [weak self] in
+    let open = NotchHomeRoundButton(symbol: "arrow.up.forward", fallback: "\u{2197}", size: 26) { [weak self] in
       self?.onOpenApp?()
     }
-    open.frame.origin = NSPoint(x: w - pad - 30, y: topInset + 11)
+    open.frame.origin = NSPoint(x: w - pad - 26, y: topInset + 8)
     addSubview(open)
 
-    var y = topInset + 4 + NotchHomeView.headerHeight + 6
+    var y = topInset + 2 + NotchHomeView.headerHeight + 4
 
     if let f = model.items.first(where: { NotchHomeView.isFeatured($0, model) }) {
       let fh = NotchHomeView.featuredHeight(f)
@@ -3254,26 +3254,26 @@ final class NotchHomeView: NSView {
       let asking = f.section == "Needs you"
       let lab = label(asking ? "NEEDS YOU" : "UP NEXT", size: 10.5, weight: .medium,
                       color: asking ? NotchHomePalette.amber : NotchHomePalette.idle, kern: 0.8)
-      lab.frame = NSRect(x: 16, y: 12, width: 160, height: 14)
+      lab.frame = NSRect(x: 16, y: 10, width: 160, height: 14)
       card.addSubview(lab)
-      let t = label(f.title, size: 15, weight: .medium, color: NotchHomePalette.text)
-      t.frame = NSRect(x: 16, y: 28, width: card.frame.width - 130, height: 20)
+      let t = label(f.title, size: 13.5, weight: .medium, color: NotchHomePalette.text)
+      t.frame = NSRect(x: 16, y: 24, width: card.frame.width - 130, height: 20)
       card.addSubview(t)
       if !f.meta.isEmpty {
-        let mt = label(f.meta, size: 12.5, color: NotchHomePalette.muted)
+        let mt = label(f.meta, size: 11.5, color: NotchHomePalette.muted)
         mt.alignment = .right
-        mt.frame = NSRect(x: card.frame.width - 16 - 110, y: 29, width: 110, height: 18)
+        mt.frame = NSRect(x: card.frame.width - 16 - 110, y: 25, width: 110, height: 18)
         card.addSubview(mt)
       }
-      let ln = label(f.line, size: 13, color: asking ? NotchHomePalette.amber : NotchHomePalette.muted)
-      ln.frame = NSRect(x: 16, y: 50, width: card.frame.width - 32, height: 18)
+      let ln = label(f.line, size: 11.5, color: asking ? NotchHomePalette.amber : NotchHomePalette.muted)
+      ln.frame = NSRect(x: 16, y: 43, width: card.frame.width - 32, height: 18)
       card.addSubview(ln)
       var bx: CGFloat = 16
       for a in f.actions.prefix(3) {
         let b = NotchHomeButton(title: a.label, primary: a.primary) { [weak self] in
           self?.onAction?(f.id, a.action)
         }
-        b.frame.origin = NSPoint(x: bx, y: 78)
+        b.frame.origin = NSPoint(x: bx, y: 68)
         card.addSubview(b)
         bx += b.frame.width + 8
       }
@@ -3288,45 +3288,45 @@ final class NotchHomeView: NSView {
       if item.section != lastSection {
         lastSection = item.section
         let s = label(item.section.uppercased(), size: 10.5, weight: .medium, color: NotchHomePalette.idle, kern: 0.8)
-        s.frame = NSRect(x: pad, y: y + 10, width: w - pad * 2, height: 14)
+        s.frame = NSRect(x: pad, y: y + 8, width: w - pad * 2, height: 14)
         addSubview(s)
-        y += 28
+        y += 24
       }
-      let row = NotchHomeRowView(frame: NSRect(x: 12, y: y, width: w - 24, height: 54))
+      let row = NotchHomeRowView(frame: NSRect(x: 12, y: y, width: w - 24, height: 44))
       row.onSelect = { [weak self] in self?.onSelect?(item.id) }
       let d = dot(NotchHomePalette.tone(item.tone), size: 8)
-      d.frame.origin = NSPoint(x: 14, y: 23)
+      d.frame.origin = NSPoint(x: 14, y: 18)
       row.addSubview(d)
       var rightWidth: CGFloat = 0
       if !item.status.isEmpty {
-        let st = label(item.status, size: 12, weight: .medium, color: NotchHomePalette.tone(item.tone))
+        let st = label(item.status, size: 11.5, weight: .medium, color: NotchHomePalette.tone(item.tone))
         st.alignment = .right
-        st.frame = NSRect(x: row.frame.width - 14 - 90, y: 10, width: 90, height: 16)
+        st.frame = NSRect(x: row.frame.width - 14 - 90, y: 6, width: 90, height: 16)
         row.addSubview(st)
         rightWidth = 96
       }
       if !item.meta.isEmpty {
-        let mt = label(item.meta, size: item.status.isEmpty ? 12 : 11.5, color: item.status.isEmpty ? NotchHomePalette.muted : NotchHomePalette.idle)
+        let mt = label(item.meta, size: 11.5, color: item.status.isEmpty ? NotchHomePalette.muted : NotchHomePalette.idle)
         mt.alignment = .right
-        mt.frame = NSRect(x: row.frame.width - 14 - 90, y: item.status.isEmpty ? 10 : 29, width: 90, height: 16)
+        mt.frame = NSRect(x: row.frame.width - 14 - 90, y: item.status.isEmpty ? 6 : 24, width: 90, height: 16)
         row.addSubview(mt)
         rightWidth = 96
       }
       let textWidth = row.frame.width - 34 - rightWidth - 10
-      let t = label(item.title, size: 14, weight: .medium, color: NotchHomePalette.text)
+      let t = label(item.title, size: 13, weight: .medium, color: NotchHomePalette.text)
       t.sizeToFit()
-      t.frame = NSRect(x: 34, y: 9, width: min(t.frame.width, textWidth), height: 18)
+      t.frame = NSRect(x: 34, y: 6, width: min(t.frame.width, textWidth), height: 18)
       row.addSubview(t)
       if !item.tag.isEmpty && t.frame.maxX + 70 < row.frame.width - rightWidth {
         let c = chip(item.tag)
-        c.frame.origin = NSPoint(x: t.frame.maxX + 8, y: 11)
+        c.frame.origin = NSPoint(x: t.frame.maxX + 8, y: 8)
         row.addSubview(c)
       }
-      let l = label(item.line, size: 12.5, color: NotchHomePalette.muted)
-      l.frame = NSRect(x: 34, y: 29, width: textWidth, height: 18)
+      let l = label(item.line, size: 11.5, color: NotchHomePalette.muted)
+      l.frame = NSRect(x: 34, y: 24, width: textWidth, height: 18)
       row.addSubview(l)
       addSubview(row)
-      y += 54
+      y += 44
       shown += 1
     }
     if model.items.isEmpty {
@@ -3468,7 +3468,7 @@ final class NotchHomeController {
     let w: CGFloat
     let h: CGFloat
     if expanded {
-      w = max(hw.size.width + 150, 400)
+      w = max(hw.size.width + 90, 360)
       h = min(
         NotchHomeView.expandedHeight(
           model: model, detail: detail, topInset: hw.attached ? hw.size.height : 8),

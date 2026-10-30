@@ -107,7 +107,7 @@ class NotchTarget {
 String _when(int unix, DateTime now) {
   if (unix <= 0) return '';
   final d = DateTime.fromMillisecondsSinceEpoch(unix * 1000).difference(now);
-  if (d.isNegative) return 'due';
+  if (d.isNegative) return 'overdue';
   if (d.inMinutes < 1) return 'in <1m';
   if (d.inHours < 1) return 'in ${d.inMinutes}m';
   if (d.inDays < 1) return 'in ${d.inHours}h';
@@ -116,7 +116,7 @@ String _when(int unix, DateTime now) {
 
 String _short(int unix, DateTime now) {
   final d = DateTime.fromMillisecondsSinceEpoch(unix * 1000).difference(now);
-  if (d.isNegative) return 'due';
+  if (d.isNegative) return '';
   if (d.inMinutes < 1) return '<1m';
   if (d.inHours < 1) return '${d.inMinutes}m';
   if (d.inDays < 1) return '${d.inHours}h';
