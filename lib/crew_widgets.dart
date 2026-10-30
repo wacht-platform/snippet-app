@@ -1,8 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'api.dart';
-import 'dialog_widgets.dart';
-import 'menu_widgets.dart';
 import 'screens/mochi_color_picker.dart';
 import 'crew_status.dart';
 import 'mochi.dart';
@@ -480,6 +480,7 @@ Future<void> showCrewAgentMenu(
     anchor: point == null ? context : null,
     items: [
       appMenuItem(value: 'color', icon: 'sparkles', label: 'Change colour'),
+      appMenuItem(value: 'model', icon: 'cpu', label: 'Change model'),
       appMenuItem(
           value: 'delete', icon: 'trash', label: 'Delete agent', danger: true),
     ],
@@ -487,6 +488,8 @@ Future<void> showCrewAgentMenu(
   if (!context.mounted) return;
   if (picked == 'color') {
     await showMochiColorPicker(context, client, agent.id, name, point: point);
+  } else if (picked == 'model') {
+    await _pickCrewModel(context, client, agent, name, point, onDeleted);
   } else if (picked == 'delete') {
     final ok = await confirmAction(context,
         title: 'Delete $name?',
@@ -501,5 +504,78 @@ Future<void> showCrewAgentMenu(
     } catch (e) {
       if (context.mounted) toast(context, '$e', danger: true);
     }
+  }
+}
+
+
+Future<void> _pickCrewModel(BuildContext context, DaemonClient client,
+    CoordinationAgent agent, String name, Offset? point,
+    VoidCallback? onChanged) async {
+  ServerConfig cfg;
+  try {
+    cfg = await client.getConfig();
+  } catch (e) {
+    if (context.mounted) toast(context, '$e', danger: true);
+    return;
+  }
+  if (!context.mounted) return;
+  if (cfg.profiles.isEmpty) {
+    toast(context, 'No models configured');
+    return;
+  }
+  String? picked;
+  if (kMobile) {
+    final c = Completer<String?>();
+    showAppSheet(context,
+            title: '$name works on',
+            child: SheetActions([
+              SheetAction('sparkles', "Session's own model", () {
+                Navigator.pop(context);
+                c.complete('');
+              }),
+              for (final p in cfg.profiles)
+                SheetAction(
+                    'provider:${p.provider}',
+                    p.name == agent.profile ? '${p.name}  (current)' : p.name,
+                    () {
+                  Navigator.pop(context);
+                  c.complete(p.name);
+                }),
+            ]))
+        .whenComplete(() {
+      if (!c.isCompleted) c.complete(null);
+    });
+    picked = await c.future;
+  } else {
+    picked = await showAppMenu<String>(
+      context,
+      point: point,
+      anchor: point == null ? context : null,
+      minWidth: 260,
+      maxWidth: 360,
+      items: [
+        appMenuHeading<String>('Works on'),
+        appMenuRow<String>(
+            value: '',
+            icon: 'sparkles',
+            label: "Session's own model",
+            selected: agent.profile == null),
+        for (final p in cfg.profiles)
+          appMenuRow<String>(
+              value: p.name,
+              icon: 'provider:${p.provider}',
+              label: p.name,
+              description: '${p.provider} \u00b7 ${p.model}',
+              selected: p.name == agent.profile),
+      ],
+    );
+  }
+  if (picked == null || picked == (agent.profile ?? '')) return;
+  try {
+    await client.setAgentProfile(agent.id, picked.isEmpty ? null : picked);
+    if (context.mounted) toast(context, 'Model updated');
+    onChanged?.call();
+  } catch (e) {
+    if (context.mounted) toast(context, '$e', danger: true);
   }
 }
