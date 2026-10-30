@@ -784,6 +784,11 @@ extension _DesktopShellPanesExt on _DesktopShellState {
               tooltip: 'Tasks',
               onTap: _client == null ? null : () => _openTasksPopover(ctx)),
         ),
+        IconBtn('search',
+            size: 28,
+            iconSize: 16,
+            tooltip: 'Search or jump (\u2318K)',
+            onTap: _openCommandPalette),
       ]),
     );
   }

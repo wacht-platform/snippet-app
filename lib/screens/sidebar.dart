@@ -1053,18 +1053,6 @@ class SidebarState extends State<Sidebar> {
         decoration: BoxDecoration(
             border: Border(top: BorderSide(color: AppColors.line))),
         child: Column(children: [
-          if (widget.onOpenPalette != null)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(10, 4, 10, 0),
-              child: Align(
-                alignment: Alignment.centerRight,
-                child: IconBtn('search',
-                    size: 24,
-                    iconSize: 14,
-                    tooltip: 'Search or jump (⌘K)',
-                    onTap: widget.onOpenPalette),
-              ),
-            ),
           if (widget.desktopFooter != null) widget.desktopFooter!,
         ]),
       ),
