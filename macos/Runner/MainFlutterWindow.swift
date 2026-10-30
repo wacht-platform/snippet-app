@@ -1857,7 +1857,7 @@ final class NotchHUDController {
       topCornerRadius = 6
       bottomCornerRadius = 18
       targetWidth = hw.width + 120 + topCornerRadius * 2
-      targetHeight = hw.height + (callMode == "prompt" ? 92 : 62)
+      targetHeight = hw.height + (callMode == "prompt" ? 80 : 48)
     } else if callMode == "tracking" {
       topCornerRadius = 6
       bottomCornerRadius = 16
