@@ -12,7 +12,6 @@ import '../platform.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'agents_sidebar_panel.dart';
-import 'list_search_field.dart';
 import 'mission_control.dart';
 import 'mission_control/coordination_agent_detail.dart';
 import 'settings_panel.dart';
@@ -460,8 +459,6 @@ class SidebarState extends State<Sidebar> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     _mobileAgentsHeader(hasClient),
-                    _mobileSearch(_agentSearchCtl, 'Search agents',
-                        (v) => setState(() => _agentFilterQuery = v)),
                     Expanded(
                       child: AgentsSidebarPanel(
                         key: _agentsPanelKey,
@@ -630,15 +627,6 @@ class SidebarState extends State<Sidebar> {
   /// The control at the right of every phone page header: the machine
   /// switcher.
   List<Widget> _headerTrailing(bool hasClient) => [_machineAvatarButton()];
-
-  /// The filter field under a phone page header.
-  Widget _mobileSearch(TextEditingController controller, String hint,
-          ValueChanged<String> onChanged) =>
-      Padding(
-        padding: const EdgeInsets.fromLTRB(M.gutter, 2, M.gutter, 6),
-        child: ListSearchField(
-            controller: controller, hint: hint, onChanged: onChanged),
-      );
 
   Widget _mobileSettingsHeader() => MobileBackBar(
         title: 'Settings',

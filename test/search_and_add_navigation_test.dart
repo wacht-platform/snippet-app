@@ -166,22 +166,14 @@ void main() {
       expect(find.text('No tasks yet'), findsOneWidget);
       expect(find.byTooltip('New task'), findsOneWidget);
 
-      // 3. Agents: one card per agent, and filtering narrows the agents.
+      // 3. Agents: one card per agent, with no search field.
       await tester.pumpWidget(buildTestWidget(home: MobileHome.agents));
       await tester.pumpAndSettle();
       expect(find.text('Snippet'), findsOneWidget);
       expect(find.text('Reviewer'), findsOneWidget);
       expect(find.byTooltip('Mission Control'), findsNothing);
 
-      await tester.enterText(_field('Search agents'), 'security');
-      await tester.pumpAndSettle();
-      expect(find.text('Reviewer'), findsOneWidget);
-      expect(find.text('Snippet'), findsNothing);
-      await tester.enterText(_field('Search agents'), 'nonexistentquery');
-      await tester.pumpAndSettle();
-      expect(find.text('No agents match the search.'), findsOneWidget);
-      await tester.enterText(_field('Search agents'), '');
-      await tester.pumpAndSettle();
+      expect(_field('Search agents'), findsNothing);
 
       expect(find.byType(CreateAgentForm), findsNothing);
       await tester.tap(find.byTooltip('New agent'));

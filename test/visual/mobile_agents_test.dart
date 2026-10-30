@@ -122,12 +122,7 @@ void main() {
 
         await tester.tap(find.text('Ada'));
         expect(openedAgent, 'ada');
-        await tester.enterText(_agentSearch, 'no match');
-        await tester.pump();
-        expect(find.text('Ada'), findsNothing);
-        await tester.enterText(_agentSearch, '');
-        await tester.pump();
-        expect(find.text('Ada'), findsOneWidget);
+        expect(_agentSearch, findsNothing);
         await tester.pumpWidget(const SizedBox.shrink());
         await tester.pump();
         expect(tester.takeException(), isNull);
