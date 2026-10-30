@@ -36,6 +36,8 @@ class _CallPromptCardState extends State<CallPromptCard> {
   @override
   Widget build(BuildContext context) {
     final tracking = widget.status.phase == CallPhase.tracking;
+    final auto = tracking && widget.status.auto;
+    final autoLabel = widget.status.label.trim();
     final pad = kMobile ? 14.0 : 12.0;
     return Material(
       color: kMobile ? AppColors.surface2 : AppColors.surface1,
@@ -61,7 +63,14 @@ class _CallPromptCardState extends State<CallPromptCard> {
               ),
               const SizedBox(width: S.s8),
               Expanded(
-                child: Text(tracking ? 'Taking notes' : widget.status.title,
+                child: Text(
+                    auto
+                        ? (autoLabel.isEmpty
+                            ? 'Recording'
+                            : 'Recording under $autoLabel')
+                        : tracking
+                            ? 'Taking notes'
+                            : widget.status.title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: sans(kMobile ? 14 : 13,

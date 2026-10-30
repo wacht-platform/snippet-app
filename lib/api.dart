@@ -584,6 +584,39 @@ class DaemonClient {
     return (jsonDecode(r.body) as Map<String, dynamic>)['held'] == true;
   }
 
+  /// GET /ambient/recording; null when the daemon predates the endpoint.
+  Future<RecordingPolicy?> getRecording() async {
+    final r = await http.get(_uri('/ambient/recording'));
+    if (r.statusCode == 404) return null;
+    if (r.statusCode != 200) throw _err('load recording policy', r);
+    return RecordingPolicy.fromJson(jsonDecode(r.body) as Map<String, dynamic>);
+  }
+
+  Future<RecordingPolicy> setRecording({
+    int? retentionDays,
+    int? snoozeMinutes,
+    String? removeRule,
+    String? removeWindow,
+  }) async {
+    final r = await http.post(_uri('/ambient/recording'),
+        headers: _json,
+        body: jsonEncode({
+          if (retentionDays != null) 'retention_days': retentionDays,
+          if (snoozeMinutes != null) 'snooze_minutes': snoozeMinutes,
+          if (removeRule != null) 'remove_rule': removeRule,
+          if (removeWindow != null) 'remove_window': removeWindow,
+        }));
+    if (r.statusCode != 200) throw _err('save recording policy', r);
+    return RecordingPolicy.fromJson(jsonDecode(r.body) as Map<String, dynamic>);
+  }
+
+  /// [mode] is 'delete' or 'redact'.
+  Future<void> deleteRecording(String id, String mode) async {
+    final r = await http.post(_uri('/ambient/recordings/delete'),
+        headers: _json, body: jsonEncode({'id': id, 'mode': mode}));
+    if (r.statusCode != 200) throw _err('$mode recording', r);
+  }
+
   Future<AmbientStats> ambientStats() async {
     final r = await http.get(_uri('/ambient/stats'));
     if (r.statusCode != 200) throw _err('load ambient stats', r);

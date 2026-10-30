@@ -194,6 +194,7 @@ class _VoiceScreenState extends State<VoiceScreen> {
     super.initState();
     _load();
     _loadAmbient();
+    _loadRecording();
   }
 
   Future<void> _load() async {
@@ -230,6 +231,200 @@ class _VoiceScreenState extends State<VoiceScreen> {
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  RecordingPolicy? _rec;
+
+  Future<void> _loadRecording() async {
+    try {
+      final r = await widget.client.getRecording();
+      if (mounted) setState(() => _rec = r);
+    } catch (_) {}
+  }
+
+  Future<void> _recAct(Future<RecordingPolicy?> Function() call,
+      {String? done}) async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      final next = await call();
+      if (!mounted) return;
+      if (next != null) setState(() => _rec = next);
+      if (done != null) toast(context, done);
+    } catch (e) {
+      if (mounted) toast(context, "Couldn't save: $e", danger: true);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _removeRule(String id, String label) async {
+    final ok = await confirmAction(context,
+        title: 'Remove rule?',
+        body: 'Mission Control will stop applying "$label".',
+        confirmLabel: 'Remove');
+    if (!ok || !mounted) return;
+    await _recAct(() => widget.client.setRecording(removeRule: id),
+        done: 'Rule removed');
+  }
+
+  Future<void> _removeWindow(String id, String label) async {
+    final ok = await confirmAction(context,
+        title: 'Remove window?',
+        body: 'Mission Control will stop applying "$label".',
+        confirmLabel: 'Remove');
+    if (!ok || !mounted) return;
+    await _recAct(() => widget.client.setRecording(removeWindow: id),
+        done: 'Window removed');
+  }
+
+  Future<void> _deleteRecording(RecordingEntry e, bool redact) async {
+    final ok = await confirmAction(context,
+        title: redact ? 'Redact recording?' : 'Delete recording?',
+        body: redact
+            ? 'The transcript is kept but its text is removed.'
+            : 'This recording is deleted for good.',
+        confirmLabel: redact ? 'Redact' : 'Delete');
+    if (!ok || !mounted) return;
+    await _recAct(() async {
+      await widget.client.deleteRecording(e.id, redact ? 'redact' : 'delete');
+      return widget.client.getRecording();
+    }, done: redact ? 'Recording redacted' : 'Recording deleted');
+  }
+
+  static String _clock(DateTime t) =>
+      '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+
+  static String _when(int ms) {
+    final t = DateTime.fromMillisecondsSinceEpoch(ms);
+    const m = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+    ];
+    return '${m[t.month - 1]} ${t.day}, ${_clock(t)}';
+  }
+
+  String _snoozeLabel(RecordingPolicy r) {
+    final until = r.snoozeUntil;
+    if (until == null) return 'Off';
+    final left = until - DateTime.now().millisecondsSinceEpoch;
+    if (left <= 0) return 'Off';
+    final mins = (left / 60000).ceil();
+    if (mins < 60) return '$mins min left';
+    final h = mins ~/ 60;
+    return mins % 60 == 0 ? '$h h left' : '$h h ${mins % 60} min left';
+  }
+
+  int _untilTomorrowMinutes() {
+    final n = DateTime.now();
+    final t = DateTime(n.year, n.month, n.day + 1);
+    return t.difference(n).inMinutes + 1;
+  }
+
+  String _retentionLabel(int d) => d == 0 ? 'Forever' : '$d days';
+
+  List<Widget> _recordingGroups() {
+    final r = _rec;
+    if (r == null) return const [];
+    final days = <int>{7, 30, 60, 90, r.retentionDays}.toList()..sort();
+    final snoozing = _snoozeLabel(r) != 'Off';
+    final ruleRows = <Widget>[
+      for (final x in r.rules.where((x) => x.mode != 'ask'))
+        SettingsRow(
+          label: x.label,
+          sub: x.mode == 'auto'
+              ? (x.basis.isEmpty
+                  ? 'Always record'
+                  : 'Always record · "${x.basis}"')
+              : 'Never record',
+          trailing: Btn('Remove',
+              small: true,
+              variant: BtnVariant.ghost,
+              disabled: _busy,
+              onTap: () => _removeRule(x.id, x.label)),
+        ),
+      for (final w in r.windows)
+        SettingsRow(
+          label: w.label,
+          sub: w.mode == 'auto'
+              ? (w.basis.isEmpty
+                  ? 'Record · ${_when(w.fromMs)} to ${_when(w.toMs)}'
+                  : 'Record · "${w.basis}"')
+              : 'Never record · ${_when(w.fromMs)} to ${_when(w.toMs)}',
+          trailing: Btn('Remove',
+              small: true,
+              variant: BtnVariant.ghost,
+              disabled: _busy,
+              onTap: () => _removeWindow(w.id, w.label)),
+        ),
+    ];
+    return [
+      SettingsGroup(
+        header: 'Recording',
+        footer: 'Snoozing stops automatic recording for a while.',
+        children: [
+          SettingsRow(
+            label: 'Snooze',
+            trailing: SettingsPopup<int>(
+              label: _snoozeLabel(r),
+              selected: snoozing ? -1 : 0,
+              items: const [
+                (0, 'Off'),
+                (60, '1 hour'),
+                (240, '4 hours'),
+                (-2, 'Until tomorrow'),
+              ],
+              onSelected: (m) => _recAct(() => widget.client.setRecording(
+                  snoozeMinutes: m == -2 ? _untilTomorrowMinutes() : m)),
+            ),
+          ),
+          SettingsRow(
+            label: 'Keep recordings',
+            trailing: SettingsPopup<int>(
+              label: _retentionLabel(r.retentionDays),
+              selected: r.retentionDays,
+              items: [
+                for (final d in days.where((d) => d > 0)) (d, _retentionLabel(d)),
+                (0, 'Forever'),
+              ],
+              onSelected: (d) =>
+                  _recAct(() => widget.client.setRecording(retentionDays: d)),
+            ),
+          ),
+        ],
+      ),
+      SettingsGroup(
+        header: 'Rules',
+        footer: ruleRows.isEmpty
+            ? null
+            : 'Rules are set by asking Mission Control.',
+        children: ruleRows.isEmpty
+            ? [
+                SettingsRow(
+                    label:
+                        'Ask Mission Control, for example: always record my Monday standup.')
+              ]
+            : ruleRows,
+      ),
+      SettingsGroup(
+        header: 'Recordings',
+        children: r.recordings.isEmpty
+            ? const [SettingsRow(label: 'No recordings yet')]
+            : [
+                for (final e in r.recordings)
+                  SettingsRow(
+                    label: _when(e.started),
+                    sub: '${e.lines} ${e.lines == 1 ? 'line' : 'lines'}',
+                    trailing: SettingsPopup<String>(
+                      label: 'Manage',
+                      selected: '',
+                      items: const [('delete', 'Delete'), ('redact', 'Redact')],
+                      onSelected: (m) => _deleteRecording(e, m == 'redact'),
+                    ),
+                  ),
+              ],
+      ),
+    ];
   }
 
   AmbientSettings? _ambient;
@@ -511,6 +706,7 @@ class _VoiceScreenState extends State<VoiceScreen> {
           ),
         ],
       ),
+      ..._recordingGroups(),
       VoiceprintGroup(
         ambient: a,
         phase: _phase,

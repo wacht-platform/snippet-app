@@ -1674,6 +1674,73 @@ class AmbientEvent {
         kept = j['kept'] as bool? ?? true;
 }
 
+class RecordingRule {
+  final String id, label, mode, basis;
+  final List<String> keywords;
+  final List<int>? weekdays;
+  final String? fromHhmm, toHhmm;
+  RecordingRule.fromJson(Map<String, dynamic> j)
+      : id = '${j['id'] ?? ''}',
+        label = '${j['label'] ?? ''}',
+        mode = '${j['mode'] ?? 'ask'}',
+        basis = '${j['basis'] ?? ''}',
+        keywords = [
+          for (final k in ((j['when'] as Map?)?['keywords'] as List?) ?? [])
+            '$k'
+        ],
+        weekdays = (((j['when'] as Map?)?['weekdays']) as List?)
+            ?.map((e) => (e as num).toInt())
+            .toList(),
+        fromHhmm = (j['when'] as Map?)?['from_hhmm'] as String?,
+        toHhmm = (j['when'] as Map?)?['to_hhmm'] as String?;
+}
+
+class RecordingWindow {
+  final String id, label, mode, basis;
+  final int fromMs, toMs;
+  RecordingWindow.fromJson(Map<String, dynamic> j)
+      : id = '${j['id'] ?? ''}',
+        label = '${j['label'] ?? ''}',
+        mode = '${j['mode'] ?? 'never'}',
+        basis = '${j['basis'] ?? ''}',
+        fromMs = (j['from_ms'] as num?)?.toInt() ?? 0,
+        toMs = (j['to_ms'] as num?)?.toInt() ?? 0;
+}
+
+class RecordingEntry {
+  final String id, path;
+  final int started, ended, lines;
+  RecordingEntry.fromJson(Map<String, dynamic> j)
+      : id = '${j['id'] ?? ''}',
+        path = '${j['path'] ?? ''}',
+        started = (j['started'] as num?)?.toInt() ?? 0,
+        ended = (j['ended'] as num?)?.toInt() ?? 0,
+        lines = (j['lines'] as num?)?.toInt() ?? 0;
+}
+
+class RecordingPolicy {
+  final int retentionDays;
+  final int? snoozeUntil;
+  final List<RecordingRule> rules;
+  final List<RecordingWindow> windows;
+  final List<RecordingEntry> recordings;
+  RecordingPolicy.fromJson(Map<String, dynamic> j)
+      : retentionDays = (j['retention_days'] as num?)?.toInt() ?? 0,
+        snoozeUntil = (j['snooze_until'] as num?)?.toInt(),
+        rules = [
+          for (final r in (j['rules'] as List?) ?? [])
+            RecordingRule.fromJson((r as Map).cast<String, dynamic>())
+        ],
+        windows = [
+          for (final r in (j['windows'] as List?) ?? [])
+            RecordingWindow.fromJson((r as Map).cast<String, dynamic>())
+        ],
+        recordings = [
+          for (final r in (j['recordings'] as List?) ?? [])
+            RecordingEntry.fromJson((r as Map).cast<String, dynamic>())
+        ];
+}
+
 class AmbientStats {
   final int segments;
   final int audioSeconds;

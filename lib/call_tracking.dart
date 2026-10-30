@@ -22,7 +22,11 @@ class CallEvent {
     this.state = '',
     this.title = callPromptTitle,
     this.body = callPromptBody,
+    this.auto = false,
+    this.label = '',
   });
+  final bool auto;
+  final String label;
   final String type;
   final String callId;
   final int expiresAtMs;
@@ -65,6 +69,10 @@ CallEvent? parseCallEvent(Map<String, dynamic> event) {
       state: '${scope['state'] ?? ''}',
       title: title.isEmpty ? callPromptTitle : title,
       body: body.isEmpty ? callPromptBody : body,
+      auto: scopes.any((s) => s['auto'] == true),
+      label: scopes
+          .map((s) => '${s['label'] ?? ''}')
+          .firstWhere((s) => s.isNotEmpty, orElse: () => ''),
     );
   }
   return null;
@@ -89,7 +97,11 @@ class CallStatus {
     this.expiresAtMs = 0,
     this.title = callPromptTitle,
     this.body = callPromptBody,
+    this.auto = false,
+    this.label = '',
   });
+  final bool auto;
+  final String label;
   final String callId;
   final CallPhase phase;
   final String url;
@@ -121,7 +133,12 @@ class CallTracker {
       return true;
     }
     if (e.state == 'tracking') {
-      _set(CallStatus(callId: e.callId, phase: CallPhase.tracking, url: url));
+      _set(CallStatus(
+          callId: e.callId,
+          phase: CallPhase.tracking,
+          url: url,
+          auto: e.auto,
+          label: e.label));
       return true;
     }
     if (current != null && current.callId == e.callId) {
