@@ -103,6 +103,21 @@ void main() {
     expect(b.cache, 'warm');
   });
 
+  test('parses keep_awake and labels the menu item', () {
+    final on = SessionInfo.fromJson({'id': 'a', 'keep_awake': true});
+    final off = SessionInfo.fromJson({'id': 'b'});
+    expect(on.keepAwake, isTrue);
+    expect(off.keepAwake, isFalse);
+    expect(keepAwakeLabel(off), "Don't auto-settle");
+    expect(keepAwakeLabel(on), 'Allow auto-settle');
+    expect(
+        splitSettled([
+          SessionInfo.fromJson(
+              {'id': 'k', 'keep_awake': true, 'settled': true})
+        ]).settled.length,
+        1);
+  });
+
   test('splitSettled separates and orders settled by settle time', () {
     final r = splitSettled([
       _s('m1', active: 5),

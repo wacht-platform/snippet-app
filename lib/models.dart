@@ -164,6 +164,9 @@ class SessionInfo {
 
   /// Parked to cut cache cost; the daemon deletes it 15 days after [settledAt].
   final bool settled;
+
+  /// Opts the session out of automatic settling.
+  final bool keepAwake;
   final int? settledAt;
   final int idleSecs;
   final String cache;
@@ -212,6 +215,7 @@ class SessionInfo {
         running = j['running'] == true,
         profile = j['profile'] as String?,
         settled = j['settled'] == true,
+        keepAwake = j['keep_awake'] == true,
         settledAt = (j['settled_at'] as num?)?.toInt(),
         idleSecs = (j['idle_secs'] as num?)?.toInt() ?? 0,
         cache = j['cache'] as String? ?? 'warm',
@@ -233,6 +237,7 @@ class SessionInfo {
         running: running,
         profile: profile,
         settled: settled,
+        keepAwake: keepAwake,
         settledAt: settledAt,
         idleSecs: idleSecs,
         cache: cache,
@@ -269,6 +274,7 @@ class SessionInfo {
     required this.running,
     required this.profile,
     this.settled = false,
+    this.keepAwake = false,
     this.settledAt,
     this.idleSecs = 0,
     this.cache = 'warm',

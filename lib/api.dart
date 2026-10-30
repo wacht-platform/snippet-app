@@ -708,6 +708,12 @@ class DaemonClient {
     if (r.statusCode != 200) throw _err('wake session', r);
   }
 
+  Future<void> setKeepAwake(String sessionId, bool on) async {
+    final r = await http.post(_uri('/session/keep_awake'),
+        headers: _json, body: jsonEncode({'session': sessionId, 'on': on}));
+    if (r.statusCode != 200) throw _err('update keep awake', r);
+  }
+
   Future<void> renameSession(String sessionId, String title) async {
     final r = await http.post(_uri('/session/rename'),
         headers: _json,
