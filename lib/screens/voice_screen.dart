@@ -6,8 +6,10 @@ import 'package:record/record.dart';
 import '../api.dart';
 import '../models.dart';
 import '../platform.dart';
+import '../settings_accordion.dart';
 import '../settings_form.dart';
 import '../theme.dart';
+import '../voice_picker.dart';
 import '../voiceprint_enrol.dart';
 import '../widgets.dart';
 import 'shell_nav.dart';
@@ -38,6 +40,7 @@ class _VoiceScreenState extends State<VoiceScreen> {
   EnrolPhase _phase = EnrolPhase.idle;
   String? _enrolError;
   bool _manageOpen = false;
+  final Map<String, bool> _open = {};
   AudioRecorder? _sampleRecorder;
   StreamSubscription<Uint8List>? _sampleSub;
   Timer? _tick;
@@ -57,8 +60,8 @@ class _VoiceScreenState extends State<VoiceScreen> {
     super.dispose();
   }
 
-  void _resetLive() => _live.value = const EnrolLive(
-      Duration.zero, [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+  void _resetLive() => _live.value =
+      const EnrolLive(Duration.zero, [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
 
   Future<void> _teardownRecorder() async {
     _tick?.cancel();
@@ -296,33 +299,6 @@ class _VoiceScreenState extends State<VoiceScreen> {
     ]);
   }
 
-  Future<void> _editKey(String service, bool keySet, String hint,
-      Future<void> Function(String key) save) async {
-    final key = await promptText(context,
-        title: keySet ? 'Replace $service key' : '$service API key',
-        hint: hint,
-        saveLabel: 'Save key');
-    if (key == null || key.trim().isEmpty || !mounted) return;
-    await save(key.trim());
-  }
-
-  Widget _keyRow(String label, bool keySet, VoidCallback onTap) => kMobile
-      ? SettingsRow(
-          label: label,
-          onTap: _busy ? null : onTap,
-          trailing: Text(keySet ? 'Set' : 'Not set',
-              style:
-                  sans(15, color: keySet ? AppColors.fg3 : AppColors.danger)),
-          chevron: true,
-        )
-      : SettingsRow(
-          label: label,
-          trailing: _keyControl(keySet, onTap),
-        );
-
-  String _voiceLabel(TtsVoice v) =>
-      '${v.name} · ${v.accent} ${v.gender.toLowerCase()}';
-
   String _speedLabel(int pct) =>
       '${(pct / 100).toStringAsFixed(pct % 10 == 0 ? 1 : 2)}×';
 
@@ -339,15 +315,32 @@ class _VoiceScreenState extends State<VoiceScreen> {
             orElse: () => (a.deepgramHost, a.deepgramHost))
         .$2;
     final voice = a.ttsVoices.where((v) => v.model == a.ttsVoice).firstOrNull;
+    final flux = a.stt == 'flux';
+    final rime = a.ttsProvider == 'rime';
+    final usesDeepgram = flux || !rime;
+    final listenOk = flux ? a.deepgramKeySet : a.assemblyaiKeySet;
+    final replyOk = rime ? a.rimeKeySet : a.deepgramKeySet;
+    final anyReply = a.deepgramKeySet || a.rimeKeySet;
+    bool open(String id, bool def) => _open[id] ?? def;
+    void toggle(String id, bool def) =>
+        setState(() => _open[id] = !open(id, def));
+    Widget key(String label, bool set, String hint, String name,
+            Future<void> Function(String) save) =>
+        InlineKeyRow(
+            label: label, keySet: set, hint: hint, busy: _busy, onSave: save);
     return [
-      SettingsGroup(
-        header: 'Speech services',
-        footer: 'Keys stay on the server. Replies need a Deepgram or Rime key; Deepgram Flux listening needs Deepgram.',
+      SettingsAccordion(
+        title: 'Listening',
+        summary:
+            listenOk ? (flux ? 'Deepgram Flux' : 'AssemblyAI') : 'Key needed',
+        warn: !listenOk,
+        open: open('listen', !listenOk),
+        onToggle: () => toggle('listen', !listenOk),
         children: [
           SettingsRow(
             label: 'Speech recognition',
             trailing: SettingsPopup<String>(
-              label: a.stt == 'flux' ? 'Deepgram Flux' : 'AssemblyAI',
+              label: flux ? 'Deepgram Flux' : 'AssemblyAI',
               selected: a.stt,
               items: const [
                 ('assemblyai', 'AssemblyAI'),
@@ -357,36 +350,39 @@ class _VoiceScreenState extends State<VoiceScreen> {
                   _saveAmbient(stt: v, done: 'Speech recognition saved'),
             ),
           ),
-          _keyRow(
-              'AssemblyAI key',
-              a.assemblyaiKeySet,
-              () => _editKey(
-                  'AssemblyAI',
-                  a.assemblyaiKeySet,
-                  'Paste the key from assemblyai.com/dashboard',
-                  (k) => _saveAmbient(
-                      assemblyaiKey: k, done: 'AssemblyAI key saved'))),
-          _keyRow(
-              'Deepgram key',
-              a.deepgramKeySet,
-              () => _editKey(
-                  'Deepgram',
-                  a.deepgramKeySet,
-                  'Paste the key from console.deepgram.com',
-                  (k) => _saveAmbient(
-                      deepgramKey: k, done: 'Deepgram key saved'))),
-          _keyRow(
-              'Rime key',
-              a.rimeKeySet,
-              () => _editKey(
-                  'Rime',
-                  a.rimeKeySet,
-                  'Paste the key from rime.ai',
-                  (k) => _saveAmbient(rimeKey: k, done: 'Rime key saved'))),
+          if (flux)
+            key(
+                'Deepgram key',
+                a.deepgramKeySet,
+                'Paste the key from console.deepgram.com',
+                'Deepgram',
+                (k) => _saveAmbient(deepgramKey: k, done: 'Deepgram key saved'))
+          else
+            key(
+                'AssemblyAI key',
+                a.assemblyaiKeySet,
+                'Paste the key from assemblyai.com/dashboard',
+                'AssemblyAI',
+                (k) => _saveAmbient(
+                    assemblyaiKey: k, done: 'AssemblyAI key saved')),
+        ],
+      ),
+      SettingsAccordion(
+        title: 'Replies',
+        summary: !anyReply
+            ? 'Key needed'
+            : (rime ? 'Rime' : 'Deepgram') +
+                (replyOk ? '' : ' (no key, using the other)'),
+        warn: !anyReply,
+        open: open('reply', !anyReply),
+        onToggle: () => toggle('reply', !anyReply),
+        footer:
+            'Spoken replies need a Deepgram or Rime key. Keys stay on the server.',
+        children: [
           SettingsRow(
             label: 'Reply voice',
             trailing: SettingsPopup<String>(
-              label: a.ttsProvider == 'rime' ? 'Rime' : 'Deepgram',
+              label: rime ? 'Rime' : 'Deepgram',
               selected: a.ttsProvider,
               items: const [('deepgram', 'Deepgram'), ('rime', 'Rime')],
               onSelected: (v) => _saveAmbient(
@@ -396,32 +392,29 @@ class _VoiceScreenState extends State<VoiceScreen> {
                       : 'Replies now use Deepgram'),
             ),
           ),
-          _keyRow(
-              'Typesafe key',
-              a.watcherKeySet,
-              () => _editKey(
-                  'Typesafe',
-                  a.watcherKeySet,
-                  'Paste your Typesafe API key',
-                  (k) => _saveAmbient(
-                      typesafeKey: k, done: 'Typesafe key saved'))),
-          SettingsRow(
-            label: 'Deepgram region',
-            trailing: SettingsPopup<String>(
-              label: hostLabel,
-              selected: a.deepgramHost,
-              items: [for (final h in hosts) (h.$1, h.$2)],
-              onSelected: (h) =>
-                  _saveAmbient(deepgramHost: h, done: 'Region saved'),
-            ),
-          ),
-          if (a.ttsProvider == 'rime') ...[
+          if (rime)
+            key('Rime key', a.rimeKeySet, 'Paste the key from rime.ai', 'Rime',
+                (k) => _saveAmbient(rimeKey: k, done: 'Rime key saved'))
+          else if (!flux)
+            key(
+                'Deepgram key',
+                a.deepgramKeySet,
+                'Paste the key from console.deepgram.com',
+                'Deepgram',
+                (k) => _saveAmbient(deepgramKey: k, done: 'Deepgram key saved'))
+          else
+            const SettingsRow(
+                label: 'Deepgram key', sub: 'Shared with Listening'),
+          if (rime) ...[
             SettingsRow(
               label: 'Rime model',
               trailing: SettingsPopup<String>(
                 label: a.rimeModel == 'coda' ? 'Coda' : 'Mist v3 (fastest)',
                 selected: a.rimeModel,
-                items: const [('mistv3', 'Mist v3 (fastest)'), ('coda', 'Coda')],
+                items: const [
+                  ('mistv3', 'Mist v3 (fastest)'),
+                  ('coda', 'Coda')
+                ],
                 onSelected: (m) => _saveAmbient(
                     rimeModel: m,
                     rimeVoice: m == 'coda' ? 'lyra' : 'cove',
@@ -430,27 +423,66 @@ class _VoiceScreenState extends State<VoiceScreen> {
             ),
             SettingsRow(
               label: 'Rime voice',
-              sub: a.rimeVoice,
-              chevron: true,
-              onTap: () async {
-                final v = await promptText(context,
-                    title: 'Rime voice',
-                    initial: a.rimeVoice,
-                    hint: a.rimeModel == 'coda' ? 'e.g. lyra' : 'e.g. cove');
-                if (v == null || v.trim().isEmpty || !mounted) return;
-                await _saveAmbient(rimeVoice: v.trim(), done: 'Voice saved');
-              },
+              trailing: _VoiceButton(
+                label: a.rimeVoice.isEmpty
+                    ? 'Choose'
+                    : a.rimeVoice[0].toUpperCase() + a.rimeVoice.substring(1),
+                onTap: _busy
+                    ? null
+                    : () async {
+                        final list = await rimeVoices(a.rimeModel);
+                        if (!mounted) return;
+                        if (list.isEmpty) {
+                          toast(context, "Couldn't load the Rime voice list",
+                              danger: true);
+                          return;
+                        }
+                        final v = await showVoicePicker(context,
+                            title: 'Rime voice',
+                            voices: list,
+                            selected: a.rimeVoice);
+                        if (v != null && mounted) {
+                          await _saveAmbient(rimeVoice: v, done: 'Voice saved');
+                        }
+                      },
+              ),
             ),
-          ] else if (a.ttsVoices.isNotEmpty)
+          ] else ...[
+            if (a.ttsVoices.isNotEmpty)
+              SettingsRow(
+                label: 'Voice',
+                trailing: _VoiceButton(
+                  label: voice?.name ?? a.ttsVoice,
+                  onTap: _busy
+                      ? null
+                      : () async {
+                          final v = await showVoicePicker(context,
+                              title: 'Deepgram voice',
+                              voices: [
+                                for (final t in a.ttsVoices)
+                                  PickVoice(t.model, t.name,
+                                      sub:
+                                          '${t.accent} · ${t.gender.toLowerCase()}',
+                                      group: t.gender)
+                              ],
+                              selected: a.ttsVoice);
+                          if (v != null && mounted) {
+                            await _saveAmbient(
+                                ttsVoice: v, done: 'Voice saved');
+                          }
+                        },
+                ),
+              ),
+          ],
+          if (usesDeepgram)
             SettingsRow(
-              label: 'Voice',
+              label: 'Deepgram region',
               trailing: SettingsPopup<String>(
-                label: voice?.name ?? a.ttsVoice,
-                sheetHeightFactor: 0.5,
-                selected: a.ttsVoice,
-                items: [for (final v in a.ttsVoices) (v.model, _voiceLabel(v))],
-                onSelected: (m) =>
-                    _saveAmbient(ttsVoice: m, done: 'Voice saved'),
+                label: hostLabel,
+                selected: a.deepgramHost,
+                items: [for (final h in hosts) (h.$1, h.$2)],
+                onSelected: (h) =>
+                    _saveAmbient(deepgramHost: h, done: 'Region saved'),
               ),
             ),
           SettingsRow(
@@ -465,8 +497,11 @@ class _VoiceScreenState extends State<VoiceScreen> {
           ),
         ],
       ),
-      SettingsGroup(
-        header: 'Conversation',
+      SettingsAccordion(
+        title: 'Conversation',
+        summary: a.wakePhrases.isEmpty ? 'No wake phrase' : a.wakePhrases.first,
+        open: open('conv', false),
+        onToggle: () => toggle('conv', false),
         footer: 'A wake phrase starts a conversation, even in Passive mode.',
         children: [
           SettingsRow(
@@ -484,6 +519,20 @@ class _VoiceScreenState extends State<VoiceScreen> {
               onSelected: (s) => _saveAmbient(timeout: s),
             ),
           ),
+        ],
+      ),
+      SettingsAccordion(
+        title: 'Advanced',
+        summary: a.watcherKeySet ? 'Typesafe set' : 'Typesafe not set',
+        open: open('adv', false),
+        onToggle: () => toggle('adv', false),
+        children: [
+          key(
+              'Typesafe key',
+              a.watcherKeySet,
+              'Paste your Typesafe API key',
+              'Typesafe',
+              (k) => _saveAmbient(typesafeKey: k, done: 'Typesafe key saved')),
         ],
       ),
       VoiceprintGroup(
@@ -539,17 +588,6 @@ class _VoiceScreenState extends State<VoiceScreen> {
     ];
   }
 
-  Widget _keyControl(bool keySet, VoidCallback onTap) =>
-      Row(mainAxisSize: MainAxisSize.min, children: [
-        Text(keySet ? 'Set' : 'Not set',
-            style: sans(13, color: keySet ? AppColors.fg3 : AppColors.danger)),
-        const SizedBox(width: S.s12),
-        Btn(keySet ? 'Replace' : 'Add key',
-            small: true,
-            variant: BtnVariant.secondary,
-            onTap: _busy ? null : onTap),
-      ]);
-
   @override
   Widget build(BuildContext context) {
     final v = _voice;
@@ -601,4 +639,28 @@ class _VoiceScreenState extends State<VoiceScreen> {
     }
     return body;
   }
+}
+
+class _VoiceButton extends StatelessWidget {
+  const _VoiceButton({required this.label, required this.onTap});
+  final String label;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) => Material(
+        color: kMobile ? Colors.transparent : AppColors.surface2,
+        borderRadius: BorderRadius.circular(7),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(7),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              Text(label, style: sans(kMobile ? 15 : 13, color: AppColors.fg2)),
+              const SizedBox(width: 6),
+              AppIcon('chevron-right', size: 12, color: AppColors.fg4),
+            ]),
+          ),
+        ),
+      );
 }
