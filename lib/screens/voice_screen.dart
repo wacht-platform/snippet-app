@@ -342,7 +342,7 @@ class _VoiceScreenState extends State<VoiceScreen> {
     return [
       SettingsGroup(
         header: 'Speech services',
-        footer: 'Keys stay on the server.',
+        footer: 'Keys stay on the server. Replies need a Deepgram or Rime key; Deepgram Flux listening needs Deepgram.',
         children: [
           SettingsRow(
             label: 'Speech recognition',
