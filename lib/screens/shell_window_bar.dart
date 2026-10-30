@@ -418,7 +418,7 @@ Future<void> showTopMachinesPopover({
             : (size.width - origin.dx - box.size.width).clamp(10.0, 500.0),
         top: opensUp ? null : origin.dy + box.size.height + 4,
         bottom: opensUp ? size.height - origin.dy + 6 : null,
-        width: 260,
+        width: 340,
         child: Material(
           color: AppColors.overlay,
           shape: RoundedRectangleBorder(
