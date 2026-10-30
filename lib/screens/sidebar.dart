@@ -923,43 +923,19 @@ class SidebarState extends State<Sidebar> {
                       decoration: BoxDecoration(
                           color: AppColors.accent, shape: BoxShape.circle),
                     ),
+                  if (widget.onOpenPalette != null)
+                    IconBtn('search',
+                        size: 24,
+                        iconSize: 14,
+                        tooltip: 'Search or jump (⌘K)',
+                        onTap: widget.onOpenPalette),
                 ]),
               ),
             ),
           ),
         ),
       ),
-      if (widget.onOpenPalette != null)
-        Padding(
-          padding: const EdgeInsets.fromLTRB(10, 10, 10, 0),
-          child: Material(
-            color: AppColors.surface1,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-              side: BorderSide(color: AppColors.line),
-            ),
-            child: InkWell(
-              borderRadius: BorderRadius.circular(8),
-              onTap: widget.onOpenPalette,
-              child: SizedBox(
-                height: 32,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  child: Row(children: [
-                    AppIcon('search', size: 15, color: AppColors.fg4),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text('Search or jump',
-                          style: sans(13, color: AppColors.fg4)),
-                    ),
-                    Text('⌘K', style: mono(11, color: AppColors.fg4)),
-                  ]),
-                ),
-              ),
-            ),
-          ),
-        )
-      else
+      if (widget.onOpenPalette == null)
       Padding(
         padding: const EdgeInsets.fromLTRB(8, 10, 8, 4),
         child: Container(
