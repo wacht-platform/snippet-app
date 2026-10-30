@@ -3287,7 +3287,8 @@ final class NotchHomeView: NSView {
         body.font = NotchHomeType.sans(12)
         body.textColor = item.tone == "run" ? NotchHomePalette.amber : NotchHomePalette.muted
         body.maximumNumberOfLines = 5
-        body.lineBreakMode = .byTruncatingTail
+        body.lineBreakMode = .byWordWrapping
+        body.cell?.truncatesLastVisibleLine = true
         body.frame = NSRect(x: pad, y: y, width: w - pad * 2, height: bodyH - 6)
         addSubview(body)
         y += bodyH
