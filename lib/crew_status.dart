@@ -88,6 +88,6 @@ String crewSummary(List<CrewEntry> c) {
   final w = crewCount(c, CrewState.working);
   return [
     if (n > 0) '$n waiting on you',
-    '$w working',
+    '$w active task${w == 1 ? '' : 's'}',
   ].join(' · ');
 }

@@ -423,7 +423,7 @@ Map<String, dynamic> buildModel({
   final summary = [
     if (needs > 0) '$needs need${needs == 1 ? 's' : ''} you',
     if (failedJobs > 0) '$failedJobs job${failedJobs == 1 ? '' : 's'} failed',
-    '$working working',
+    '$working active task${working == 1 ? '' : 's'}',
     '${crewCount(crew, CrewState.standingBy)} standing by',
   ].join(' · ');
   final upNext = sortedJobs

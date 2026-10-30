@@ -48,7 +48,7 @@ void main() {
     expect(crew[0].line, 'Run it?');
     expect(crew[0].isApproval, isTrue);
     expect(crew[3].lead, isNull);
-    expect(crewSummary(crew), '1 waiting on you · 1 working');
+    expect(crewSummary(crew), '1 waiting on you · 1 active task');
   });
 
   test('worker wins over owner and needs-you outranks working', () {

@@ -52,7 +52,7 @@ void main() {
         targets: {});
     expect(m['state'], 'idle');
     expect(m['title'], 'Team status');
-    expect(m['subtitle'], '0 working \u00b7 1 standing by');
+    expect(m['subtitle'], '0 active tasks \u00b7 1 standing by');
   });
 
   test('recent notifications appear last and open their payload', () {
