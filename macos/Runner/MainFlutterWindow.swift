@@ -3470,10 +3470,10 @@ final class NotchHomeController {
           model: model, detail: detail, topInset: hw.attached ? hw.size.height : 8),
         panelSize.height)
     } else if hw.attached {
-      w = hw.size.width + 2 * 70
+      w = hw.size.width + 2 * 46
       h = hw.size.height
     } else {
-      w = model.badge > 0 ? 150 : 56
+      w = model.badge > 0 ? 100 : 56
       h = 28
     }
 
