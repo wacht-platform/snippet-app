@@ -146,6 +146,11 @@ class Pills<T> extends StatelessWidget {
         ]);
 }
 
+final _codedLink = RegExp(r'`(\[[^\]`]+\]\((?:session|artifact):[^)\s`]+\))`');
+
+String unwrapCodedLinks(String md) =>
+    md.replaceAllMapped(_codedLink, (m) => m.group(1)!);
+
 void openMarkdownLink(String? href, [BuildContext? context, String? text]) {
   if (href == null || href.isEmpty) return;
   final uri = Uri.tryParse(href);
@@ -1248,7 +1253,7 @@ class Bubble extends StatelessWidget {
     final files = matches.length - images - audio;
     final textBody = shown.isNotEmpty
         ? MarkdownBody(
-            data: shown,
+            data: unwrapCodedLinks(shown),
             selectable: false,
             styleSheet: markdownStyle(context),
             builders: {'pre': PreBlockBuilder()},
@@ -1275,7 +1280,7 @@ class Bubble extends StatelessWidget {
         ? const SizedBox.shrink()
         : (selectable ? SelectionArea(child: textBody) : textBody);
     final agentContent = MarkdownBody(
-      data: shown,
+      data: unwrapCodedLinks(shown),
       selectable: false,
       styleSheet: agentMarkdownStyle(context),
       builders: {'pre': PreBlockBuilder()},

@@ -19,7 +19,7 @@ class ThinkingMarkdown extends StatelessWidget {
     final text = data.trim();
     if (text.isEmpty) return const SizedBox.shrink();
     return MarkdownBody(
-      data: text,
+      data: unwrapCodedLinks(text),
       selectable: false,
       styleSheet: thinkingMarkdownStyle(context),
       builders: {'pre': PreBlockBuilder()},
