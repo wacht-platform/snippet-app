@@ -112,12 +112,12 @@ ThemePreset _dark({
   required Color danger,
   required Color warn,
 }) {
-  const canvas = Color(0xFF000000);
-  const bg = Color(0xFF000000);
-  const floor = Color(0xFF000000);
-  const surface1 = Color(0xFF0A0A0A);
-  const surface2 = Color(0xFF101010);
-  const surface3 = Color(0xFF191919);
+  const canvas = Color(0xFF060606);
+  const bg = Color(0xFF0B0B0B);
+  const floor = Color(0xFF060606);
+  const surface1 = Color(0xFF151515);
+  const surface2 = Color(0xFF1F1F1F);
+  const surface3 = Color(0xFF2B2B2B);
 
   return ThemePreset(
     name: name,
@@ -132,8 +132,8 @@ ThemePreset _dark({
     fg2: inkMuted,
     fg3: inkSubtle,
     fg4: inkFaint,
-    border: const Color(0xFF1B1B1B),
-    border2: const Color(0xFF2C2C2C),
+    border: const Color(0xFF2A2A2A),
+    border2: const Color(0xFF3B3B3B),
     accent: accent,
     accentHover: _lighten(accent, 0.06),
     accentFg: const Color(0xFF000000),
@@ -152,21 +152,21 @@ ThemePreset _dark({
     diffDelBg: _withAlpha(danger, 0.10),
     diffAddFg: _lighten(success, 0.14),
     diffDelFg: _lighten(danger, 0.14),
-    diffGutter: const Color(0xFF2C2C2C),
+    diffGutter: const Color(0xFF3B3B3B),
   );
 }
 
 // The only client theme.
 final _amoled = _dark(
   name: 'amoled',
-  label: 'Black',
+  label: 'Charcoal',
   accent: const Color(0xFFFFFFFF),
   accentFill: const Color(0xFFF2F2F2),
   accentFillHover: const Color(0xFFD9D9D9),
   ink: const Color(0xFFFFFFFF),
-  inkMuted: const Color(0xFFD6D6D6),
-  inkSubtle: const Color(0xFF8E8E8E),
-  inkFaint: const Color(0xFF5C5C5C),
+  inkMuted: const Color(0xFFDCDCDC),
+  inkSubtle: const Color(0xFFABABAB),
+  inkFaint: const Color(0xFF7A7A7A),
   success: const Color(0xFF34D399),
   danger: const Color(0xFFFF5C5C),
   warn: const Color(0xFFF59E0B),
@@ -174,22 +174,22 @@ final _amoled = _dark(
 
 // The theme in use on every platform: true black with white as the only
 // accent; colour is kept for status (amber, green, red).
-const _emberCanvas = Color(0xFF000000);
+const _emberCanvas = Color(0xFF0B0B0B);
 final _ember = ThemePreset(
   name: 'ember',
-  label: 'Black',
+  label: 'Charcoal',
   bg: _emberCanvas,
   canvas: _emberCanvas,
   floor: _emberCanvas,
-  surface1: const Color(0xFF0A0A0A),
-  surface2: const Color(0xFF101010),
-  surface3: const Color(0xFF191919),
+  surface1: const Color(0xFF151515),
+  surface2: const Color(0xFF1F1F1F),
+  surface3: const Color(0xFF2B2B2B),
   fg1: const Color(0xFFFFFFFF),
-  fg2: const Color(0xFFD6D6D6),
-  fg3: const Color(0xFF8E8E8E),
-  fg4: const Color(0xFF5C5C5C),
-  border: const Color(0xFF1B1B1B),
-  border2: const Color(0xFF2C2C2C),
+  fg2: const Color(0xFFDCDCDC),
+  fg3: const Color(0xFFABABAB),
+  fg4: const Color(0xFF7A7A7A),
+  border: const Color(0xFF2A2A2A),
+  border2: const Color(0xFF3B3B3B),
   accent: const Color(0xFFFFFFFF),
   accentHover: const Color(0xFFE0E0E0),
   accentFg: const Color(0xFF000000),
@@ -208,7 +208,7 @@ final _ember = ThemePreset(
   diffDelBg: const Color(0xFFFF5C5C).withValues(alpha: 0.10),
   diffAddFg: const Color(0xFF6EE7B7),
   diffDelFg: const Color(0xFFFF8A8A),
-  diffGutter: const Color(0xFF2C2C2C),
+  diffGutter: const Color(0xFF3B3B3B),
 );
 
 final List<ThemePreset> allPresets = [_amoled];

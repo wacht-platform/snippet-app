@@ -237,11 +237,7 @@ Map<String, dynamic> buildModel({
   final upNext = sortedJobs
       .where((j) => (j.lastError ?? '').isEmpty && j.nextRunAt > 0)
       .firstOrNull;
-  final featured =
-      items.where((i) => i['section'] == 'Needs you').firstOrNull ??
-          (upNext == null
-              ? null
-              : items.firstWhere((i) => i['id'] == 'job:${upNext.id}'));
+  final featured = items.where((i) => i['section'] == 'Needs you').firstOrNull;
   return {
     'featuredId': featured?['id'] ?? '',
     'pill': upNext == null ? '' : _short(upNext.nextRunAt, now),

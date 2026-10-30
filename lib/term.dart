@@ -64,7 +64,7 @@ class _SessionTermViewState extends State<SessionTermView> {
     cursor: const Color(0xff9DB0FF),
     selection: const Color(0x559DB0FF),
     foreground: const Color(0xffEDE7DD),
-    background: const Color(0xff000000),
+    background: const Color(0xff0b0b0b),
     black: const Color(0xff1B1917),
     red: const Color(0xffE5745F),
     green: const Color(0xff7FB88F),
