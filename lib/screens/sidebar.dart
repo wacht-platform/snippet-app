@@ -899,6 +899,7 @@ class SidebarState extends State<Sidebar> {
         _matchesQuery(s))));
     final list = split.main;
     final settledRows = split.settled;
+    final settledOpen = _settledOpen || _filterQuery.trim().isNotEmpty;
     final mc = all.where((s) => isDedicatedMcSession(s.id)).firstOrNull;
     _chatsShownAt ??= DateTime.now();
     final rows = <Widget>[];
@@ -1069,13 +1070,18 @@ class SidebarState extends State<Sidebar> {
                 _emptySessions(searching: _filterQuery.trim().isNotEmpty)
               else ...[
                 ...rows,
-                if (settledRows.isNotEmpty)
+                if (settledRows.isNotEmpty && settledOpen)
                   _settledGroup(settledRows, mobile: false),
               ],
             ],
           ),
         ),
       ),
+      if (hasClient && settledRows.isNotEmpty && !settledOpen)
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          child: _settledGroup(settledRows, mobile: false),
+        ),
       Container(
         decoration: BoxDecoration(
             border: Border(top: BorderSide(color: AppColors.line))),

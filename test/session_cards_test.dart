@@ -47,16 +47,19 @@ Future<void> _pump(WidgetTester tester, Size size, TargetPlatform p,
       active: null,
       client: _Client(),
       selectedSessionId: 'b',
-      sessions: sessions ?? [
-        _s('a', 'Redo voice settings subpage', 'waiting_for_input',
-            branch: 'main', changes: {'files': 4, 'added': 120, 'removed': 31}),
-        _s('b', 'Richer session cards', 'running',
-            branch: 'cards', since: _now - 260,
-            changes: {'files': 2, 'added': 88, 'removed': 12}),
-        _s('c', 'Release pipeline fix', 'idle',
-            folder: '/home/dev/code/snippet-service', branch: 'main'),
-        _s('d', 'Notes', 'idle', folder: ''),
-      ],
+      sessions: sessions ??
+          [
+            _s('a', 'Redo voice settings subpage', 'waiting_for_input',
+                branch: 'main',
+                changes: {'files': 4, 'added': 120, 'removed': 31}),
+            _s('b', 'Richer session cards', 'running',
+                branch: 'cards',
+                since: _now - 260,
+                changes: {'files': 2, 'added': 88, 'removed': 12}),
+            _s('c', 'Release pipeline fix', 'idle',
+                folder: '/home/dev/code/snippet-service', branch: 'main'),
+            _s('d', 'Notes', 'idle', folder: ''),
+          ],
       sessionsLoading: false,
       onRefreshSessions: () {},
       onNewSession: () {},
@@ -121,6 +124,31 @@ void main() {
       expect(find.text('New session'), findsOneWidget);
       await expectLater(find.byType(Sidebar),
           matchesGoldenFile('visual/goldens/session_list_empty.png'));
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
+
+  testWidgets('desktop keeps Settled at the bottom until expanded',
+      (tester) async {
+    try {
+      final settled = SessionInfo.fromJson({
+        'id': 'z',
+        'title': 'Old chat',
+        'settled': true,
+        'settled_at': _now - 3600,
+        'last_active': _now - 90000,
+      });
+      await _pump(tester, const Size(300, 520), TargetPlatform.macOS,
+          sessions: [_s('a', 'Live chat', 'idle'), settled]);
+      final header = tester.getTopLeft(find.text('SETTLED')).dy;
+      expect(header,
+          greaterThan(tester.getBottomLeft(find.text('Live chat')).dy + 100));
+      expect(find.text('Old chat'), findsNothing);
+      await tester.tap(find.text('SETTLED'));
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(find.text('Old chat'), findsOneWidget);
+      expect(tester.getTopLeft(find.text('SETTLED')).dy, lessThan(header));
     } finally {
       debugDefaultTargetPlatformOverride = null;
     }
