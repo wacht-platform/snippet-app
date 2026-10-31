@@ -753,7 +753,15 @@ Set<String> supersededAmbientTurns(Iterable<String> texts) {
   return out;
 }
 
-bool isAmbientResume(String text) => text.trimLeft().startsWith('<ambient_resume>');
+bool isAmbientResume(String text) => text.trimLeft().startsWith('<ambient_resume');
+
+/// Daemon-written voice notes addressed to the model, never to the reader.
+bool isAmbientNote(String text) {
+  final t = text.trimLeft();
+  return isAmbientResume(t) ||
+      t.startsWith('<ambient_context_alert') ||
+      t.startsWith('<ambient_check_in');
+}
 
 /// Project harness events into the Mission Control chat feed.
 List<FeedItem> feedItemsFromEvents(List<Map<String, dynamic>> events) {
@@ -791,6 +799,7 @@ List<FeedItem> feedItemsFromEvents(List<Map<String, dynamic>> events) {
               AutonomousRoundItem(id: 'h-r-$i', timestamp: now, round: round));
           break;
         }
+        if (isAmbientNote(text)) break;
         final workerQuestion = parseWorkerQuestion(text);
         if (workerQuestion != null) {
           out.add(WorkerQuestionItem(
