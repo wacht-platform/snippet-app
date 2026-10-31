@@ -580,40 +580,44 @@ class _VoiceNoteState extends State<VoiceNote> {
             button: true,
             label: _playing ? 'Pause voice note' : 'Play voice note',
             child: Material(
-              color: AppColors.accent,
+              color: AppColors.surface3,
               shape: const CircleBorder(),
               child: InkWell(
                 onTap: _error == null ? _toggle : null,
                 customBorder: const CircleBorder(),
                 child: SizedBox(
-                  width: 40,
-                  height: 40,
+                  width: 38,
+                  height: 38,
                   child: Center(
                     child: _loading
-                        ? Spinner(size: 15, color: AppColors.accentFg)
+                        ? Spinner(size: 15, color: AppColors.fg1)
                         : AppIcon(_playing ? 'pause' : 'play',
-                            size: 16, color: AppColors.accentFg),
+                            size: 15, color: AppColors.fg1),
                   ),
                 ),
               ),
             ),
           ),
           const SizedBox(width: 12),
-          Expanded(
-            child: LayoutBuilder(
-              builder: (_, c) => GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTapDown: (d) => _seekTo(d.localPosition.dx / c.maxWidth),
-                onHorizontalDragUpdate: (d) =>
-                    _seekTo(d.localPosition.dx / c.maxWidth),
-                child: SizedBox(
-                  height: 28,
-                  child: CustomPaint(
-                    painter: _NoteWave(
-                      seed: widget.path.hashCode,
-                      progress: progress,
-                      played: AppColors.accent,
-                      rest: AppColors.fg4.withValues(alpha: 0.55),
+          Flexible(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 300),
+              child: LayoutBuilder(
+                builder: (_, c) => GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTapDown: (d) => _seekTo(d.localPosition.dx / c.maxWidth),
+                  onHorizontalDragUpdate: (d) =>
+                      _seekTo(d.localPosition.dx / c.maxWidth),
+                  child: SizedBox(
+                    width: double.infinity,
+                    height: 26,
+                    child: CustomPaint(
+                      painter: _NoteWave(
+                        seed: widget.path.hashCode,
+                        progress: progress,
+                        played: AppColors.fg1,
+                        rest: AppColors.fg4.withValues(alpha: 0.5),
+                      ),
                     ),
                   ),
                 ),
@@ -627,6 +631,8 @@ class _VoiceNoteState extends State<VoiceNote> {
                   color: _error == null ? AppColors.fg3 : AppColors.danger)),
         ]),
         if (widget.transcript != null) ...[
+          const SizedBox(height: 10),
+          Container(height: 1, color: AppColors.line),
           const SizedBox(height: 10),
           widget.transcript!,
         ],
@@ -824,8 +830,8 @@ class _NoteWave extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    const step = 5.0;
-    const stroke = 3.0;
+    const step = 4.0;
+    const stroke = 2.5;
     final count = (size.width / step).floor();
     if (count <= 0) return;
     final rnd = math.Random(seed);
