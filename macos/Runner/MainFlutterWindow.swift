@@ -3150,9 +3150,15 @@ final class NotchHomeView: NSView {
   }
 
   /// Content height for the expanded state, so the controller can size the shape.
+  static func detailLine(_ item: NotchHomeItem) -> String {
+    let dup = item.details.contains { $0.components(separatedBy: "\t").dropFirst().first == item.line }
+    return dup ? "" : item.line
+  }
+
   static func detailBodyHeight(_ item: NotchHomeItem, width: CGFloat) -> CGFloat {
-    if item.line.isEmpty { return 0 }
-    let rect = (item.line as NSString).boundingRect(
+    let line = detailLine(item)
+    if line.isEmpty { return item.details.isEmpty ? 0 : 6 }
+    let rect = (line as NSString).boundingRect(
       with: NSSize(width: width, height: .greatestFiniteMagnitude),
       options: [.usesLineFragmentOrigin],
       attributes: [.font: NotchHomeType.sans(12)])
@@ -3294,8 +3300,8 @@ final class NotchHomeView: NSView {
       }
       var y = topInset + 4 + 26 + 6
       let bodyH = NotchHomeView.detailBodyHeight(item, width: w - pad * 2)
-      if bodyH > 0 {
-        let body = NSTextField(wrappingLabelWithString: item.line)
+      if !NotchHomeView.detailLine(item).isEmpty {
+        let body = NSTextField(wrappingLabelWithString: NotchHomeView.detailLine(item))
         body.font = NotchHomeType.sans(12)
         body.textColor = item.tone == "run" ? NotchHomePalette.amber : NotchHomePalette.muted
         body.maximumNumberOfLines = 5
@@ -3303,8 +3309,8 @@ final class NotchHomeView: NSView {
         body.cell?.truncatesLastVisibleLine = true
         body.frame = NSRect(x: pad, y: y, width: w - pad * 2, height: bodyH - 6)
         addSubview(body)
-        y += bodyH
       }
+      y += bodyH
       for text in item.details.prefix(8) {
         let parts = text.components(separatedBy: "\t")
         let l = label(parts[0], size: 11.5, color: NotchHomePalette.muted)
