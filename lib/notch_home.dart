@@ -8,6 +8,7 @@ import 'api.dart';
 import 'crew_status.dart';
 import 'models.dart';
 import 'notifications.dart' show onNotifTap;
+import 'plain_text.dart';
 import 'platform.dart';
 import 'screens/tasks/task_common.dart' show openTaskInTab;
 import 'session_quick_send.dart';
@@ -302,7 +303,7 @@ Map<String, dynamic> buildModel({
       'id': id,
       'section': asking ? 'Needs you' : 'Working',
       'title': e.agent.displayName,
-      'line': e.line,
+      'line': plainInline(e.line),
       'tone': asking ? 'run' : 'accent',
       'tag': e.agent.role.trim(),
       'meta': e.sessions.length > 1 ? '${e.sessions.length} sessions' : '',
@@ -327,7 +328,7 @@ Map<String, dynamic> buildModel({
       'id': id,
       'section': 'Needs you',
       'title': s.title.trim().isEmpty ? 'Untitled session' : s.title.trim(),
-      'line': text.isEmpty ? 'Waiting for you' : text,
+      'line': text.isEmpty ? 'Waiting for you' : plainInline(text),
       'tone': 'run',
       'tag': '',
       'meta': '',
@@ -406,8 +407,8 @@ Map<String, dynamic> buildModel({
     items.add({
       'id': id,
       'section': 'Recent',
-      'title': n.title.trim().isEmpty ? 'Notification' : n.title.trim(),
-      'line': n.subtitle.trim(),
+      'title': n.title.trim().isEmpty ? 'Notification' : plainInline(n.title),
+      'line': plainInline(n.subtitle),
       'tag': '',
       'meta': _ago(n.at, now),
       'tone': live == null ? 'idle' : 'run',

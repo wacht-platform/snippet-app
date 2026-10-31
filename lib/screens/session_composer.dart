@@ -616,7 +616,7 @@ extension _SessionScreenComposerExt on _SessionScreenState {
           AppIcon('goal', size: 14, color: AppColors.accent),
           const SizedBox(width: 8),
           Expanded(
-            child: Text(_state!.goal!.text,
+            child: Text(plainInline(_state!.goal!.text),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: sans(12, color: AppColors.fg2)),
