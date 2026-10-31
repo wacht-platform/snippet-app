@@ -3389,14 +3389,31 @@ final class NotchHomeView: NSView {
       let ln = label(f.line, size: 11.5, color: asking ? NotchHomePalette.amber : NotchHomePalette.muted)
       ln.frame = NSRect(x: 16, y: 43, width: card.frame.width - 32, height: 18)
       card.addSubview(ln)
-      var bx: CGFloat = 16
+      let strip = NSView(frame: .zero)
+      var bx: CGFloat = 0
       for a in f.actions.prefix(3) {
         let b = NotchHomeButton(title: a.label, primary: a.primary) { [weak self] in
           self?.onAction?(f.id, a.action)
         }
-        b.frame.origin = NSPoint(x: bx, y: 68)
-        card.addSubview(b)
+        b.frame.origin = NSPoint(x: bx, y: 0)
+        strip.addSubview(b)
         bx += b.frame.width + 8
+      }
+      let stripW = max(bx - 8, 0)
+      let avail = card.frame.width - 32
+      strip.frame = NSRect(x: 0, y: 0, width: stripW, height: 26)
+      if stripW <= avail {
+        strip.frame.origin = NSPoint(x: 16, y: 68)
+        card.addSubview(strip)
+      } else {
+        let scroll = NSScrollView(frame: NSRect(x: 16, y: 68, width: avail, height: 26))
+        scroll.drawsBackground = false
+        scroll.hasHorizontalScroller = false
+        scroll.hasVerticalScroller = false
+        scroll.horizontalScrollElasticity = .allowed
+        scroll.verticalScrollElasticity = .none
+        scroll.documentView = strip
+        card.addSubview(scroll)
       }
       addSubview(card)
       y += fh + 6
