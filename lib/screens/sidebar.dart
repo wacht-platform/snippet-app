@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../api.dart';
 import '../drafts.dart';
+import '../diff_counts.dart';
 import '../models.dart';
 import '../settled_sessions.dart';
 import '../crew_status.dart';
@@ -1293,11 +1294,7 @@ class SidebarState extends State<Sidebar> {
         ),
       if (hasDiff) ...[
         const SizedBox(width: 8),
-        Text('+${c.added}',
-            style: sans(size, color: AppColors.ok, tabular: true)),
-        const SizedBox(width: 5),
-        Text('-${c.removed}',
-            style: sans(size, color: AppColors.danger, tabular: true)),
+        DiffCounts(s, size: size),
       ],
     ]);
   }

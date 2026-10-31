@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 
+import '../diff_counts.dart';
 import '../mochi.dart';
 import '../models.dart';
 import '../platform.dart';
@@ -276,9 +277,15 @@ class ShellRecentPlaceholder extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(width: 8),
-                        Text(
-                          relativeTime(s.lastActive),
-                          style: mono(10, color: AppColors.fg3),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text(
+                              relativeTime(s.lastActive),
+                              style: mono(10, color: AppColors.fg3),
+                            ),
+                            DiffCounts(s, size: 10.5),
+                          ],
                         ),
                       ]),
                     ),

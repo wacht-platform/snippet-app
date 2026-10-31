@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../diff_counts.dart';
 import '../models.dart';
 import '../theme.dart';
 import '../widgets.dart';
@@ -71,6 +72,7 @@ Future<String?> showInboundSharePicker({
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TS.meta()),
+            trailing: DiffCounts(s),
             onTap: () => Navigator.pop(context, s.id),
           ),
       ],
