@@ -1545,7 +1545,7 @@ class _SessionActionsPanelState extends State<_SessionActionsPanel> {
     return _row(
       icon: 'archive',
       label: 'Auto-settle',
-      detail: 'Save memory and park this chat after an hour idle',
+      detail: 'Save memory and park this chat after 12 hours idle',
       onTap: flip,
       trailing: SettingsSwitch(value: on, onChanged: (_) => flip()),
     );
