@@ -1279,6 +1279,10 @@ class MissionControlTask {
   final bool archived;
   final List<NotificationMarker> notifications;
   final bool summary;
+  final String? statusReason;
+  final List<String> waitingOn;
+  final String? currentStep;
+  final String? supersededBy;
 
   MissionControlTask.preview(MissionControlTask o)
       : id = o.id,
@@ -1290,6 +1294,10 @@ class MissionControlTask {
         sessionId = o.sessionId,
         archived = o.archived,
         notifications = o.notifications,
+        statusReason = o.statusReason,
+        waitingOn = o.waitingOn,
+        currentStep = o.currentStep,
+        supersededBy = o.supersededBy,
         summary = false;
 
   MissionControlTask.fromJson(Map<String, dynamic> j)
@@ -1305,7 +1313,11 @@ class MissionControlTask {
         notifications = ((j['notifications'] as List?) ?? const [])
             .whereType<Map>()
             .map((e) => NotificationMarker.fromJson(e.cast<String, dynamic>()))
-            .toList();
+            .toList(),
+        statusReason = _optText(j['status_reason']),
+        waitingOn = _textList(j['waiting_on']),
+        currentStep = _optText(j['current_step']),
+        supersededBy = _optText(j['superseded_by']);
 
   bool get isActive =>
       !archived && (status == 'pending' || status == 'in_progress');
@@ -1445,6 +1457,7 @@ final ValueNotifier<int> modelsRevision = ValueNotifier<int>(0);
 enum TaskStatus {
   todo('todo', 'To do'),
   inProgress('in_progress', 'In progress'),
+  inReview('in_review', 'In review'),
   blocked('blocked', 'Blocked'),
   done('done', 'Done'),
   failed('failed', 'Failed'),
@@ -1544,6 +1557,11 @@ class TaskItem {
   /// The session the task is routed to.
   final String sessionId;
 
+  final String? statusReason;
+  final List<String> waitingOn;
+  final String? currentStep;
+  final String? supersededBy;
+
   TaskItem.fromJson(Map<String, dynamic> j)
       : id = j['id'] as String? ?? '',
         title = j['title'] as String? ?? '',
@@ -1563,7 +1581,11 @@ class TaskItem {
         updatedAt = j['updated_at'] as String? ?? '',
         completedAt = j['completed_at'] as String?,
         threadId = j['thread_id'] as String? ?? '',
-        sessionId = j['session_id'] as String? ?? '';
+        sessionId = j['session_id'] as String? ?? '',
+        statusReason = _optText(j['status_reason']),
+        waitingOn = _textList(j['waiting_on']),
+        currentStep = _optText(j['current_step']),
+        supersededBy = _optText(j['superseded_by']);
 
   /// This task in another column, for showing a move before the daemon
   /// confirms it.
@@ -1583,8 +1605,20 @@ class TaskItem {
         updatedAt = t.updatedAt,
         completedAt = t.completedAt,
         threadId = t.threadId,
-        sessionId = t.sessionId;
+        sessionId = t.sessionId,
+        statusReason = t.statusReason,
+        waitingOn = t.waitingOn,
+        currentStep = t.currentStep,
+        supersededBy = t.supersededBy;
 }
+
+String? _optText(dynamic v) {
+  final s = v is String ? v.trim() : '';
+  return s.isEmpty ? null : s;
+}
+
+List<String> _textList(dynamic v) =>
+    v is List ? v.whereType<String>().where((e) => e.isNotEmpty).toList() : const [];
 
 /// A task's links plus its resolved blockers.
 ///

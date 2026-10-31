@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../task_reason.dart';
 import '../../api.dart';
 import '../../models.dart';
 import '../../panel.dart';
@@ -49,11 +50,26 @@ class TaskFeed {
 Color statusColor(TaskStatus status) => switch (status) {
       TaskStatus.todo => AppColors.fg3,
       TaskStatus.inProgress => AppColors.run,
+      TaskStatus.inReview => AppColors.accent,
       TaskStatus.blocked => AppColors.danger,
       TaskStatus.done => AppColors.ok,
       TaskStatus.failed => AppColors.danger,
       TaskStatus.cancelled => AppColors.fg4,
     };
+
+/// The notes for a task, with dependency and replacement ids resolved to the
+/// titles of the tasks in [all].
+TaskNote noteForTask(TaskItem t, Iterable<TaskItem> all) {
+  final titles = {for (final x in all) x.id: x.title};
+  return taskNote(
+    status: t.status.wire,
+    statusReason: t.statusReason,
+    waitingOn: t.waitingOn,
+    currentStep: t.currentStep,
+    supersededBy: t.supersededBy,
+    titleOf: (id) => titles[id],
+  );
+}
 
 /// Whether a task matches a search: title, description or plan.
 bool taskMatches(TaskItem task, String query) {
@@ -145,4 +161,31 @@ Future<bool> showCreateTask(BuildContext context, DaemonClient client) async {
     child: CreateTaskForm(client: client),
   );
   return created == true;
+}
+
+/// The reason, current step and replacement notes under a task's status.
+class TaskNoteLines extends StatelessWidget {
+  const TaskNoteLines({super.key, required this.note, this.colour});
+  final TaskNote note;
+  final Color? colour;
+
+  @override
+  Widget build(BuildContext context) {
+    final lines = [
+      if (note.reason != null) note.reason!,
+      if (note.step != null) 'Now: ${note.step}',
+      if (note.replacedBy != null) note.replacedBy!,
+    ];
+    if (lines.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (final l in lines)
+            Text(l, style: sans(12.5, color: colour ?? AppColors.fg4)),
+        ],
+      ),
+    );
+  }
 }

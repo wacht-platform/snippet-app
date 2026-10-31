@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../api.dart';
 import '../mochi.dart';
 import '../models.dart';
+import '../task_reason.dart';
 import '../theme.dart';
 import '../widgets.dart';
 
@@ -102,6 +103,18 @@ class _MissionBoardPanelState extends State<MissionBoardPanel> {
             style: sans(11, spacing: 0.9, color: AppColors.fg4)),
       );
 
+  TaskNote _note(MissionControlTask t) {
+    final titles = {for (final x in _tasks) x.id: x.title};
+    return taskNote(
+      status: t.status,
+      statusReason: t.statusReason,
+      waitingOn: t.waitingOn,
+      currentStep: t.currentStep,
+      supersededBy: t.supersededBy,
+      titleOf: (id) => titles[id],
+    );
+  }
+
   Widget _taskRow(MissionControlTask t, {required bool done}) {
     final sid = t.sessionId;
     return Material(
@@ -123,10 +136,28 @@ class _MissionBoardPanelState extends State<MissionBoardPanel> {
             ),
             const SizedBox(width: 12),
             Expanded(
-              child: Text(t.title.isEmpty ? '(untitled)' : t.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: sans(13, color: done ? AppColors.fg3 : AppColors.fg1)),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(t.title.isEmpty ? '(untitled)' : t.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: sans(13,
+                          color: done ? AppColors.fg3 : AppColors.fg1)),
+                  if (_note(t).line case final line?)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(line,
+                          key: ValueKey('note-${t.id}'),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: sans(11.5,
+                              color: t.status == 'blocked'
+                                  ? AppColors.danger
+                                  : AppColors.fg4)),
+                    ),
+                ],
+              ),
             ),
             const SizedBox(width: 8),
             Text(relativeTime(t.updatedAt),
@@ -233,7 +264,10 @@ class _MissionBoardPanelState extends State<MissionBoardPanel> {
     }
 
     final doing = _tasks
-        .where((t) => t.status == 'in_progress' || t.status == 'blocked')
+        .where((t) =>
+            t.status == 'in_progress' ||
+            t.status == 'in_review' ||
+            t.status == 'blocked')
         .toList();
     final done =
         _tasks.where((t) => t.status == 'done' && today(t.updatedAt)).toList();

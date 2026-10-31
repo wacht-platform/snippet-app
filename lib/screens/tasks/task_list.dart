@@ -1,3 +1,4 @@
+import '../../task_reason.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -101,6 +102,7 @@ class TaskList extends StatelessWidget {
           TaskRow(
               key: ValueKey('t-${list[i].id}'),
               task: list[i],
+              note: noteForTask(list[i], tasks),
               onTap: () => onOpen(list[i]),
               divider: i < list.length - 1),
       ];
@@ -114,6 +116,7 @@ class TaskList extends StatelessWidget {
         TaskRow(
             key: ValueKey('t-${task.id}'),
             task: task,
+            note: noteForTask(task, tasks),
             selected: task.id == selectedId,
             onTap: () => onOpen(task)),
     ];
@@ -200,9 +203,11 @@ class TaskRow extends StatelessWidget {
       {super.key,
       required this.task,
       required this.onTap,
+      this.note,
       this.selected = false,
       this.divider = false});
   final TaskItem task;
+  final TaskNote? note;
   final bool selected;
   final VoidCallback onTap;
 
@@ -211,12 +216,16 @@ class TaskRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final detail = workPlanLine(task) ?? task.description.trim().split('\n').first;
+    final detail = note?.line ??
+        workPlanLine(task) ??
+        task.description.trim().split('\n').first;
     final age = taskAge(task);
     if (kMobile) {
       final Widget glyph = switch (task.status) {
         TaskStatus.inProgress =>
           WorkingMochi(size: 18, color: mochiPalette.first.$2),
+        TaskStatus.inReview =>
+          AppIcon('eye', size: 18, color: AppColors.accent),
         TaskStatus.blocked => MochiIcon(color: AppColors.run, size: 18),
         TaskStatus.done => AppIcon('check-circle', size: 18, color: AppColors.ok),
         TaskStatus.failed =>

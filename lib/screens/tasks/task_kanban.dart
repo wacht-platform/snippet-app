@@ -1,3 +1,4 @@
+import '../../task_reason.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -325,7 +326,10 @@ class _TaskKanbanState extends State<TaskKanban> {
       );
 
   Widget _draggableCard(TaskItem task) {
-    final card = _TaskCard(task: task, onTap: () => _open(task));
+    final card = _TaskCard(
+        task: task,
+        note: noteForTask(task, _feed.tasks),
+        onTap: () => _open(task));
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
       child: Draggable<TaskItem>(
@@ -338,7 +342,10 @@ class _TaskKanbanState extends State<TaskKanban> {
             width: _columnWidth - 16,
             child: Transform.rotate(
               angle: -0.02,
-              child: _TaskCard(task: task, lifted: true),
+              child: _TaskCard(
+                  task: task,
+                  note: noteForTask(task, _feed.tasks),
+                  lifted: true),
             ),
           ),
         ),
@@ -350,9 +357,11 @@ class _TaskKanbanState extends State<TaskKanban> {
 }
 
 class _TaskCard extends StatefulWidget {
-  const _TaskCard({required this.task, this.onTap, this.lifted = false});
+  const _TaskCard(
+      {required this.task, this.note, this.onTap, this.lifted = false});
 
   final TaskItem task;
+  final TaskNote? note;
   final VoidCallback? onTap;
   final bool lifted;
 
@@ -398,6 +407,13 @@ class _TaskCardState extends State<_TaskCard> {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: TS.label(AppColors.fg1)),
+              if (widget.note?.line case final line?) ...[
+                const SizedBox(height: 4),
+                Text(line,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TS.meta(statusColor(t.status))),
+              ],
               if (detail.isNotEmpty) ...[
                 const SizedBox(height: 4),
                 Text(detail,

@@ -1,3 +1,4 @@
+import '../../task_reason.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -10,7 +11,7 @@ import '../../theme.dart';
 import '../../widgets.dart';
 import '../../mochi.dart';
 import '../mobile_chrome.dart';
-import 'task_common.dart' show statusColor;
+import 'task_common.dart' show statusColor, TaskNoteLines;
 
 /// One task: its state, its roster, its links, and its own message room.
 ///
@@ -71,7 +72,12 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
       final task = await widget.client.getTask(widget.taskId);
       final roster = await widget.client.taskAgents(widget.taskId);
       final links = await widget.client.taskLinks(widget.taskId);
+      Map<String, String> titles = const {};
+      try {
+        titles = {for (final x in await widget.client.tasks()) x.id: x.title};
+      } catch (_) {}
       if (!mounted) return;
+      this.titles = titles;
       // The room is keyed by the task's own thread id, which the daemon derives
       // from the task — so a client never invents one, and reconnecting lands in
       // the same conversation.
@@ -350,6 +356,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                         const SizedBox(height: S.s4),
                         Text(t.status.label,
                             style: sans(13, color: AppColors.fg3)),
+                        TaskNoteLines(note: _note(t)),
                       ],
                     ],
                   ),
@@ -408,6 +415,17 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
       ),
     );
   }
+
+  Map<String, String> titles = const {};
+
+  TaskNote _note(TaskItem t) => taskNote(
+        status: t.status.wire,
+        statusReason: t.statusReason,
+        waitingOn: t.waitingOn,
+        currentStep: t.currentStep,
+        supersededBy: t.supersededBy,
+        titleOf: (id) => titles[id],
+      );
 
   Widget _body(TaskItem? t) {
     return loading

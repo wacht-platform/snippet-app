@@ -50,6 +50,7 @@ class _TasksPopoverState extends State<_TasksPopover> {
 
   Color _dot(TaskStatus s) => switch (s) {
         TaskStatus.inProgress => AppColors.run,
+        TaskStatus.inReview => AppColors.accent,
         TaskStatus.blocked || TaskStatus.failed => AppColors.danger,
         _ => AppColors.fg4,
       };
@@ -122,7 +123,7 @@ class _TasksPopoverState extends State<_TasksPopover> {
       );
 
   int _rank(TaskStatus s) => switch (s) {
-        TaskStatus.inProgress => 0,
+        TaskStatus.inProgress || TaskStatus.inReview => 0,
         TaskStatus.blocked || TaskStatus.failed => 1,
         _ => 2,
       };
