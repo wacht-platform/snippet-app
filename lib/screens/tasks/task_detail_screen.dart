@@ -356,6 +356,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                         const SizedBox(height: S.s4),
                         Text(t.status.label,
                             style: sans(13, color: AppColors.fg3)),
+                        if (t.goalTitle != null) _goalLine(t),
                         TaskNoteLines(note: _note(t)),
                       ],
                     ],
@@ -366,7 +367,11 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
           else if (kMobile)
             MobileBackBar(
               title: t?.title ?? 'Task',
-              subtitle: t?.status.label,
+              subtitle: t == null
+                  ? null
+                  : t.goalTitle == null
+                      ? t.status.label
+                      : '${t.status.label}  ·  Goal: ${t.goalTitle}',
               onTitleTap: () {},
             )
           else if (widget.embedded)
@@ -418,6 +423,15 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
 
   Map<String, String> titles = const {};
 
+  Widget _goalLine(TaskItem t) => Padding(
+        padding: const EdgeInsets.only(top: 2),
+        child: Text('Goal: ${t.goalTitle}',
+            key: const ValueKey('task-goal'),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: sans(13, color: AppColors.fg3)),
+      );
+
   TaskNote _note(TaskItem t) => taskNote(
         status: t.status.wire,
         statusReason: t.statusReason,
@@ -461,6 +475,10 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (t.goalTitle != null && !kMobile && !widget.pane) ...[
+              _goalLine(t),
+              const SizedBox(height: S.s8),
+            ],
             if (t.description.trim().isNotEmpty) ...[
               _Description(markdown: t.description),
               const SizedBox(height: S.s12),

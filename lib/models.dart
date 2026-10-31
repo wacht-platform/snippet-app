@@ -1561,6 +1561,8 @@ class TaskItem {
   final List<String> waitingOn;
   final String? currentStep;
   final String? supersededBy;
+  final String? goalId;
+  final String? goalTitle;
 
   TaskItem.fromJson(Map<String, dynamic> j)
       : id = j['id'] as String? ?? '',
@@ -1585,7 +1587,9 @@ class TaskItem {
         statusReason = _optText(j['status_reason']),
         waitingOn = _textList(j['waiting_on']),
         currentStep = _optText(j['current_step']),
-        supersededBy = _optText(j['superseded_by']);
+        supersededBy = _optText(j['superseded_by']),
+        goalId = _optText(j['goal_id']),
+        goalTitle = _optText(j['goal_title']);
 
   /// This task in another column, for showing a move before the daemon
   /// confirms it.
@@ -1609,7 +1613,9 @@ class TaskItem {
         statusReason = t.statusReason,
         waitingOn = t.waitingOn,
         currentStep = t.currentStep,
-        supersededBy = t.supersededBy;
+        supersededBy = t.supersededBy,
+        goalId = t.goalId,
+        goalTitle = t.goalTitle;
 }
 
 String? _optText(dynamic v) {

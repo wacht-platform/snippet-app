@@ -5,6 +5,7 @@ import '../../models.dart';
 import '../../platform.dart';
 import '../../theme.dart';
 import '../../widgets.dart';
+import '../goals/goal_widgets.dart';
 import '../list_search_field.dart';
 import 'task_common.dart';
 import 'task_list.dart';
@@ -26,6 +27,7 @@ class _TasksScreenState extends State<TasksScreen> {
   final _search = TextEditingController();
   String _query = '';
   Set<TaskStatus> _filter = {};
+  bool _goals = false;
 
   void _sync() {
     if (mounted) setState(() {});
@@ -61,12 +63,17 @@ class _TasksScreenState extends State<TasksScreen> {
         bottom: false,
         child: Column(children: [
           SnAppBar(
-            title: 'Tasks',
+            title: _goals ? 'Goals' : 'Tasks',
             titleSize: kMobile ? M.pageTitle : 18,
             background: AppColors.bg,
             bordered: false,
             actions: [
-              IconBtn('sliders',
+              Btn(_goals ? 'Tasks' : 'Goals',
+                  small: true,
+                  variant: BtnVariant.surface,
+                  onTap: () => setState(() => _goals = !_goals)),
+              const SizedBox(width: 6),
+              if (!_goals) IconBtn('sliders',
                   size: kMobile ? M.minTarget : 24,
                   iconSize: 16,
                   active: _filter.isNotEmpty,
@@ -75,23 +82,28 @@ class _TasksScreenState extends State<TasksScreen> {
                       : 'Filter (${_filter.length} selected)',
                   onTap: _pickFilter),
               const SizedBox(width: 6),
-              Btn('New task',
-                  small: true,
-                  icon: 'plus',
-                  variant: BtnVariant.surface,
-                  onTap: _create),
+              if (!_goals)
+                Btn('New task',
+                    small: true,
+                    icon: 'plus',
+                    variant: BtnVariant.surface,
+                    onTap: _create),
               const SizedBox(width: 2),
             ],
           ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(M.gutter, 0, M.gutter, 4),
-            child: ListSearchField(
-              controller: _search,
-              hint: 'Search tasks',
-              onChanged: (v) => setState(() => _query = v),
+          if (!_goals)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(M.gutter, 0, M.gutter, 4),
+              child: ListSearchField(
+                controller: _search,
+                hint: 'Search tasks',
+                onChanged: (v) => setState(() => _query = v),
+              ),
             ),
-          ),
-          Expanded(child: _body()),
+          Expanded(
+              child: _goals
+                  ? GoalsList(client: widget.client)
+                  : _body()),
         ]),
       ),
     );

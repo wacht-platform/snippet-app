@@ -3,12 +3,14 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../api.dart';
+import '../goal_models.dart';
 import '../mochi.dart';
 import '../models.dart';
 import '../task_reason.dart';
 import '../theme.dart';
 import '../widgets.dart';
 
+import 'goals/goal_widgets.dart';
 import 'shell_models.dart' show RightTab;
 
 class MissionBoardPanel extends StatefulWidget {
@@ -42,6 +44,7 @@ class MissionBoardPanel extends StatefulWidget {
 class _MissionBoardPanelState extends State<MissionBoardPanel> {
   List<MissionControlTask> _tasks = const [];
   List<RecurringJob> _jobs = const [];
+  List<Goal> _goals = const [];
   bool _loaded = false;
   Timer? _timer;
 
@@ -71,8 +74,13 @@ class _MissionBoardPanelState extends State<MissionBoardPanel> {
       try {
         jobs = await widget.client.recurringJobs();
       } catch (_) {}
+      List<Goal> goals = const [];
+      try {
+        goals = await widget.client.goals();
+      } catch (_) {}
       if (!mounted) return;
       setState(() {
+        _goals = goals;
         _tasks = o.recentTasks.where((t) => !t.archived).toList();
         _jobs = jobs.where((j) => j.enabled && j.nextRunAt > 0).toList()
           ..sort((a, b) => a.nextRunAt.compareTo(b.nextRunAt));
@@ -279,7 +287,7 @@ class _MissionBoardPanelState extends State<MissionBoardPanel> {
               padding: const EdgeInsets.only(bottom: 24),
               children: [
                 _headerBar(),
-                if (doing.isEmpty && _jobs.isEmpty && done.isEmpty)
+                if (doing.isEmpty && _jobs.isEmpty && done.isEmpty && _goals.isEmpty)
                   Padding(
                     padding: const EdgeInsets.fromLTRB(24, 120, 24, 0),
                     child: Column(children: [
@@ -296,6 +304,20 @@ class _MissionBoardPanelState extends State<MissionBoardPanel> {
                               height: 1.5, color: AppColors.fg4)),
                     ]),
                   ),
+                if (_goals.isNotEmpty) ...[
+                  _label('Goals'),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    child: Column(children: [
+                      for (final g in _goals.take(6))
+                        GoalRow(
+                          goal: g,
+                          onTap: () =>
+                              openGoalDetail(context, widget.client, g.id),
+                        ),
+                    ]),
+                  ),
+                ],
                 if (doing.isNotEmpty) ...[
                   _label('Working now'),
                   Padding(
