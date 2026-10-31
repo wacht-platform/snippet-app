@@ -619,8 +619,8 @@ class _CrewRow extends StatelessWidget {
     return Tooltip(
       message:
           [e.agent.displayName, e.line].where((x) => x.isNotEmpty).join('\n'),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(8),
+      child: HoverSurface(
+        radius: 8,
         onTap: onTap,
         onSecondaryTapDown: onMenu == null
             ? null
@@ -815,37 +815,35 @@ class _CrewTile extends StatelessWidget {
     return SizedBox(
       width: 141,
       height: 92,
-      child: Material(
-        color: AppColors.surface3,
-        borderRadius: BorderRadius.circular(10),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(10),
-          onTap: onTap,
-          onSecondaryTapDown: onMenu == null
-              ? null
-              : (d) => onMenu!(context, e.agent, d.globalPosition),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Opacity(
-                    opacity: idle ? .85 : 1,
-                    child: AgentMochi(e.agent.id, size: 32)),
-                const Spacer(),
-                Text(e.agent.displayName,
+      child: HoverSurface(
+        rest: AppColors.surface3,
+        hoverColor: Color.lerp(AppColors.surface3, AppColors.fg1, 0.07),
+        radius: 10,
+        onTap: onTap,
+        onSecondaryTapDown: onMenu == null
+            ? null
+            : (d) => onMenu!(context, e.agent, d.globalPosition),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Opacity(
+                  opacity: idle ? .85 : 1,
+                  child: AgentMochi(e.agent.id, size: 32)),
+              const Spacer(),
+              Text(e.agent.displayName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: sans(13.5, weight: W.label, color: AppColors.fg1)),
+              if (e.line.isNotEmpty)
+                Text(e.line,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: sans(13.5, weight: W.label, color: AppColors.fg1)),
-                if (e.line.isNotEmpty)
-                  Text(e.line,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: sans(12,
-                          color: idle ? AppColors.fg4 : crewColor(e.state))),
-              ],
-            ),
+                    style: sans(12,
+                        color: idle ? AppColors.fg4 : crewColor(e.state))),
+            ],
           ),
         ),
       ),

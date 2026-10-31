@@ -783,6 +783,71 @@ class _PressableState extends State<Pressable> {
   }
 }
 
+/// A tappable row or tile whose fill eases between rest, hover and selected,
+/// so pointer movement over a list reads as one smooth sweep.
+class HoverSurface extends StatefulWidget {
+  const HoverSurface({
+    super.key,
+    required this.child,
+    this.onTap,
+    this.onSecondaryTapDown,
+    this.onLongPress,
+    this.radius = 8,
+    this.selected = false,
+    this.rest,
+    this.selectedColor,
+    this.hoverColor,
+  });
+
+  final Widget child;
+  final VoidCallback? onTap;
+  final GestureTapDownCallback? onSecondaryTapDown;
+  final VoidCallback? onLongPress;
+  final double radius;
+  final bool selected;
+  final Color? rest;
+  final Color? selectedColor;
+  final Color? hoverColor;
+
+  @override
+  State<HoverSurface> createState() => _HoverSurfaceState();
+}
+
+class _HoverSurfaceState extends State<HoverSurface> {
+  bool _hover = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final rest = widget.rest ?? Colors.transparent;
+    final color = widget.selected
+        ? (widget.selectedColor ?? AppColors.surface2)
+        : _hover && widget.onTap != null
+            ? (widget.hoverColor ?? AppColors.surface1)
+            : rest;
+    final r = BorderRadius.circular(widget.radius);
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hover = true),
+      onExit: (_) => setState(() => _hover = false),
+      child: AnimatedContainer(
+        duration: reduceMotion(context) ? Duration.zero : Motion.quick,
+        curve: Curves.easeOut,
+        decoration: BoxDecoration(color: color, borderRadius: r),
+        child: Material(
+          type: MaterialType.transparency,
+          child: InkWell(
+            borderRadius: r,
+            hoverColor: Colors.transparent,
+            onTap: widget.onTap,
+            onLongPress: widget.onLongPress,
+            onSecondaryTapDown: widget.onSecondaryTapDown,
+            child: widget.child,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class IconBtn extends StatelessWidget {
   final String name;
   final VoidCallback? onTap;

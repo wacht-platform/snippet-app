@@ -2949,7 +2949,7 @@ final class NotchHomeButton: NSButton {
 
 final class NotchHomeRowView: NSView {
   var onSelect: (() -> Void)?
-  var fillsAlways = false
+  var fillsAlways = false { didSet { applyFill(animated: false) } }
   private var hovering = false
 
   override var isFlipped: Bool { true }
@@ -2964,24 +2964,37 @@ final class NotchHomeRowView: NSView {
         owner: self, userInfo: nil))
   }
 
+  override func viewDidMoveToWindow() {
+    super.viewDidMoveToWindow()
+    if let w = window {
+      hovering = bounds.contains(convert(w.mouseLocationOutsideOfEventStream, from: nil))
+    }
+    applyFill(animated: false)
+  }
+
+  private func applyFill(animated: Bool) {
+    wantsLayer = true
+    guard let layer = layer else { return }
+    layer.cornerRadius = fillsAlways ? 12 : 10
+    let target: NSColor = fillsAlways ? NotchHomePalette.card : (hovering ? NotchHomePalette.row : .clear)
+    CATransaction.begin()
+    CATransaction.setAnimationDuration(animated ? 0.14 : 0)
+    CATransaction.setAnimationTimingFunction(CAMediaTimingFunction(name: .easeOut))
+    layer.backgroundColor = target.cgColor
+    CATransaction.commit()
+  }
+
   override func mouseEntered(with event: NSEvent) {
     hovering = true
-    needsDisplay = true
+    applyFill(animated: true)
   }
 
   override func mouseExited(with event: NSEvent) {
     hovering = false
-    needsDisplay = true
+    applyFill(animated: true)
   }
 
   override func mouseDown(with event: NSEvent) { onSelect?() }
-
-  override func draw(_ dirtyRect: NSRect) {
-    guard hovering || fillsAlways else { return }
-    (fillsAlways ? NotchHomePalette.card : NotchHomePalette.row).setFill()
-    let r: CGFloat = fillsAlways ? 12 : 10
-    NSBezierPath(roundedRect: bounds, xRadius: r, yRadius: r).fill()
-  }
 }
 
 final class NotchHomeBackground: NSView {
@@ -3069,6 +3082,7 @@ final class NotchHomeView: NSView {
   var onOpenApp: (() -> Void)?
 
   private var attached = true
+  private var lastLayoutKey = ""
   private var wasExpanded = false
   var maskDuration: CFTimeInterval = 0
   var maskTiming = CAMediaTimingFunction(name: .easeInEaseOut)
@@ -3198,9 +3212,15 @@ final class NotchHomeView: NSView {
     self.attached = attached
     let collapsing = wasExpanded && !expanded
     wasExpanded = expanded
+    let layoutKey = "\(expanded)|\(detail?.id ?? "")|\(attached)"
+    let switching = expanded && !collapsing && layoutKey != lastLayoutKey && !lastLayoutKey.isEmpty
+    let sameLayout = layoutKey == lastLayoutKey
+    lastLayoutKey = layoutKey
     let leaving = subviews.filter { $0 !== background }
     for v in leaving {
-      if collapsing {
+      if sameLayout {
+        v.removeFromSuperview()
+      } else if collapsing || switching {
         NSAnimationContext.runAnimationGroup({ ctx in
           ctx.duration = 0.12
           v.animator().alphaValue = 0
@@ -3228,8 +3248,9 @@ final class NotchHomeView: NSView {
     }
     mask.path = newPath
     defer {
-      let delay: TimeInterval = collapsing ? 0.14 : 0
+      let delay: TimeInterval = collapsing ? 0.14 : (switching ? 0.1 : 0)
       for v in subviews where v !== background && !leaving.contains(where: { $0 === v }) {
+        if sameLayout { continue }
         v.alphaValue = 0
         DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
           NSAnimationContext.runAnimationGroup { ctx in
