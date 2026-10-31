@@ -725,7 +725,7 @@ class SidebarState extends State<Sidebar> {
         child: Padding(
           padding: mobile
               ? const EdgeInsets.fromLTRB(4, 16, 4, 10)
-              : const EdgeInsets.fromLTRB(10, 10, 10, 10),
+              : const EdgeInsets.fromLTRB(6, 10, 6, 10),
           child: Row(children: [
             AppIcon('archive', size: mobile ? 15 : 13, color: AppColors.fg4),
             const SizedBox(width: 8),
@@ -938,7 +938,7 @@ class SidebarState extends State<Sidebar> {
               onTap: hasClient ? widget.onOpenMissionControl : null,
               child: Container(
                 height: 46,
-                padding: const EdgeInsets.only(left: 8, right: 2),
+                padding: const EdgeInsets.only(left: 6, right: 2),
                 child: Row(children: [
                   MochiIcon(color: AppColors.accent, size: 22),
                   const SizedBox(width: 10),
@@ -1056,7 +1056,7 @@ class SidebarState extends State<Sidebar> {
           onRefresh: () async => widget.onRefreshSessions(),
           child: ListView(
             physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.fromLTRB(10, 0, 10, 16),
+            padding: const EdgeInsets.fromLTRB(8, 0, 8, 16),
             children: [
               if (!hasClient)
                 const SidebarEmpty('Add a machine to begin.')
@@ -1064,7 +1064,7 @@ class SidebarState extends State<Sidebar> {
                 _emptySessions(searching: _filterQuery.trim().isNotEmpty)
               else ...[
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(10, 10, 10, 4),
+                  padding: const EdgeInsets.fromLTRB(6, 10, 6, 4),
                   child: Text('Sessions',
                       style: sans(12, weight: W.label, color: AppColors.fg4)),
                 ),
@@ -1078,7 +1078,7 @@ class SidebarState extends State<Sidebar> {
       ),
       if (hasClient && settledRows.isNotEmpty && !settledOpen)
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 8),
           child: _settledGroup(settledRows, mobile: false),
         ),
       Container(
@@ -1115,7 +1115,7 @@ class SidebarState extends State<Sidebar> {
             ? null
             : (d) => _sessionActions(s, position: d.globalPosition),
         child: Container(
-          padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+          padding: const EdgeInsets.fromLTRB(6, 8, 6, 8),
           child: SizedBox(
               height: 52,
               child: Row(
