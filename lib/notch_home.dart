@@ -328,7 +328,7 @@ Map<String, dynamic> buildModel({
       'id': id,
       'section': 'Needs you',
       'title': s.title.trim().isEmpty ? 'Untitled session' : s.title.trim(),
-      'line': text.isEmpty ? 'Waiting for you' : plainInline(text),
+      'line': text.isEmpty ? 'Question waiting for your answer' : plainInline(text),
       'tone': 'run',
       'tag': '',
       'meta': '',

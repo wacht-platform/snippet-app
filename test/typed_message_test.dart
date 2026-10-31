@@ -15,4 +15,19 @@ void main() {
     expect(m!.messageKind, '');
     expect(m.urgent, isFalse);
   });
+
+  test('a question notification leads with the question itself', () {
+    expect(
+        userQuestionLead({
+          'questions': {
+            'questions': [
+              {'text': 'Ship the APK now?'},
+              {'text': 'Which build?'}
+            ]
+          }
+        }),
+        'Ship the APK now? (+1 more)');
+    expect(userQuestionLead({'questions': [{'text': 'Merge it?'}]}), 'Merge it?');
+    expect(userQuestionLead({}), 'Needs your input');
+  });
 }

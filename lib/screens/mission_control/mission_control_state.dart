@@ -868,6 +868,18 @@ List<FeedItem> feedItemsFromEvents(List<Map<String, dynamic>> events) {
   return out;
 }
 
+/// What a notification says when an agent asks the user: the question itself,
+/// with a count when it asks several, never a generic "needs input".
+String userQuestionLead(Map<String, dynamic> e) {
+  final raw = e['questions'];
+  final list = raw is Map ? raw['questions'] : raw;
+  final text = missionControlQuestionText(
+      {...e, 'questions': list is List ? list : const []});
+  if (text.isEmpty) return 'Needs your input';
+  final more = list is List && list.length > 1 ? ' (+${list.length - 1} more)' : '';
+  return '$text$more';
+}
+
 String missionControlQuestionText(Map<String, dynamic> e) {
   final questions = e['questions'];
   if (questions is List && questions.isNotEmpty) {

@@ -344,7 +344,7 @@ extension _SessionScreenSocketExt on _SessionScreenState {
             if (kind == 'assistant_text' || kind == 'assistant') {
               msgText = ((e['text'] as String?) ?? '').trim();
             } else if (kind == 'user_question') {
-              msgText = 'Needs your input';
+              msgText = userQuestionLead(e);
             }
             if (msgText.isNotEmpty) {
               final cleaned = msgText.replaceAll(RegExp(r'\s+'), ' ').trim();

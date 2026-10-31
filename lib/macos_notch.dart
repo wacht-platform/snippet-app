@@ -24,7 +24,8 @@ import 'screens/mission_control/mission_control_state.dart'
         parseMissionEnvelope,
         parseParentMessage,
         parseWorkerQuestion,
-        supersededAmbientTurns;
+        supersededAmbientTurns,
+        userQuestionLead;
 import 'store.dart';
 import 'tool_activity.dart' show ToolStep, toolSentence;
 import 'session_quick_send.dart'
@@ -274,7 +275,7 @@ class MacosNotch {
                   if (kind == 'assistant_text' || kind == 'assistant') {
                     msgText = ((e['text'] as String?) ?? '').trim();
                   } else if (kind == 'user_question') {
-                    msgText = 'Needs your input';
+                    msgText = userQuestionLead(e);
                   }
                   if (msgText.isNotEmpty) {
                     final cleaned =
