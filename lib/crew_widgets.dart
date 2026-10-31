@@ -676,39 +676,56 @@ class _CrewStackState extends State<CrewStack> {
                   borderRadius: BorderRadius.circular(12),
                   elevation: 0,
                   child: Container(
-                    width: 440,
-                    padding: const EdgeInsets.all(20),
+                    width: 412,
+                    padding: const EdgeInsets.fromLTRB(8, 10, 8, 8),
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(color: AppColors.lineStrong),
                     ),
-                    child: Wrap(spacing: 12, runSpacing: 12, children: [
-                      for (final e in list)
-                        _CrewTile(
-                          e,
-                          onTap: () {
-                            _portal.hide();
-                            widget.onOpen(e.agent);
-                          },
-                          onMenu: widget.onMenu == null
-                              ? null
-                              : (ctx, a, p) async {
-                                  _pinned = true;
-                                  _hide?.cancel();
-                                  try {
-                                    await widget.onMenu!(ctx, a, p);
-                                  } finally {
-                                    _pinned = false;
-                                    if (mounted) _later();
-                                  }
-                                },
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+                          child: Row(children: [
+                            Text('Crew',
+                                style: sans(12,
+                                    weight: W.label, color: AppColors.fg3)),
+                            const SizedBox(width: 6),
+                            Text('${list.length}',
+                                style: mono(11, color: AppColors.fg4)),
+                          ]),
                         ),
-                      if (widget.onNew != null)
-                        _NewAgentTile(onTap: () {
-                          _portal.hide();
-                          widget.onNew!();
-                        }),
-                    ]),
+                        Wrap(spacing: 4, runSpacing: 4, children: [
+                          for (final e in list)
+                            _CrewTile(
+                              e,
+                              onTap: () {
+                                _portal.hide();
+                                widget.onOpen(e.agent);
+                              },
+                              onMenu: widget.onMenu == null
+                                  ? null
+                                  : (ctx, a, p) async {
+                                      _pinned = true;
+                                      _hide?.cancel();
+                                      try {
+                                        await widget.onMenu!(ctx, a, p);
+                                      } finally {
+                                        _pinned = false;
+                                        if (mounted) _later();
+                                      }
+                                    },
+                            ),
+                          if (widget.onNew != null)
+                            _NewAgentTile(onTap: () {
+                              _portal.hide();
+                              widget.onNew!();
+                            }),
+                        ]),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -759,38 +776,42 @@ class _CrewTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final idle = e.state == CrewState.standingBy;
     return SizedBox(
-      width: 186,
-      height: 96,
+      width: 194,
+      height: 52,
       child: HoverSurface(
-        rest: AppColors.surface3,
-        hoverColor: Color.lerp(AppColors.surface3, AppColors.fg1, 0.07),
+        rest: Colors.transparent,
+        hoverColor: AppColors.surface3,
         radius: 10,
         onTap: onTap,
         onSecondaryTapDown: onMenu == null
             ? null
             : (d) => onMenu!(context, e.agent, d.globalPosition),
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Opacity(
-                  opacity: idle ? .85 : 1,
-                  child: AgentMochi(e.agent.id, size: 32)),
-              const Spacer(),
-              Text(e.agent.displayName,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: sans(13.5, weight: W.label, color: AppColors.fg1)),
-              if (e.line.isNotEmpty)
-                Text(e.line,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: sans(12,
-                        color: idle ? AppColors.fg4 : crewColor(e.state))),
-            ],
-          ),
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          child: Row(children: [
+            Opacity(
+                opacity: idle ? .85 : 1,
+                child: AgentMochi(e.agent.id, size: 30)),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(e.agent.displayName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: sans(13.5, weight: W.label, color: AppColors.fg1)),
+                  if (e.line.isNotEmpty)
+                    Text(e.line,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: sans(12,
+                            color: idle ? AppColors.fg4 : crewColor(e.state))),
+                ],
+              ),
+            ),
+          ]),
         ),
       ),
     );
@@ -803,22 +824,28 @@ class _NewAgentTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => SizedBox(
-        width: 186,
-        height: 96,
-        child: Material(
-          color: Colors.transparent,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-            side: BorderSide(color: AppColors.lineStrong),
-          ),
-          child: InkWell(
-            borderRadius: BorderRadius.circular(10),
-            onTap: onTap,
-            child:
-                Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-              AppIcon('plus', size: 18, color: AppColors.fg3),
-              const SizedBox(height: 6),
-              Text('New agent', style: sans(13, color: AppColors.fg3)),
+        width: 194,
+        height: 52,
+        child: HoverSurface(
+          rest: Colors.transparent,
+          hoverColor: AppColors.surface3,
+          radius: 10,
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            child: Row(children: [
+              Container(
+                width: 30,
+                height: 30,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: AppColors.lineStrong),
+                ),
+                child: AppIcon('plus', size: 14, color: AppColors.fg3),
+              ),
+              const SizedBox(width: 10),
+              Text('New agent', style: sans(13.5, color: AppColors.fg3)),
             ]),
           ),
         ),

@@ -45,6 +45,7 @@ void main() {
     await mouse.addPointer(location: Offset.zero);
     await mouse.moveTo(tester.getCenter(find.byType(CrewStack)));
     await tester.pump(const Duration(milliseconds: 50));
+    await tester.pump(const Duration(milliseconds: 400));
     final scout = tester.getTopLeft(find.text('Scout'));
     final reviewer = tester.getTopLeft(find.text('Reviewer'));
     final snippet = tester.getTopLeft(find.text('Snippet'));
@@ -52,8 +53,8 @@ void main() {
     expect(reviewer.dx, greaterThan(scout.dx));
     expect((reviewer.dy - scout.dy).abs(), lessThan(40));
     expect(snippet.dx, scout.dx);
-    expect(snippet.dy, greaterThan(scout.dy + 60));
-    expect(add.dy, greaterThan(scout.dy + 60));
+    expect(snippet.dy, greaterThan(scout.dy + 40));
+    expect(add.dy, greaterThan(scout.dy + 40));
     expect(add.dx, greaterThan(snippet.dx));
 
     await mouse.moveTo(tester.getCenter(find.text('Scout')));
