@@ -110,8 +110,8 @@ enum SnippetTheme {
   static let fg2 = NSColor(srgbRed: 0xDC / 255.0, green: 0xDC / 255.0, blue: 0xDC / 255.0, alpha: 1.0)
   static let fg3 = NSColor(srgbRed: 0xAB / 255.0, green: 0xAB / 255.0, blue: 0xAB / 255.0, alpha: 1.0)
   static let fg4 = NSColor(srgbRed: 0x7A / 255.0, green: 0x7A / 255.0, blue: 0x7A / 255.0, alpha: 1.0)
-  static let accent = NSColor(srgbRed: 0xFF / 255.0, green: 0xFF / 255.0, blue: 0xFF / 255.0, alpha: 1.0)
-  static let accentFill = NSColor(srgbRed: 0xF2 / 255.0, green: 0xF2 / 255.0, blue: 0xF2 / 255.0, alpha: 1.0)
+  static let accent = NSColor(srgbRed: 0xA7 / 255.0, green: 0x8B / 255.0, blue: 0xFA / 255.0, alpha: 1.0)
+  static let accentFill = NSColor(srgbRed: 0xA7 / 255.0, green: 0x8B / 255.0, blue: 0xFA / 255.0, alpha: 1.0)
   static let ok = NSColor(srgbRed: 0x34 / 255.0, green: 0xD3 / 255.0, blue: 0x99 / 255.0, alpha: 1.0)
   static let run = NSColor(srgbRed: 0xF5 / 255.0, green: 0x9E / 255.0, blue: 0x0B / 255.0, alpha: 1.0)
 }

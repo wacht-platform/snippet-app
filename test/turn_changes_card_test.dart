@@ -30,7 +30,7 @@ void main() {
     expect(find.text('+140'), findsOneWidget);
     expect(find.textContaining('file0.dart'), findsNothing);
     await tester.tap(find.text('6 files changed'));
-    await tester.pump();
+    await tester.pumpAndSettle();
     expect(find.textContaining('file0.dart'), findsOneWidget);
     expect(find.textContaining('file5.dart'), findsOneWidget);
     await tester.tap(find.textContaining('file2.dart'));

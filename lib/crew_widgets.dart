@@ -655,47 +655,59 @@ class _CrewStackState extends State<CrewStack> {
           offset: const Offset(14, -6),
           child: Align(
             alignment: Alignment.topLeft,
-            child: MouseRegion(
-              onEnter: (_) => _show(),
-              onExit: (_) => _later(),
-              child: Material(
-                color: AppColors.surface2,
-                borderRadius: BorderRadius.circular(12),
-                elevation: 0,
-                child: Container(
-                  width: 440,
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: AppColors.lineStrong),
-                  ),
-                  child: Wrap(spacing: 12, runSpacing: 12, children: [
-                    for (final e in list)
-                      _CrewTile(
-                        e,
-                        onTap: () {
+            child: TweenAnimationBuilder<double>(
+              tween: Tween(begin: 0, end: 1),
+              duration: Motion.fast,
+              curve: Curves.easeOutCubic,
+              builder: (_, t, child) => Opacity(
+                opacity: t,
+                child: Transform.scale(
+                    scale: 0.96 + 0.04 * t,
+                    alignment: Alignment.topLeft,
+                    child: child),
+              ),
+              child: MouseRegion(
+                onEnter: (_) => _show(),
+                onExit: (_) => _later(),
+                child: Material(
+                  color: AppColors.surface2,
+                  borderRadius: BorderRadius.circular(12),
+                  elevation: 0,
+                  child: Container(
+                    width: 440,
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: AppColors.lineStrong),
+                    ),
+                    child: Wrap(spacing: 12, runSpacing: 12, children: [
+                      for (final e in list)
+                        _CrewTile(
+                          e,
+                          onTap: () {
+                            _portal.hide();
+                            widget.onOpen(e.agent);
+                          },
+                          onMenu: widget.onMenu == null
+                              ? null
+                              : (ctx, a, p) async {
+                                  _pinned = true;
+                                  _hide?.cancel();
+                                  try {
+                                    await widget.onMenu!(ctx, a, p);
+                                  } finally {
+                                    _pinned = false;
+                                    if (mounted) _later();
+                                  }
+                                },
+                        ),
+                      if (widget.onNew != null)
+                        _NewAgentTile(onTap: () {
                           _portal.hide();
-                          widget.onOpen(e.agent);
-                        },
-                        onMenu: widget.onMenu == null
-                            ? null
-                            : (ctx, a, p) async {
-                                _pinned = true;
-                                _hide?.cancel();
-                                try {
-                                  await widget.onMenu!(ctx, a, p);
-                                } finally {
-                                  _pinned = false;
-                                  if (mounted) _later();
-                                }
-                              },
-                      ),
-                    if (widget.onNew != null)
-                      _NewAgentTile(onTap: () {
-                        _portal.hide();
-                        widget.onNew!();
-                      }),
-                  ]),
+                          widget.onNew!();
+                        }),
+                    ]),
+                  ),
                 ),
               ),
             ),

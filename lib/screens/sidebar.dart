@@ -716,46 +716,76 @@ class SidebarState extends State<Sidebar> {
         (s.branch?.toLowerCase().contains(q) ?? false);
   }
 
-  Widget _settledGroup(List<SessionInfo> rows, {required bool mobile}) {
-    final open = _settledOpen || _filterQuery.trim().isNotEmpty;
-    final shown = rows;
-    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      HoverSurface(
-        radius: 8,
-        onTap: () => setState(() => _settledOpen = !_settledOpen),
-        child: Padding(
-          padding: mobile
-              ? const EdgeInsets.fromLTRB(4, 16, 4, 10)
-              : const EdgeInsets.fromLTRB(10, 10, 10, 10),
-          child: Row(children: [
-            AppIcon('archive', size: mobile ? 15 : 13, color: AppColors.fg4),
-            const SizedBox(width: 8),
-            Text('Settled',
-                style: sans(mobile ? 14 : 13,
-                    weight: W.label, color: AppColors.fg3)),
-            const SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 1),
-              decoration: BoxDecoration(
-                  color: AppColors.surface2,
-                  borderRadius: BorderRadius.circular(99)),
-              child: Text('${rows.length}',
-                  style: sans(mobile ? 12.5 : 11.5,
-                      color: AppColors.fg3, tabular: true)),
-            ),
-            const Spacer(),
-            AppIcon(open ? 'chevron-down' : 'chevron-right',
-                size: 13, color: AppColors.fg4),
-          ]),
-        ),
+  Widget _settledHeader(List<SessionInfo> rows,
+      {required bool mobile, required bool open}) {
+    return HoverSurface(
+      radius: 8,
+      onTap: () => setState(() => _settledOpen = !_settledOpen),
+      child: Padding(
+        padding: mobile
+            ? const EdgeInsets.fromLTRB(4, 16, 4, 10)
+            : const EdgeInsets.fromLTRB(10, 10, 10, 10),
+        child: Row(children: [
+          AppIcon('archive', size: mobile ? 15 : 13, color: AppColors.fg4),
+          const SizedBox(width: 8),
+          Text('Settled',
+              style: sans(mobile ? 14 : 13,
+                  weight: W.label, color: AppColors.fg3)),
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 1),
+            decoration: BoxDecoration(
+                color: AppColors.surface2,
+                borderRadius: BorderRadius.circular(99)),
+            child: Text('${rows.length}',
+                style: sans(mobile ? 12.5 : 11.5,
+                    color: AppColors.fg3, tabular: true)),
+          ),
+          const Spacer(),
+          AnimatedRotation(
+            turns: open ? 0.25 : 0,
+            duration: Motion.base,
+            curve: Curves.easeOutCubic,
+            child: AppIcon('chevron-right', size: 13, color: AppColors.fg4),
+          ),
+        ]),
       ),
-      if (open) ...[
-        for (var i = 0; i < shown.length; i++)
-          mobile
-              ? _mobileSessionRow(shown[i], divider: i + 1 < shown.length)
-              : _desktopChatRow(shown[i]),
-      ],
-    ]);
+    );
+  }
+
+  /// Grows and shrinks its child with the content kept visible while the size
+  /// eases, so expanding and collapsing reads as one motion.
+  Widget _reveal(bool show, Widget child) => Reveal(show: show, child: child);
+
+  /// [pinned] is the bottom bar shown while collapsed on desktop; otherwise
+  /// the group lives in the list (phones always, desktop once expanded).
+  Widget _settledGroup(List<SessionInfo> rows,
+      {required bool mobile, bool pinned = false}) {
+    final open = _settledOpen || _filterQuery.trim().isNotEmpty;
+    Widget list() =>
+        Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          for (var i = 0; i < rows.length; i++)
+            mobile
+                ? _mobileSessionRow(rows[i], divider: i + 1 < rows.length)
+                : _desktopChatRow(rows[i]),
+        ]);
+    if (pinned) {
+      return _reveal(!open, _settledHeader(rows, mobile: false, open: false));
+    }
+    if (mobile) {
+      return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        _settledHeader(rows, mobile: true, open: open),
+        _reveal(open, list()),
+      ]);
+    }
+    return _reveal(
+      open,
+      Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        const SizedBox(height: 32),
+        _settledHeader(rows, mobile: false, open: true),
+        list(),
+      ]),
+    );
   }
 
   Future<void> _setSettled(SessionInfo s, bool settle) async {
@@ -1051,19 +1081,17 @@ class SidebarState extends State<Sidebar> {
                       style: sans(12, weight: W.label, color: AppColors.fg4)),
                 ),
                 ...rows,
-                if (settledRows.isNotEmpty && settledOpen) ...[
-                  const SizedBox(height: 32),
+                if (settledRows.isNotEmpty)
                   _settledGroup(settledRows, mobile: false),
-                ],
               ],
             ],
           ),
         ),
       ),
-      if (hasClient && settledRows.isNotEmpty && !settledOpen)
+      if (hasClient && settledRows.isNotEmpty)
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 4),
-          child: _settledGroup(settledRows, mobile: false),
+          child: _settledGroup(settledRows, mobile: false, pinned: true),
         ),
       Container(
         decoration: BoxDecoration(

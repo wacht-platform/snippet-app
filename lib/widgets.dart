@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 export 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
@@ -173,11 +174,13 @@ void _openSessionLink(BuildContext context, Uri uri, String? text) {
   final id = Uri.decodeComponent(uri.path).trim();
   final client = DaemonScope.maybeOf(context) ?? DaemonScope.current;
   if (client == null || id.isEmpty) {
-    toast(context, 'Connect to the machine to open this session.', danger: true);
+    toast(context, 'Connect to the machine to open this session.',
+        danger: true);
     return;
   }
   final title = (text ?? '').trim();
-  final open = context.findAncestorWidgetOfExactType<SessionScreen>()?.onOpenSession;
+  final open =
+      context.findAncestorWidgetOfExactType<SessionScreen>()?.onOpenSession;
   if (open != null) {
     open(id, title, null);
     return;
@@ -198,7 +201,8 @@ void _openArtifactLink(BuildContext context, Uri uri) {
   final version = at > 0 ? int.tryParse(tail.substring(at + 1)) : null;
   final client = DaemonScope.maybeOf(context) ?? DaemonScope.current;
   if (client == null || id.isEmpty) {
-    toast(context, 'Connect to the machine to open this artifact.', danger: true);
+    toast(context, 'Connect to the machine to open this artifact.',
+        danger: true);
     return;
   }
   openArtifact(context,
@@ -225,7 +229,8 @@ MarkdownStyleSheet markdownStyle(BuildContext context) {
     strong: TS.body(AppColors.fg1).copyWith(fontWeight: weightFor(W.strong)),
     em: TS.body().copyWith(fontStyle: FontStyle.italic),
     a: TS.body(_linkColor).copyWith(
-        decoration: TextDecoration.underline, decorationColor: _linkColor.withValues(alpha: 0.5)),
+        decoration: TextDecoration.underline,
+        decorationColor: _linkColor.withValues(alpha: 0.5)),
     h1: TS.sectionTitle(),
     h1Padding: const EdgeInsets.only(top: S.s12, bottom: S.s4),
     h2: TS.rowTitle().copyWith(fontWeight: weightFor(W.strong)),
@@ -277,14 +282,17 @@ MarkdownStyleSheet agentMarkdownStyle(BuildContext context) {
     em: prose.copyWith(fontStyle: FontStyle.italic),
     a: prose.copyWith(
         color: _linkColor,
-        decoration: TextDecoration.underline, decorationColor: _linkColor.withValues(alpha: 0.5)),
+        decoration: TextDecoration.underline,
+        decorationColor: _linkColor.withValues(alpha: 0.5)),
     listBullet: prose.copyWith(color: AppColors.fg3),
     blockquote:
         prose.copyWith(color: AppColors.fg3, fontStyle: FontStyle.italic),
     code: kMobile
-        ? TS.code(Color.lerp(AppColors.fg1, AppColors.run, 0.3)).copyWith(
-            fontSize: 13.5, backgroundColor: AppColors.surface2)
-        : TS.code(AppColors.fg1)
+        ? TS
+            .code(Color.lerp(AppColors.fg1, AppColors.run, 0.3))
+            .copyWith(fontSize: 13.5, backgroundColor: AppColors.surface2)
+        : TS
+            .code(AppColors.fg1)
             .copyWith(fontSize: 13, backgroundColor: AppColors.surface1),
   );
   return _cachedAgentMarkdownStyle!;
@@ -324,7 +332,8 @@ MarkdownStyleSheet thinkingMarkdownStyle(BuildContext context) {
         .copyWith(fontStyle: FontStyle.italic),
     strong: sans(13, height: 1.45, color: dim, weight: W.label),
     a: sans(13, height: 1.45, color: _linkColor).copyWith(
-        decoration: TextDecoration.underline, decorationColor: _linkColor.withValues(alpha: 0.5)),
+        decoration: TextDecoration.underline,
+        decorationColor: _linkColor.withValues(alpha: 0.5)),
     h1: sans(kMobile ? 16 : 14, weight: W.label, height: 1.3, color: dim),
     h1Padding: const EdgeInsets.only(top: 4, bottom: 2),
     h2: sans(kMobile ? 14 : 13, weight: W.label, height: 1.3, color: dim),
@@ -778,6 +787,67 @@ class _PressableState extends State<Pressable> {
         duration: reduced ? Duration.zero : Motion.press,
         curve: Motion.enter,
         child: widget.child,
+      ),
+    );
+  }
+}
+
+/// Grows and shrinks [child] with its content visible while the size eases.
+/// The child leaves the tree once the collapse has finished.
+class Reveal extends StatefulWidget {
+  const Reveal({super.key, required this.show, required this.child});
+
+  final bool show;
+  final Widget child;
+
+  @override
+  State<Reveal> createState() => _RevealState();
+}
+
+class _RevealState extends State<Reveal> {
+  late bool _mounted = widget.show;
+  Timer? _unmount;
+
+  @override
+  void didUpdateWidget(Reveal old) {
+    super.didUpdateWidget(old);
+    if (widget.show == old.show) return;
+    _unmount?.cancel();
+    if (widget.show) {
+      _mounted = true;
+    } else {
+      _unmount = Timer(Motion.base + const Duration(milliseconds: 40), () {
+        if (mounted && !widget.show) setState(() => _mounted = false);
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _unmount?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final dur = reduceMotion(context) ? Duration.zero : Motion.base;
+    return AnimatedSize(
+      duration: dur,
+      curve: Curves.easeOutCubic,
+      alignment: Alignment.topCenter,
+      child: Align(
+        alignment: Alignment.topCenter,
+        heightFactor: widget.show ? 1 : 0,
+        child: !_mounted
+            ? const SizedBox(width: double.infinity)
+            : IgnorePointer(
+                ignoring: !widget.show,
+                child: AnimatedOpacity(
+                  opacity: widget.show ? 1 : 0,
+                  duration: dur == Duration.zero ? dur : Motion.fast,
+                  child: widget.child,
+                ),
+              ),
       ),
     );
   }
@@ -1329,7 +1399,8 @@ class Bubble extends StatelessWidget {
             selectable: false,
             styleSheet: markdownStyle(context),
             builders: {'pre': PreBlockBuilder()},
-            onTapLink: (txt, href, title) => openMarkdownLink(href, context, txt),
+            onTapLink: (txt, href, title) =>
+                openMarkdownLink(href, context, txt),
           )
         : null;
     final voice = <Widget>[
@@ -1399,48 +1470,48 @@ class Bubble extends StatelessWidget {
           : (box.maxWidth.isFinite ? box.maxWidth * 0.18 : 140.0)
               .clamp(24.0, 140.0);
       return Padding(
-      padding: EdgeInsets.only(left: inset, top: 4, bottom: 4),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          if (media != null)
-            for (final m in media) ...[
-              m,
-              const SizedBox(height: 6),
-            ],
-          if (shown.isNotEmpty)
-            Container(
-              padding: kMobile
-                  ? const EdgeInsets.fromLTRB(15, 10, 15, 11)
-                  : const EdgeInsets.fromLTRB(14, 9, 14, 10),
-              decoration: BoxDecoration(
-                color: AppColors.surface2,
-                borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(kMobile ? 20 : 16),
-                  topRight: Radius.circular(kMobile ? 20 : 16),
-                  bottomLeft: Radius.circular(kMobile ? 20 : 16),
-                  bottomRight: const Radius.circular(6),
+        padding: EdgeInsets.only(left: inset, top: 4, bottom: 4),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            if (media != null)
+              for (final m in media) ...[
+                m,
+                const SizedBox(height: 6),
+              ],
+            if (shown.isNotEmpty)
+              Container(
+                padding: kMobile
+                    ? const EdgeInsets.fromLTRB(15, 10, 15, 11)
+                    : const EdgeInsets.fromLTRB(14, 9, 14, 10),
+                decoration: BoxDecoration(
+                  color: AppColors.surface2,
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(kMobile ? 20 : 16),
+                    topRight: Radius.circular(kMobile ? 20 : 16),
+                    bottomLeft: Radius.circular(kMobile ? 20 : 16),
+                    bottomRight: const Radius.circular(6),
+                  ),
+                ),
+                child: DefaultTextStyle.merge(
+                  textWidthBasis: TextWidthBasis.longestLine,
+                  child: mineText,
                 ),
               ),
-              child: DefaultTextStyle.merge(
-                textWidthBasis: TextWidthBasis.longestLine,
-                child: mineText,
-              ),
-            ),
-          if (media == null || media.isEmpty) ...[
-            for (final v in voice) ...[
-              const SizedBox(height: 6),
-              v,
+            if (media == null || media.isEmpty) ...[
+              for (final v in voice) ...[
+                const SizedBox(height: 6),
+                v,
+              ],
+              for (final extra in extras) ...[
+                const SizedBox(height: 6),
+                extra,
+              ],
             ],
-            for (final extra in extras) ...[
-              const SizedBox(height: 6),
-              extra,
-            ],
+            ...pastedCards,
           ],
-          ...pastedCards,
-        ],
-      ),
-    );
+        ),
+      );
     });
   }
 }
@@ -1552,7 +1623,8 @@ class NoteLine extends StatelessWidget {
         child: Text(text,
             maxLines: 3,
             overflow: TextOverflow.ellipsis,
-            style: sans(kMobile ? 13 : 12.5, height: 1.4, color: AppColors.fg3)),
+            style:
+                sans(kMobile ? 13 : 12.5, height: 1.4, color: AppColors.fg3)),
       );
     }
     final limit = text.toLowerCase().contains('session limit') ||
@@ -1838,15 +1910,15 @@ class SnAppBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Theme.of(context); // Rebuild on theme change
-    final onBack = this.onBack != null &&
-            !kMobile &&
-            ShellPanelRoot.isRoot(context)
-        ? null
-        : this.onBack;
+    final onBack =
+        this.onBack != null && !kMobile && ShellPanelRoot.isRoot(context)
+            ? null
+            : this.onBack;
     final actions = ShellPanelRoot.inPanel(context)
         ? this
             .actions
-            .where((a) => !(a is IconBtn && ShellPanelRoot.hides(context, a.name, a.tooltip)))
+            .where((a) => !(a is IconBtn &&
+                ShellPanelRoot.hides(context, a.name, a.tooltip)))
             .toList()
         : this.actions;
     final repeats = subtitle == null &&
@@ -1905,15 +1977,15 @@ class SnAppBar extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 if (!repeats)
-                Text(title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: kMobile && (titleSize ?? 0) >= 22
-                        ? TS.pageTitle()
-                        : kMobile
-                            ? sans(titleSize ?? 18,
-                                spacing: -0.3, color: AppColors.fg1)
-                            : display(titleSize ?? 15)),
+                  Text(title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: kMobile && (titleSize ?? 0) >= 22
+                          ? TS.pageTitle()
+                          : kMobile
+                              ? sans(titleSize ?? 18,
+                                  spacing: -0.3, color: AppColors.fg1)
+                              : display(titleSize ?? 15)),
                 if (subtitle != null)
                   Text(subtitle!,
                       maxLines: 1,

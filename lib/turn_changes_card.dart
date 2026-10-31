@@ -78,51 +78,61 @@ class _TurnChangesCardState extends State<TurnChangesCard> {
                   const SizedBox(width: 10),
                   _Delta(_n(e['add']), _n(e['del']), size: 12.5),
                   const SizedBox(width: 6),
-                  AppIcon(_open ? 'chevron-down' : 'chevron-right',
-                      size: 13, color: AppColors.fg4),
+                  AnimatedRotation(
+                    turns: _open ? 0.25 : 0,
+                    duration: Motion.base,
+                    curve: Curves.easeOutCubic,
+                    child: AppIcon('chevron-right',
+                        size: 13, color: AppColors.fg4),
+                  ),
                 ]),
               ),
             ),
           ),
-          if (_open) ...[
-            for (final f in files)
-              InkWell(
-                onTap: widget.onOpenFile == null
-                    ? null
-                    : () => widget.onOpenFile!(f.path),
-                child: SizedBox(
-                  height: 32,
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(14, 0, 14, 0),
-                    child: Row(children: [
-                      FileGlyph(f.path.split('/').last, size: 15),
-                      const SizedBox(width: 10),
-                      Expanded(child: _Path(f.path)),
-                      const SizedBox(width: 10),
-                      _Bar(f.add, f.del, width: 28),
-                      const SizedBox(width: 10),
-                      SizedBox(
-                          width: 74,
-                          child: Align(
-                              alignment: Alignment.centerRight,
-                              child: _Delta(f.add, f.del, size: 12))),
-                    ]),
-                  ),
-                ),
-              ),
-            if (hidden > 0)
-              SizedBox(
-                height: 28,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(39, 0, 14, 0),
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text('+$hidden more files',
-                        style: sans(12, color: AppColors.fg4)),
-                  ),
-                ),
-              ),
-          ],
+          Reveal(
+            show: _open,
+            child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (final f in files)
+                    InkWell(
+                      onTap: widget.onOpenFile == null
+                          ? null
+                          : () => widget.onOpenFile!(f.path),
+                      child: SizedBox(
+                        height: 32,
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(14, 0, 14, 0),
+                          child: Row(children: [
+                            FileGlyph(f.path.split('/').last, size: 15),
+                            const SizedBox(width: 10),
+                            Expanded(child: _Path(f.path)),
+                            const SizedBox(width: 10),
+                            _Bar(f.add, f.del, width: 28),
+                            const SizedBox(width: 10),
+                            SizedBox(
+                                width: 74,
+                                child: Align(
+                                    alignment: Alignment.centerRight,
+                                    child: _Delta(f.add, f.del, size: 12))),
+                          ]),
+                        ),
+                      ),
+                    ),
+                  if (hidden > 0)
+                    SizedBox(
+                      height: 28,
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(39, 0, 14, 0),
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text('+$hidden more files',
+                              style: sans(12, color: AppColors.fg4)),
+                        ),
+                      ),
+                    ),
+                ]),
+          ),
         ]),
       ),
     );

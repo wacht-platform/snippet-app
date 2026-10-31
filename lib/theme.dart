@@ -160,9 +160,9 @@ ThemePreset _dark({
 final _amoled = _dark(
   name: 'amoled',
   label: 'Charcoal',
-  accent: const Color(0xFFFFFFFF),
-  accentFill: const Color(0xFFF2F2F2),
-  accentFillHover: const Color(0xFFD9D9D9),
+  accent: const Color(0xFFA78BFA),
+  accentFill: const Color(0xFFA78BFA),
+  accentFillHover: const Color(0xFFBBA5FB),
   ink: const Color(0xFFFFFFFF),
   inkMuted: const Color(0xFFDCDCDC),
   inkSubtle: const Color(0xFFABABAB),
@@ -172,8 +172,7 @@ final _amoled = _dark(
   warn: const Color(0xFFF59E0B),
 );
 
-// The theme in use on every platform: true black with white as the only
-// accent; colour is kept for status (amber, green, red).
+// The theme in use on every platform: true black with a violet accent; colour is kept for status (amber, green, red).
 const _emberCanvas = Color(0xFF0B0B0B);
 final _ember = ThemePreset(
   name: 'ember',
@@ -190,14 +189,14 @@ final _ember = ThemePreset(
   fg4: const Color(0xFF7A7A7A),
   border: const Color(0xFF222222),
   border2: const Color(0xFF303030),
-  accent: const Color(0xFFFFFFFF),
-  accentHover: const Color(0xFFE0E0E0),
-  accentFg: const Color(0xFF000000),
-  accentBg: const Color(0xFFFFFFFF).withValues(alpha: 0.10),
-  accentLine: const Color(0xFFFFFFFF).withValues(alpha: 0.30),
-  accentRing: const Color(0xFFFFFFFF).withValues(alpha: 0.40),
-  accentFill: const Color(0xFFF2F2F2),
-  accentFillHover: const Color(0xFFD9D9D9),
+  accent: const Color(0xFFA78BFA),
+  accentHover: const Color(0xFFBBA5FB),
+  accentFg: const Color(0xFF140E2E),
+  accentBg: const Color(0xFFA78BFA).withValues(alpha: 0.14),
+  accentLine: const Color(0xFFA78BFA).withValues(alpha: 0.38),
+  accentRing: const Color(0xFFA78BFA).withValues(alpha: 0.45),
+  accentFill: const Color(0xFFA78BFA),
+  accentFillHover: const Color(0xFFBBA5FB),
   ok: const Color(0xFF34D399),
   okBg: const Color(0xFF34D399).withValues(alpha: 0.13),
   run: const Color(0xFFF59E0B),
