@@ -152,6 +152,7 @@ class SidebarState extends State<Sidebar> {
   String? _providersFor;
 
   List<CoordinationAgent> _crew = const [];
+  bool _crewOpen = false;
   DateTime? _crewAt;
   Timer? _crewTimer;
 
@@ -966,21 +967,66 @@ class SidebarState extends State<Sidebar> {
                       ],
                     ),
                   ),
-                  Builder(
-                    builder: (ctx) => IconBtn('plus',
-                        size: 26,
-                        iconSize: 13,
-                        tooltip: 'New agent', onTap: () async {
-                      await _openCreateAgent(ctx);
-                      _crewAt = null;
-                      _loadCrew();
-                    }),
-                  ),
+                  if (_crew.isNotEmpty)
+                    Tooltip(
+                      message: _crewOpen ? 'Hide agents' : 'Show agents',
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(12),
+                        onTap: () => setState(() => _crewOpen = !_crewOpen),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 6),
+                          child: SizedBox(
+                            height: 22,
+                            width: 22.0 + 14 * (_crew.length.clamp(1, 4) - 1),
+                            child: Stack(children: [
+                              for (var i = 0; i < _crew.length && i < 4; i++)
+                                Positioned(
+                                  left: 14.0 * i,
+                                  child: Container(
+                                    width: 22,
+                                    height: 22,
+                                    alignment: Alignment.center,
+                                    decoration: BoxDecoration(
+                                        color: AppColors.bg,
+                                        shape: BoxShape.circle),
+                                    child: AgentMochi(_crew[i].id, size: 18),
+                                  ),
+                                ),
+                            ]),
+                          ),
+                        ),
+                      ),
+                    )
+                  else
+                    const SizedBox(width: 6),
                 ]),
               ),
             ),
           ),
         ),
+        if (widget.onOpenPalette != null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
+            child: Material(
+              color: AppColors.surface1,
+              borderRadius: BorderRadius.circular(8),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(8),
+                onTap: widget.onOpenPalette,
+                child: Container(
+                  height: 32,
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  child: Row(children: [
+                    Text('Search', style: sans(13, color: AppColors.fg4)),
+                    const Spacer(),
+                    Text(kMacOS ? '⌘K' : 'Ctrl K',
+                        style: mono(11, color: AppColors.fg4)),
+                  ]),
+                ),
+              ),
+            ),
+          ),
         if (widget.onOpenPalette == null)
           Padding(
             padding: const EdgeInsets.fromLTRB(8, 10, 8, 4),
@@ -1018,7 +1064,7 @@ class SidebarState extends State<Sidebar> {
               ]),
             ),
           ),
-        if (_crew.isNotEmpty)
+        if (_crew.isNotEmpty && _crewOpen)
           ConstrainedBox(
             constraints: const BoxConstraints(maxHeight: 280),
             child: SingleChildScrollView(
@@ -1036,6 +1082,29 @@ class SidebarState extends State<Sidebar> {
                     _loadCrew();
                   });
                 },
+              ),
+            ),
+          ),
+        if (_crewOpen)
+          Builder(
+            builder: (ctx) => Padding(
+              padding: const EdgeInsets.fromLTRB(8, 0, 8, 6),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(8),
+                onTap: () async {
+                  await _openCreateAgent(ctx);
+                  _crewAt = null;
+                  _loadCrew();
+                },
+                child: Container(
+                  height: 32,
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: Row(children: [
+                    AppIcon('plus', size: 14, color: AppColors.fg4),
+                    const SizedBox(width: 12),
+                    Text('New agent', style: sans(13, color: AppColors.fg3)),
+                  ]),
+                ),
               ),
             ),
           ),
