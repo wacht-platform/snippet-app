@@ -1247,6 +1247,8 @@ class SidebarState extends State<Sidebar> {
       AppIcon(s.isGit ? 'git-branch' : 'folder',
           size: size + 1, color: AppColors.fg4),
       const SizedBox(width: 5),
+      if (!s.isGit)
+        Text('No git repo', style: sans(size, color: AppColors.fg4)),
       if (branch.isNotEmpty)
         Flexible(
           child: Text(branch,
