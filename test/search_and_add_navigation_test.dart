@@ -154,7 +154,7 @@ void main() {
       // The filter sits under the header, always visible.
       await tester.enterText(_field('Search sessions'), 'Nonexistent');
       await tester.pumpAndSettle();
-      expect(find.text('No chats match the search.'), findsOneWidget);
+      expect(find.text('No matching sessions'), findsOneWidget);
       await tester.tap(find.byTooltip('Clear').first);
       await tester.pumpAndSettle();
       expect(find.text('Feature Setup'), findsOneWidget);
@@ -275,7 +275,7 @@ void main() {
       // Search for nonexistent chat
       await tester.enterText(_field('Search sessions'), 'Session Title 99');
       await tester.pumpAndSettle();
-      expect(find.text('No chats match the search.'), findsOneWidget);
+      expect(find.text('No matching sessions'), findsOneWidget);
       await tester.enterText(_field('Search sessions'), '');
       await tester.pumpAndSettle();
 
@@ -297,7 +297,7 @@ void main() {
       // Empty sessions
       await tester.pumpWidget(buildWidget([]));
       await tester.pumpAndSettle();
-      expect(find.text('No chats yet.'), findsOneWidget);
+      expect(find.text('No sessions yet'), findsOneWidget);
     } finally {
       debugDefaultTargetPlatformOverride = null;
     }

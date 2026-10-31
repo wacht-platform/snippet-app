@@ -693,6 +693,23 @@ class SidebarState extends State<Sidebar> {
     );
   }
 
+  Widget _emptySessions({bool searching = false}) => Padding(
+        padding: EdgeInsets.only(top: kMobile ? 72 : 32),
+        child: EmptyState(
+          icon: searching ? 'search' : 'chat',
+          title: searching ? 'No matching sessions' : 'No sessions yet',
+          body: searching
+              ? 'Nothing matches "${_filterQuery.trim()}". Try a title, project or branch.'
+              : 'Start one and it shows up here with its project, status and changes.',
+          action: searching || widget.client == null
+              ? null
+              : Btn('New session',
+                  icon: 'plus',
+                  small: !kMobile,
+                  onTap: widget.onNewSession),
+        ),
+      );
+
   bool _matchesQuery(SessionInfo s) {
     final q = _filterQuery.trim().toLowerCase();
     if (q.isEmpty) return true;
@@ -789,10 +806,7 @@ class SidebarState extends State<Sidebar> {
           padding: EdgeInsets.fromLTRB(
               kMobile ? M.gutter : 8, 2, kMobile ? M.gutter : 8, 32),
           children: [
-            Padding(
-                padding: const EdgeInsets.all(20),
-                child: Text('No chats yet.',
-                    textAlign: TextAlign.center, style: TS.meta())),
+            _emptySessions(),
           ]);
     }
     final mc = all.where((s) => isDedicatedMcSession(s.id)).toList();
@@ -833,15 +847,8 @@ class SidebarState extends State<Sidebar> {
         mobileChildren.add(_settledGroup(settledRows, mobile: true));
       }
       if (mobileChildren.isEmpty) {
-        mobileChildren.add(Padding(
-          padding: const EdgeInsets.all(20),
-          child: Text(
-              _filterQuery.trim().isNotEmpty
-                  ? 'No chats match the search.'
-                  : 'No chats yet.',
-              textAlign: TextAlign.center,
-              style: TS.meta()),
-        ));
+        mobileChildren
+            .add(_emptySessions(searching: _filterQuery.trim().isNotEmpty));
       }
       return PullToRefresh(
         onRefresh: () async => widget.onRefreshSessions(),
@@ -867,10 +874,7 @@ class SidebarState extends State<Sidebar> {
       }
     }
     if (list.isEmpty && mc.isEmpty && settledRows.isEmpty) {
-      children.add(Padding(
-          padding: const EdgeInsets.all(20),
-          child: Text('Nothing here.',
-              textAlign: TextAlign.center, style: TS.meta())));
+      children.add(_emptySessions());
     }
     final listView = ListView(
         padding: EdgeInsets.fromLTRB(
@@ -1062,9 +1066,7 @@ class SidebarState extends State<Sidebar> {
               if (!hasClient)
                 const SidebarEmpty('Add a machine to begin.')
               else if (list.isEmpty && settledRows.isEmpty)
-                SidebarEmpty(_filterQuery.trim().isNotEmpty
-                    ? 'No chats match the search.'
-                    : 'No chats yet.')
+                _emptySessions(searching: _filterQuery.trim().isNotEmpty)
               else ...[
                 ...rows,
                 if (settledRows.isNotEmpty)

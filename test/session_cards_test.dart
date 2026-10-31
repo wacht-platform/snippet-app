@@ -33,7 +33,8 @@ SessionInfo _s(String id, String title, String status,
       if (since != null) 'running_since': since,
     });
 
-Future<void> _pump(WidgetTester tester, Size size, TargetPlatform p) async {
+Future<void> _pump(WidgetTester tester, Size size, TargetPlatform p,
+    {List<SessionInfo>? sessions}) async {
   debugDefaultTargetPlatformOverride = p;
   tester.view.devicePixelRatio = 1;
   tester.view.physicalSize = size;
@@ -46,7 +47,7 @@ Future<void> _pump(WidgetTester tester, Size size, TargetPlatform p) async {
       active: null,
       client: _Client(),
       selectedSessionId: 'b',
-      sessions: [
+      sessions: sessions ?? [
         _s('a', 'Redo voice settings subpage', 'waiting_for_input',
             branch: 'main', changes: {'files': 4, 'added': 120, 'removed': 31}),
         _s('b', 'Richer session cards', 'running',
@@ -107,6 +108,19 @@ void main() {
       expect(find.text('+120'), findsOneWidget);
       await expectLater(find.byType(Sidebar),
           matchesGoldenFile('visual/goldens/session_cards_desktop.png'));
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
+
+  testWidgets('empty phone list offers to start a session', (tester) async {
+    try {
+      await _pump(tester, const Size(390, 700), TargetPlatform.android,
+          sessions: const []);
+      expect(find.text('No sessions yet'), findsOneWidget);
+      expect(find.text('New session'), findsOneWidget);
+      await expectLater(find.byType(Sidebar),
+          matchesGoldenFile('visual/goldens/session_list_empty.png'));
     } finally {
       debugDefaultTargetPlatformOverride = null;
     }
