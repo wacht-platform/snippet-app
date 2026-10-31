@@ -1127,6 +1127,9 @@ class CoordinationAgent {
   /// uses the session's own model.
   final String? profile;
 
+  /// Per-agent ceiling before compaction; null follows the model's window.
+  final int? maxContextTokens;
+
   CoordinationAgent.fromJson(Map<String, dynamic> j)
       : id = j['id'] as String? ?? '',
         color = j['color'] as String?,
@@ -1134,6 +1137,10 @@ class CoordinationAgent {
         profile = (j['profile'] as String?)?.trim().isEmpty ?? true
             ? null
             : (j['profile'] as String).trim(),
+        maxContextTokens = switch (j['max_context_tokens']) {
+          final num n when n > 0 => n.toInt(),
+          _ => null,
+        },
         fullName = j['display_name'] as String? ?? '',
         nickname = (j['nickname'] as String?)?.trim().isEmpty ?? true
             ? null
@@ -1393,6 +1400,20 @@ class RecurringJob {
       final h = (raw['hour'] as num?)?.toInt() ?? 0;
       final m = (raw['minute'] as num?)?.toInt() ?? 0;
       return 'daily ${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}';
+    }
+    if (kind == 'weekly') {
+      const names = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+      final mask = (raw['days'] as num?)?.toInt() ?? 0;
+      final days = [
+        for (var i = 0; i < 7; i++)
+          if (mask & (1 << i) != 0) names[i]
+      ];
+      final h = (raw['hour'] as num?)?.toInt() ?? 0;
+      final m = (raw['minute'] as num?)?.toInt() ?? 0;
+      final at =
+          '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}';
+      if (days.length == 5 && mask == 31) return 'weekdays $at';
+      return days.isEmpty ? 'weekly $at' : '${days.join(',')} $at';
     }
     if (kind == 'once') {
       final at = (raw['at'] as num?)?.toInt() ?? 0;

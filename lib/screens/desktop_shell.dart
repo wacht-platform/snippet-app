@@ -992,6 +992,12 @@ class _DesktopShellState extends State<DesktopShell>
           ['recurring', 'cron']
         ),
         (
+          SettingsPage.wakes,
+          'repeat',
+          'Settings: Wakes',
+          ['wake', 'keep warm', 'schedule', 'agents']
+        ),
+        (
           SettingsPage.vault,
           'lock-key',
           'Settings: Vault',

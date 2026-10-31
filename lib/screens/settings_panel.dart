@@ -25,6 +25,7 @@ import 'accounts_screen.dart';
 import '../motion.dart';
 import '../desktop_layout.dart';
 import 'memory_screen.dart';
+import 'wakes_screen.dart';
 
 /// Rows for the machine popover/sheet: live dot (re-pinged on open), label,
 /// host, trailing overflow. Pops itself before invoking any callback.
@@ -176,6 +177,7 @@ enum SettingsPage {
   usage,
   vault,
   scheduled,
+  wakes,
   voice,
   webSearch,
   accounts,
@@ -315,6 +317,7 @@ class SettingsPanelState extends State<SettingsPanel> {
         case SettingsPage.scheduled:
           _recurringKey.currentState?.add();
         case SettingsPage.usage:
+        case SettingsPage.wakes:
         case SettingsPage.memory:
         case SettingsPage.routing:
         case SettingsPage.voice:
@@ -332,6 +335,7 @@ class SettingsPanelState extends State<SettingsPanel> {
     (SettingsPage.usage, 'gauge', 'Usage'),
     (SettingsPage.memory, 'book-marked', 'Memory'),
     (SettingsPage.scheduled, 'calendar-clock', 'Scheduled'),
+    (SettingsPage.wakes, 'repeat', 'Wakes'),
     (SettingsPage.vault, 'lock', 'Vault'),
     (SettingsPage.voice, 'mic', 'Voice'),
     (SettingsPage.webSearch, 'globe', 'Web search'),
@@ -632,6 +636,8 @@ class SettingsPanelState extends State<SettingsPanel> {
           nav(SettingsPage.vault, 'Vault', 'Secrets for agents', 'lock'),
           nav(SettingsPage.scheduled, 'Scheduled', 'Recurring jobs',
               'calendar-clock'),
+          nav(SettingsPage.wakes, 'Wakes', 'Agent schedules and keep-warm',
+              'repeat'),
           nav(SettingsPage.voice, 'Voice', 'Voice notes and transcription',
               'mic'),
           nav(SettingsPage.webSearch, 'Web search', 'Let agents search the web',
@@ -702,6 +708,11 @@ class SettingsPanelState extends State<SettingsPanel> {
       SettingsPage.scheduled => RecurringScreen(
           client: widget.client,
           listOnly: true,
+          embedded: true,
+          onBack: back,
+        ),
+      SettingsPage.wakes => WakesScreen(
+          client: widget.client,
           embedded: true,
           onBack: back,
         ),
@@ -801,6 +812,7 @@ class SettingsPanelState extends State<SettingsPanel> {
         SettingsPage.usage => 'Usage',
         SettingsPage.vault => 'Vault',
         SettingsPage.scheduled => 'Scheduled',
+        SettingsPage.wakes => 'Wakes',
         SettingsPage.voice => 'Voice',
         SettingsPage.webSearch => 'Web search',
         SettingsPage.accounts => 'Accounts',
@@ -993,6 +1005,10 @@ class SettingsPanelState extends State<SettingsPanel> {
         ),
       SettingsPage.vault => VaultScreen(
           key: _vaultKey,
+          client: widget.client,
+          embedded: true,
+        ),
+      SettingsPage.wakes => WakesScreen(
           client: widget.client,
           embedded: true,
         ),

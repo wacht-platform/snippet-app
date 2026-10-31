@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import 'api.dart';
 import 'dialog_widgets.dart';
+import 'screens/agent_wake_panel.dart';
 import 'screens/mochi_color_picker.dart';
 import 'crew_status.dart';
 import 'mochi.dart';
@@ -485,6 +486,10 @@ Future<void> showCrewAgentMenu(
       appMenuItem(value: 'color', icon: 'sparkles', label: 'Change colour'),
       appMenuItem(value: 'model', icon: 'cpu', label: 'Change model'),
       appMenuItem(
+          value: 'wakes',
+          icon: 'calendar-clock',
+          label: 'Wakes and reporting'),
+      appMenuItem(
           value: 'delete', icon: 'trash', label: 'Delete agent', danger: true),
     ],
   );
@@ -506,6 +511,14 @@ Future<void> showCrewAgentMenu(
     }
   } else if (picked == 'color') {
     await showMochiColorPicker(context, client, agent.id, name, point: point);
+  } else if (picked == 'wakes') {
+    await showAgentWakeSettings(context,
+        client: client,
+        owner: agent.id,
+        name: name,
+        agent: agent,
+        point: point,
+        onChanged: onDeleted);
   } else if (picked == 'model') {
     await _pickCrewModel(context, client, agent, name, point, onDeleted);
   } else if (picked == 'delete') {

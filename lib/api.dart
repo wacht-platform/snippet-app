@@ -11,6 +11,7 @@ import 'response_cache.dart';
 import 'swr.dart';
 import 'mochi.dart';
 import 'models.dart';
+import 'wake_models.dart';
 import 'github_models.dart';
 
 class DownloadCancelled implements Exception {
@@ -1525,6 +1526,105 @@ class DaemonClient {
         headers: _json,
         body: jsonEncode({'profile': profile}));
     if (r.statusCode != 200) throw _err('set agent model', r);
+  }
+
+  /// POST /agents/{id}/context — the agent's context ceiling before compaction.
+  /// Null clears it back to the model's own window; the daemon refuses less
+  /// than 16000.
+  Future<void> setAgentContext(String agentId, int? maxContextTokens) async {
+    final r = await http.post(
+        _uri('/agents/${Uri.encodeComponent(agentId)}/context'),
+        headers: _json,
+        body: jsonEncode({
+          'max_context_tokens':
+              (maxContextTokens ?? 0) <= 0 ? null : maxContextTokens
+        }));
+    if (r.statusCode != 200) throw _err('set context length', r);
+  }
+
+  String _ownerPath(String prefix, String owner) =>
+      '$prefix/${owner.split('/').map(Uri.encodeComponent).join('/')}';
+
+  /// GET /wakes — every wake schedule with the daemon's limits.
+  Future<WakeList> wakes() async {
+    final r = await http.get(_uri('/wakes'));
+    if (r.statusCode != 200) throw _err('list wakes', r);
+    return WakeList.fromJson(jsonDecode(r.body) as Map<String, dynamic>);
+  }
+
+  /// GET /wakes/{owner} — null when the owner has no wake schedule.
+  Future<WakeSchedule?> wake(String owner) async {
+    final r = await http.get(_uri(_ownerPath('/wakes', owner)));
+    if (r.statusCode == 404) return null;
+    if (r.statusCode != 200) throw _err('read wake', r);
+    return WakeSchedule.fromJson(jsonDecode(r.body) as Map<String, dynamic>);
+  }
+
+  /// PUT /wakes/{owner}. Only the keys in [body] change; see [wakeBody].
+  Future<WakeSchedule> setWake(String owner, Map<String, dynamic> body) async {
+    final r = await http.put(_uri(_ownerPath('/wakes', owner)),
+        headers: _json, body: jsonEncode(body));
+    if (r.statusCode != 200) throw _err('save wake', r);
+    return WakeSchedule.fromJson(jsonDecode(r.body) as Map<String, dynamic>);
+  }
+
+  /// DELETE /wakes/{owner}.
+  Future<void> clearWake(String owner) async {
+    final r = await http.delete(_uri(_ownerPath('/wakes', owner)));
+    if (r.statusCode != 200 && r.statusCode != 404) {
+      throw _err('clear wake', r);
+    }
+  }
+
+  /// GET /wake-runs — recent wake runs, newest first.
+  Future<List<WakeRun>> wakeRuns({String? owner, int limit = 10}) async {
+    final r = await http.get(_uri('/wake-runs', {
+      if (owner != null && owner.isNotEmpty) 'owner': owner,
+      'limit': '$limit',
+    }));
+    if (r.statusCode != 200) throw _err('list wake runs', r);
+    final body = jsonDecode(r.body) as Map<String, dynamic>;
+    return [
+      for (final e in (body['runs'] as List?) ?? const [])
+        if (e is Map<String, dynamic>) WakeRun.fromJson(e)
+    ];
+  }
+
+  /// GET /keep-warm — every keep-warm entry, the limits and last week's spend.
+  Future<KeepWarmList> keepWarm() async {
+    final r = await http.get(_uri('/keep-warm'));
+    if (r.statusCode != 200) throw _err('list keep-warm', r);
+    return KeepWarmList.fromJson(jsonDecode(r.body) as Map<String, dynamic>);
+  }
+
+  /// GET /keep-warm/{owner} — null when none is set.
+  Future<KeepWarmEntry?> keepWarmFor(String owner) async {
+    final r = await http.get(_uri(_ownerPath('/keep-warm', owner)));
+    if (r.statusCode == 404) return null;
+    if (r.statusCode != 200) throw _err('read keep-warm', r);
+    return KeepWarmEntry.fromJson(jsonDecode(r.body) as Map<String, dynamic>);
+  }
+
+  /// PUT /keep-warm/{owner}.
+  Future<KeepWarmEntry> setKeepWarm(String owner,
+      {required bool enabled, int? intervalMinutes, int? maxIdleHours}) async {
+    final r = await http.put(_uri(_ownerPath('/keep-warm', owner)),
+        headers: _json,
+        body: jsonEncode({
+          'enabled': enabled,
+          if (intervalMinutes != null) 'interval_minutes': intervalMinutes,
+          if (maxIdleHours != null) 'max_idle_hours': maxIdleHours,
+        }));
+    if (r.statusCode != 200) throw _err('save keep-warm', r);
+    return KeepWarmEntry.fromJson(jsonDecode(r.body) as Map<String, dynamic>);
+  }
+
+  /// DELETE /keep-warm/{owner}.
+  Future<void> clearKeepWarm(String owner) async {
+    final r = await http.delete(_uri(_ownerPath('/keep-warm', owner)));
+    if (r.statusCode != 200 && r.statusCode != 404) {
+      throw _err('clear keep-warm', r);
+    }
   }
 
   /// GET /agents/{id}/board — this agent's coordination memory, newest first.
