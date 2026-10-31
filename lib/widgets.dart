@@ -804,6 +804,8 @@ class Reveal extends StatefulWidget {
   State<Reveal> createState() => _RevealState();
 }
 
+const _revealSize = Duration(milliseconds: 340);
+
 class _RevealState extends State<Reveal> {
   late bool _mounted = widget.show;
   Timer? _unmount;
@@ -816,7 +818,7 @@ class _RevealState extends State<Reveal> {
     if (widget.show) {
       _mounted = true;
     } else {
-      _unmount = Timer(Motion.base + const Duration(milliseconds: 40), () {
+      _unmount = Timer(_revealSize + const Duration(milliseconds: 40), () {
         if (mounted && !widget.show) setState(() => _mounted = false);
       });
     }
@@ -830,10 +832,10 @@ class _RevealState extends State<Reveal> {
 
   @override
   Widget build(BuildContext context) {
-    final dur = reduceMotion(context) ? Duration.zero : Motion.base;
+    final dur = reduceMotion(context) ? Duration.zero : _revealSize;
     return AnimatedSize(
       duration: dur,
-      curve: Curves.easeOutCubic,
+      curve: Curves.easeInOutCubic,
       alignment: Alignment.topCenter,
       child: Align(
         alignment: Alignment.topCenter,
@@ -844,7 +846,8 @@ class _RevealState extends State<Reveal> {
                 ignoring: !widget.show,
                 child: AnimatedOpacity(
                   opacity: widget.show ? 1 : 0,
-                  duration: dur == Duration.zero ? dur : Motion.fast,
+                  duration: dur == Duration.zero ? dur : Motion.base,
+                  curve: Curves.easeOut,
                   child: widget.child,
                 ),
               ),

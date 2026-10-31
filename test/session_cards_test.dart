@@ -164,4 +164,32 @@ void main() {
       debugDefaultTargetPlatformOverride = null;
     }
   });
+
+  testWidgets('mobile Settled animates open', (tester) async {
+    try {
+      final settled = SessionInfo.fromJson({
+        'id': 'z',
+        'title': 'Old chat',
+        'settled': true,
+        'settled_at': _now - 3600,
+        'last_active': _now - 90000,
+      });
+      await _pump(tester, const Size(390, 700), TargetPlatform.android,
+          sessions: [_s('a', 'Live chat', 'idle'), settled]);
+      final box = tester.renderObject<RenderBox>(find
+          .ancestor(of: find.text('Old chat'), matching: find.byType(AnimatedSize))
+          .first);
+      final full = box.size.height;
+      expect(full, greaterThan(0));
+      await tester.tap(find.text('Settled'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 80));
+      final mid = box.size.height;
+      expect(mid, inExclusiveRange(0, full));
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(find.text('Old chat'), findsNothing);
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
 }
