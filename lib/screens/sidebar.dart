@@ -1009,28 +1009,6 @@ class SidebarState extends State<Sidebar> {
             ),
           ),
         ),
-        if (widget.onOpenPalette != null)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
-            child: Material(
-              color: AppColors.surface1,
-              borderRadius: BorderRadius.circular(8),
-              child: InkWell(
-                borderRadius: BorderRadius.circular(8),
-                onTap: widget.onOpenPalette,
-                child: Container(
-                  height: 32,
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
-                  child: Row(children: [
-                    Text('Search', style: sans(13, color: AppColors.fg4)),
-                    const Spacer(),
-                    Text(kMacOS ? '⌘K' : 'Ctrl K',
-                        style: mono(11, color: AppColors.fg4)),
-                  ]),
-                ),
-              ),
-            ),
-          ),
         if (widget.onOpenPalette == null)
           Padding(
             padding: const EdgeInsets.fromLTRB(8, 10, 8, 4),
@@ -1081,6 +1059,11 @@ class SidebarState extends State<Sidebar> {
               else if (list.isEmpty && settledRows.isEmpty)
                 _emptySessions(searching: _filterQuery.trim().isNotEmpty)
               else ...[
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(10, 10, 10, 4),
+                  child: Text('Sessions',
+                      style: sans(12, weight: W.label, color: AppColors.fg4)),
+                ),
                 ...rows,
                 if (settledRows.isNotEmpty && settledOpen)
                   _settledGroup(settledRows, mobile: false),

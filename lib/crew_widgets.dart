@@ -626,18 +626,31 @@ class _CrewRow extends StatelessWidget {
             ? null
             : (d) => onMenu!(context, e.agent, d.globalPosition),
         child: Container(
-          height: 34,
-          padding: const EdgeInsets.symmetric(horizontal: 8),
+          height: 52,
+          padding: const EdgeInsets.symmetric(horizontal: 14),
           child: Row(children: [
             Opacity(
-                opacity: idle ? .7 : 1,
-                child: AgentMochi(e.agent.id, size: 20)),
-            const SizedBox(width: 10),
+                opacity: idle ? .8 : 1,
+                child: AgentMochi(e.agent.id, size: 30)),
+            const SizedBox(width: 12),
             Expanded(
-              child: Text(e.agent.displayName,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: sans(13, color: idle ? AppColors.fg3 : AppColors.fg1)),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(e.agent.displayName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: sans(14,
+                          weight: W.label,
+                          color: idle ? AppColors.fg2 : AppColors.fg1)),
+                  if (e.line.isNotEmpty)
+                    Text(e.line,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: sans(12, color: idle ? AppColors.fg4 : c)),
+                ],
+              ),
             ),
             if (!idle)
               Container(
@@ -704,11 +717,11 @@ class _CrewStackState extends State<CrewStack> {
         controller: _portal,
         overlayChildBuilder: (_) => CompositedTransformFollower(
           link: _link,
-          targetAnchor: Alignment.bottomRight,
-          followerAnchor: Alignment.topRight,
-          offset: const Offset(0, 4),
+          targetAnchor: Alignment.topRight,
+          followerAnchor: Alignment.topLeft,
+          offset: const Offset(14, -6),
           child: Align(
-            alignment: Alignment.topRight,
+            alignment: Alignment.topLeft,
             child: MouseRegion(
               onEnter: (_) => _show(),
               onExit: (_) => _later(),
@@ -717,8 +730,8 @@ class _CrewStackState extends State<CrewStack> {
                 borderRadius: BorderRadius.circular(12),
                 elevation: 0,
                 child: Container(
-                  width: 232,
-                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  width: 300,
+                  padding: const EdgeInsets.symmetric(vertical: 8),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: AppColors.lineStrong),
