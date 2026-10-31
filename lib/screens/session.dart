@@ -735,6 +735,7 @@ class _SessionScreenState extends State<SessionScreen>
   }
 
   bool _isGitSession = false;
+  bool _typedCompact = false;
 
   void _loadSettled() {
     if (_isMissionControl) return;
