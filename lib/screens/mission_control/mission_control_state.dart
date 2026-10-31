@@ -479,11 +479,15 @@ class DirectMessage {
     required this.fromKind,
     required this.body,
     this.isReply = false,
+    this.messageKind = '',
+    this.urgent = false,
   });
   final String threadId;
   final String fromId;
   final String fromKind;
   final String body;
+  final String messageKind;
+  final bool urgent;
 
   /// True when this is an ANSWER to a question this session asked, rather than
   /// a message addressed to this session's agent. The two read differently.
@@ -521,6 +525,8 @@ DirectMessage? parseDirectMessage(String text) {
     fromId: field('from'),
     fromKind: field('from_kind'),
     body: body,
+    messageKind: field('kind'),
+    urgent: field('urgency').startsWith('urgent'),
   );
 }
 

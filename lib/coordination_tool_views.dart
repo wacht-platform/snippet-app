@@ -67,6 +67,12 @@ String _statusTitle(String status) {
   return t.isEmpty ? t : '${t[0].toUpperCase()}${t.substring(1)}';
 }
 
+String _typedTag(String kind, String urgency) {
+  final k = kind.replaceAll('_', ' ');
+  if (urgency == 'urgent' && k != 'interrupt') return k.isEmpty ? 'urgent' : '$k, urgent';
+  return k;
+}
+
 String _count(int n, String one, String many) => '$n ${n == 1 ? one : many}';
 
 /// The (verb, object) sentence for a Mission Control or coordination tool, or
@@ -147,16 +153,20 @@ String _count(int n, String one, String many) => '$n ${n == 1 ? one : many}';
     case 'send_agent_message':
       final to = [arg('to'), arg('agent_id'), arg('recipient'), arg('peer_id')]
           .firstWhere((v) => v.isNotEmpty, orElse: () => '');
+      final tag = _typedTag(arg('kind'), arg('urgency'));
       return to.isEmpty
-          ? (running ? 'Messaging an agent' : 'Messaged an agent', '')
-          : (running ? 'Messaging' : 'Messaged', to);
+          ? (running ? 'Messaging an agent' : 'Messaged an agent', tag)
+          : (running ? 'Messaging' : 'Messaged', tag.isEmpty ? to : '$to · $tag');
     case 'post_coordination_message':
       return (
         running ? 'Posting to the coordination thread' : 'Posted to the coordination thread',
         ''
       );
     case 'post_task_coordination':
-      return (running ? 'Posting to the task thread' : 'Posted to the task thread', '');
+      return (
+        running ? 'Posting to the task thread' : 'Posted to the task thread',
+        _typedTag(arg('kind'), arg('urgency'))
+      );
     case 'message_mission_control':
       return (running ? 'Messaging Mission Control' : 'Messaged Mission Control', '');
     case 'record_coordination_note':

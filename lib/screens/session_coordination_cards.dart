@@ -363,11 +363,15 @@ class DirectMessageCard extends StatelessWidget {
         footer: 'Starts once claimed; the agent can also ask or decline',
       );
     }
+    final typed = message.messageKind.replaceAll('_', ' ');
+    final label = typed.isEmpty ? '' : '${typed[0].toUpperCase()}${typed.substring(1)}';
     return _ThreadCard(
       icon: message.isReply ? 'corner-down-right' : 'message',
-      tone: Tone.accent,
+      tone: message.urgent ? Tone.danger : Tone.accent,
       kind: message.isReply ? 'Reply from $who' : 'Message from $who',
-      status: message.isReply ? 'Reply' : 'Message',
+      status: message.urgent
+          ? (label.isEmpty ? 'Urgent' : '$label, urgent')
+          : (label.isNotEmpty ? label : (message.isReply ? 'Reply' : 'Message')),
       body: message.body,
     );
   }
