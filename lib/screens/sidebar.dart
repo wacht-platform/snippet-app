@@ -711,14 +711,13 @@ class SidebarState extends State<Sidebar> {
               ? const EdgeInsets.fromLTRB(4, 16, 4, 10)
               : const EdgeInsets.fromLTRB(8, 14, 6, 6),
           child: Row(children: [
-            AppIcon(open ? 'chevron-down' : 'chevron-right',
-                size: 13, color: AppColors.fg4),
-            const SizedBox(width: 6),
             Text(mobile ? 'Settled' : 'SETTLED',
                 style: mobile
                     ? sans(13, color: AppColors.fg3)
                     : sans(11, color: AppColors.fg4, spacing: 0.9)),
-            const SizedBox(width: 8),
+            const SizedBox(width: 10),
+            Expanded(child: Container(height: 1, color: AppColors.line)),
+            const SizedBox(width: 10),
             Text('${rows.length}',
                 style: sans(mobile ? 13 : 11.5,
                     color: AppColors.fg4, tabular: true)),
