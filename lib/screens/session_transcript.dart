@@ -466,7 +466,6 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
                         client: widget.client, path: full, name: name);
                   }
                 },
-                onOpenAll: () => _performMacAction('file_changes'),
               ));
         case 'file_presented':
           endTools(key);

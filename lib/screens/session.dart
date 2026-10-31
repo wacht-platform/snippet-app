@@ -760,21 +760,39 @@ class _SessionScreenState extends State<SessionScreen>
   Widget _settledNotice() => Container(
         margin: EdgeInsets.fromLTRB(
             kMobile ? M.gutter : 20, 6, kMobile ? M.gutter : 20, 0),
-        padding: const EdgeInsets.fromLTRB(12, 4, 4, 4),
+        padding: const EdgeInsets.fromLTRB(10, 8, 8, 8),
         decoration: BoxDecoration(
           color: AppColors.surface1,
-          borderRadius: BorderRadius.circular(R.sm),
-          border: Border.all(color: AppColors.line),
+          borderRadius: BorderRadius.circular(12),
         ),
         child: Row(children: [
+          Container(
+            width: 30,
+            height: 30,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+                color: AppColors.surface3,
+                borderRadius: BorderRadius.circular(9)),
+            child: AppIcon('archive', size: 15, color: AppColors.fg2),
+          ),
+          const SizedBox(width: 10),
           Expanded(
-            child: Text('Settled to save tokens. Sending a message wakes it.',
-                style: sans(12.5, color: AppColors.fg3)),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('Settled',
+                    style: sans(13, weight: W.label, color: AppColors.fg1)),
+                Text('Parked to save tokens. A message wakes it.',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: sans(12, color: AppColors.fg4)),
+              ],
+            ),
           ),
-          TextButton(
-            onPressed: _wake,
-            child: Text('Wake', style: sans(12.5, color: AppColors.accent)),
-          ),
+          const SizedBox(width: 8),
+          Btn('Wake',
+              small: true, variant: BtnVariant.secondary, onTap: _wake),
         ]),
       );
 

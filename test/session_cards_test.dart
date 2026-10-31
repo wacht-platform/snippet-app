@@ -149,6 +149,8 @@ void main() {
       await tester.pump(const Duration(milliseconds: 400));
       expect(find.text('Old chat'), findsOneWidget);
       expect(tester.getTopLeft(find.text('Settled').first).dy, lessThan(header));
+      await expectLater(find.byType(Sidebar),
+          matchesGoldenFile('visual/goldens/session_settled_desktop.png'));
     } finally {
       debugDefaultTargetPlatformOverride = null;
     }

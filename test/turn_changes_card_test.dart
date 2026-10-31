@@ -9,13 +9,11 @@ void main() {
     tester.view.physicalSize = const Size(390, 500);
     addTearDown(tester.view.reset);
     final opened = <String>[];
-    var all = 0;
     await tester.pumpWidget(MaterialApp(
       theme: buildAppTheme(),
       home: Scaffold(
         body: TurnChangesCard(
             onOpenFile: opened.add,
-            onOpenAll: () => all++,
             event: {
           'kind': 'turn_changes',
           'total_files': 6,
@@ -37,8 +35,6 @@ void main() {
     expect(find.textContaining('file5.dart'), findsOneWidget);
     await tester.tap(find.textContaining('file2.dart'));
     expect(opened, ['lib/screens/file2.dart']);
-    await tester.tap(find.text('View all changes'));
-    expect(all, 1);
     await tester.pump();
     await expectLater(find.byType(TurnChangesCard),
         matchesGoldenFile('visual/goldens/turn_changes_card.png'));

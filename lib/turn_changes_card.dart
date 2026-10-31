@@ -11,12 +11,10 @@ class TurnChangesCard extends StatefulWidget {
     super.key,
     required this.event,
     this.onOpenFile,
-    this.onOpenAll,
   });
 
   final Map<String, dynamic> event;
   final void Function(String path)? onOpenFile;
-  final VoidCallback? onOpenAll;
 
   @override
   State<TurnChangesCard> createState() => _TurnChangesCardState();
@@ -112,21 +110,15 @@ class _TurnChangesCardState extends State<TurnChangesCard> {
                   ),
                 ),
               ),
-            if (hidden > 0 || widget.onOpenAll != null)
-              InkWell(
-                onTap: widget.onOpenAll,
-                child: SizedBox(
-                  height: 30,
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(39, 0, 14, 0),
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                          hidden > 0
-                              ? '$hidden more · view all changes'
-                              : 'View all changes',
-                          style: sans(12, color: AppColors.fg3)),
-                    ),
+            if (hidden > 0)
+              SizedBox(
+                height: 28,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(39, 0, 14, 0),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text('+$hidden more files',
+                        style: sans(12, color: AppColors.fg4)),
                   ),
                 ),
               ),

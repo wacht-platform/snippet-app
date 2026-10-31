@@ -720,27 +720,31 @@ class SidebarState extends State<Sidebar> {
     final open = _settledOpen || _filterQuery.trim().isNotEmpty;
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       InkWell(
+        borderRadius: BorderRadius.circular(8),
         onTap: () => setState(() => _settledOpen = !_settledOpen),
         child: Padding(
           padding: mobile
               ? const EdgeInsets.fromLTRB(4, 16, 4, 10)
               : const EdgeInsets.fromLTRB(10, 10, 10, 10),
           child: Row(children: [
-            if (!mobile) ...[
-              AppIcon(open ? 'chevron-down' : 'chevron-right',
-                  size: 12, color: AppColors.fg4),
-              const SizedBox(width: 6),
-            ],
-            Text('Settled', style: sans(13, color: AppColors.fg3)),
-            const SizedBox(width: 10),
-            Expanded(
-                child: mobile
-                    ? Container(height: 1, color: AppColors.line)
-                    : const SizedBox.shrink()),
-            const SizedBox(width: 10),
-            Text('${rows.length}',
-                style: sans(mobile ? 13 : 11.5,
-                    color: AppColors.fg4, tabular: true)),
+            AppIcon('archive', size: mobile ? 15 : 13, color: AppColors.fg4),
+            const SizedBox(width: 8),
+            Text('Settled',
+                style: sans(mobile ? 14 : 13,
+                    weight: W.label, color: AppColors.fg3)),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 1),
+              decoration: BoxDecoration(
+                  color: AppColors.surface2,
+                  borderRadius: BorderRadius.circular(99)),
+              child: Text('${rows.length}',
+                  style: sans(mobile ? 12.5 : 11.5,
+                      color: AppColors.fg3, tabular: true)),
+            ),
+            const Spacer(),
+            AppIcon(open ? 'chevron-down' : 'chevron-right',
+                size: 13, color: AppColors.fg4),
           ]),
         ),
       ),
@@ -1222,8 +1226,9 @@ class SidebarState extends State<Sidebar> {
     final settled = s.settled;
     final running = !settled && sessionIsActive(s.status);
     final waiting = !settled && s.status == 'waiting_for_input';
+    final left = settled ? settledDaysLeft(s) : null;
     final (String text, Color color, bool pill) = settled
-        ? ('Settled', AppColors.fg4, false)
+        ? (left == null ? 'Settled' : '${left}d left', AppColors.fg4, false)
         : waiting
             ? ('Input', AppColors.run, true)
             : running
