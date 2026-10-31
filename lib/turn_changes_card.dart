@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'file_icons.dart';
 import 'theme.dart';
 import 'widgets.dart';
 
@@ -55,19 +56,32 @@ class _TurnChangesCardState extends State<TurnChangesCard> {
           InkWell(
             onTap: () => setState(() => _open = !_open),
             child: SizedBox(
-              height: 36,
+              height: 46,
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 10),
                 child: Row(children: [
-                  AppIcon(_open ? 'chevron-down' : 'chevron-right',
-                      size: 12, color: AppColors.fg4),
-                  const SizedBox(width: 8),
+                  Container(
+                    width: 28,
+                    height: 28,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                        color: AppColors.surface3,
+                        borderRadius: BorderRadius.circular(8)),
+                    child: AppIcon('file-diff', size: 15, color: AppColors.fg2),
+                  ),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: Text(
                         '$total ${total == 1 ? 'file' : 'files'} changed',
-                        style: sans(13, color: AppColors.fg2)),
+                        style:
+                            sans(13.5, weight: W.label, color: AppColors.fg1)),
                   ),
+                  _Bar(_n(e['add']), _n(e['del']), width: 44),
+                  const SizedBox(width: 10),
                   _Delta(_n(e['add']), _n(e['del']), size: 12.5),
+                  const SizedBox(width: 6),
+                  AppIcon(_open ? 'chevron-down' : 'chevron-right',
+                      size: 13, color: AppColors.fg4),
                 ]),
               ),
             ),
@@ -79,13 +93,21 @@ class _TurnChangesCardState extends State<TurnChangesCard> {
                     ? null
                     : () => widget.onOpenFile!(f.path),
                 child: SizedBox(
-                  height: 28,
+                  height: 32,
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(32, 0, 12, 0),
+                    padding: const EdgeInsets.fromLTRB(14, 0, 14, 0),
                     child: Row(children: [
+                      FileGlyph(f.path.split('/').last, size: 15),
+                      const SizedBox(width: 10),
                       Expanded(child: _Path(f.path)),
                       const SizedBox(width: 10),
-                      _Delta(f.add, f.del, size: 12),
+                      _Bar(f.add, f.del, width: 28),
+                      const SizedBox(width: 10),
+                      SizedBox(
+                          width: 74,
+                          child: Align(
+                              alignment: Alignment.centerRight,
+                              child: _Delta(f.add, f.del, size: 12))),
                     ]),
                   ),
                 ),
@@ -96,7 +118,7 @@ class _TurnChangesCardState extends State<TurnChangesCard> {
                 child: SizedBox(
                   height: 30,
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(32, 0, 12, 0),
+                    padding: const EdgeInsets.fromLTRB(39, 0, 14, 0),
                     child: Align(
                       alignment: Alignment.centerLeft,
                       child: Text(
@@ -153,5 +175,35 @@ class _Delta extends StatelessWidget {
         Text('-$del',
             style: sans(size, color: AppColors.danger, tabular: true)),
     ]);
+  }
+}
+
+class _Bar extends StatelessWidget {
+  const _Bar(this.add, this.del, {required this.width});
+
+  final int add;
+  final int del;
+  final double width;
+
+  @override
+  Widget build(BuildContext context) {
+    final total = add + del;
+    if (total == 0) return SizedBox(width: width);
+    final share = (add / total).clamp(0.0, 1.0);
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(2),
+      child: SizedBox(
+        width: width,
+        height: 4,
+        child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Expanded(
+              flex: (share * 100).round().clamp(1, 99),
+              child: ColoredBox(color: AppColors.ok)),
+          Expanded(
+              flex: ((1 - share) * 100).round().clamp(1, 99),
+              child: ColoredBox(color: AppColors.danger)),
+        ]),
+      ),
+    );
   }
 }

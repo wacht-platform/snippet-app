@@ -152,7 +152,6 @@ class SidebarState extends State<Sidebar> {
   String? _providersFor;
 
   List<CoordinationAgent> _crew = const [];
-  bool _crewOpen = false;
   DateTime? _crewAt;
   Timer? _crewTimer;
 
@@ -725,7 +724,7 @@ class SidebarState extends State<Sidebar> {
         child: Padding(
           padding: mobile
               ? const EdgeInsets.fromLTRB(4, 16, 4, 10)
-              : const EdgeInsets.fromLTRB(14, 10, 16, 10),
+              : const EdgeInsets.fromLTRB(10, 10, 10, 10),
           child: Row(children: [
             if (!mobile) ...[
               AppIcon(open ? 'chevron-down' : 'chevron-right',
@@ -968,31 +967,36 @@ class SidebarState extends State<Sidebar> {
                     ),
                   ),
                   if (_crew.isNotEmpty)
-                    Tooltip(
-                      message: _crewOpen ? 'Hide agents' : 'Show agents',
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(12),
-                        onTap: () => setState(() => _crewOpen = !_crewOpen),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 6),
-                          child: SizedBox(
-                            height: 22,
-                            width: 22.0 + 14 * (_crew.length.clamp(1, 4) - 1),
-                            child: Stack(children: [
-                              for (var i = 0; i < _crew.length && i < 4; i++)
-                                Positioned(
-                                  left: 14.0 * i,
-                                  child: Container(
-                                    width: 22,
-                                    height: 22,
-                                    alignment: Alignment.center,
-                                    decoration: BoxDecoration(
-                                        color: AppColors.bg,
-                                        shape: BoxShape.circle),
-                                    child: AgentMochi(_crew[i].id, size: 18),
-                                  ),
-                                ),
+                    CrewStack(
+                      entries: deriveCrew(
+                          _crew, widget.sessions ?? const <SessionInfo>[]),
+                      onOpen: (a) => widget.onOpenAgent?.call(a),
+                      onMenu: (ctx, agent, point) {
+                        final c = widget.client;
+                        if (c == null) return;
+                        showCrewAgentMenu(ctx,
+                            client: c,
+                            agent: agent,
+                            point: point, onDeleted: () {
+                          _crewAt = null;
+                          _loadCrew();
+                        });
+                      },
+                      footer: Builder(
+                        builder: (ctx) => InkWell(
+                          onTap: () async {
+                            await _openCreateAgent(ctx);
+                            _crewAt = null;
+                            _loadCrew();
+                          },
+                          child: Container(
+                            height: 32,
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            child: Row(children: [
+                              AppIcon('plus', size: 14, color: AppColors.fg4),
+                              const SizedBox(width: 12),
+                              Text('New agent',
+                                  style: sans(13, color: AppColors.fg3)),
                             ]),
                           ),
                         ),
@@ -1062,50 +1066,6 @@ class SidebarState extends State<Sidebar> {
                     setState(() => _filterQuery = '');
                   }),
               ]),
-            ),
-          ),
-        if (_crew.isNotEmpty && _crewOpen)
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxHeight: 280),
-            child: SingleChildScrollView(
-              child: CrewRoster(
-                dense: true,
-                entries: crewOrdered(deriveCrew(
-                    _crew, widget.sessions ?? const <SessionInfo>[])),
-                onOpen: (a) => widget.onOpenAgent?.call(a),
-                onMenu: (ctx, agent, point) {
-                  final c = widget.client;
-                  if (c == null) return;
-                  showCrewAgentMenu(ctx, client: c, agent: agent, point: point,
-                      onDeleted: () {
-                    _crewAt = null;
-                    _loadCrew();
-                  });
-                },
-              ),
-            ),
-          ),
-        if (_crewOpen)
-          Builder(
-            builder: (ctx) => Padding(
-              padding: const EdgeInsets.fromLTRB(8, 0, 8, 6),
-              child: InkWell(
-                borderRadius: BorderRadius.circular(8),
-                onTap: () async {
-                  await _openCreateAgent(ctx);
-                  _crewAt = null;
-                  _loadCrew();
-                },
-                child: Container(
-                  height: 32,
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  child: Row(children: [
-                    AppIcon('plus', size: 14, color: AppColors.fg4),
-                    const SizedBox(width: 12),
-                    Text('New agent', style: sans(13, color: AppColors.fg3)),
-                  ]),
-                ),
-              ),
             ),
           ),
       ],

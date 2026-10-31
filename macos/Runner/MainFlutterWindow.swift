@@ -3164,7 +3164,6 @@ final class NotchHomeView: NSView {
       var h = topInset + 4 + 26 + 6
       h += detailBodyHeight(d, width: width - 40)
       h += CGFloat(min(d.details.count, 8)) * 26
-      if !d.actions.isEmpty { h += 40 }
       return h + 10
     }
     var h = topInset + 2 + headerHeight + 4
@@ -3271,9 +3270,22 @@ final class NotchHomeView: NSView {
       }
       back.frame.origin = NSPoint(x: pad, y: topInset + 4)
       addSubview(back)
+      var actionButtons: [NotchHomeButton] = []
+      for a in item.actions.prefix(3) {
+        actionButtons.append(NotchHomeButton(title: a.label, primary: a.primary) { [weak self] in
+          self?.onAction?(item.id, a.action)
+        })
+      }
+      let actionsW = actionButtons.reduce(CGFloat(0)) { $0 + $1.frame.width + 8 }
+      var bx = w - pad - actionsW + 8
+      for b in actionButtons {
+        b.frame.origin = NSPoint(x: bx, y: topInset + 4)
+        addSubview(b)
+        bx += b.frame.width + 8
+      }
       let title = label(item.title, size: 13.5, weight: .medium, color: NotchHomePalette.text)
       title.sizeToFit()
-      title.frame = NSRect(x: pad + 36, y: topInset + 8, width: min(title.frame.width, w - pad * 2 - 36 - 70), height: 18)
+      title.frame = NSRect(x: pad + 36, y: topInset + 8, width: min(title.frame.width, w - pad * 2 - 36 - actionsW - 8), height: 18)
       addSubview(title)
       if !item.tag.isEmpty {
         let c = chip(item.tag)
@@ -3305,15 +3317,6 @@ final class NotchHomeView: NSView {
           addSubview(r)
         }
         y += 26
-      }
-      var x = pad
-      for a in item.actions.prefix(4) {
-        let b = NotchHomeButton(title: a.label, primary: a.primary) { [weak self] in
-          self?.onAction?(item.id, a.action)
-        }
-        b.frame.origin = NSPoint(x: x, y: y + 6)
-        addSubview(b)
-        x += b.frame.width + 8
       }
       return
     }

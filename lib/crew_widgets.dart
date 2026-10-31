@@ -650,3 +650,122 @@ class _CrewRow extends StatelessWidget {
     );
   }
 }
+
+/// Collapsed crew: overlapping avatars that open the roster in a popover on
+/// hover or tap.
+class CrewStack extends StatefulWidget {
+  const CrewStack({
+    super.key,
+    required this.entries,
+    required this.onOpen,
+    this.onMenu,
+    this.footer,
+  });
+
+  final List<CrewEntry> entries;
+  final ValueChanged<CoordinationAgent> onOpen;
+  final void Function(BuildContext, CoordinationAgent, Offset)? onMenu;
+  final Widget? footer;
+
+  @override
+  State<CrewStack> createState() => _CrewStackState();
+}
+
+class _CrewStackState extends State<CrewStack> {
+  final _portal = OverlayPortalController();
+  final _link = LayerLink();
+  Timer? _hide;
+
+  void _show() {
+    _hide?.cancel();
+    if (!_portal.isShowing) _portal.show();
+  }
+
+  void _later() {
+    _hide?.cancel();
+    _hide = Timer(const Duration(milliseconds: 220), () {
+      if (mounted && _portal.isShowing) _portal.hide();
+    });
+  }
+
+  @override
+  void dispose() {
+    _hide?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final list = crewOrdered(widget.entries);
+    final shown = list.take(4).toList();
+    return CompositedTransformTarget(
+      link: _link,
+      child: OverlayPortal(
+        controller: _portal,
+        overlayChildBuilder: (_) => CompositedTransformFollower(
+          link: _link,
+          targetAnchor: Alignment.bottomRight,
+          followerAnchor: Alignment.topRight,
+          offset: const Offset(0, 4),
+          child: Align(
+            alignment: Alignment.topRight,
+            child: MouseRegion(
+              onEnter: (_) => _show(),
+              onExit: (_) => _later(),
+              child: Material(
+                color: AppColors.surface2,
+                borderRadius: BorderRadius.circular(12),
+                elevation: 0,
+                child: Container(
+                  width: 232,
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.lineStrong),
+                  ),
+                  child: Column(mainAxisSize: MainAxisSize.min, children: [
+                    for (final e in list)
+                      _CrewRow(e, () {
+                        _portal.hide();
+                        widget.onOpen(e.agent);
+                      }, widget.onMenu),
+                    if (widget.footer != null) widget.footer!,
+                  ]),
+                ),
+              ),
+            ),
+          ),
+        ),
+        child: MouseRegion(
+          onEnter: (_) => _show(),
+          onExit: (_) => _later(),
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => _portal.isShowing ? _portal.hide() : _portal.show(),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              child: SizedBox(
+                height: 22,
+                width: 22.0 + 14 * (shown.length.clamp(1, 4) - 1),
+                child: Stack(children: [
+                  for (var i = 0; i < shown.length; i++)
+                    Positioned(
+                      left: 14.0 * i,
+                      child: Container(
+                        width: 22,
+                        height: 22,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                            color: AppColors.bg, shape: BoxShape.circle),
+                        child: AgentMochi(shown[i].agent.id, size: 18),
+                      ),
+                    ),
+                ]),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
