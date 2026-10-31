@@ -494,7 +494,9 @@ Future<void> showCrewAgentMenu(
         title:
             'Nickname for ${agent.fullName.trim().isEmpty ? agent.id : agent.fullName.trim()}',
         initial: agent.nickname ?? '',
-        hint: 'Leave empty to use the name');
+        hint: 'Leave empty to use the name',
+        anchored: true,
+        point: point);
     if (next == null || next == (agent.nickname ?? '')) return;
     try {
       await client.setAgentNickname(agent.id, next.isEmpty ? null : next);

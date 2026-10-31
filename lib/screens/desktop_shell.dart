@@ -1166,11 +1166,12 @@ class _DesktopShellState extends State<DesktopShell>
       if (_instances.isEmpty) _instances = items;
     }
     final name = '${m['name'] ?? ''}';
-    final resolved = _instances.where((i) => i.url == url).firstOrNull ??
+    String norm(String u) => u.trim().toLowerCase().replaceAll(RegExp(r'/+$'), '');
+    final resolved = _instances.where((i) => norm(i.url) == norm(url)).firstOrNull ??
         _instances
             .where((i) => name.isNotEmpty && i.label == name)
             .firstOrNull ??
-        (_instances.length == 1 ? _instances.first : null);
+        (_instances.length == 1 ? _instances.first : _active);
     if (resolved == null) {
       toast(context, 'That machine is no longer saved.', danger: true);
       return;

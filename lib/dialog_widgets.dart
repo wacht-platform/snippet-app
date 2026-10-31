@@ -306,7 +306,13 @@ Future<String?> promptText(BuildContext context,
     String? hint,
     String saveLabel = 'Save',
     int minLines = 1,
-    int maxLines = 1}) {
+    int maxLines = 1,
+    bool anchored = false,
+    Offset? point}) {
+  if (!kMobile && (anchored || point != null)) {
+    return _showInlinePrompt(context,
+        title: title, initial: initial, hint: hint, point: point);
+  }
   final field = _TextPromptSheet(
       initial: initial,
       hint: hint,
@@ -321,6 +327,115 @@ Future<String?> promptText(BuildContext context,
     );
   }
   return showAppSheet<String>(context, title: title, child: field);
+}
+
+Future<String?> _showInlinePrompt(BuildContext context,
+    {required String title,
+    required String initial,
+    String? hint,
+    Offset? point}) {
+  final overlay = Overlay.of(context, rootOverlay: true)
+      .context
+      .findRenderObject() as RenderBox?;
+  final box = context.findRenderObject() as RenderBox?;
+  if (overlay == null) return Future.value();
+  final screen = overlay.size;
+  final at = point != null
+      ? overlay.globalToLocal(point)
+      : box != null && box.attached
+          ? box.localToGlobal(Offset(0, box.size.height + 6), ancestor: overlay)
+          : screen.center(Offset.zero);
+  const w = 300.0;
+  final left = at.dx.clamp(8.0, screen.width - w - 8);
+  final top = at.dy.clamp(8.0, screen.height - 150);
+  return showGeneralDialog<String>(
+    context: context,
+    barrierDismissible: true,
+    barrierLabel: 'Dismiss',
+    barrierColor: Colors.transparent,
+    transitionDuration: Motion.fast,
+    pageBuilder: (ctx, _, __) => Stack(children: [
+      Positioned(
+        left: left,
+        top: top,
+        width: w,
+        child: Material(
+          color: AppColors.surface2,
+          elevation: 10,
+          shadowColor: Colors.black.withValues(alpha: 0.5),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(color: AppColors.border2),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: sans(12.5, color: AppColors.fg3)),
+                const SizedBox(height: 8),
+                _InlinePromptField(initial: initial, hint: hint),
+              ],
+            ),
+          ),
+        ),
+      ),
+    ]),
+    transitionBuilder: (_, animation, __, child) {
+      final curve = CurvedAnimation(parent: animation, curve: Motion.enter);
+      return FadeTransition(
+        opacity: curve,
+        child: ScaleTransition(
+          scale: Tween(begin: 0.97, end: 1.0).animate(curve),
+          alignment: Alignment.topLeft,
+          child: child,
+        ),
+      );
+    },
+  );
+}
+
+class _InlinePromptField extends StatefulWidget {
+  final String initial;
+  final String? hint;
+  const _InlinePromptField({required this.initial, this.hint});
+
+  @override
+  State<_InlinePromptField> createState() => _InlinePromptFieldState();
+}
+
+class _InlinePromptFieldState extends State<_InlinePromptField> {
+  late final TextEditingController _c =
+      TextEditingController(text: widget.initial)
+        ..selection =
+            TextSelection(baseOffset: 0, extentOffset: widget.initial.length);
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  void _done() => Navigator.pop(context, _c.text.trim());
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(children: [
+      Expanded(
+        child: AppField(
+            controller: _c,
+            hint: widget.hint,
+            autofocus: true,
+            onSubmitted: (_) => _done()),
+      ),
+      const SizedBox(width: 8),
+      Btn('Save', onTap: _done),
+    ]);
+  }
 }
 
 class _TextPromptSheet extends StatefulWidget {
@@ -525,9 +640,9 @@ Future<T?> showAnchoredPanel<T>(
       return FadeTransition(
         opacity: curve,
         child: SlideTransition(
-          position: Tween(
-                  begin: Offset(0, above ? 0.02 : -0.02), end: Offset.zero)
-              .animate(curve),
+          position:
+              Tween(begin: Offset(0, above ? 0.02 : -0.02), end: Offset.zero)
+                  .animate(curve),
           child: child,
         ),
       );
