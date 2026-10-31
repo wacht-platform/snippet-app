@@ -69,3 +69,4 @@ test/visual/failures/
 # churn on every restyle. `test/flutter_test_config.dart` writes them on a first
 # run when the directory is empty, then comparisons run normally.
 test/visual/goldens/
+test/failures/
