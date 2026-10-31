@@ -108,8 +108,6 @@ void main() {
     final off = SessionInfo.fromJson({'id': 'b'});
     expect(on.keepAwake, isTrue);
     expect(off.keepAwake, isFalse);
-    expect(keepAwakeLabel(off), "Don't auto-settle");
-    expect(keepAwakeLabel(on), 'Allow auto-settle');
     expect(
         splitSettled([
           SessionInfo.fromJson(

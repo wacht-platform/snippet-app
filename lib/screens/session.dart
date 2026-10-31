@@ -36,6 +36,7 @@ import '../tool_views.dart';
 import '../transcript.dart';
 import '../term.dart';
 import '../panel.dart';
+import '../settings_form.dart';
 import '../share_inbound.dart';
 import '../widgets.dart';
 import 'artifact_viewer.dart';
@@ -719,12 +720,26 @@ class _SessionScreenState extends State<SessionScreen>
 
   late String _title;
   bool _settled = false;
+  bool _keepAwake = false;
+
+  Future<void> _setAutoSettle(bool on) async {
+    final before = _keepAwake;
+    _keepAwake = !on;
+    try {
+      await widget.client.setKeepAwake(widget.sessionId, !on);
+    } catch (e) {
+      _keepAwake = before;
+      if (mounted) toast(context, "Couldn't change auto-settle: $e", danger: true);
+    }
+  }
 
   void _loadSettled() {
     if (_isMissionControl) return;
     widget.client.sessions().then((list) {
       if (!mounted) return;
-      final now = list.any((x) => x.id == widget.sessionId && x.settled);
+      final me = list.where((x) => x.id == widget.sessionId).firstOrNull;
+      _keepAwake = me?.keepAwake ?? false;
+      final now = me?.settled ?? false;
       if (now != _settled) setState(() => _settled = now);
     }).catchError((_) {});
   }

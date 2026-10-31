@@ -1270,6 +1270,8 @@ class _SessionActionsPanel extends StatefulWidget {
   final bool hideWorkspace;
   final bool hideGoal;
   final bool hideCheckpoints;
+  final bool? autoSettle;
+  final ValueChanged<bool>? onAutoSettle;
   const _SessionActionsPanel({
     required this.session,
     required this.onSetGoal,
@@ -1294,6 +1296,8 @@ class _SessionActionsPanel extends StatefulWidget {
     this.hideWorkspace = false,
     this.hideGoal = false,
     this.hideCheckpoints = false,
+    this.autoSettle,
+    this.onAutoSettle,
   });
 
   @override
@@ -1302,6 +1306,7 @@ class _SessionActionsPanel extends StatefulWidget {
 
 class _SessionActionsPanelState extends State<_SessionActionsPanel> {
   String? _open;
+  late bool? _auto = widget.autoSettle;
   late final TextEditingController _goalCtl = TextEditingController();
 
   @override
@@ -1380,6 +1385,7 @@ class _SessionActionsPanelState extends State<_SessionActionsPanel> {
     String? id,
     VoidCallback? onTap,
     Widget? child,
+    Widget? trailing,
   }) {
     final open = id != null && _open == id;
     final expandable = id != null;
@@ -1435,7 +1441,9 @@ class _SessionActionsPanelState extends State<_SessionActionsPanel> {
                   ),
                 ],
                 const SizedBox(width: 8),
-                if (expandable || (kMobile && onTap != null))
+                if (trailing != null)
+                  trailing
+                else if (expandable || (kMobile && onTap != null))
                   AppIcon(open ? 'chevron-down' : 'chevron-right',
                       size: 15, color: AppColors.fg4),
               ]),
@@ -1526,6 +1534,23 @@ class _SessionActionsPanelState extends State<_SessionActionsPanel> {
     );
   }
 
+  Widget? _autoSettleRow() {
+    final on = _auto;
+    if (on == null || widget.onAutoSettle == null) return null;
+    void flip() {
+      setState(() => _auto = !on);
+      widget.onAutoSettle!(!on);
+    }
+
+    return _row(
+      icon: 'archive',
+      label: 'Auto-settle',
+      detail: 'Save memory and park this chat after an hour idle',
+      onTap: flip,
+      trailing: SettingsSwitch(value: on, onChanged: (_) => flip()),
+    );
+  }
+
   Widget _mobileBuild(HarnessState? s, bool goalOn, List<Widget> workRows,
       List<Widget> historyRows) {
     final sessionRows = <Widget>[
@@ -1536,6 +1561,7 @@ class _SessionActionsPanelState extends State<_SessionActionsPanel> {
             label: 'Automated wakes',
             detail: 'Keeps the work moving while you are away',
             onTap: widget.onAutonomy),
+      if (_autoSettleRow() case final row?) row,
     ];
     final shortcuts = <Widget>[
       _shortcut('git-branch', 'Git', widget.onGit),
@@ -1664,6 +1690,7 @@ class _SessionActionsPanelState extends State<_SessionActionsPanel> {
           label: 'Scheduled',
           detail: 'Recurring jobs on this machine',
           onTap: widget.onRecurring),
+      if (_autoSettleRow() case final row?) row,
     ];
 
     final workspaceRows = <Widget>[

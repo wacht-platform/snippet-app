@@ -752,19 +752,6 @@ class SidebarState extends State<Sidebar> {
     }
   }
 
-  Future<void> _toggleKeepAwake(SessionInfo s) async {
-    final c = widget.client;
-    if (c == null) return;
-    try {
-      await c.setKeepAwake(s.id, !s.keepAwake);
-      if (!mounted) return;
-      toast(context, s.keepAwake ? 'Auto-settle allowed' : 'Kept awake');
-      widget.onRefreshSessions();
-    } catch (e) {
-      if (mounted) toast(context, "Couldn't update: $e", danger: true);
-    }
-  }
-
   List<SessionInfo> _sortSessionsByRecency(Iterable<SessionInfo> sessions) {
     final sorted = sessions.toList();
     sorted.sort((a, b) => b.lastActive.compareTo(a.lastActive));
@@ -1732,10 +1719,6 @@ class SidebarState extends State<Sidebar> {
             appMenuItem(value: 'wake', icon: 'play', label: 'Wake')
           else if (!sessionIsActive(s.status))
             appMenuItem(value: 'settle', icon: 'archive', label: 'Settle now'),
-          appMenuItem(
-              value: 'keep',
-              icon: 'lock',
-              label: keepAwakeLabel(s)),
           const PopupMenuDivider(height: 9),
           appMenuItem(
               value: 'delete', icon: 'trash', label: 'Delete', danger: true),
@@ -1745,8 +1728,6 @@ class SidebarState extends State<Sidebar> {
         _enterSelect(seed: s.id);
       } else if (selected == 'settle' || selected == 'wake') {
         await _setSettled(s, selected == 'settle');
-      } else if (selected == 'keep') {
-        await _toggleKeepAwake(s);
       } else if (selected == 'rename') {
         _beginRename(s);
       } else if (selected == 'delete') {
@@ -1775,10 +1756,6 @@ class SidebarState extends State<Sidebar> {
               Navigator.pop(context);
               _setSettled(s, true);
             }),
-          SheetAction('lock', keepAwakeLabel(s), () {
-            Navigator.pop(context);
-            _toggleKeepAwake(s);
-          }),
           SheetAction('trash', 'Delete', () {
             Navigator.pop(context);
             _confirmDeleteSessions([s]);

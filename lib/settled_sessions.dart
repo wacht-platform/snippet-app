@@ -30,6 +30,3 @@ String settledMeta(SessionInfo s, {int? nowSecs}) {
   if (d == 0) return 'Settled · deleted today';
   return 'Settled · deleted in $d ${d == 1 ? 'day' : 'days'}';
 }
-
-String keepAwakeLabel(SessionInfo s) =>
-    s.keepAwake ? 'Allow auto-settle' : "Don't auto-settle";

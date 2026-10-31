@@ -909,6 +909,8 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
       hideWorkspace: _isMissionControl,
       hideGoal: _isMissionControl,
       hideCheckpoints: _isMissionControl,
+      autoSettle: _isMissionControl || widget.readOnly ? null : !_keepAwake,
+      onAutoSettle: _setAutoSettle,
       onAutonomy: _isMissionControl ? () => navigate!(_openAutonomy) : null,
       onSetGoal: (text) {
         _send({'kind': 'set_goal', 'value': text});
