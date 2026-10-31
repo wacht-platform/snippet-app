@@ -79,6 +79,35 @@ void main() {
     await tester.pumpWidget(const SizedBox());
   });
 
+  testWidgets('long-press on the front or ghost card expands the stack',
+      (tester) async {
+    Map<String, dynamic>? opened;
+    onNotifTap = (p) => opened = p;
+    await mount(tester);
+    for (final title in ['First', 'Second', 'Third']) {
+      enqueue(title);
+    }
+    await tester.pump();
+    await tester.longPress(find.text('Third'));
+    await tester.pump();
+    expect(find.text('Collapse'), findsOneWidget);
+    expect(find.text('First'), findsOneWidget);
+    expect(opened, isNull);
+    await tester.tap(find.text('Collapse'));
+    await tester.pump();
+    final front = tester.getRect(find.byType(Dismissible));
+    await tester.longPressAt(Offset(front.center.dx, front.bottom + 4));
+    await tester.pump();
+    expect(find.text('Collapse'), findsOneWidget);
+    await tester.tap(find.text('Collapse'));
+    await tester.pump();
+    await tester.tap(find.text('Third'));
+    await tester.pump();
+    expect(opened?['title'], 'Third');
+    expect(find.text('Collapse'), findsNothing);
+    await tester.pumpWidget(const SizedBox());
+  });
+
   testWidgets('swipe removes only the top card', (tester) async {
     await mount(tester);
     for (final title in ['First', 'Second', 'Third']) {

@@ -98,9 +98,11 @@ void main() {
                       expanded: expanded,
                       onToggle: () {},
                       onClearAll: () {},
-                      cardBuilder: (p, embedded) => NotificationMessageCard(
+                      cardBuilder: (p, embedded, lifted) =>
+                          NotificationMessageCard(
                         payload: p,
                         embedded: embedded,
+                        lifted: lifted,
                         initiallyExpanded: open && identical(p, _items.first),
                         onOpen: () {},
                         onDismiss: () {},

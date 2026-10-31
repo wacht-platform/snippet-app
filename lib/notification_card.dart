@@ -77,6 +77,7 @@ class NotificationMessageCard extends StatefulWidget {
     this.send = quickSendForPayload,
     this.initiallyExpanded = false,
     this.embedded = false,
+    this.lifted = true,
   });
 
   final Map<String, dynamic> payload;
@@ -87,6 +88,7 @@ class NotificationMessageCard extends StatefulWidget {
   final Future<bool> Function(Map<String, dynamic>, QuickAction) send;
   final bool initiallyExpanded;
   final bool embedded;
+  final bool lifted;
 
   @override
   State<NotificationMessageCard> createState() =>
@@ -332,6 +334,7 @@ class _NotificationMessageCardState extends State<NotificationMessageCard> {
                   color: AppColors.surface2,
                   border: Border.all(color: AppColors.lineStrong),
                   borderRadius: BorderRadius.circular(radius),
+                  boxShadow: widget.lifted ? overlayShadow : null,
                 ),
           child: Material(
             type: MaterialType.transparency,

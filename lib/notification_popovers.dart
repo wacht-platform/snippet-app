@@ -31,6 +31,9 @@ class _NotificationPopoversState extends State<NotificationPopovers> {
 
   bool get _held => _pointer || _cardHold || _expanded;
 
+  // Clears the app bar (56 on phones, 44 on desktop panes) so toasts never cover header controls.
+  static double get _anchorTop => kMobile ? M.appBarHeight + S.s12 : 44 + S.s8;
+
   Duration _life(Map<String, dynamic> p) {
     final base = kMobile ? 5 : 7;
     return Duration(seconds: needsYou(p) ? base * 3 : base);
@@ -180,8 +183,8 @@ class _NotificationPopoversState extends State<NotificationPopovers> {
     return Overlay(initialEntries: [_contentEntry]);
   }
 
-  Widget _card(
-      Map<String, dynamic> payload, bool embedded, bool reducedMotion) {
+  Widget _card(Map<String, dynamic> payload, bool embedded, bool lifted,
+      bool reducedMotion) {
     return Dismissible(
       key: ObjectKey(payload),
       direction: DismissDirection.horizontal,
@@ -192,6 +195,7 @@ class _NotificationPopoversState extends State<NotificationPopovers> {
         key: ObjectKey(payload),
         payload: payload,
         embedded: embedded,
+        lifted: lifted,
         onOpen: () => _remove(payload, open: true, feedback: true),
         onDismiss: () => _remove(payload, feedback: true),
         onHold: (hold) => _setHold(card: hold),
@@ -209,7 +213,7 @@ class _NotificationPopoversState extends State<NotificationPopovers> {
       widget.child,
       if (call != null)
         Positioned(
-            top: S.s8,
+            top: _anchorTop,
             left: S.s12,
             right: S.s12,
             child: SafeArea(
@@ -225,7 +229,7 @@ class _NotificationPopoversState extends State<NotificationPopovers> {
             )))
       else
         Positioned(
-            top: S.s8,
+            top: _anchorTop,
             left: S.s12,
             right: S.s12,
             child: SafeArea(
@@ -273,8 +277,9 @@ class _NotificationPopoversState extends State<NotificationPopovers> {
                                   _setHold();
                                 }),
                                 onClearAll: _clearAll,
-                                cardBuilder: (payload, embedded) =>
-                                    _card(payload, embedded, reducedMotion),
+                                cardBuilder: (payload, embedded, lifted) =>
+                                    _card(payload, embedded, lifted,
+                                        reducedMotion),
                               ),
                             ),
                           ),

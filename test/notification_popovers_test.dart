@@ -200,7 +200,7 @@ void main() {
     await tester.pump(const Duration(seconds: 16));
     expect(find.text('Next'), findsOneWidget);
     await tester.pump(const Duration(seconds: 1));
-    expect(find.text('1 more'), findsOneWidget);
+    expect(find.text('Collapse'), findsOneWidget, reason: 'a hold expands');
     await gesture.cancel();
     expect(notificationAppForeground, isTrue);
     expect(suppressVisibleNotification({'url': 'u', 'session': 's'}), isFalse);
@@ -243,7 +243,7 @@ void main() {
         final available = width - 24 - 20 - 30;
         const cap = 420.0;
         expect(rect.width, closeTo(available < cap ? available : cap, .01));
-        expect(rect.top, closeTo(32, .01));
+        expect(rect.top, closeTo(24.0 + (mobile ? 56 + 12 : 44 + 8), .01));
         if (mobile) {
           expect(rect.center.dx, closeTo((width + 20 - 30) / 2, .01));
         } else {

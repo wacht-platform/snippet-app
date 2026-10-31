@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'notification_card.dart' show notificationTone;
 import 'platform.dart';
 import 'theme.dart';
@@ -10,7 +11,7 @@ bool needsYou(Map<String, dynamic> p) =>
     '${p['kind'] ?? ''}'.split('.').last == 'waiting';
 
 typedef StackCardBuilder = Widget Function(
-    Map<String, dynamic> payload, bool embedded);
+    Map<String, dynamic> payload, bool embedded, bool lifted);
 
 class NotificationStack extends StatelessWidget {
   const NotificationStack({
@@ -31,7 +32,7 @@ class NotificationStack extends StatelessWidget {
   static double get _pillWidth => 300;
   static double get _panelRadius => kMobile ? 24 : R.lg;
   static double get _ghostRadius => kMobile ? 22 : R.card;
-  static const _peek = 7.0;
+  static const _peek = 9.0;
 
   @override
   Widget build(BuildContext context) {
@@ -41,7 +42,7 @@ class NotificationStack extends StatelessWidget {
     final child = single
         ? KeyedSubtree(
             key: const ValueKey('single'),
-            child: cardBuilder(items.first, false))
+            child: cardBuilder(items.first, false, true))
         : expanded
             ? KeyedSubtree(
                 key: const ValueKey('expanded'), child: _expanded(context))
@@ -87,6 +88,11 @@ class NotificationStack extends StatelessWidget {
     );
   }
 
+  void _expandByHold() {
+    if (kMobile) HapticFeedback.selectionClick();
+    onToggle();
+  }
+
   Widget _collapsed(BuildContext context, bool calm) {
     final ghosts = math.min(items.length - 1, 2);
     final hidden = items.skip(1).toList();
@@ -94,60 +100,93 @@ class NotificationStack extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Padding(
-          padding: EdgeInsets.only(bottom: _peek * ghosts),
-          child: LayoutBuilder(builder: (context, box) {
-            final width =
-                kMobile ? math.min(box.maxWidth, _pillWidth) : box.maxWidth;
-            final side = kMobile ? (box.maxWidth - width) / 2 : 0.0;
-            return Stack(clipBehavior: Clip.none, children: [
-              for (var i = 2; i >= 1; i--)
-                AnimatedPositioned(
-                  duration: calm ? Duration.zero : Motion.base,
-                  curve: Motion.enter,
-                  left: side + (kMobile ? 14.0 : 10.0) * i,
-                  right: side + (kMobile ? 14.0 : 10.0) * i,
-                  bottom: -_peek * (i <= ghosts ? i : i - 1),
-                  height: 28,
-                  child: AnimatedOpacity(
-                    duration: calm ? Duration.zero : Motion.fast,
-                    opacity: i <= ghosts ? 1 : 0,
+        LayoutBuilder(builder: (context, box) {
+          final width =
+              kMobile ? math.min(box.maxWidth, _pillWidth) : box.maxWidth;
+          final side = kMobile ? (box.maxWidth - width) / 2 : 0.0;
+          return Stack(clipBehavior: Clip.none, children: [
+            Positioned(
+              left: side,
+              right: side,
+              top: 0,
+              bottom: 0,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(kMobile ? 28 : R.card),
+                  boxShadow: overlayShadow,
+                ),
+              ),
+            ),
+            for (var i = 2; i >= 1; i--)
+              AnimatedPositioned(
+                duration: calm ? Duration.zero : Motion.base,
+                curve: Motion.enter,
+                left: side + (kMobile ? 14.0 : 10.0) * i,
+                right: side + (kMobile ? 14.0 : 10.0) * i,
+                bottom: _peek * (ghosts - math.min(i, ghosts)),
+                height: 28,
+                child: AnimatedOpacity(
+                  duration: calm ? Duration.zero : Motion.fast,
+                  opacity: i <= ghosts ? 1 : 0,
+                  child: IgnorePointer(
+                    ignoring: i > ghosts,
                     child: GestureDetector(
                       behavior: HitTestBehavior.opaque,
                       onTap: onToggle,
+                      onLongPress: _expandByHold,
                       child: DecoratedBox(
                         decoration: BoxDecoration(
-                          color: Color.lerp(AppColors.surface2, AppColors.bg,
-                              i == 1 ? .2 : .5),
-                          border: Border.all(
-                              color: Color.lerp(AppColors.lineStrong,
-                                  AppColors.bg, i == 1 ? 0 : .3)!),
+                          color: i == 1
+                              ? AppColors.surface3
+                              : Color.lerp(
+                                  AppColors.surface3, AppColors.surface1, .5),
+                          border: Border.all(color: AppColors.lineStrong),
                           borderRadius: BorderRadius.circular(_ghostRadius),
                         ),
                       ),
                     ),
                   ),
                 ),
-              cardBuilder(items.first, false),
-            ]);
-          }),
-        ),
-        Padding(
-          padding: const EdgeInsets.only(top: S.s8),
-          child: Wrap(
-            alignment: kMobile ? WrapAlignment.center : WrapAlignment.end,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            spacing: S.s4,
-            runSpacing: S.s4,
-            children: [
-              _Toggle(
-                label: '${hidden.length} more',
-                icon: 'chevron-down',
-                tones: [for (final p in hidden.take(3)) notificationTone(p)],
-                onTap: onToggle,
               ),
-              _QuietButton('Clear all', onClearAll),
-            ],
+            AnimatedPadding(
+              duration: calm ? Duration.zero : Motion.base,
+              curve: Motion.enter,
+              padding: EdgeInsets.only(bottom: _peek * ghosts),
+              child: GestureDetector(
+                onLongPress: _expandByHold,
+                child: cardBuilder(items.first, false, false),
+              ),
+            ),
+          ]);
+        }),
+        Padding(
+          padding: const EdgeInsets.only(top: S.s6),
+          child: Align(
+            alignment: kMobile ? Alignment.topCenter : Alignment.topRight,
+            child: Container(
+              padding: const EdgeInsets.all(S.s2),
+              decoration: BoxDecoration(
+                color: AppColors.surface2,
+                border: Border.all(color: AppColors.lineStrong),
+                borderRadius: BorderRadius.circular(R.pill),
+                boxShadow: overlayShadow,
+              ),
+              child: Wrap(
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    _Toggle(
+                      label: '${hidden.length} more',
+                      icon: 'chevron-down',
+                      tones: [
+                        for (final p in hidden.take(3)) notificationTone(p)
+                      ],
+                      onTap: onToggle,
+                    ),
+                    Container(
+                        width: 1, height: 14, color: AppColors.lineStrong),
+                    _QuietButton('Clear all', onClearAll),
+                  ]),
+            ),
           ),
         ),
       ],
@@ -180,7 +219,7 @@ class NotificationStack extends StatelessWidget {
                 padding: EdgeInsets.only(left: inset + 18, right: inset),
                 child: Divider(height: 1, thickness: 1, color: AppColors.line),
               ),
-            cardBuilder(p, true),
+            cardBuilder(p, true, false),
           ],
         ],
       );
@@ -194,6 +233,7 @@ class NotificationStack extends StatelessWidget {
         color: AppColors.surface2,
         border: Border.all(color: AppColors.lineStrong),
         borderRadius: BorderRadius.circular(_panelRadius),
+        boxShadow: overlayShadow,
       ),
       child: Column(mainAxisSize: MainAxisSize.min, children: [
         Padding(
@@ -264,7 +304,7 @@ class _Toggle extends StatelessWidget {
     return HoverSurface(
       onTap: onTap,
       radius: R.pill,
-      rest: inPanel ? AppColors.surface3 : AppColors.surface2,
+      rest: inPanel ? AppColors.surface3 : Colors.transparent,
       hoverColor: inPanel
           ? Color.lerp(AppColors.surface3, AppColors.fg4, .16)
           : AppColors.surface3,
