@@ -16,11 +16,13 @@ class PresentedFileCard extends StatelessWidget {
     required this.path,
     required this.caption,
     this.onOpenFileTab,
+    this.grouped = false,
   });
 
   final DaemonClient client;
   final String path;
   final String caption;
+  final bool grouped;
   final void Function(String path, String name)? onOpenFileTab;
 
   String get _name => path.split('/').last;
@@ -82,13 +84,15 @@ class PresentedFileCard extends StatelessWidget {
         message: 'Download',
         child: InkWell(
           onTap: () => _download(context),
-          borderRadius: BorderRadius.circular(R.xs),
-          child: SizedBox(
-            width: kMobile ? 40 : 28,
-            height: kMobile ? 40 : 24,
-            child: Center(
-                child: AppIcon('download',
-                    size: kMobile ? 18 : 14, color: AppColors.fg3)),
+          customBorder: const CircleBorder(),
+          child: Container(
+            width: kMobile ? 36 : 28,
+            height: kMobile ? 36 : 28,
+            alignment: Alignment.center,
+            decoration:
+                BoxDecoration(color: AppColors.surface3, shape: BoxShape.circle),
+            child: AppIcon('download',
+                size: kMobile ? 16 : 14, color: AppColors.fg2),
           ),
         ),
       );
@@ -103,6 +107,7 @@ class PresentedFileCard extends StatelessWidget {
         icon: _icon,
         name: _name,
         detail: [_kindLabel, if (caption.isNotEmpty) caption].join(' · '),
+        grouped: grouped,
         onTap: () => _open(context),
         trailing: _downloadButton(context),
       ),
@@ -140,6 +145,7 @@ class MediaRow extends StatelessWidget {
     required this.detail,
     required this.onTap,
     this.trailing,
+    this.grouped = false,
   });
 
   final String icon;
@@ -147,73 +153,64 @@ class MediaRow extends StatelessWidget {
   final String detail;
   final VoidCallback onTap;
   final Widget? trailing;
+  final bool grouped;
 
   @override
   Widget build(BuildContext context) {
-    final nameStyle = sans(kMobile ? 14 : 13.5, weight: W.label, color: AppColors.fg1);
-    final detailStyle = sans(kMobile ? 13 : 12.5, color: AppColors.fg3);
+    final row = InkWell(
+      onTap: onTap,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(minHeight: kMobile ? 60 : 48),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 8, 10, 8),
+          child: Row(children: [
+            Container(
+              width: 36,
+              height: 36,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: AppColors.surface3,
+                borderRadius: BorderRadius.circular(9),
+              ),
+              child: AppIcon(icon, size: 17, color: AppColors.fg2),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: sans(kMobile ? 14.5 : 13.5,
+                          weight: W.label, color: AppColors.fg1)),
+                  if (detail.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(detail,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: sans(kMobile ? 13 : 12, color: AppColors.fg4)),
+                  ],
+                ],
+              ),
+            ),
+            if (trailing != null) ...[
+              const SizedBox(width: 8),
+              trailing!,
+            ],
+          ]),
+        ),
+      ),
+    );
+    if (grouped) return Material(color: Colors.transparent, child: row);
     return Padding(
       padding: EdgeInsets.symmetric(vertical: kMobile ? 4 : 3),
       child: Material(
-        color: AppColors.surface1,
-        borderRadius: BorderRadius.circular(10),
+        color: AppColors.surface2,
+        borderRadius: BorderRadius.circular(12),
         clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: onTap,
-          child: ConstrainedBox(
-            constraints: BoxConstraints(minHeight: kMobile ? 52 : 40),
-            child: Padding(
-              padding: EdgeInsets.fromLTRB(kMobile ? 10 : 8, 0, 8, 0),
-              child: Row(children: [
-                Container(
-                  width: 32,
-                  height: 32,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: AppColors.accentBg,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: AppIcon(icon, size: 16, color: AppColors.accent),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: kMobile
-                      ? Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(name,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: nameStyle),
-                            if (detail.isNotEmpty)
-                              Text(detail,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: detailStyle),
-                          ],
-                        )
-                      : Text.rich(
-                          TextSpan(children: [
-                            TextSpan(text: name, style: nameStyle),
-                            if (detail.isNotEmpty)
-                              TextSpan(text: '  $detail', style: detailStyle),
-                          ]),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                ),
-                if (trailing != null) ...[
-                  const SizedBox(width: 4),
-                  trailing!,
-                ],
-                const SizedBox(width: 4),
-                AppIcon('chevron-right', size: 14, color: AppColors.fg4),
-                const SizedBox(width: 4),
-              ]),
-            ),
-          ),
-        ),
+        child: row,
       ),
     );
   }
@@ -255,11 +252,13 @@ class _PresentedFilesState extends State<PresentedFiles> {
     }
   }
 
-  Widget _row(({String path, String caption}) f) => PresentedFileCard(
+  Widget _row(({String path, String caption}) f, {bool grouped = false}) =>
+      PresentedFileCard(
         client: widget.client,
         path: f.path,
         caption: f.caption,
         onOpenFileTab: widget.onOpenFileTab,
+        grouped: grouped,
       );
 
   @override
@@ -288,7 +287,20 @@ class _PresentedFilesState extends State<PresentedFiles> {
             ),
           ]),
         ),
-        for (final f in visible) _row(f),
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Material(
+            color: AppColors.surface2,
+            borderRadius: BorderRadius.circular(12),
+            clipBehavior: Clip.antiAlias,
+            child: Column(children: [
+              for (var i = 0; i < visible.length; i++) ...[
+                if (i > 0) Container(height: 1, color: AppColors.line),
+                _row(visible[i], grouped: true),
+              ],
+            ]),
+          ),
+        ),
         if (hidden > 0 || (_all && files.length > _shown))
           GestureDetector(
             behavior: HitTestBehavior.opaque,

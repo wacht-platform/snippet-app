@@ -446,6 +446,9 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
           if (_s(e['step']) == 'interrupted') break;
           addEvent(key,
               SystemRow(step: _s(e['step']), reasoning: _s(e['reasoning'])));
+        case 'turn_changes':
+          endTools(key);
+          addEvent(key, TurnChangesCard(event: e));
         case 'file_presented':
           endTools(key);
           final file = (path: _s(e['path']), caption: _s(e['caption']));

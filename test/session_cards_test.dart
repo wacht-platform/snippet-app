@@ -18,7 +18,7 @@ class _Client extends DaemonClient {
 final _now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
 
 SessionInfo _s(String id, String title, String status,
-        {String folder = '/code/snippet-mobile',
+        {String folder = '/home/dev/code/snippet-mobile',
         String? branch,
         Map<String, dynamic>? changes,
         int? since}) =>
@@ -53,7 +53,7 @@ Future<void> _pump(WidgetTester tester, Size size, TargetPlatform p) async {
             branch: 'cards', since: _now - 260,
             changes: {'files': 2, 'added': 88, 'removed': 12}),
         _s('c', 'Release pipeline fix', 'idle',
-            folder: '/code/snippet-service', branch: 'main'),
+            folder: '/home/dev/code/snippet-service', branch: 'main'),
         _s('d', 'Notes', 'idle', folder: ''),
       ],
       sessionsLoading: false,
@@ -86,7 +86,7 @@ void main() {
       (tester) async {
     try {
       await _pump(tester, const Size(390, 700), TargetPlatform.android);
-      expect(find.text('snippet-mobile'), findsNWidgets(2));
+      expect(find.text('~/code/snippet-mobile'), findsNWidgets(2));
       expect(find.text('Input'), findsOneWidget);
       expect(find.text('Working 4m'), findsOneWidget);
       expect(find.text('+88'), findsOneWidget);

@@ -328,9 +328,9 @@ void main() {
         expect(posC, lessThan(posB));
         expect(posB, lessThan(posA));
         expect(find.text('REPO-ALPHA'), findsNothing);
-        expect(find.text('repo-alpha'), findsNWidgets(2));
-        expect(find.text('repo-beta'), findsOneWidget);
-        expect(find.text('repo-gamma'), findsOneWidget);
+        expect(find.text('/workspace/repo-alpha'), findsNWidgets(2));
+        expect(find.text('/workspace/repo-beta'), findsOneWidget);
+        expect(find.text('/workspace/repo-gamma'), findsOneWidget);
       } finally {
         debugDefaultTargetPlatformOverride = null;
       }

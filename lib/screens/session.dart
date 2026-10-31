@@ -39,6 +39,7 @@ import '../panel.dart';
 import '../settings_form.dart';
 import '../share_inbound.dart';
 import '../widgets.dart';
+import '../turn_changes_card.dart';
 import 'artifact_viewer.dart';
 import 'tasks/task_common.dart' show openTaskDetail;
 import 'pull_requests.dart';

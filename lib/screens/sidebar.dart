@@ -1120,10 +1120,8 @@ class SidebarState extends State<Sidebar> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Row(children: [
-                    _projectBadge(s, size: 14),
-                    const SizedBox(width: 6),
                     Expanded(
-                      child: Text(_projectName(s),
+                      child: Text(_projectPath(s),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: sans(11.5, color: AppColors.fg4)),
@@ -1167,21 +1165,22 @@ class SidebarState extends State<Sidebar> {
     );
   }
 
-  String _projectName(SessionInfo s) => s.projectFolder.trim().isEmpty
-      ? 'No project'
-      : lastPathSegment(s.projectFolder, ifEmpty: s.projectFolder);
-
-  Widget _projectBadge(SessionInfo s, {required double size}) {
-    final name = _projectName(s);
-    return Container(
-      width: size,
-      height: size,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-          color: AppColors.surface3, borderRadius: BorderRadius.circular(4)),
-      child: Text(name.characters.first.toUpperCase(),
-          style: sans(size * 0.65, weight: W.title, color: AppColors.fg3)),
-    );
+  String _projectPath(SessionInfo s) {
+    final f = s.projectFolder.trim();
+    if (f.isEmpty) return 'No project';
+    final home = RegExp(r'^(/home/[^/]+|/Users/[^/]+)(?=/|$)').firstMatch(f);
+    final rest = home == null ? f : f.substring(home.end);
+    final parts = rest.split('/').where((e) => e.isNotEmpty).toList();
+    if (parts.isEmpty) return home == null ? '/' : '~';
+    final tail = parts.length > 3 ? parts.sublist(parts.length - 3) : parts;
+    final lead = parts.length > 3
+        ? '…/'
+        : home != null
+            ? '~/'
+            : f.startsWith('/')
+                ? '/'
+                : '';
+    return '$lead${tail.join('/')}';
   }
 
   String _elapsed(int since) {
@@ -1570,13 +1569,8 @@ class SidebarState extends State<Sidebar> {
   Widget _mobileSessionRow(SessionInfo s, {required bool divider}) {
     final checked = _selected.contains(s.id);
     final renaming = _renamingId == s.id;
-    final folderName = s.projectFolder.trim().isEmpty
-        ? ''
-        : lastPathSegment(s.projectFolder, ifEmpty: s.projectFolder);
     final draft = !renaming && _hasDraft(s);
     final settled = s.settled;
-    final running = !settled && sessionIsActive(s.status);
-    final waiting = !settled && s.status == 'waiting_for_input';
     void open() {
       if (_selecting) {
         _toggleSelected(s.id);
@@ -1617,13 +1611,11 @@ class SidebarState extends State<Sidebar> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Row(children: [
-                    _projectBadge(s, size: 16),
-                    const SizedBox(width: 7),
                     Expanded(
-                      child: Text(_projectName(s),
+                      child: Text(_projectPath(s),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: sans(13, color: AppColors.fg3)),
+                          style: sans(14, color: AppColors.fg3)),
                     ),
                     const SizedBox(width: 10),
                     _statusChip(s, draft: draft, size: 12.5),
@@ -1669,12 +1661,12 @@ class SidebarState extends State<Sidebar> {
                         AgentMochi(s.displayAgentId!, size: 14),
                       ] else if ((s.profile ?? '').isNotEmpty) ...[
                         const SizedBox(width: 8),
-                        if (_profileProviders[s.profile] != null) ...[
+                        if (_profileProviders[s.profile] != null)
                           ProviderLogo(_profileProviders[s.profile],
-                              size: 13, color: AppColors.fg3),
-                          const SizedBox(width: 5),
-                        ],
-                        Text(s.profile!, style: sans(13, color: AppColors.fg3)),
+                              size: 15, color: AppColors.fg3)
+                        else
+                          Text(s.profile!,
+                              style: sans(13, color: AppColors.fg3)),
                       ],
                     ]),
                   ],
