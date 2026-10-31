@@ -430,7 +430,7 @@ class _DesktopShellState extends State<DesktopShell>
   ShellSection get _effectiveSection =>
       _hiddenSections.contains(_section) ? ShellSection.sessions : _section;
 
-  bool _sidePanelHidden = false;
+  bool _sidePanelHidden = true;
   Map<String, String> _tabProviders = const {};
   String? _tabProvidersFor;
 

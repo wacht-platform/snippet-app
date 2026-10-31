@@ -146,7 +146,16 @@ void main() {
           greaterThan(tester.getBottomLeft(find.text('Live chat')).dy + 100));
       expect(find.text('Old chat'), findsNothing);
       await tester.tap(find.text('Settled'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 80));
+      final mid = tester.widget<AnimatedOpacity>(find.ancestor(
+          of: find.text('Old chat'), matching: find.byType(AnimatedOpacity)).first);
+      expect(mid.opacity, 1);
+      final fade = tester.renderObject<RenderBox>(find.ancestor(
+          of: find.text('Old chat'), matching: find.byType(AnimatedSize)).first);
+      final midH = fade.size.height;
       await tester.pump(const Duration(milliseconds: 400));
+      expect(fade.size.height, greaterThan(midH));
       expect(find.text('Old chat'), findsOneWidget);
       expect(tester.getTopLeft(find.text('Settled').first).dy, lessThan(header));
       await expectLater(find.byType(Sidebar),

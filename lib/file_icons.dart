@@ -319,7 +319,7 @@ String _ext(String name) {
     'jsx' => ('JSX', _yellow),
     'ts' || 'mts' || 'cts' => ('TS', _blue),
     'tsx' => ('TSX', _blue),
-    'dart' => ('DT', _teal),
+    'dart' => ('DT', Color(0xFF54C5F8)),
     'kt' || 'kts' => ('KT', _purple),
     'swift' => ('SW', _orange),
     'java' => ('JV', _red),
@@ -386,7 +386,7 @@ class FileGlyph extends StatelessWidget {
           height: box,
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.16),
+            color: color.withValues(alpha: 0.22),
             borderRadius: BorderRadius.circular(box * 0.26),
           ),
           child: Text(label,
