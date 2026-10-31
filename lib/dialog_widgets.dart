@@ -72,14 +72,14 @@ class _AppFieldState extends State<AppField> {
         padding: EdgeInsets.symmetric(horizontal: kMobile ? 14 : 11),
         constraints: BoxConstraints(minHeight: kMobile ? 48 : 34),
         decoration: BoxDecoration(
-          color: kMobile ? AppColors.surface1 : AppColors.surface2,
+          color: AppColors.surface1,
           borderRadius: BorderRadius.circular(kMobile ? 16 : R.md),
           border: Border.all(
               color: _focus.hasFocus
                   ? AppColors.accentLine
                   : (kMobile
                       ? AppColors.fg1.withValues(alpha: 0.08)
-                      : AppColors.border)),
+                      : AppColors.lineStrong)),
         ),
         child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
           if (widget.icon != null) ...[
