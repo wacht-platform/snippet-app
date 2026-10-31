@@ -1,3 +1,4 @@
+import 'dart:ui' show ImageFilter;
 import 'package:flutter/material.dart';
 
 import 'platform.dart';
@@ -209,14 +210,29 @@ Future<T?> showModal<T>(
 // plain shell background so phones look exactly as before.
 Widget _frame(Widget child, {required bool rounded, bool edge = true}) {
   final panel = rounded || edge;
-  final color = panel ? AppColors.glassSurface : AppColors.bg;
+  final glass = panel && !kMobile;
+  final color = !panel
+      ? AppColors.bg
+      : glass
+          ? AppColors.windowBg
+          : AppColors.glassSurface;
   final radius = BorderRadius.circular(R.card);
+  Widget frost(Widget w) => glass
+      ? BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 28, sigmaY: 28), child: w)
+      : w;
 
   Widget themedBody = !panel
       ? child
       : Builder(
           builder: (ctx) => Theme(
-            data: Theme.of(ctx).copyWith(scaffoldBackgroundColor: color),
+            data: Theme.of(ctx).copyWith(
+                scaffoldBackgroundColor: glass ? Colors.transparent : color,
+                appBarTheme: glass
+                    ? Theme.of(ctx).appBarTheme.copyWith(
+                        backgroundColor: Colors.transparent,
+                        surfaceTintColor: Colors.transparent)
+                    : null),
             child: child,
           ),
         );
@@ -224,7 +240,7 @@ Widget _frame(Widget child, {required bool rounded, bool edge = true}) {
   if (rounded) {
     return ClipRRect(
       borderRadius: radius,
-      child: Material(
+      child: frost(Material(
         color: color,
         shape: RoundedRectangleBorder(
           borderRadius: radius,
@@ -232,19 +248,19 @@ Widget _frame(Widget child, {required bool rounded, bool edge = true}) {
         ),
         clipBehavior: Clip.antiAlias,
         child: themedBody,
-      ),
+      )),
     );
   }
 
   if (edge) {
     return ClipRect(
-      child: Container(
+      child: frost(Container(
         decoration: BoxDecoration(
           color: color,
           border: Border(left: BorderSide(color: AppColors.glassBorder)),
         ),
         child: themedBody,
-      ),
+      )),
     );
   }
 
