@@ -3161,11 +3161,11 @@ final class NotchHomeView: NSView {
 
   static func expandedHeight(model: NotchHomeModel, detail: NotchHomeItem?, topInset: CGFloat, width: CGFloat) -> CGFloat {
     if let d = detail {
-      var h = topInset + 8 + 28 + 10
+      var h = topInset + 4 + 26 + 6
       h += detailBodyHeight(d, width: width - 40)
       h += CGFloat(min(d.details.count, 8)) * 26
-      if !d.actions.isEmpty { h += 46 }
-      return h + 12
+      if !d.actions.isEmpty { h += 40 }
+      return h + 10
     }
     var h = topInset + 2 + headerHeight + 4
     if let f = model.items.first(where: { isFeatured($0, model) }) {
@@ -3269,18 +3269,18 @@ final class NotchHomeView: NSView {
       let back = NotchHomeRoundButton(symbol: "chevron.left", fallback: "\u{2039}", size: 26) { [weak self] in
         self?.onSelect?(nil)
       }
-      back.frame.origin = NSPoint(x: pad, y: topInset + 6)
+      back.frame.origin = NSPoint(x: pad, y: topInset + 4)
       addSubview(back)
       let title = label(item.title, size: 13.5, weight: .medium, color: NotchHomePalette.text)
       title.sizeToFit()
-      title.frame = NSRect(x: pad + 36, y: topInset + 9, width: min(title.frame.width, w - pad * 2 - 36 - 70), height: 18)
+      title.frame = NSRect(x: pad + 36, y: topInset + 8, width: min(title.frame.width, w - pad * 2 - 36 - 70), height: 18)
       addSubview(title)
       if !item.tag.isEmpty {
         let c = chip(item.tag)
-        c.frame.origin = NSPoint(x: title.frame.maxX + 8, y: topInset + 10)
+        c.frame.origin = NSPoint(x: title.frame.maxX + 8, y: topInset + 9)
         addSubview(c)
       }
-      var y = topInset + 8 + 28 + 10
+      var y = topInset + 4 + 26 + 6
       let bodyH = NotchHomeView.detailBodyHeight(item, width: w - pad * 2)
       if bodyH > 0 {
         let body = NSTextField(wrappingLabelWithString: item.line)
@@ -3559,7 +3559,10 @@ final class NotchHomeController {
     let w: CGFloat
     let h: CGFloat
     if expanded {
-      w = min(max(hw.size.width + 2 * 110, 440), panelSize.width)
+      let compact = detail.map { $0.details.isEmpty && $0.line.count <= 48 } ?? false
+      w = compact
+        ? min(max(hw.size.width + 2 * 70, 360), panelSize.width)
+        : min(max(hw.size.width + 2 * 110, 440), panelSize.width)
       h = min(
         NotchHomeView.expandedHeight(
           model: model, detail: detail, topInset: hw.attached ? hw.size.height : 8, width: w),
