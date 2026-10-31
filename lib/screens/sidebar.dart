@@ -123,6 +123,8 @@ class SidebarState extends State<Sidebar> {
   final GlobalKey<AgentsSidebarPanelState> _agentsPanelKey =
       GlobalKey<AgentsSidebarPanelState>();
   bool _selecting = false;
+  static const _settledCap = 5;
+  static bool _settledAll = false;
   static bool _settledOpen = false;
   final Set<String> _selected = {};
 
@@ -718,6 +720,9 @@ class SidebarState extends State<Sidebar> {
 
   Widget _settledGroup(List<SessionInfo> rows, {required bool mobile}) {
     final open = _settledOpen || _filterQuery.trim().isNotEmpty;
+    final shown = _settledAll || rows.length <= _settledCap + 1
+        ? rows
+        : rows.take(_settledCap).toList();
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       HoverSurface(
         radius: 8,
@@ -748,11 +753,27 @@ class SidebarState extends State<Sidebar> {
           ]),
         ),
       ),
-      if (open)
-        for (var i = 0; i < rows.length; i++)
+      if (open) ...[
+        for (var i = 0; i < shown.length; i++)
           mobile
-              ? _mobileSessionRow(rows[i], divider: i + 1 < rows.length)
-              : _desktopChatRow(rows[i]),
+              ? _mobileSessionRow(shown[i], divider: i + 1 < shown.length)
+              : _desktopChatRow(shown[i]),
+        if (rows.length > _settledCap + 1)
+          HoverSurface(
+            radius: 8,
+            onTap: () => setState(() => _settledAll = !_settledAll),
+            child: Padding(
+              padding: mobile
+                  ? const EdgeInsets.fromLTRB(4, 12, 4, 12)
+                  : const EdgeInsets.fromLTRB(6, 10, 6, 10),
+              child: Text(
+                  _settledAll
+                      ? 'Show fewer'
+                      : 'Show ${rows.length - _settledCap} more',
+                  style: sans(mobile ? 14 : 12.5, color: AppColors.fg3)),
+            ),
+          ),
+      ],
     ]);
   }
 
@@ -1049,8 +1070,10 @@ class SidebarState extends State<Sidebar> {
                       style: sans(12, weight: W.label, color: AppColors.fg4)),
                 ),
                 ...rows,
-                if (settledRows.isNotEmpty && settledOpen)
+                if (settledRows.isNotEmpty && settledOpen) ...[
+                  const SizedBox(height: 32),
                   _settledGroup(settledRows, mobile: false),
+                ],
               ],
             ],
           ),
@@ -1121,17 +1144,13 @@ class SidebarState extends State<Sidebar> {
                   height: 20,
                   child: Row(children: [
                     Expanded(
-                      child:
-                          Text(s.title.trim().isEmpty ? '(untitled)' : s.title,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: sans(13.5,
-                                  weight: W.label,
-                                  color: settled
-                                      ? AppColors.fg4
-                                      : selected
-                                          ? AppColors.fg1
-                                          : AppColors.fg2)),
+                      child: Text(
+                          s.title.trim().isEmpty ? '(untitled)' : s.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: sans(13.5,
+                              weight: W.label,
+                              color: selected ? AppColors.fg1 : AppColors.fg2)),
                     ),
                     if (s.keepAwake) ...[
                       const SizedBox(width: 6),
@@ -1224,12 +1243,10 @@ class SidebarState extends State<Sidebar> {
     final branch = s.branch?.trim() ?? '';
     final c = s.shownChanges;
     final hasDiff = c != null && (c.added > 0 || c.removed > 0);
-    if (branch.isEmpty && !hasDiff && !s.isGit) return null;
     return Row(children: [
-      if (s.isGit) ...[
-        AppIcon('git-branch', size: size + 1, color: AppColors.fg4),
-        const SizedBox(width: 5),
-      ],
+      AppIcon(s.isGit ? 'git-branch' : 'folder',
+          size: size + 1, color: AppColors.fg4),
+      const SizedBox(width: 5),
       if (branch.isNotEmpty)
         Flexible(
           child: Text(branch,
@@ -1628,8 +1645,7 @@ class SidebarState extends State<Sidebar> {
                               style: sans(16,
                                   weight: W.strong,
                                   height: 21 / 16,
-                                  color:
-                                      settled ? AppColors.fg3 : AppColors.fg1)),
+                                  color: AppColors.fg1)),
                     ),
                     if (s.keepAwake) ...[
                       const SizedBox(width: 8),

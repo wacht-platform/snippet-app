@@ -90,26 +90,16 @@ class CrewRoster extends StatelessWidget {
     required this.onOpen,
     this.onMenu,
     this.columns = 2,
-    this.dense = false,
   });
 
   final List<CrewEntry> entries;
   final ValueChanged<CoordinationAgent> onOpen;
   final void Function(BuildContext, CoordinationAgent, Offset)? onMenu;
   final int columns;
-  final bool dense;
 
   @override
   Widget build(BuildContext context) {
     final list = crewOrdered(entries);
-    if (dense) {
-      return Padding(
-        padding: const EdgeInsets.fromLTRB(8, 2, 8, 6),
-        child: Column(children: [
-          for (final e in list) _CrewRow(e, () => onOpen(e.agent), onMenu),
-        ]),
-      );
-    }
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
       child: LayoutBuilder(builder: (context, box) {
@@ -606,64 +596,6 @@ Future<void> _pickCrewModel(
   }
 }
 
-class _CrewRow extends StatelessWidget {
-  const _CrewRow(this.e, this.onTap, this.onMenu);
-  final CrewEntry e;
-  final VoidCallback onTap;
-  final void Function(BuildContext, CoordinationAgent, Offset)? onMenu;
-
-  @override
-  Widget build(BuildContext context) {
-    final idle = e.state == CrewState.standingBy;
-    final c = crewColor(e.state);
-    return Tooltip(
-      message:
-          [e.agent.displayName, e.line].where((x) => x.isNotEmpty).join('\n'),
-      child: HoverSurface(
-        radius: 8,
-        onTap: onTap,
-        onSecondaryTapDown: onMenu == null
-            ? null
-            : (d) => onMenu!(context, e.agent, d.globalPosition),
-        child: Container(
-          height: 52,
-          padding: const EdgeInsets.symmetric(horizontal: 14),
-          child: Row(children: [
-            Opacity(
-                opacity: idle ? .8 : 1,
-                child: AgentMochi(e.agent.id, size: 30)),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(e.agent.displayName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: sans(14,
-                          weight: W.label,
-                          color: idle ? AppColors.fg2 : AppColors.fg1)),
-                  if (e.line.isNotEmpty)
-                    Text(e.line,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: sans(12, color: idle ? AppColors.fg4 : c)),
-                ],
-              ),
-            ),
-            if (!idle)
-              Container(
-                  width: 6,
-                  height: 6,
-                  decoration: BoxDecoration(color: c, shape: BoxShape.circle)),
-          ]),
-        ),
-      ),
-    );
-  }
-}
-
 /// Collapsed crew: overlapping avatars that open the roster in a popover on
 /// hover or tap.
 class CrewStack extends StatefulWidget {
@@ -731,13 +663,13 @@ class _CrewStackState extends State<CrewStack> {
                 borderRadius: BorderRadius.circular(12),
                 elevation: 0,
                 child: Container(
-                  width: 312,
-                  padding: const EdgeInsets.all(10),
+                  width: 420,
+                  padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(color: AppColors.lineStrong),
                   ),
-                  child: Wrap(spacing: 8, runSpacing: 8, children: [
+                  child: Wrap(spacing: 10, runSpacing: 10, children: [
                     for (final e in list)
                       _CrewTile(
                         e,
@@ -813,8 +745,8 @@ class _CrewTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final idle = e.state == CrewState.standingBy;
     return SizedBox(
-      width: 141,
-      height: 92,
+      width: 191,
+      height: 124,
       child: HoverSurface(
         rest: AppColors.surface3,
         hoverColor: Color.lerp(AppColors.surface3, AppColors.fg1, 0.07),
@@ -831,7 +763,7 @@ class _CrewTile extends StatelessWidget {
             children: [
               Opacity(
                   opacity: idle ? .85 : 1,
-                  child: AgentMochi(e.agent.id, size: 32)),
+                  child: AgentMochi(e.agent.id, size: 44)),
               const Spacer(),
               Text(e.agent.displayName,
                   maxLines: 1,
@@ -857,8 +789,8 @@ class _NewAgentTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => SizedBox(
-        width: 141,
-        height: 92,
+        width: 191,
+        height: 124,
         child: Material(
           color: Colors.transparent,
           shape: RoundedRectangleBorder(

@@ -35,11 +35,13 @@ class DaemonClient {
       return connector(uri,
           connectTimeout: connectTimeout, pingInterval: pingInterval);
     }
-    return ws_io.IOWebSocketChannel.connect(
+    final channel = ws_io.IOWebSocketChannel.connect(
       uri,
       connectTimeout: connectTimeout,
       pingInterval: pingInterval,
     );
+    channel.ready.catchError((Object _) {});
+    return channel;
   }
 
   final String baseUrl; // e.g. https://abc.trycloudflare.com
@@ -162,7 +164,12 @@ class DaemonClient {
     final uri = base.replace(
       scheme: wsScheme,
       path: '/attach',
-      queryParameters: {'session': sessionId, 'token': token, 'compact': '1', 'stream_delta': '1'},
+      queryParameters: {
+        'session': sessionId,
+        'token': token,
+        'compact': '1',
+        'stream_delta': '1'
+      },
     );
     return _connectWs(
       uri,
@@ -214,8 +221,8 @@ class DaemonClient {
   /// POST /ambient/call/{id}/track|ignore|stop. Returns the HTTP status so the
   /// caller can treat 404/409 (already resolved) as a dismissal.
   Future<int> ambientCallAction(String callId, String action) async {
-    final r = await http.post(
-        _uri('/ambient/call/${Uri.encodeComponent(callId)}/$action'));
+    final r = await http
+        .post(_uri('/ambient/call/${Uri.encodeComponent(callId)}/$action'));
     return r.statusCode;
   }
 
@@ -445,12 +452,14 @@ class DaemonClient {
 
   Future<void> setRouting(String route, List<String> profiles) async {
     final r = await http.post(_uri('/config/routing'),
-        headers: _json, body: jsonEncode({'route': route, 'profiles': profiles}));
+        headers: _json,
+        body: jsonEncode({'route': route, 'profiles': profiles}));
     if (r.statusCode != 200) throw _err('set routing', r);
     invalidateConfig();
   }
 
-  Future<void> resolveLimit(String session, String action, {String? profile}) async {
+  Future<void> resolveLimit(String session, String action,
+      {String? profile}) async {
     final r = await http.post(_uri('/session/limit'),
         headers: _json,
         body: jsonEncode({
@@ -485,7 +494,8 @@ class DaemonClient {
     return VoiceSettings.fromJson(jsonDecode(r.body) as Map<String, dynamic>);
   }
 
-  Future<List<AmbientEvent>> ambientEvents({int limit = 50, String? query}) async {
+  Future<List<AmbientEvent>> ambientEvents(
+      {int limit = 50, String? query}) async {
     final r = await http.get(_uri('/ambient/events', {
       'limit': '$limit',
       if (query != null && query.trim().isNotEmpty) 'q': query.trim(),
@@ -554,7 +564,8 @@ class DaemonClient {
           if (enabled != null) 'enabled': enabled,
           if (mode != null) 'mode': mode,
           if (watcher != null) 'watcher': watcher,
-          if (watcherChatContext != null) 'watcher_chat_context': watcherChatContext,
+          if (watcherChatContext != null)
+            'watcher_chat_context': watcherChatContext,
           if (typesafeKey != null) 'typesafe_api_key': typesafeKey,
           if (conversationTimeoutSecs != null)
             'conversation_timeout_secs': conversationTimeoutSecs,
@@ -993,7 +1004,8 @@ class DaemonClient {
 
   String _ghError(http.Response r) {
     try {
-      return (jsonDecode(r.body) as Map<String, dynamic>)['error']?.toString() ??
+      return (jsonDecode(r.body) as Map<String, dynamic>)['error']
+              ?.toString() ??
           r.body;
     } catch (_) {
       return r.body;
@@ -1011,8 +1023,8 @@ class DaemonClient {
   }
 
   Future<PrDetail> githubPr(String session, int number) async {
-    final r = await http.get(
-        _uri('/github/pr', {'session': session, 'number': '$number'}));
+    final r = await http
+        .get(_uri('/github/pr', {'session': session, 'number': '$number'}));
     if (r.statusCode != 200) throw _ghError(r);
     return PrDetail.fromJson(jsonDecode(r.body) as Map<String, dynamic>);
   }
@@ -1065,8 +1077,8 @@ class DaemonClient {
   }
 
   Future<String> githubCommitDiff(String session, String sha) async {
-    final r = await http.get(
-        _uri('/github/commit/diff', {'session': session, 'sha': sha}));
+    final r = await http
+        .get(_uri('/github/commit/diff', {'session': session, 'sha': sha}));
     if (r.statusCode != 200) throw _ghError(r);
     return (jsonDecode(r.body) as Map<String, dynamic>)['diff'] as String? ??
         '';
@@ -1159,7 +1171,8 @@ class DaemonClient {
   Future<void> prState(String session, int number, String action) async {
     final r = await http.post(_uri('/github/pr/state'),
         headers: _json,
-        body: jsonEncode({'session': session, 'number': number, 'action': action}));
+        body: jsonEncode(
+            {'session': session, 'number': number, 'action': action}));
     if (r.statusCode != 200) throw _ghError(r);
   }
 
@@ -1195,7 +1208,8 @@ class DaemonClient {
   }
 
   /// An absolute URL for a signed artifact link from [artifacts].
-  Uri artifactUri(String signedPath) => Uri.parse(baseUrl).replace(path: signedPath);
+  Uri artifactUri(String signedPath) =>
+      Uri.parse(baseUrl).replace(path: signedPath);
 
   /// The text behind a signed artifact link, for Source views and native
   /// renderers.
@@ -1455,7 +1469,9 @@ class DaemonClient {
   Future<void> deleteAgent(String id) async {
     final r = await http.delete(_uri('/agents/${Uri.encodeComponent(id)}'));
     if (r.statusCode != 200) {
-      throw r.body.trim().isEmpty ? 'Couldn\'t delete agent (${r.statusCode})' : r.body.trim();
+      throw r.body.trim().isEmpty
+          ? 'Couldn\'t delete agent (${r.statusCode})'
+          : r.body.trim();
     }
   }
 
