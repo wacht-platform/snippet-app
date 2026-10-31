@@ -663,13 +663,13 @@ class _CrewStackState extends State<CrewStack> {
                 borderRadius: BorderRadius.circular(12),
                 elevation: 0,
                 child: Container(
-                  width: 420,
-                  padding: const EdgeInsets.all(12),
+                  width: 440,
+                  padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(color: AppColors.lineStrong),
                   ),
-                  child: Wrap(spacing: 10, runSpacing: 10, children: [
+                  child: Wrap(spacing: 12, runSpacing: 12, children: [
                     for (final e in list)
                       _CrewTile(
                         e,
@@ -745,8 +745,8 @@ class _CrewTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final idle = e.state == CrewState.standingBy;
     return SizedBox(
-      width: 191,
-      height: 124,
+      width: 186,
+      height: 96,
       child: HoverSurface(
         rest: AppColors.surface3,
         hoverColor: Color.lerp(AppColors.surface3, AppColors.fg1, 0.07),
@@ -763,7 +763,7 @@ class _CrewTile extends StatelessWidget {
             children: [
               Opacity(
                   opacity: idle ? .85 : 1,
-                  child: AgentMochi(e.agent.id, size: 44)),
+                  child: AgentMochi(e.agent.id, size: 32)),
               const Spacer(),
               Text(e.agent.displayName,
                   maxLines: 1,
@@ -789,8 +789,8 @@ class _NewAgentTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => SizedBox(
-        width: 191,
-        height: 124,
+        width: 186,
+        height: 96,
         child: Material(
           color: Colors.transparent,
           shape: RoundedRectangleBorder(

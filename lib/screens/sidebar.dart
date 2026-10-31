@@ -123,8 +123,6 @@ class SidebarState extends State<Sidebar> {
   final GlobalKey<AgentsSidebarPanelState> _agentsPanelKey =
       GlobalKey<AgentsSidebarPanelState>();
   bool _selecting = false;
-  static const _settledCap = 5;
-  static bool _settledAll = false;
   static bool _settledOpen = false;
   final Set<String> _selected = {};
 
@@ -720,9 +718,7 @@ class SidebarState extends State<Sidebar> {
 
   Widget _settledGroup(List<SessionInfo> rows, {required bool mobile}) {
     final open = _settledOpen || _filterQuery.trim().isNotEmpty;
-    final shown = _settledAll || rows.length <= _settledCap + 1
-        ? rows
-        : rows.take(_settledCap).toList();
+    final shown = rows;
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       HoverSurface(
         radius: 8,
@@ -730,7 +726,7 @@ class SidebarState extends State<Sidebar> {
         child: Padding(
           padding: mobile
               ? const EdgeInsets.fromLTRB(4, 16, 4, 10)
-              : const EdgeInsets.fromLTRB(6, 10, 6, 10),
+              : const EdgeInsets.fromLTRB(10, 10, 10, 10),
           child: Row(children: [
             AppIcon('archive', size: mobile ? 15 : 13, color: AppColors.fg4),
             const SizedBox(width: 8),
@@ -758,21 +754,6 @@ class SidebarState extends State<Sidebar> {
           mobile
               ? _mobileSessionRow(shown[i], divider: i + 1 < shown.length)
               : _desktopChatRow(shown[i]),
-        if (rows.length > _settledCap + 1)
-          HoverSurface(
-            radius: 8,
-            onTap: () => setState(() => _settledAll = !_settledAll),
-            child: Padding(
-              padding: mobile
-                  ? const EdgeInsets.fromLTRB(4, 12, 4, 12)
-                  : const EdgeInsets.fromLTRB(6, 10, 6, 10),
-              child: Text(
-                  _settledAll
-                      ? 'Show fewer'
-                      : 'Show ${rows.length - _settledCap} more',
-                  style: sans(mobile ? 14 : 12.5, color: AppColors.fg3)),
-            ),
-          ),
       ],
     ]);
   }
@@ -1057,7 +1038,7 @@ class SidebarState extends State<Sidebar> {
           onRefresh: () async => widget.onRefreshSessions(),
           child: ListView(
             physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.fromLTRB(8, 0, 8, 16),
+            padding: const EdgeInsets.fromLTRB(4, 0, 4, 16),
             children: [
               if (!hasClient)
                 const SidebarEmpty('Add a machine to begin.')
@@ -1065,7 +1046,7 @@ class SidebarState extends State<Sidebar> {
                 _emptySessions(searching: _filterQuery.trim().isNotEmpty)
               else ...[
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(6, 10, 6, 4),
+                  padding: const EdgeInsets.fromLTRB(10, 10, 10, 4),
                   child: Text('Sessions',
                       style: sans(12, weight: W.label, color: AppColors.fg4)),
                 ),
@@ -1081,7 +1062,7 @@ class SidebarState extends State<Sidebar> {
       ),
       if (hasClient && settledRows.isNotEmpty && !settledOpen)
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 4),
           child: _settledGroup(settledRows, mobile: false),
         ),
       Container(
@@ -1116,7 +1097,7 @@ class SidebarState extends State<Sidebar> {
           ? null
           : (d) => _sessionActions(s, position: d.globalPosition),
       child: Container(
-        padding: const EdgeInsets.fromLTRB(6, 8, 6, 8),
+        padding: const EdgeInsets.fromLTRB(10, 11, 10, 11),
         child: Row(children: [
           if (_selecting) ...[
             SelectCheck(checked, size: 14),
