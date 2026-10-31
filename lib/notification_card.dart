@@ -178,7 +178,7 @@ class _NotificationMessageCardState extends State<NotificationMessageCard> {
         '${(p['body'] ?? '').toString().trim().isNotEmpty ? p['body'] : p['message'] ?? ''}');
     final action = cardActionFor(p);
     final busy = _state == _Send.sending;
-    final mood = _mood(p, action);
+    final mood = notificationTone(p);
     final ago = _ago(p['created_at']);
     final showBody = body.isNotEmpty && body != title;
 
@@ -377,7 +377,7 @@ class _NotificationMessageCardState extends State<NotificationMessageCard> {
   }
 }
 
-Color _mood(Map<String, dynamic> p, CardAction a) =>
+Color notificationTone(Map<String, dynamic> p) =>
     switch ('${p['kind'] ?? ''}'.split('.').last) {
       'waiting' => AppColors.run,
       'done' || 'completed' => AppColors.ok,

@@ -1,4 +1,8 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:snippet/notification_card.dart';
@@ -43,17 +47,41 @@ const _items = <Map<String, dynamic>>[
 ];
 
 void main() {
+  setUpAll(() async {
+    final packages =
+        (jsonDecode(File('.dart_tool/package_config.json').readAsStringSync())
+            as Map)['packages'] as List;
+    final root = packages.firstWhere(
+        (p) => p['name'] == 'lucide_icons_flutter')['rootUri'] as String;
+    final pkg = Uri.parse(root).toFilePath();
+    final font = File('$pkg/assets/lucide.ttf');
+    if (!font.existsSync()) return;
+    await (FontLoader('packages/lucide_icons_flutter/Lucide')
+          ..addFont(font.readAsBytes().then(ByteData.sublistView)))
+        .load();
+  });
+
   for (final (name, platform, width) in [
     ('mobile', TargetPlatform.android, 390.0),
     ('desktop', TargetPlatform.macOS, 444.0),
   ]) {
-    for (final expanded in [false, true]) {
-      testWidgets('stack ${expanded ? 'expanded' : 'collapsed'} ($name)',
+    for (final (expanded, open) in [
+      (false, false),
+      (false, true),
+      (true, false)
+    ]) {
+      testWidgets(
+          'stack ${expanded ? 'expanded' : open ? 'open' : 'collapsed'} ($name)',
           (tester) async {
         debugDefaultTargetPlatformOverride = platform;
         try {
-          await tester.binding
-              .setSurfaceSize(Size(width, expanded ? 640 : 220));
+          await tester.binding.setSurfaceSize(Size(
+              width,
+              expanded
+                  ? 640
+                  : open
+                      ? 320
+                      : 220));
           await tester.pumpWidget(MaterialApp(
             debugShowCheckedModeBanner: false,
             theme: buildAppTheme(),
@@ -73,6 +101,7 @@ void main() {
                       cardBuilder: (p, embedded) => NotificationMessageCard(
                         payload: p,
                         embedded: embedded,
+                        initiallyExpanded: open && identical(p, _items.first),
                         onOpen: () {},
                         onDismiss: () {},
                         onHold: (_) {},
@@ -86,8 +115,10 @@ void main() {
           ));
           await tester.pumpAndSettle();
           expect(tester.takeException(), isNull);
-          await expectGolden(tester, find.byType(Scaffold),
-              'goldens/notification_stack_${expanded ? 'expanded' : 'collapsed'}_$name.png');
+          await expectGolden(
+              tester,
+              find.byType(Scaffold),
+              'goldens/notification_stack_${expanded ? 'expanded' : open ? 'open' : 'collapsed'}_$name.png');
         } finally {
           debugDefaultTargetPlatformOverride = null;
           await tester.binding.setSurfaceSize(null);

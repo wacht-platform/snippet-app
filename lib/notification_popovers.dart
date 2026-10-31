@@ -185,8 +185,7 @@ class _NotificationPopoversState extends State<NotificationPopovers> {
     return Dismissible(
       key: ObjectKey(payload),
       direction: DismissDirection.horizontal,
-      movementDuration:
-          reducedMotion ? Duration.zero : const Duration(milliseconds: 160),
+      movementDuration: reducedMotion ? Duration.zero : Motion.fast,
       resizeDuration: null,
       onDismissed: (_) => _remove(payload, feedback: true),
       child: NotificationMessageCard(
@@ -205,7 +204,7 @@ class _NotificationPopoversState extends State<NotificationPopovers> {
     _pending.removeWhere(suppressVisibleNotification);
     final items = _ordered;
     final call = callTracker.state.value;
-    final reducedMotion = MediaQuery.disableAnimationsOf(context);
+    final reducedMotion = reduceMotion(context);
     return Stack(children: [
       widget.child,
       if (call != null)
@@ -235,17 +234,22 @@ class _NotificationPopoversState extends State<NotificationPopovers> {
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 420),
                 child: AnimatedSwitcher(
-                  duration: reducedMotion
-                      ? Duration.zero
-                      : const Duration(milliseconds: 180),
+                  duration: reducedMotion ? Duration.zero : Motion.open,
+                  reverseDuration: reducedMotion ? Duration.zero : Motion.close,
+                  switchInCurve: Motion.enter,
+                  switchOutCurve: Motion.exit,
                   transitionBuilder: (child, animation) => FadeTransition(
                     opacity: animation,
                     child: SlideTransition(
                       position: Tween<Offset>(
                               begin: const Offset(0, -.08), end: Offset.zero)
-                          .animate(CurvedAnimation(
-                              parent: animation, curve: Curves.easeOutCubic)),
-                      child: child,
+                          .animate(animation),
+                      child: ScaleTransition(
+                        alignment:
+                            kMobile ? Alignment.topCenter : Alignment.topRight,
+                        scale: Tween(begin: .96, end: 1.0).animate(animation),
+                        child: child,
+                      ),
                     ),
                   ),
                   child: items.isEmpty
