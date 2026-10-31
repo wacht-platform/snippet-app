@@ -448,6 +448,7 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
               SystemRow(step: _s(e['step']), reasoning: _s(e['reasoning'])));
         case 'turn_changes':
           endTools(key);
+          if (isDedicatedMcSession(widget.sessionId)) break;
           addEvent(
               key,
               TurnChangesCard(

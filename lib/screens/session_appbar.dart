@@ -377,7 +377,7 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
     var add = 0, del = 0;
     final evs = s?.events ?? const <Map<String, dynamic>>[];
     for (var i = evs.length - 1; i >= 0; i--) {
-      if (evs[i]['kind'] != 'turn_changes') continue;
+      if (evs[i]['kind'] != 'turn_changes' || _isMissionControl) continue;
       add += (evs[i]['add'] as num?)?.toInt() ?? 0;
       del += (evs[i]['del'] as num?)?.toInt() ?? 0;
       if (!_isGitSession) break;
