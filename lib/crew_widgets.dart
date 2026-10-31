@@ -672,13 +672,13 @@ class CrewStack extends StatefulWidget {
     required this.entries,
     required this.onOpen,
     this.onMenu,
-    this.footer,
+    this.onNew,
   });
 
   final List<CrewEntry> entries;
   final ValueChanged<CoordinationAgent> onOpen;
-  final void Function(BuildContext, CoordinationAgent, Offset)? onMenu;
-  final Widget? footer;
+  final Future<void> Function(BuildContext, CoordinationAgent, Offset)? onMenu;
+  final VoidCallback? onNew;
 
   @override
   State<CrewStack> createState() => _CrewStackState();
@@ -688,6 +688,7 @@ class _CrewStackState extends State<CrewStack> {
   final _portal = OverlayPortalController();
   final _link = LayerLink();
   Timer? _hide;
+  bool _pinned = false;
 
   void _show() {
     _hide?.cancel();
@@ -697,7 +698,7 @@ class _CrewStackState extends State<CrewStack> {
   void _later() {
     _hide?.cancel();
     _hide = Timer(const Duration(milliseconds: 220), () {
-      if (mounted && _portal.isShowing) _portal.hide();
+      if (mounted && !_pinned && _portal.isShowing) _portal.hide();
     });
   }
 
@@ -730,19 +731,38 @@ class _CrewStackState extends State<CrewStack> {
                 borderRadius: BorderRadius.circular(12),
                 elevation: 0,
                 child: Container(
-                  width: 300,
-                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  width: 312,
+                  padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(14),
                     border: Border.all(color: AppColors.lineStrong),
                   ),
-                  child: Column(mainAxisSize: MainAxisSize.min, children: [
+                  child: Wrap(spacing: 8, runSpacing: 8, children: [
                     for (final e in list)
-                      _CrewRow(e, () {
+                      _CrewTile(
+                        e,
+                        onTap: () {
+                          _portal.hide();
+                          widget.onOpen(e.agent);
+                        },
+                        onMenu: widget.onMenu == null
+                            ? null
+                            : (ctx, a, p) async {
+                                _pinned = true;
+                                _hide?.cancel();
+                                try {
+                                  await widget.onMenu!(ctx, a, p);
+                                } finally {
+                                  _pinned = false;
+                                  if (mounted) _later();
+                                }
+                              },
+                      ),
+                    if (widget.onNew != null)
+                      _NewAgentTile(onTap: () {
                         _portal.hide();
-                        widget.onOpen(e.agent);
-                      }, widget.onMenu),
-                    if (widget.footer != null) widget.footer!,
+                        widget.onNew!();
+                      }),
                   ]),
                 ),
               ),
@@ -781,4 +801,82 @@ class _CrewStackState extends State<CrewStack> {
       ),
     );
   }
+}
+
+class _CrewTile extends StatelessWidget {
+  const _CrewTile(this.e, {required this.onTap, this.onMenu});
+  final CrewEntry e;
+  final VoidCallback onTap;
+  final void Function(BuildContext, CoordinationAgent, Offset)? onMenu;
+
+  @override
+  Widget build(BuildContext context) {
+    final idle = e.state == CrewState.standingBy;
+    return SizedBox(
+      width: 141,
+      height: 92,
+      child: Material(
+        color: AppColors.surface3,
+        borderRadius: BorderRadius.circular(10),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(10),
+          onTap: onTap,
+          onSecondaryTapDown: onMenu == null
+              ? null
+              : (d) => onMenu!(context, e.agent, d.globalPosition),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Opacity(
+                    opacity: idle ? .85 : 1,
+                    child: AgentMochi(e.agent.id, size: 32)),
+                const Spacer(),
+                Text(e.agent.displayName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: sans(13.5, weight: W.label, color: AppColors.fg1)),
+                if (e.line.isNotEmpty)
+                  Text(e.line,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: sans(12,
+                          color: idle ? AppColors.fg4 : crewColor(e.state))),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _NewAgentTile extends StatelessWidget {
+  const _NewAgentTile({required this.onTap});
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+        width: 141,
+        height: 92,
+        child: Material(
+          color: Colors.transparent,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+            side: BorderSide(color: AppColors.lineStrong),
+          ),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(10),
+            onTap: onTap,
+            child:
+                Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+              AppIcon('plus', size: 18, color: AppColors.fg3),
+              const SizedBox(height: 6),
+              Text('New agent', style: sans(13, color: AppColors.fg3)),
+            ]),
+          ),
+        ),
+      );
 }

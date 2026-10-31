@@ -975,10 +975,10 @@ class SidebarState extends State<Sidebar> {
                       entries: deriveCrew(
                           _crew, widget.sessions ?? const <SessionInfo>[]),
                       onOpen: (a) => widget.onOpenAgent?.call(a),
-                      onMenu: (ctx, agent, point) {
+                      onMenu: (ctx, agent, point) async {
                         final c = widget.client;
                         if (c == null) return;
-                        showCrewAgentMenu(ctx,
+                        await showCrewAgentMenu(ctx,
                             client: c,
                             agent: agent,
                             point: point, onDeleted: () {
@@ -986,25 +986,11 @@ class SidebarState extends State<Sidebar> {
                           _loadCrew();
                         });
                       },
-                      footer: Builder(
-                        builder: (ctx) => InkWell(
-                          onTap: () async {
-                            await _openCreateAgent(ctx);
-                            _crewAt = null;
-                            _loadCrew();
-                          },
-                          child: Container(
-                            height: 32,
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            child: Row(children: [
-                              AppIcon('plus', size: 14, color: AppColors.fg4),
-                              const SizedBox(width: 12),
-                              Text('New agent',
-                                  style: sans(13, color: AppColors.fg3)),
-                            ]),
-                          ),
-                        ),
-                      ),
+                      onNew: () async {
+                        await _openCreateAgent(context);
+                        _crewAt = null;
+                        _loadCrew();
+                      },
                     )
                   else
                     const SizedBox(width: 6),
@@ -1116,81 +1102,69 @@ class SidebarState extends State<Sidebar> {
             : (d) => _sessionActions(s, position: d.globalPosition),
         child: Container(
           padding: const EdgeInsets.fromLTRB(6, 8, 6, 8),
-          child: SizedBox(
-              height: 52,
-              child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    if (_selecting) ...[
-                      Center(child: SelectCheck(checked, size: 14)),
-                      const SizedBox(width: 10),
-                    ],
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          SizedBox(
-                            height: 16,
-                            child: Text(_projectPath(s),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: sans(11.5, color: AppColors.fg4)),
-                          ),
-                          SizedBox(
-                            height: 20,
-                            child: Row(children: [
-                              Expanded(
-                                child: Text(
-                                    s.title.trim().isEmpty
-                                        ? '(untitled)'
-                                        : s.title,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: sans(13.5,
-                                        weight: W.label,
-                                        color: settled
-                                            ? AppColors.fg4
-                                            : selected
-                                                ? AppColors.fg1
-                                                : AppColors.fg2)),
-                              ),
-                              if (s.keepAwake) ...[
-                                const SizedBox(width: 6),
-                                Tooltip(
-                                    message: "Won't auto-settle",
-                                    child: AppIcon('lock',
-                                        size: 11, color: AppColors.fg4)),
-                              ],
-                            ]),
-                          ),
-                          SizedBox(
-                            height: 16,
-                            child: _detailLine(s, size: 12) ??
-                                const SizedBox.shrink(),
-                          ),
-                        ],
+          child: Row(children: [
+            if (_selecting) ...[
+              SelectCheck(checked, size: 14),
+              const SizedBox(width: 10),
+            ],
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(
+                    height: 16,
+                    child: Row(children: [
+                      Expanded(
+                        child: Text(_projectPath(s),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: sans(11.5, color: AppColors.fg4)),
                       ),
-                    ),
-                    const SizedBox(width: 10),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        SizedBox(
-                            height: 16,
-                            child: _statusChip(s,
-                                draft: draft, size: 12, plain: true)),
-                        SizedBox(
-                          height: 16,
-                          child: _profileProviders[s.profile] != null
-                              ? ProviderLogo(_profileProviders[s.profile],
-                                  size: 14, color: AppColors.fg3)
-                              : const SizedBox.shrink(),
-                        ),
+                      const SizedBox(width: 8),
+                      _statusChip(s, draft: draft, size: 12, plain: true),
+                    ]),
+                  ),
+                  SizedBox(
+                    height: 20,
+                    child: Row(children: [
+                      Expanded(
+                        child: Text(
+                            s.title.trim().isEmpty ? '(untitled)' : s.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: sans(13.5,
+                                weight: W.label,
+                                color: settled
+                                    ? AppColors.fg4
+                                    : selected
+                                        ? AppColors.fg1
+                                        : AppColors.fg2)),
+                      ),
+                      if (s.keepAwake) ...[
+                        const SizedBox(width: 6),
+                        Tooltip(
+                            message: "Won't auto-settle",
+                            child: AppIcon('lock',
+                                size: 11, color: AppColors.fg4)),
                       ],
-                    ),
-                  ])),
+                    ]),
+                  ),
+                  SizedBox(
+                    height: 16,
+                    child: Row(children: [
+                      Expanded(
+                          child: _detailLine(s, size: 12) ??
+                              const SizedBox.shrink()),
+                      if (_profileProviders[s.profile] != null)
+                        ProviderLogo(_profileProviders[s.profile],
+                            size: 14, color: AppColors.fg3),
+                    ]),
+                  ),
+                ],
+              ),
+            ),
+          ]),
         ),
       ),
     );

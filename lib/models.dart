@@ -245,10 +245,15 @@ class SessionInfo {
             : null,
         totalChanges = j['total_changes'] is Map
             ? (
-                files: ((j['total_changes'] as Map)['files'] as num?)?.toInt() ?? 0,
-                added: ((j['total_changes'] as Map)['added'] as num?)?.toInt() ?? 0,
+                files:
+                    ((j['total_changes'] as Map)['files'] as num?)?.toInt() ??
+                        0,
+                added:
+                    ((j['total_changes'] as Map)['added'] as num?)?.toInt() ??
+                        0,
                 removed:
-                    ((j['total_changes'] as Map)['removed'] as num?)?.toInt() ?? 0,
+                    ((j['total_changes'] as Map)['removed'] as num?)?.toInt() ??
+                        0,
               )
             : null,
         runningSince = (j['running_since'] as num?)?.toInt(),
@@ -260,14 +265,14 @@ class SessionInfo {
         originFolder = j['origin_folder'] as String?,
         branch = j['branch'] as String?;
 
-  SessionInfo withTitle(String title) => SessionInfo._(
+  SessionInfo _copy({String? title, String? status}) => SessionInfo._(
         id: id,
         folder: folder,
         conversation: conversation,
-        title: title,
-        status: status,
+        title: title ?? this.title,
+        status: status ?? this.status,
         lastActive: lastActive,
-        running: running,
+        running: status == null ? running : status == 'running',
         profile: profile,
         settled: settled,
         keepAwake: keepAwake,
@@ -284,21 +289,9 @@ class SessionInfo {
         branch: branch,
       );
 
-  SessionInfo withStatus(String status) => SessionInfo._(
-        id: id,
-        folder: folder,
-        conversation: conversation,
-        title: title,
-        status: status,
-        lastActive: lastActive,
-        running: status == 'running',
-        profile: profile,
-        agentId: agentId,
-        workerAgentId: workerAgentId,
-        attention: attention,
-        originFolder: originFolder,
-        branch: branch,
-      );
+  SessionInfo withTitle(String title) => _copy(title: title);
+
+  SessionInfo withStatus(String status) => _copy(status: status);
 
   const SessionInfo._({
     required this.id,
