@@ -1292,7 +1292,7 @@ class _AudioTranscriptCardState extends State<AudioTranscriptCard> {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: kMobile
-                          ? sans(13, height: 19 / 13, color: AppColors.fg2)
+                          ? sans(12.5, height: 18 / 12.5, color: AppColors.fg2)
                           : sans(12, height: 1.4, color: AppColors.fg2),
                     ),
                   ),
@@ -1541,13 +1541,13 @@ extension on Bubble {
     final maxWidth =
         (MediaQuery.sizeOf(context).width - 32).clamp(160.0, 280.0);
     Widget card(Widget child) => Container(
-          constraints: BoxConstraints(maxWidth: kMobile ? 320 : 440),
+          constraints: BoxConstraints(maxWidth: kMobile ? 272 : 340),
           padding: kMobile
-              ? const EdgeInsets.fromLTRB(10, 10, 14, 12)
-              : const EdgeInsets.fromLTRB(12, 12, 16, 12),
+              ? const EdgeInsets.fromLTRB(8, 8, 12, 10)
+              : const EdgeInsets.fromLTRB(8, 8, 12, 10),
           decoration: BoxDecoration(
             color: AppColors.surface2,
-            borderRadius: BorderRadius.circular(kMobile ? 18 : R.card),
+            borderRadius: BorderRadius.circular(kMobile ? 16 : R.card),
           ),
           child: child,
         );

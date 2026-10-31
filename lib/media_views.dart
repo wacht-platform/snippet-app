@@ -586,22 +586,22 @@ class _VoiceNoteState extends State<VoiceNote> {
                 onTap: _error == null ? _toggle : null,
                 customBorder: const CircleBorder(),
                 child: SizedBox(
-                  width: 38,
-                  height: 38,
+                  width: 32,
+                  height: 32,
                   child: Center(
                     child: _loading
-                        ? Spinner(size: 15, color: AppColors.fg1)
+                        ? Spinner(size: 13, color: AppColors.fg1)
                         : AppIcon(_playing ? 'pause' : 'play',
-                            size: 15, color: AppColors.fg1),
+                            size: 13, color: AppColors.fg1),
                   ),
                 ),
               ),
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 10),
           Flexible(
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 300),
+              constraints: const BoxConstraints(maxWidth: 190),
               child: LayoutBuilder(
                 builder: (_, c) => GestureDetector(
                   behavior: HitTestBehavior.opaque,
@@ -610,7 +610,7 @@ class _VoiceNoteState extends State<VoiceNote> {
                       _seekTo(d.localPosition.dx / c.maxWidth),
                   child: SizedBox(
                     width: double.infinity,
-                    height: 26,
+                    height: 22,
                     child: CustomPaint(
                       painter: _NoteWave(
                         seed: widget.path.hashCode,
@@ -624,16 +624,16 @@ class _VoiceNoteState extends State<VoiceNote> {
               ),
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 10),
           Text(time,
               style: sans(12,
                   tabular: true,
                   color: _error == null ? AppColors.fg3 : AppColors.danger)),
         ]),
         if (widget.transcript != null) ...[
-          const SizedBox(height: 10),
+          const SizedBox(height: 6),
           Container(height: 1, color: AppColors.line),
-          const SizedBox(height: 10),
+          const SizedBox(height: 4),
           widget.transcript!,
         ],
       ],
