@@ -89,7 +89,7 @@ class CrewRoster extends StatelessWidget {
     required this.entries,
     required this.onOpen,
     this.onMenu,
-    this.columns = 3,
+    this.columns = 2,
   });
 
   final List<CrewEntry> entries;

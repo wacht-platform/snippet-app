@@ -17,7 +17,34 @@ const mochiPalette = <(String, Color)>[
   ('Hojicha', Color(0xFFD8B48C)),
 ];
 
+enum MascotShape { mochi, bunny, cat, bear, ghost, cloud, onigiri }
+
+MascotShape mascotShapeNamed(String? name) => MascotShape.values
+    .firstWhere((m) => m.name == name, orElse: () => MascotShape.mochi);
+
 final agentColors = ValueNotifier<Map<String, String>>(const {});
+final agentShapes = ValueNotifier<Map<String, String>>(const {});
+
+MascotShape mascotShapeFor(String agentId) =>
+    mascotShapeNamed(agentShapes.value[agentId]);
+
+void rememberAgentShapes(Iterable<(String, String?)> agents) {
+  final next = <String, String>{};
+  for (final (id, shape) in agents) {
+    if (shape != null && shape.isNotEmpty) next[id] = shape;
+  }
+  if (!mapEquals(next, agentShapes.value)) agentShapes.value = next;
+}
+
+void setRememberedAgentShape(String id, String? shape) {
+  final next = Map<String, String>.of(agentShapes.value);
+  if (shape == null) {
+    next.remove(id);
+  } else {
+    next[id] = shape;
+  }
+  agentShapes.value = next;
+}
 
 Color? parseHexColor(String? hex) {
   final h = hex?.trim().replaceFirst('#', '') ?? '';
@@ -53,15 +80,20 @@ void setRememberedAgentColor(String id, String? color) {
 }
 
 class MochiIcon extends StatelessWidget {
-  const MochiIcon({super.key, required this.color, this.size = 18});
+  const MochiIcon(
+      {super.key,
+      required this.color,
+      this.size = 18,
+      this.shape = MascotShape.mochi});
 
   final Color color;
   final double size;
+  final MascotShape shape;
 
   @override
   Widget build(BuildContext context) => SizedBox.square(
         dimension: size,
-        child: CustomPaint(painter: _MochiPainter(color, size)),
+        child: CustomPaint(painter: _MochiPainter(color, size, shape: shape)),
       );
 }
 
@@ -72,18 +104,26 @@ class AgentMochi extends StatelessWidget {
   final double size;
 
   @override
-  Widget build(BuildContext context) => ValueListenableBuilder(
-        valueListenable: agentColors,
-        builder: (_, __, ___) =>
-            MochiIcon(color: mochiColorFor(agentId), size: size),
+  Widget build(BuildContext context) => ListenableBuilder(
+        listenable: Listenable.merge([agentColors, agentShapes]),
+        builder: (_, __) => MochiIcon(
+            color: mochiColorFor(agentId),
+            size: size,
+            shape: mascotShapeFor(agentId)),
       );
 }
 
 enum MochiEyes { dot, flat, happy }
 
 class WorkingMochi extends StatefulWidget {
-  const WorkingMochi({super.key, this.size = 20, this.squeeze = false, this.color});
+  const WorkingMochi(
+      {super.key,
+      this.size = 20,
+      this.squeeze = false,
+      this.color,
+      this.shape = MascotShape.mochi});
 
+  final MascotShape shape;
   final double size;
   final bool squeeze;
   final Color? color;
@@ -140,7 +180,7 @@ class _WorkingMochiState extends State<WorkingMochi>
     final size = widget.size;
     final color = widget.color ?? mochiPalette.first.$2;
     if (still) {
-      return MochiIcon(color: color, size: size);
+      return MochiIcon(color: color, size: size, shape: widget.shape);
     }
     return AnimatedBuilder(
       animation: _c,
@@ -189,7 +229,8 @@ class _WorkingMochiState extends State<WorkingMochi>
                 painter: _MochiPainter(color, size,
                     eyes: _eyes,
                     blink: blink,
-                    look: widget.squeeze ? 0 : look),
+                    look: widget.squeeze ? 0 : look,
+                    shape: widget.shape),
               ),
             ),
           ),
@@ -201,8 +242,12 @@ class _WorkingMochiState extends State<WorkingMochi>
 
 class _MochiPainter extends CustomPainter {
   _MochiPainter(this.color, this.size,
-      {this.eyes = MochiEyes.dot, this.blink = 0, this.look = 0});
+      {this.eyes = MochiEyes.dot,
+      this.blink = 0,
+      this.look = 0,
+      this.shape = MascotShape.mochi});
 
+  final MascotShape shape;
   final Color color;
   final double size;
   final MochiEyes eyes;
@@ -216,20 +261,7 @@ class _MochiPainter extends CustomPainter {
     canvas.scale(k);
     canvas.translate(-18, -26);
     final small = size < 22;
-    final body = Path()
-      ..moveTo(20, 84)
-      ..cubicTo(20, 54, 38, 38, 60, 38)
-      ..cubicTo(82, 38, 100, 54, 100, 84)
-      ..cubicTo(100, 98, 84, 100, 60, 100)
-      ..cubicTo(36, 100, 20, 98, 20, 84)
-      ..close();
-    canvas.drawPath(body, Paint()..color = color);
-    final leaf = Path()
-      ..moveTo(60, 39)
-      ..quadraticBezierTo(66, 25, 80, 28)
-      ..quadraticBezierTo(74, 41, 60, 39)
-      ..close();
-    canvas.drawPath(leaf, Paint()..color = const Color(0xFF7FD1A6));
+    _drawBody(canvas, shape, color);
     final ink = Paint()..color = const Color(0xFF15161C);
     if (!small) {
       final blush = Paint()..color = const Color(0xE6F2A7A0);
@@ -285,7 +317,135 @@ class _MochiPainter extends CustomPainter {
       old.size != size ||
       old.eyes != eyes ||
       old.blink != blink ||
-      old.look != look;
+      old.look != look ||
+      old.shape != shape;
+}
+
+Path _blob() => Path()
+  ..moveTo(20, 84)
+  ..cubicTo(20, 60, 36, 48, 60, 48)
+  ..cubicTo(84, 48, 100, 60, 100, 84)
+  ..cubicTo(100, 98, 84, 100, 60, 100)
+  ..cubicTo(36, 100, 20, 98, 20, 84)
+  ..close();
+
+void _drawBody(Canvas canvas, MascotShape shape, Color color) {
+  final fill = Paint()..color = color;
+  final inner = Paint()..color = const Color(0x66F2A7A0);
+  final round = Paint()
+    ..color = color
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 7
+    ..strokeJoin = StrokeJoin.round;
+  switch (shape) {
+    case MascotShape.mochi:
+      canvas.drawPath(
+          Path()
+            ..moveTo(20, 84)
+            ..cubicTo(20, 54, 38, 38, 60, 38)
+            ..cubicTo(82, 38, 100, 54, 100, 84)
+            ..cubicTo(100, 98, 84, 100, 60, 100)
+            ..cubicTo(36, 100, 20, 98, 20, 84)
+            ..close(),
+          fill);
+      canvas.drawPath(
+          Path()
+            ..moveTo(60, 39)
+            ..quadraticBezierTo(66, 25, 80, 28)
+            ..quadraticBezierTo(74, 41, 60, 39)
+            ..close(),
+          Paint()..color = const Color(0xFF7FD1A6));
+    case MascotShape.bunny:
+      for (final (cx, tilt) in [(44.0, -0.14), (76.0, 0.14)]) {
+        canvas.save();
+        canvas.translate(cx, 42);
+        canvas.rotate(tilt);
+        canvas.drawOval(
+            Rect.fromCenter(center: Offset.zero, width: 17, height: 40), fill);
+        canvas.drawOval(
+            Rect.fromCenter(center: const Offset(0, 2), width: 8, height: 26),
+            inner);
+        canvas.restore();
+      }
+      canvas.drawPath(_blob(), fill);
+    case MascotShape.cat:
+      for (final sign in [-1.0, 1.0]) {
+        double x(double dx) => 60 + sign * dx;
+        final ear = Path()
+          ..moveTo(x(34), 62)
+          ..lineTo(x(30), 33)
+          ..lineTo(x(12), 52)
+          ..close();
+        canvas.drawPath(ear, fill);
+        canvas.drawPath(ear, round);
+        canvas.drawPath(
+            Path()
+              ..moveTo(x(28), 54)
+              ..lineTo(x(26), 41)
+              ..lineTo(x(18), 52)
+              ..close(),
+            inner);
+      }
+      canvas.drawPath(_blob(), fill);
+      final whisker = Paint()
+        ..color = const Color(0x8015161C)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.8
+        ..strokeCap = StrokeCap.round;
+      for (final sign in [-1.0, 1.0]) {
+        canvas.drawLine(Offset(60 + sign * 46, 78), Offset(60 + sign * 34, 80), whisker);
+        canvas.drawLine(Offset(60 + sign * 46, 85), Offset(60 + sign * 34, 84), whisker);
+      }
+    case MascotShape.bear:
+      for (final sign in [-1.0, 1.0]) {
+        canvas.drawCircle(Offset(60 + sign * 28, 52), 11, fill);
+        canvas.drawCircle(Offset(60 + sign * 28, 52), 5.5, inner);
+      }
+      canvas.drawPath(_blob(), fill);
+      canvas.drawOval(
+          Rect.fromCenter(center: const Offset(60, 85), width: 30, height: 20),
+          Paint()..color = const Color(0x55FFFFFF));
+    case MascotShape.ghost:
+      canvas.drawPath(
+          Path()
+            ..moveTo(20, 102)
+            ..lineTo(20, 70)
+            ..cubicTo(20, 50, 38, 40, 60, 40)
+            ..cubicTo(82, 40, 100, 50, 100, 70)
+            ..lineTo(100, 102)
+            ..quadraticBezierTo(92, 94, 84, 102)
+            ..quadraticBezierTo(76, 110, 68, 102)
+            ..quadraticBezierTo(60, 94, 52, 102)
+            ..quadraticBezierTo(44, 110, 36, 102)
+            ..quadraticBezierTo(28, 94, 20, 102)
+            ..close(),
+          fill);
+    case MascotShape.cloud:
+      canvas.drawCircle(const Offset(38, 80), 19, fill);
+      canvas.drawCircle(const Offset(60, 64), 24, fill);
+      canvas.drawCircle(const Offset(83, 80), 19, fill);
+      canvas.drawRRect(
+          RRect.fromRectAndRadius(
+              const Rect.fromLTWH(26, 72, 68, 28), const Radius.circular(14)),
+          fill);
+    case MascotShape.onigiri:
+      final body = Path()
+        ..moveTo(60, 40)
+        ..cubicTo(68, 40, 74, 46, 80, 56)
+        ..lineTo(98, 88)
+        ..cubicTo(103, 97, 98, 100, 90, 100)
+        ..lineTo(30, 100)
+        ..cubicTo(22, 100, 17, 97, 22, 88)
+        ..lineTo(40, 56)
+        ..cubicTo(46, 46, 52, 40, 60, 40)
+        ..close();
+      canvas.drawPath(body, fill);
+      canvas.save();
+      canvas.clipPath(body);
+      canvas.drawRect(const Rect.fromLTWH(10, 91, 100, 12),
+          Paint()..color = const Color(0xFF2B2E36));
+      canvas.restore();
+  }
 }
 
 class DottedMochi extends StatelessWidget {

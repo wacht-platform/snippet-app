@@ -11,7 +11,7 @@ Future<void> showMochiColorPicker(
     {Offset? point}) {
   final picker = _Picker(client: client, agentId: agentId);
   if (kMobile) {
-    return showAppSheet<void>(context, title: '$name colour', child: picker);
+    return showAppSheet<void>(context, title: '$name look', child: picker);
   }
   final overlay =
       Overlay.of(context, rootOverlay: true).context.findRenderObject() as RenderBox?;
@@ -64,13 +64,33 @@ Future<void> showMochiColorPicker(
   );
 }
 
-class _Picker extends StatelessWidget {
+class _Picker extends StatefulWidget {
   const _Picker({required this.client, required this.agentId});
 
   static const desktopWidth = 4 * 40.0 + 3 * 2 + 16;
 
   final DaemonClient client;
   final String agentId;
+
+  @override
+  State<_Picker> createState() => _PickerState();
+}
+
+class _PickerState extends State<_Picker> {
+  DaemonClient get client => widget.client;
+  String get agentId => widget.agentId;
+
+  Future<void> _pickShape(BuildContext context, MascotShape shape) async {
+    final before = agentShapes.value[agentId];
+    final value = shape == MascotShape.mochi ? null : shape.name;
+    setRememberedAgentShape(agentId, value);
+    try {
+      await client.setAgentShape(agentId, value);
+    } catch (_) {
+      setRememberedAgentShape(agentId, before);
+      if (context.mounted) toast(context, 'Could not change shape', danger: true);
+    }
+  }
 
   Future<void> _pick(BuildContext context, Color? color) async {
     final before = agentColors.value[agentId];
@@ -115,6 +135,32 @@ class _Picker extends StatelessWidget {
           ),
       ],
     );
+    final shapeNow = mascotShapeFor(agentId);
+    final shapes = Wrap(
+      spacing: kMobile ? 6 : 2,
+      runSpacing: kMobile ? 6 : 2,
+      children: [
+        for (final shape in MascotShape.values)
+          Tooltip(
+            message: shape.name[0].toUpperCase() + shape.name.substring(1),
+            waitDuration: const Duration(milliseconds: 400),
+            child: Material(
+              color: shape == shapeNow ? AppColors.surface3 : Colors.transparent,
+              borderRadius: BorderRadius.circular(kMobile ? 12 : 8),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(kMobile ? 12 : 8),
+                hoverColor: AppColors.surface3,
+                onTap: () => _pickShape(context, shape),
+                child: SizedBox.square(
+                  dimension: cell,
+                  child: Center(
+                      child: MochiIcon(color: current, size: icon, shape: shape)),
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
     if (kMobile) {
       return Padding(
         padding: const EdgeInsets.fromLTRB(M.gutter, 4, M.gutter, 12),
@@ -122,6 +168,8 @@ class _Picker extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           mainAxisSize: MainAxisSize.min,
           children: [
+            shapes,
+            const SizedBox(height: 12),
             grid,
             if (custom) ...[
               const SizedBox(height: 10),
@@ -140,6 +188,8 @@ class _Picker extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
         children: [
+          shapes,
+          const SizedBox(height: 6),
           grid,
           if (custom) ...[
             const SizedBox(height: 4),
