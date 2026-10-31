@@ -448,7 +448,26 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
               SystemRow(step: _s(e['step']), reasoning: _s(e['reasoning'])));
         case 'turn_changes':
           endTools(key);
-          addEvent(key, TurnChangesCard(event: e));
+          addEvent(
+              key,
+              TurnChangesCard(
+                event: e,
+                onOpenFile: (rel) {
+                  final ws = _state?.workspace ?? '';
+                  final full = rel.startsWith('/') || ws.isEmpty
+                      ? rel
+                      : '${ws.endsWith('/') ? ws : '$ws/'}$rel';
+                  final name = rel.split('/').last;
+                  final open = widget.onOpenFileTab;
+                  if (open != null) {
+                    open(full, name);
+                  } else {
+                    presentFileOnDesktop(context,
+                        client: widget.client, path: full, name: name);
+                  }
+                },
+                onOpenAll: () => _performMacAction('file_changes'),
+              ));
         case 'file_presented':
           endTools(key);
           final file = (path: _s(e['path']), caption: _s(e['caption']));

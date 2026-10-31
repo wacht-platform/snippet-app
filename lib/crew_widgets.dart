@@ -90,16 +90,26 @@ class CrewRoster extends StatelessWidget {
     required this.onOpen,
     this.onMenu,
     this.columns = 2,
+    this.dense = false,
   });
 
   final List<CrewEntry> entries;
   final ValueChanged<CoordinationAgent> onOpen;
   final void Function(BuildContext, CoordinationAgent, Offset)? onMenu;
   final int columns;
+  final bool dense;
 
   @override
   Widget build(BuildContext context) {
     final list = crewOrdered(entries);
+    if (dense) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(8, 2, 8, 6),
+        child: Column(children: [
+          for (final e in list) _CrewRow(e, () => onOpen(e.agent), onMenu),
+        ]),
+      );
+    }
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
       child: LayoutBuilder(builder: (context, box) {
@@ -108,8 +118,7 @@ class CrewRoster extends StatelessWidget {
         return Wrap(spacing: gap, runSpacing: gap, children: [
           for (final e in list)
             SizedBox(
-                width: w,
-                child: _Bubble(e, () => onOpen(e.agent), onMenu)),
+                width: w, child: _Bubble(e, () => onOpen(e.agent), onMenu)),
         ]);
       }),
     );
@@ -462,7 +471,6 @@ class _CrewCardState extends State<_CrewCard> {
   }
 }
 
-
 /// Colour and delete for one agent, from a right-click, long-press or the
 /// card's more button. Deleting is refused by the daemon while the agent is
 /// still on an unfinished task, and its message is shown as is.
@@ -493,7 +501,8 @@ Future<void> showCrewAgentMenu(
   if (!context.mounted) return;
   if (picked == 'nickname') {
     final next = await promptText(context,
-        title: 'Nickname for ${agent.fullName.trim().isEmpty ? agent.id : agent.fullName.trim()}',
+        title:
+            'Nickname for ${agent.fullName.trim().isEmpty ? agent.id : agent.fullName.trim()}',
         initial: agent.nickname ?? '',
         hint: 'Leave empty to use the name');
     if (next == null || next == (agent.nickname ?? '')) return;
@@ -524,9 +533,12 @@ Future<void> showCrewAgentMenu(
   }
 }
 
-
-Future<void> _pickCrewModel(BuildContext context, DaemonClient client,
-    CoordinationAgent agent, String name, Offset? point,
+Future<void> _pickCrewModel(
+    BuildContext context,
+    DaemonClient client,
+    CoordinationAgent agent,
+    String name,
+    Offset? point,
     VoidCallback? onChanged) async {
   ServerConfig cfg;
   try {
@@ -544,22 +556,19 @@ Future<void> _pickCrewModel(BuildContext context, DaemonClient client,
   if (kMobile) {
     final c = Completer<String?>();
     showAppSheet(context,
-            title: '$name works on',
-            child: SheetActions([
-              SheetAction('sparkles', "Session's own model", () {
-                Navigator.pop(context);
-                c.complete('');
-              }),
-              for (final p in cfg.profiles)
-                SheetAction(
-                    'provider:${p.provider}',
-                    p.name == agent.profile ? '${p.name}  (current)' : p.name,
-                    () {
-                  Navigator.pop(context);
-                  c.complete(p.name);
-                }),
-            ]))
-        .whenComplete(() {
+        title: '$name works on',
+        child: SheetActions([
+          SheetAction('sparkles', "Session's own model", () {
+            Navigator.pop(context);
+            c.complete('');
+          }),
+          for (final p in cfg.profiles)
+            SheetAction('provider:${p.provider}',
+                p.name == agent.profile ? '${p.name}  (current)' : p.name, () {
+              Navigator.pop(context);
+              c.complete(p.name);
+            }),
+        ])).whenComplete(() {
       if (!c.isCompleted) c.complete(null);
     });
     picked = await c.future;
@@ -594,5 +603,50 @@ Future<void> _pickCrewModel(BuildContext context, DaemonClient client,
     onChanged?.call();
   } catch (e) {
     if (context.mounted) toast(context, '$e', danger: true);
+  }
+}
+
+class _CrewRow extends StatelessWidget {
+  const _CrewRow(this.e, this.onTap, this.onMenu);
+  final CrewEntry e;
+  final VoidCallback onTap;
+  final void Function(BuildContext, CoordinationAgent, Offset)? onMenu;
+
+  @override
+  Widget build(BuildContext context) {
+    final idle = e.state == CrewState.standingBy;
+    final c = crewColor(e.state);
+    return Tooltip(
+      message:
+          [e.agent.displayName, e.line].where((x) => x.isNotEmpty).join('\n'),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: onTap,
+        onSecondaryTapDown: onMenu == null
+            ? null
+            : (d) => onMenu!(context, e.agent, d.globalPosition),
+        child: Container(
+          height: 34,
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: Row(children: [
+            Opacity(
+                opacity: idle ? .7 : 1,
+                child: AgentMochi(e.agent.id, size: 20)),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(e.agent.displayName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: sans(13, color: idle ? AppColors.fg3 : AppColors.fg1)),
+            ),
+            if (!idle)
+              Container(
+                  width: 6,
+                  height: 6,
+                  decoration: BoxDecoration(color: c, shape: BoxShape.circle)),
+          ]),
+        ),
+      ),
+    );
   }
 }

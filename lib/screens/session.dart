@@ -734,12 +734,15 @@ class _SessionScreenState extends State<SessionScreen>
     }
   }
 
+  bool _isGitSession = false;
+
   void _loadSettled() {
     if (_isMissionControl) return;
     widget.client.sessions().then((list) {
       if (!mounted) return;
       final me = list.where((x) => x.id == widget.sessionId).firstOrNull;
       _keepAwake = me?.keepAwake ?? false;
+      _isGitSession = me?.isGit ?? false;
       final now = me?.settled ?? false;
       if (now != _settled) setState(() => _settled = now);
     }).catchError((_) {});

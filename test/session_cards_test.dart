@@ -141,14 +141,14 @@ void main() {
       });
       await _pump(tester, const Size(300, 520), TargetPlatform.macOS,
           sessions: [_s('a', 'Live chat', 'idle'), settled]);
-      final header = tester.getTopLeft(find.text('SETTLED')).dy;
+      final header = tester.getTopLeft(find.text('Settled')).dy;
       expect(header,
           greaterThan(tester.getBottomLeft(find.text('Live chat')).dy + 100));
       expect(find.text('Old chat'), findsNothing);
-      await tester.tap(find.text('SETTLED'));
+      await tester.tap(find.text('Settled'));
       await tester.pump(const Duration(milliseconds: 400));
       expect(find.text('Old chat'), findsOneWidget);
-      expect(tester.getTopLeft(find.text('SETTLED')).dy, lessThan(header));
+      expect(tester.getTopLeft(find.text('Settled').first).dy, lessThan(header));
     } finally {
       debugDefaultTargetPlatformOverride = null;
     }

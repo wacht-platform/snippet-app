@@ -704,9 +704,7 @@ class SidebarState extends State<Sidebar> {
           action: searching || widget.client == null
               ? null
               : Btn('New session',
-                  icon: 'plus',
-                  small: !kMobile,
-                  onTap: widget.onNewSession),
+                  icon: 'plus', small: !kMobile, onTap: widget.onNewSession),
         ),
       );
 
@@ -726,14 +724,19 @@ class SidebarState extends State<Sidebar> {
         child: Padding(
           padding: mobile
               ? const EdgeInsets.fromLTRB(4, 16, 4, 10)
-              : const EdgeInsets.fromLTRB(8, 14, 6, 6),
+              : const EdgeInsets.fromLTRB(14, 10, 16, 10),
           child: Row(children: [
-            Text(mobile ? 'Settled' : 'SETTLED',
-                style: mobile
-                    ? sans(13, color: AppColors.fg3)
-                    : sans(11, color: AppColors.fg4, spacing: 0.9)),
+            if (!mobile) ...[
+              AppIcon(open ? 'chevron-down' : 'chevron-right',
+                  size: 12, color: AppColors.fg4),
+              const SizedBox(width: 6),
+            ],
+            Text('Settled', style: sans(13, color: AppColors.fg3)),
             const SizedBox(width: 10),
-            Expanded(child: Container(height: 1, color: AppColors.line)),
+            Expanded(
+                child: mobile
+                    ? Container(height: 1, color: AppColors.line)
+                    : const SizedBox.shrink()),
             const SizedBox(width: 10),
             Text('${rows.length}',
                 style: sans(mobile ? 13 : 11.5,
@@ -922,79 +925,58 @@ class SidebarState extends State<Sidebar> {
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       if (hasClient || _crew.isNotEmpty) ...[
         Padding(
-          padding: const EdgeInsets.fromLTRB(18, 4, 12, 4),
-          child: Row(children: [
-            Expanded(
-              child: Text('CREW',
-                  style: sans(11, color: AppColors.fg4, spacing: 0.9)),
-            ),
-            Builder(
-              builder: (ctx) => IconBtn('plus',
-                  size: 22,
-                  iconSize: 12,
-                  tooltip: 'New agent', onTap: () async {
-                await _openCreateAgent(ctx);
-                _crewAt = null;
-                _loadCrew();
-              }),
-            ),
-          ]),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+          padding: const EdgeInsets.fromLTRB(8, 4, 8, 4),
           child: Material(
-            color: mcSelected ? AppColors.surface2 : AppColors.surface1,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(kMobile ? 16 : 12),
-              side: BorderSide(
-                  color: mcSelected ? AppColors.lineStrong : AppColors.line),
-            ),
-            clipBehavior: Clip.antiAlias,
+            color: mcSelected ? AppColors.surface2 : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
             child: InkWell(
+              borderRadius: BorderRadius.circular(8),
               onTap: hasClient ? widget.onOpenMissionControl : null,
-              child: SizedBox(
-                height: 52,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  child: Row(children: [
-                    MochiIcon(color: AppColors.accent, size: 20),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Mission Control',
-                              style: sans(13,
-                                  color: mcSelected
-                                      ? AppColors.fg1
-                                      : AppColors.fg2)),
-                          Text(
-                              mcWaiting
-                                  ? 'Waiting on you'
-                                  : mcBusy
-                                      ? 'Working'
-                                      : crewLine,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: sans(12,
-                                  color: mcWaiting
-                                      ? AppColors.run
-                                      : mcBusy
-                                          ? AppColors.accent
-                                          : AppColors.fg3)),
-                        ],
-                      ),
+              child: Container(
+                height: 46,
+                padding: const EdgeInsets.only(left: 8, right: 2),
+                child: Row(children: [
+                  MochiIcon(color: AppColors.accent, size: 22),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Mission Control',
+                            style: sans(13.5,
+                                weight: W.label,
+                                color: mcSelected
+                                    ? AppColors.fg1
+                                    : AppColors.fg2)),
+                        Text(
+                            mcWaiting
+                                ? 'Waiting on you'
+                                : mcBusy
+                                    ? 'Working'
+                                    : crewLine,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: sans(12,
+                                color: mcWaiting
+                                    ? AppColors.run
+                                    : mcBusy
+                                        ? AppColors.fg1
+                                        : AppColors.fg4)),
+                      ],
                     ),
-                    if (mcBusy)
-                      Container(
-                        width: 6,
-                        height: 6,
-                        decoration: BoxDecoration(
-                            color: AppColors.accent, shape: BoxShape.circle),
-                      ),
-                  ]),
-                ),
+                  ),
+                  Builder(
+                    builder: (ctx) => IconBtn('plus',
+                        size: 26,
+                        iconSize: 13,
+                        tooltip: 'New agent', onTap: () async {
+                      await _openCreateAgent(ctx);
+                      _crewAt = null;
+                      _loadCrew();
+                    }),
+                  ),
+                ]),
               ),
             ),
           ),
@@ -1041,6 +1023,7 @@ class SidebarState extends State<Sidebar> {
             constraints: const BoxConstraints(maxHeight: 280),
             child: SingleChildScrollView(
               child: CrewRoster(
+                dense: true,
                 entries: crewOrdered(deriveCrew(
                     _crew, widget.sessions ?? const <SessionInfo>[])),
                 onOpen: (a) => widget.onOpenAgent?.call(a),
@@ -1116,58 +1099,82 @@ class SidebarState extends State<Sidebar> {
             ? null
             : (d) => _sessionActions(s, position: d.globalPosition),
         child: Container(
-          padding: const EdgeInsets.fromLTRB(8, 7, 8, 7),
-          child: Row(children: [
-            if (_selecting) ...[
-              SelectCheck(checked, size: 14),
-              const SizedBox(width: 10),
-            ],
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(children: [
-                    Expanded(
-                      child: Text(_projectPath(s),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: sans(11.5, color: AppColors.fg4)),
-                    ),
-                    const SizedBox(width: 8),
-                    _statusChip(s, draft: draft, size: 11),
-                  ]),
-                  const SizedBox(height: 3),
-                  Row(children: [
-                    Expanded(
-                      child:
-                          Text(s.title.trim().isEmpty ? '(untitled)' : s.title,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: sans(13,
-                                  weight: W.label,
-                                  color: settled
-                                      ? AppColors.fg4
-                                      : selected
-                                          ? AppColors.fg1
-                                          : AppColors.fg2)),
-                    ),
-                    if (s.keepAwake) ...[
-                      const SizedBox(width: 6),
-                      Tooltip(
-                          message: "Won't auto-settle",
-                          child:
-                              AppIcon('lock', size: 11, color: AppColors.fg4)),
+          padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+          child: SizedBox(
+              height: 52,
+              child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (_selecting) ...[
+                      Center(child: SelectCheck(checked, size: 14)),
+                      const SizedBox(width: 10),
                     ],
-                  ]),
-                  if (_detailLine(s, size: 11.5) case final d?) ...[
-                    const SizedBox(height: 3),
-                    d,
-                  ],
-                ],
-              ),
-            ),
-          ]),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          SizedBox(
+                            height: 16,
+                            child: Text(_projectPath(s),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: sans(11.5, color: AppColors.fg4)),
+                          ),
+                          SizedBox(
+                            height: 20,
+                            child: Row(children: [
+                              Expanded(
+                                child: Text(
+                                    s.title.trim().isEmpty
+                                        ? '(untitled)'
+                                        : s.title,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: sans(13.5,
+                                        weight: W.label,
+                                        color: settled
+                                            ? AppColors.fg4
+                                            : selected
+                                                ? AppColors.fg1
+                                                : AppColors.fg2)),
+                              ),
+                              if (s.keepAwake) ...[
+                                const SizedBox(width: 6),
+                                Tooltip(
+                                    message: "Won't auto-settle",
+                                    child: AppIcon('lock',
+                                        size: 11, color: AppColors.fg4)),
+                              ],
+                            ]),
+                          ),
+                          SizedBox(
+                            height: 16,
+                            child: _detailLine(s, size: 12) ??
+                                const SizedBox.shrink(),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        SizedBox(
+                            height: 16,
+                            child: _statusChip(s,
+                                draft: draft, size: 12, plain: true)),
+                        SizedBox(
+                          height: 16,
+                          child: _profileProviders[s.profile] != null
+                              ? ProviderLogo(_profileProviders[s.profile],
+                                  size: 14, color: AppColors.fg3)
+                              : const SizedBox.shrink(),
+                        ),
+                      ],
+                    ),
+                  ])),
         ),
       ),
     );
@@ -1199,7 +1206,7 @@ class SidebarState extends State<Sidebar> {
   }
 
   Widget _statusChip(SessionInfo s,
-      {required bool draft, required double size}) {
+      {required bool draft, required double size, bool plain = false}) {
     final settled = s.settled;
     final running = !settled && sessionIsActive(s.status);
     final waiting = !settled && s.status == 'waiting_for_input';
@@ -1221,7 +1228,7 @@ class SidebarState extends State<Sidebar> {
     final label = Text(text,
         style: sans(size,
             weight: pill ? W.label : W.body, color: color, tabular: true));
-    if (!pill) return label;
+    if (!pill || plain) return label;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 1.5),
       decoration: BoxDecoration(
@@ -1231,23 +1238,23 @@ class SidebarState extends State<Sidebar> {
     );
   }
 
-  Widget? _detailLine(SessionInfo s,
-      {required double size, bool agent = false}) {
+  Widget? _detailLine(SessionInfo s, {required double size}) {
     final branch = s.branch?.trim() ?? '';
-    final c = s.changes;
+    final c = s.shownChanges;
     final hasDiff = c != null && (c.added > 0 || c.removed > 0);
-    if (branch.isEmpty && !hasDiff && !agent) return null;
+    if (branch.isEmpty && !hasDiff && !s.isGit) return null;
     return Row(children: [
-      if (branch.isNotEmpty) ...[
+      if (s.isGit) ...[
         AppIcon('git-branch', size: size + 1, color: AppColors.fg4),
-        const SizedBox(width: 4),
+        const SizedBox(width: 5),
+      ],
+      if (branch.isNotEmpty)
         Flexible(
           child: Text(branch,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: sans(size, color: AppColors.fg4)),
         ),
-      ],
       if (hasDiff) ...[
         const SizedBox(width: 8),
         Text('+${c.added}',

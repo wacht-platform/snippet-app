@@ -174,6 +174,9 @@ class SessionInfo {
   /// Uncommitted size of the workspace, when the daemon reports it.
   final ({int files, int added, int removed})? changes;
 
+  /// Sum of every turn's changes since the session started.
+  final ({int files, int added, int removed})? totalChanges;
+
   /// Unix seconds when the current run began.
   final int? runningSince;
 
@@ -209,6 +212,13 @@ class SessionInfo {
   /// generated worktree directory.
   String get projectFolder => originFolder ?? folder;
 
+  bool get isGit => (branch ?? '').trim().isNotEmpty || inWorktree;
+
+  /// Git repos report everything changed since the session began; plain
+  /// folders only the last turn.
+  ({int files, int added, int removed})? get shownChanges =>
+      isGit ? (totalChanges ?? changes) : changes;
+
   bool get inWorktree => originFolder != null;
 
   SessionInfo.fromJson(Map<String, dynamic> j)
@@ -231,6 +241,14 @@ class SessionInfo {
                 added: ((j['changes'] as Map)['added'] as num?)?.toInt() ?? 0,
                 removed:
                     ((j['changes'] as Map)['removed'] as num?)?.toInt() ?? 0,
+              )
+            : null,
+        totalChanges = j['total_changes'] is Map
+            ? (
+                files: ((j['total_changes'] as Map)['files'] as num?)?.toInt() ?? 0,
+                added: ((j['total_changes'] as Map)['added'] as num?)?.toInt() ?? 0,
+                removed:
+                    ((j['total_changes'] as Map)['removed'] as num?)?.toInt() ?? 0,
               )
             : null,
         runningSince = (j['running_since'] as num?)?.toInt(),
@@ -257,6 +275,7 @@ class SessionInfo {
         idleSecs: idleSecs,
         cache: cache,
         changes: changes,
+        totalChanges: totalChanges,
         runningSince: runningSince,
         agentId: agentId,
         workerAgentId: workerAgentId,
@@ -296,6 +315,7 @@ class SessionInfo {
     this.idleSecs = 0,
     this.cache = 'warm',
     this.changes,
+    this.totalChanges,
     this.runningSince,
     this.agentId,
     this.workerAgentId,

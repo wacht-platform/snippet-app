@@ -374,13 +374,14 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
   Widget _mobileHeader(HarnessState? s) {
     final ws = s?.workspace.trim() ?? '';
     final folder = ws.isEmpty ? '' : lastPathSegment(ws, ifEmpty: ws);
-    Map<String, dynamic>? last;
+    var add = 0, del = 0;
     final evs = s?.events ?? const <Map<String, dynamic>>[];
-    for (var i = evs.length - 1; i >= 0 && last == null; i--) {
-      if (evs[i]['kind'] == 'turn_changes') last = evs[i];
+    for (var i = evs.length - 1; i >= 0; i--) {
+      if (evs[i]['kind'] != 'turn_changes') continue;
+      add += (evs[i]['add'] as num?)?.toInt() ?? 0;
+      del += (evs[i]['del'] as num?)?.toInt() ?? 0;
+      if (!_isGitSession) break;
     }
-    final add = (last?['add'] as num?)?.toInt() ?? 0;
-    final del = (last?['del'] as num?)?.toInt() ?? 0;
     final sub = [
       if (folder.isNotEmpty) folder,
       if ((_modelLabel ?? '').isNotEmpty) _modelLabel!,
@@ -399,7 +400,8 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
             child: Column(mainAxisSize: MainAxisSize.min, children: [
               const WorkingMochi(size: 15),
               Text('${s.lanes.where((l) => l.running).length}',
-                  style: sans(10.5, weight: W.label, height: 1.1, color: AppColors.fg2)),
+                  style: sans(10.5,
+                      weight: W.label, height: 1.1, color: AppColors.fg2)),
             ]),
           ),
           const SizedBox(width: 8),
@@ -851,9 +853,7 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
         }
         presentScreen(context,
             builder: (_, close) => MemoryScreen(
-                client: widget.client,
-                embedded: true,
-                onBack: close));
+                client: widget.client, embedded: true, onBack: close));
         return;
       case 'recurring':
         _openRecurring();
@@ -964,9 +964,7 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
       onCheckpoints: () => navigate!(_showCheckpoints),
       onMemory: () => navigate!(() => presentScreen(context,
           builder: (_, close) => MemoryScreen(
-              client: widget.client,
-              embedded: true,
-              onBack: close))),
+              client: widget.client, embedded: true, onBack: close))),
     );
   }
 
