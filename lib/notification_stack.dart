@@ -205,14 +205,7 @@ class NotificationStack extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Padding(
-            padding: EdgeInsets.fromLTRB(inset, S.s12, inset, S.s2),
-            child: Row(children: [
-              Text(label, style: caps(10.5, color: AppColors.fg4)),
-              const SizedBox(width: S.s6),
-              Text('${rows.length}', style: mono(10.5, color: AppColors.fg4)),
-            ]),
-          ),
+          const SizedBox(height: S.s4),
           for (final (i, p) in rows.indexed) ...[
             if (i > 0)
               Padding(

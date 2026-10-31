@@ -62,8 +62,6 @@ void main() {
     for (final t in ['Blocked', 'Quiet', 'Newest']) {
       expect(find.text(t), findsOneWidget);
     }
-    expect(find.text('NEEDS YOU'), findsOneWidget);
-    expect(find.text('UPDATES'), findsOneWidget);
     expect(tester.getTopLeft(find.text('Blocked')).dy,
         lessThan(tester.getTopLeft(find.text('Newest')).dy));
     await tester.pump(const Duration(seconds: 60));

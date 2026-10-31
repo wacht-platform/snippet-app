@@ -3160,7 +3160,7 @@ final class NotchHomeView: NSView {
   }
 
   static func featuredHeight(_ item: NotchHomeItem) -> CGFloat {
-    return 64 + (item.actions.isEmpty ? 0 : 36)
+    return 50 + (item.actions.isEmpty ? 0 : 36)
   }
 
   /// Content height for the expanded state, so the controller can size the shape.
@@ -3373,21 +3373,17 @@ final class NotchHomeView: NSView {
       card.fillsAlways = true
       card.onSelect = { [weak self] in self?.onSelect?(f.id) }
       let asking = f.section == "Needs you"
-      let lab = label(asking ? "NEEDS YOU" : "UP NEXT", size: 10.5, weight: .medium,
-                      color: asking ? NotchHomePalette.amber : NotchHomePalette.idle, kern: 0.8)
-      lab.frame = NSRect(x: 16, y: 10, width: 160, height: 14)
-      card.addSubview(lab)
       let t = label(f.title, size: 13.5, weight: .medium, color: NotchHomePalette.text)
-      t.frame = NSRect(x: 16, y: 24, width: card.frame.width - 130, height: 20)
+      t.frame = NSRect(x: 16, y: 10, width: card.frame.width - 130, height: 20)
       card.addSubview(t)
       if !f.meta.isEmpty {
         let mt = label(f.meta, size: 11.5, color: NotchHomePalette.muted)
         mt.alignment = .right
-        mt.frame = NSRect(x: card.frame.width - 16 - 110, y: 25, width: 110, height: 18)
+        mt.frame = NSRect(x: card.frame.width - 16 - 110, y: 11, width: 110, height: 18)
         card.addSubview(mt)
       }
       let ln = label(f.line, size: 11.5, color: asking ? NotchHomePalette.amber : NotchHomePalette.muted)
-      ln.frame = NSRect(x: 16, y: 43, width: card.frame.width - 32, height: 18)
+      ln.frame = NSRect(x: 16, y: 29, width: card.frame.width - 32, height: 18)
       card.addSubview(ln)
       let strip = NSView(frame: .zero)
       var bx: CGFloat = 0
@@ -3403,10 +3399,10 @@ final class NotchHomeView: NSView {
       let avail = card.frame.width - 32
       strip.frame = NSRect(x: 0, y: 0, width: stripW, height: 26)
       if stripW <= avail {
-        strip.frame.origin = NSPoint(x: 16, y: 68)
+        strip.frame.origin = NSPoint(x: 16, y: 54)
         card.addSubview(strip)
       } else {
-        let scroll = NSScrollView(frame: NSRect(x: 16, y: 68, width: avail, height: 26))
+        let scroll = NSScrollView(frame: NSRect(x: 16, y: 54, width: avail, height: 26))
         scroll.drawsBackground = false
         scroll.hasHorizontalScroller = false
         scroll.hasVerticalScroller = false
@@ -3425,10 +3421,12 @@ final class NotchHomeView: NSView {
       if shown >= NotchHomeView.maxRows { break }
       if item.section != lastSection {
         lastSection = item.section
+        if item.section != "Needs you" {
         let s = label(item.section.uppercased(), size: 10.5, weight: .medium, color: NotchHomePalette.idle, kern: 0.8)
         s.frame = NSRect(x: pad, y: y + 8, width: w - pad * 2, height: 14)
         addSubview(s)
         y += 24
+        }
       }
       let row = NotchHomeRowView(frame: NSRect(x: 12, y: y, width: w - 24, height: 44))
       row.onSelect = { [weak self] in self?.onSelect?(item.id) }

@@ -96,7 +96,7 @@ class _NotificationPopoversState extends State<NotificationPopovers> {
     final kind = payload['kind']?.toString().split('.').last;
     final label = switch (kind) {
       'idle' => 'Finished · standing by',
-      'waiting' => 'Needs your input',
+      'waiting' => '',
       'error' || 'failed' => 'Failed',
       'done' || 'completed' => 'Completed',
       'term' || 'message' => 'New message',
