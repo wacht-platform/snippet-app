@@ -171,6 +171,12 @@ class SessionInfo {
   final int idleSecs;
   final String cache;
 
+  /// Uncommitted size of the workspace, when the daemon reports it.
+  final ({int files, int added, int removed})? changes;
+
+  /// Unix seconds when the current run began.
+  final int? runningSince;
+
   /// The agent this session IS, if any — an inbox belongs to an agent, and a
   /// specialized session runs as one. A durable property of the session.
   final String? agentId;
@@ -219,6 +225,15 @@ class SessionInfo {
         settledAt = (j['settled_at'] as num?)?.toInt(),
         idleSecs = (j['idle_secs'] as num?)?.toInt() ?? 0,
         cache = j['cache'] as String? ?? 'warm',
+        changes = j['changes'] is Map
+            ? (
+                files: ((j['changes'] as Map)['files'] as num?)?.toInt() ?? 0,
+                added: ((j['changes'] as Map)['added'] as num?)?.toInt() ?? 0,
+                removed:
+                    ((j['changes'] as Map)['removed'] as num?)?.toInt() ?? 0,
+              )
+            : null,
+        runningSince = (j['running_since'] as num?)?.toInt(),
         agentId = j['agent_id'] as String?,
         workerAgentId = j['worker_agent_id'] as String?,
         attention = j['attention'] is Map
@@ -241,6 +256,8 @@ class SessionInfo {
         settledAt: settledAt,
         idleSecs: idleSecs,
         cache: cache,
+        changes: changes,
+        runningSince: runningSince,
         agentId: agentId,
         workerAgentId: workerAgentId,
         attention: attention,
@@ -278,6 +295,8 @@ class SessionInfo {
     this.settledAt,
     this.idleSecs = 0,
     this.cache = 'warm',
+    this.changes,
+    this.runningSince,
     this.agentId,
     this.workerAgentId,
     this.attention,

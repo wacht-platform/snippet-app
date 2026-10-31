@@ -136,7 +136,6 @@ class SidebarState extends State<Sidebar> {
   final TextEditingController _desktopChatsSearchCtl = TextEditingController();
   final FocusNode _desktopChatsSearchFocus = FocusNode();
 
-
   MobileHome _lastMainHome = MobileHome.chats;
   late final PageController _pageController;
   int? _targetPage;
@@ -167,7 +166,8 @@ class SidebarState extends State<Sidebar> {
         final a = await client.coordinationAgents();
         if (mounted) {
           setState(() => _crew = a
-              .where((x) => x.status != 'archived' && x.kind != 'mission_control')
+              .where(
+                  (x) => x.status != 'archived' && x.kind != 'mission_control')
               .toList());
         }
       } catch (_) {}
@@ -896,49 +896,15 @@ class SidebarState extends State<Sidebar> {
     final list = split.main;
     final settledRows = split.settled;
     final mc = all.where((s) => isDedicatedMcSession(s.id)).firstOrNull;
-    final groups = <String, List<SessionInfo>>{};
-    for (final s in list) {
-      final f = s.projectFolder.trim().isEmpty
-          ? 'Other'
-          : lastPathSegment(s.projectFolder, ifEmpty: s.projectFolder);
-      groups.putIfAbsent(f, () => []).add(s);
-    }
     _chatsShownAt ??= DateTime.now();
-    var index = 0;
     final rows = <Widget>[];
-    for (final e in groups.entries) {
-      rows.add(Padding(
-        padding: const EdgeInsets.fromLTRB(8, 12, 2, 4),
-        child: Row(children: [
-          Expanded(
-            child: Text(e.key.toUpperCase(),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: sans(11, color: AppColors.fg4, spacing: 0.9)),
-          ),
-          if (hasClient)
-            IconBtn('plus',
-                size: 22,
-                iconSize: 12,
-                tooltip: 'New chat',
-                onTap: () {
-                  final folder = e.value.first.projectFolder.trim();
-                  if (widget.onNewSessionIn != null && folder.isNotEmpty) {
-                    widget.onNewSessionIn!(folder);
-                  } else {
-                    widget.onNewSession();
-                  }
-                }),
-        ]),
+    for (var i = 0; i < list.length; i++) {
+      rows.add(Appear(
+        key: ValueKey('chat-${list[i].id}'),
+        index: i,
+        since: _chatsShownAt,
+        child: _desktopChatRow(list[i]),
       ));
-      for (final s in e.value) {
-        rows.add(Appear(
-          key: ValueKey('chat-${s.id}'),
-          index: index++,
-          since: _chatsShownAt,
-          child: _desktopChatRow(s),
-        ));
-      }
     }
     final mcSelected = mc != null && mc.id == widget.selectedSessionId;
     final mcWaiting = mc != null && mc.status == 'waiting_for_input';
@@ -961,134 +927,130 @@ class SidebarState extends State<Sidebar> {
               builder: (ctx) => IconBtn('plus',
                   size: 22,
                   iconSize: 12,
-                  tooltip: 'New agent',
-                  onTap: () async {
-                    await _openCreateAgent(ctx);
-                    _crewAt = null;
-                    _loadCrew();
-                  }),
+                  tooltip: 'New agent', onTap: () async {
+                await _openCreateAgent(ctx);
+                _crewAt = null;
+                _loadCrew();
+              }),
             ),
           ]),
         ),
-
-      Padding(
-        padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-        child: Material(
-          color: mcSelected ? AppColors.surface2 : AppColors.surface1,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(kMobile ? 16 : 12),
-            side: BorderSide(
-                color: mcSelected ? AppColors.lineStrong : AppColors.line),
-          ),
-          clipBehavior: Clip.antiAlias,
-          child: InkWell(
-            onTap: hasClient ? widget.onOpenMissionControl : null,
-            child: SizedBox(
-              height: 52,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                child: Row(children: [
-                  MochiIcon(color: AppColors.accent, size: 20),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Mission Control',
-                            style: sans(13,
-                                color: mcSelected
-                                    ? AppColors.fg1
-                                    : AppColors.fg2)),
-                        Text(
-                            mcWaiting
-                                ? 'Waiting on you'
-                                : mcBusy
-                                    ? 'Working'
-                                    : crewLine,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: sans(12,
-                                color: mcWaiting
-                                    ? AppColors.run
-                                    : mcBusy
-                                        ? AppColors.accent
-                                        : AppColors.fg3)),
-                      ],
-                    ),
-                  ),
-                  if (mcBusy)
-                    Container(
-                      width: 6,
-                      height: 6,
-                      decoration: BoxDecoration(
-                          color: AppColors.accent, shape: BoxShape.circle),
-                    ),
-                ]),
-              ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+          child: Material(
+            color: mcSelected ? AppColors.surface2 : AppColors.surface1,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(kMobile ? 16 : 12),
+              side: BorderSide(
+                  color: mcSelected ? AppColors.lineStrong : AppColors.line),
             ),
-          ),
-        ),
-      ),
-      if (widget.onOpenPalette == null)
-      Padding(
-        padding: const EdgeInsets.fromLTRB(8, 10, 8, 4),
-        child: Container(
-          height: 32,
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          decoration: BoxDecoration(
-            color: AppColors.surface1,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: AppColors.line),
-          ),
-          child: Row(children: [
-            AppIcon('search', size: 14, color: AppColors.fg4),
-            const SizedBox(width: 10),
-            Expanded(
-              child: TextField(
-                controller: _desktopChatsSearchCtl,
-                focusNode: _desktopChatsSearchFocus,
-                onChanged: (v) => setState(() => _filterQuery = v),
-                style: sans(13, color: AppColors.fg1),
-                decoration: InputDecoration(
-                  isCollapsed: true,
-                  border: InputBorder.none,
-                  hintText: 'Search chats',
-                  hintStyle: sans(13, color: AppColors.fg4),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              onTap: hasClient ? widget.onOpenMissionControl : null,
+              child: SizedBox(
+                height: 52,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: Row(children: [
+                    MochiIcon(color: AppColors.accent, size: 20),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Mission Control',
+                              style: sans(13,
+                                  color: mcSelected
+                                      ? AppColors.fg1
+                                      : AppColors.fg2)),
+                          Text(
+                              mcWaiting
+                                  ? 'Waiting on you'
+                                  : mcBusy
+                                      ? 'Working'
+                                      : crewLine,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: sans(12,
+                                  color: mcWaiting
+                                      ? AppColors.run
+                                      : mcBusy
+                                          ? AppColors.accent
+                                          : AppColors.fg3)),
+                        ],
+                      ),
+                    ),
+                    if (mcBusy)
+                      Container(
+                        width: 6,
+                        height: 6,
+                        decoration: BoxDecoration(
+                            color: AppColors.accent, shape: BoxShape.circle),
+                      ),
+                  ]),
                 ),
               ),
             ),
-            if (_desktopChatsSearchCtl.text.isNotEmpty)
-              IconBtn('x', size: 20, iconSize: 10, tooltip: 'Clear', onTap: () {
-                _desktopChatsSearchCtl.clear();
-                setState(() => _filterQuery = '');
-              }),
-          ]),
-        ),
-      ),
-        if (_crew.isNotEmpty)
-        ConstrainedBox(
-          constraints: const BoxConstraints(maxHeight: 280),
-          child: SingleChildScrollView(
-            child: CrewRoster(
-              entries: crewOrdered(
-                  deriveCrew(_crew, widget.sessions ?? const <SessionInfo>[])),
-              onOpen: (a) => widget.onOpenAgent?.call(a),
-              onMenu: (ctx, agent, point) {
-                final c = widget.client;
-                if (c == null) return;
-                showCrewAgentMenu(ctx,
-                    client: c,
-                    agent: agent,
-                    point: point,
-                    onDeleted: () {
-                      _crewAt = null;
-                      _loadCrew();
-                    });
-              },
-            ),
           ),
         ),
+        if (widget.onOpenPalette == null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(8, 10, 8, 4),
+            child: Container(
+              height: 32,
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              decoration: BoxDecoration(
+                color: AppColors.surface1,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppColors.line),
+              ),
+              child: Row(children: [
+                AppIcon('search', size: 14, color: AppColors.fg4),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: TextField(
+                    controller: _desktopChatsSearchCtl,
+                    focusNode: _desktopChatsSearchFocus,
+                    onChanged: (v) => setState(() => _filterQuery = v),
+                    style: sans(13, color: AppColors.fg1),
+                    decoration: InputDecoration(
+                      isCollapsed: true,
+                      border: InputBorder.none,
+                      hintText: 'Search chats',
+                      hintStyle: sans(13, color: AppColors.fg4),
+                    ),
+                  ),
+                ),
+                if (_desktopChatsSearchCtl.text.isNotEmpty)
+                  IconBtn('x', size: 20, iconSize: 10, tooltip: 'Clear',
+                      onTap: () {
+                    _desktopChatsSearchCtl.clear();
+                    setState(() => _filterQuery = '');
+                  }),
+              ]),
+            ),
+          ),
+        if (_crew.isNotEmpty)
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 280),
+            child: SingleChildScrollView(
+              child: CrewRoster(
+                entries: crewOrdered(deriveCrew(
+                    _crew, widget.sessions ?? const <SessionInfo>[])),
+                onOpen: (a) => widget.onOpenAgent?.call(a),
+                onMenu: (ctx, agent, point) {
+                  final c = widget.client;
+                  if (c == null) return;
+                  showCrewAgentMenu(ctx, client: c, agent: agent, point: point,
+                      onDeleted: () {
+                    _crewAt = null;
+                    _loadCrew();
+                  });
+                },
+              ),
+            ),
+          ),
       ],
       Expanded(
         child: PullToRefresh(
@@ -1133,8 +1095,6 @@ class SidebarState extends State<Sidebar> {
     final checked = _selected.contains(s.id);
     final draft = _hasDraft(s);
     final settled = s.settled;
-    final running = !settled && sessionIsActive(s.status);
-    final waiting = !settled && s.status == 'waiting_for_input';
     final on = _selecting ? checked : selected;
     return Material(
       color: on ? AppColors.surface2 : Colors.transparent,
@@ -1148,63 +1108,58 @@ class SidebarState extends State<Sidebar> {
             ? null
             : (d) => _sessionActions(s, position: d.globalPosition),
         child: Container(
-          height: 30,
-          padding: const EdgeInsets.symmetric(horizontal: 8),
+          padding: const EdgeInsets.fromLTRB(8, 7, 8, 7),
           child: Row(children: [
             if (_selecting) ...[
               SelectCheck(checked, size: 14),
               const SizedBox(width: 10),
             ],
-            SizedBox(
-              width: 14,
-              child: _profileProviders[s.profile] != null
-                  ? ProviderLogo(_profileProviders[s.profile], size: 13)
-                  : AppIcon('chat', size: 13, color: AppColors.fg4),
-            ),
-            const SizedBox(width: 9),
             Expanded(
-              child: Text(s.title.trim().isEmpty ? '(untitled)' : s.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: sans(13,
-                      color: settled
-                          ? AppColors.fg4
-                          : selected
-                              ? AppColors.fg1
-                              : AppColors.fg3)),
-            ),
-            if (s.keepAwake) ...[
-              const SizedBox(width: 6),
-              Tooltip(
-                  message: "Won't auto-settle",
-                  child: AppIcon('lock', size: 11, color: AppColors.fg4)),
-            ],
-            const SizedBox(width: 10),
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 110),
-              child: settled
-                  ? Tooltip(
-                      message: settledMeta(s),
-                      child: Text('Settled',
-                          style: sans(11.5, color: AppColors.fg4)))
-                  : running || waiting
-                  ? Container(
-                      width: 6,
-                      height: 6,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: running ? AppColors.accent : Colors.transparent,
-                        border: waiting
-                            ? Border.all(color: AppColors.accent, width: 1.5)
-                            : null,
-                      ),
-                    )
-                  : _desktopChatMeta(
-                      running: running,
-                      waiting: waiting,
-                      draft: draft,
-                      folder: '',
-                      lastActive: s.lastActive),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(children: [
+                    _projectBadge(s, size: 14),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(_projectName(s),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: sans(11.5, color: AppColors.fg4)),
+                    ),
+                    const SizedBox(width: 8),
+                    _statusChip(s, draft: draft, size: 11),
+                  ]),
+                  const SizedBox(height: 3),
+                  Row(children: [
+                    Expanded(
+                      child:
+                          Text(s.title.trim().isEmpty ? '(untitled)' : s.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: sans(13,
+                                  weight: W.label,
+                                  color: settled
+                                      ? AppColors.fg4
+                                      : selected
+                                          ? AppColors.fg1
+                                          : AppColors.fg2)),
+                    ),
+                    if (s.keepAwake) ...[
+                      const SizedBox(width: 6),
+                      Tooltip(
+                          message: "Won't auto-settle",
+                          child:
+                              AppIcon('lock', size: 11, color: AppColors.fg4)),
+                    ],
+                  ]),
+                  if (_detailLine(s, size: 11.5) case final d?) ...[
+                    const SizedBox(height: 3),
+                    d,
+                  ],
+                ],
+              ),
             ),
           ]),
         ),
@@ -1212,32 +1167,89 @@ class SidebarState extends State<Sidebar> {
     );
   }
 
-  Widget _desktopChatMeta({
-    required bool running,
-    required bool waiting,
-    required bool draft,
-    required String folder,
-    required int lastActive,
-  }) {
-    final (lead, leadColor) =
-        draft ? ('Draft', AppColors.accent) : (null, AppColors.fg4);
-    final parts = <InlineSpan>[];
-    void add(String text, Color color, {bool tabular = false}) {
-      if (parts.isNotEmpty) {
-        parts.add(TextSpan(
-            text: '  ·  ', style: sans(11.5, color: AppColors.border2)));
-      }
-      parts.add(TextSpan(
-          text: text, style: sans(11.5, color: color, tabular: tabular)));
-    }
+  String _projectName(SessionInfo s) => s.projectFolder.trim().isEmpty
+      ? 'No project'
+      : lastPathSegment(s.projectFolder, ifEmpty: s.projectFolder);
 
-    if (lead != null) add(lead, leadColor);
-    if (folder.isNotEmpty) add(folder, AppColors.fg4);
-    if (lead == null && folder.isEmpty && !running && !waiting) {
-      add(relativeTime(lastActive), AppColors.fg4, tabular: true);
-    }
-    return Text.rich(TextSpan(children: parts),
-        maxLines: 1, overflow: TextOverflow.ellipsis);
+  Widget _projectBadge(SessionInfo s, {required double size}) {
+    final name = _projectName(s);
+    return Container(
+      width: size,
+      height: size,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+          color: AppColors.surface3, borderRadius: BorderRadius.circular(4)),
+      child: Text(name.characters.first.toUpperCase(),
+          style: sans(size * 0.65, weight: W.title, color: AppColors.fg3)),
+    );
+  }
+
+  String _elapsed(int since) {
+    final secs = DateTime.now().millisecondsSinceEpoch ~/ 1000 - since;
+    if (secs < 60) return '${secs < 0 ? 0 : secs}s';
+    if (secs < 3600) return '${secs ~/ 60}m';
+    return '${secs ~/ 3600}h ${(secs % 3600) ~/ 60}m';
+  }
+
+  Widget _statusChip(SessionInfo s,
+      {required bool draft, required double size}) {
+    final settled = s.settled;
+    final running = !settled && sessionIsActive(s.status);
+    final waiting = !settled && s.status == 'waiting_for_input';
+    final (String text, Color color, bool pill) = settled
+        ? ('Settled', AppColors.fg4, false)
+        : waiting
+            ? ('Input', AppColors.run, true)
+            : running
+                ? (
+                    s.runningSince != null
+                        ? 'Working ${_elapsed(s.runningSince!)}'
+                        : 'Working',
+                    AppColors.accent,
+                    true
+                  )
+                : draft
+                    ? ('Draft', AppColors.accent, false)
+                    : (relativeTime(s.lastActive), AppColors.fg4, false);
+    final label = Text(text,
+        style: sans(size,
+            weight: pill ? W.label : W.body, color: color, tabular: true));
+    if (!pill) return label;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 1.5),
+      decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.14),
+          borderRadius: BorderRadius.circular(99)),
+      child: label,
+    );
+  }
+
+  Widget? _detailLine(SessionInfo s,
+      {required double size, bool agent = false}) {
+    final branch = s.branch?.trim() ?? '';
+    final c = s.changes;
+    final hasDiff = c != null && (c.added > 0 || c.removed > 0);
+    if (branch.isEmpty && !hasDiff && !agent) return null;
+    return Row(children: [
+      if (branch.isNotEmpty) ...[
+        AppIcon('git-branch', size: size + 1, color: AppColors.fg4),
+        const SizedBox(width: 4),
+        Flexible(
+          child: Text(branch,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: sans(size, color: AppColors.fg4)),
+        ),
+      ],
+      if (hasDiff) ...[
+        const SizedBox(width: 8),
+        Text('+${c.added}',
+            style: sans(size, color: AppColors.ok, tabular: true)),
+        const SizedBox(width: 5),
+        Text('-${c.removed}',
+            style: sans(size, color: AppColors.danger, tabular: true)),
+      ],
+    ]);
   }
 
   Widget _desktopTreeRow(SessionInfo s, {required bool last}) {
@@ -1565,20 +1577,6 @@ class SidebarState extends State<Sidebar> {
     final settled = s.settled;
     final running = !settled && sessionIsActive(s.status);
     final waiting = !settled && s.status == 'waiting_for_input';
-    final branch = s.branch?.trim() ?? '';
-    final place = [
-      if (folderName.isNotEmpty) folderName,
-      if (branch.isNotEmpty) branch,
-    ].join(' · ');
-    final (String stamp, Color stampColor) = settled
-        ? ('Settled', AppColors.fg4)
-        : waiting
-        ? ('needs you', AppColors.run)
-        : running
-            ? ('working', AppColors.accent)
-            : draft
-                ? ('Draft', AppColors.accent)
-                : (relativeTime(s.lastActive), AppColors.fg4);
     void open() {
       if (_selecting) {
         _toggleSelected(s.id);
@@ -1619,12 +1617,19 @@ class SidebarState extends State<Sidebar> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Row(children: [
-                    if (!renaming && (running || waiting)) ...[
-                      running
-                          ? WorkingMochi(size: 16, color: mochiPalette.first.$2)
-                          : MochiIcon(color: AppColors.run, size: 16),
-                      const SizedBox(width: 9),
-                    ],
+                    _projectBadge(s, size: 16),
+                    const SizedBox(width: 7),
+                    Expanded(
+                      child: Text(_projectName(s),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: sans(13, color: AppColors.fg3)),
+                    ),
+                    const SizedBox(width: 10),
+                    _statusChip(s, draft: draft, size: 12.5),
+                  ]),
+                  const SizedBox(height: 6),
+                  Row(children: [
                     Expanded(
                       child: renaming
                           ? _inlineRenameField(s, compact: false)
@@ -1634,65 +1639,45 @@ class SidebarState extends State<Sidebar> {
                               style: sans(16,
                                   weight: W.strong,
                                   height: 21 / 16,
-                                  color: settled
-                                      ? AppColors.fg3
-                                      : AppColors.fg1)),
-                    ),
-                    const SizedBox(width: 10),
-                    Text(stamp,
-                        style: sans(13,
-                            weight: running || waiting || draft
-                                ? W.label
-                                : W.body,
-                            color: stampColor,
-                            tabular: true)),
-                  ]),
-                  const SizedBox(height: 5),
-                  Row(children: [
-                    AppIcon(
-                        branch.isNotEmpty || s.inWorktree
-                            ? 'git-branch'
-                            : 'folder',
-                        size: 13,
-                        color: AppColors.fg4),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                          settled
-                              ? [
-                                  if (place.isNotEmpty) place,
-                                  if (settledDaysLeft(s) != null)
-                                    settledMeta(s).replaceFirst('Settled · ', ''),
-                                ].join(' · ')
-                              : place.isEmpty
-                                  ? 'No project'
-                                  : place,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: sans(13,
-                              color: place.isEmpty
-                                  ? AppColors.fg4
-                                  : AppColors.fg3)),
+                                  color:
+                                      settled ? AppColors.fg3 : AppColors.fg1)),
                     ),
                     if (s.keepAwake) ...[
                       const SizedBox(width: 8),
                       AppIcon('lock', size: 12, color: AppColors.fg4),
                     ],
-                    if (s.displayAgentId != null &&
-                        s.displayAgentId!.trim().isNotEmpty) ...[
-                      const SizedBox(width: 8),
-                      AgentMochi(s.displayAgentId!, size: 14),
-                    ] else if ((s.profile ?? '').isNotEmpty) ...[
-                      const SizedBox(width: 8),
-                      if (_profileProviders[s.profile] != null) ...[
-                        ProviderLogo(_profileProviders[s.profile],
-                            size: 13, color: AppColors.fg3),
-                        const SizedBox(width: 5),
-                      ],
-                      Text(s.profile!,
-                          style: sans(13, color: AppColors.fg3)),
-                    ],
                   ]),
+                  if (settled ||
+                      _detailLine(s, size: 13) != null ||
+                      (s.displayAgentId ?? '').trim().isNotEmpty ||
+                      (s.profile ?? '').isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Row(children: [
+                      Expanded(
+                        child: settled
+                            ? Text(
+                                settledMeta(s).replaceFirst('Settled · ', ''),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: sans(13, color: AppColors.fg4))
+                            : _detailLine(s, size: 13) ??
+                                const SizedBox.shrink(),
+                      ),
+                      if (s.displayAgentId != null &&
+                          s.displayAgentId!.trim().isNotEmpty) ...[
+                        const SizedBox(width: 8),
+                        AgentMochi(s.displayAgentId!, size: 14),
+                      ] else if ((s.profile ?? '').isNotEmpty) ...[
+                        const SizedBox(width: 8),
+                        if (_profileProviders[s.profile] != null) ...[
+                          ProviderLogo(_profileProviders[s.profile],
+                              size: 13, color: AppColors.fg3),
+                          const SizedBox(width: 5),
+                        ],
+                        Text(s.profile!, style: sans(13, color: AppColors.fg3)),
+                      ],
+                    ]),
+                  ],
                 ],
               ),
             ),

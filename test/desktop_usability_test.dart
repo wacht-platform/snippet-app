@@ -242,7 +242,7 @@ void main() {
 
   group('Sidebar session list recency ordering', () {
     testWidgets(
-        'sessions are grouped by project, projects ordered by their newest chat',
+        'sessions are one flat list by recency, each showing its project',
         (tester) async {
       debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
       try {
@@ -319,18 +319,18 @@ void main() {
         ));
         await tester.pumpAndSettle();
 
-        // Check vertical order of sessions on screen:
-        // Must be D (4000) -> C (3000) -> B (2000) -> A (1000)
+        // Flat list by recency: D (4000) -> C (3000) -> B (2000) -> A (1000)
         final posD = tester.getTopLeft(find.text('Gamma Session Newest')).dy;
         final posC = tester.getTopLeft(find.text('Alpha Session New')).dy;
         final posB = tester.getTopLeft(find.text('Beta Session Middle')).dy;
         final posA = tester.getTopLeft(find.text('Alpha Session Old')).dy;
         expect(posD, lessThan(posC));
-        expect(posC, lessThan(posA));
-        expect(posA, lessThan(posB));
-        expect(find.text('REPO-ALPHA'), findsOneWidget);
-        expect(find.text('REPO-BETA'), findsOneWidget);
-        expect(find.text('REPO-GAMMA'), findsOneWidget);
+        expect(posC, lessThan(posB));
+        expect(posB, lessThan(posA));
+        expect(find.text('REPO-ALPHA'), findsNothing);
+        expect(find.text('repo-alpha'), findsNWidgets(2));
+        expect(find.text('repo-beta'), findsOneWidget);
+        expect(find.text('repo-gamma'), findsOneWidget);
       } finally {
         debugDefaultTargetPlatformOverride = null;
       }
