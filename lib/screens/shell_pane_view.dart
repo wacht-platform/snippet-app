@@ -34,7 +34,7 @@ class PaneSurface extends StatelessWidget {
   Widget build(BuildContext context) {
     return ClipRect(
       child: ColoredBox(
-        color: pane == ShellPane.right ? AppColors.bg : readingBg,
+        color: pane == ShellPane.right ? AppColors.windowBg : readingBg,
         child: Stack(fit: StackFit.expand, children: [
           child,
           if (droppable)
