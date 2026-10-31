@@ -1169,7 +1169,7 @@ class _ArtifactViewerState extends State<ArtifactViewer> {
     final a = _artifact;
     final v = _version;
     return Material(
-      color: AppColors.bg,
+      color: kMobile ? AppColors.bg : Colors.transparent,
       child: SafeArea(
         bottom: false,
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -1433,7 +1433,7 @@ class _SessionDeliverablesState extends State<SessionDeliverables> {
         if (seen.add(f.path)) f,
     ];
     return Material(
-      color: AppColors.bg,
+      color: kMobile ? AppColors.bg : Colors.transparent,
       child: SafeArea(
         bottom: false,
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [

@@ -36,7 +36,12 @@ class PaneSurface extends StatelessWidget {
       child: ColoredBox(
         color: pane == ShellPane.right ? AppColors.windowBg : readingBg,
         child: Stack(fit: StackFit.expand, children: [
-          child,
+          pane == ShellPane.right && !kMobile
+              ? Theme(
+                  data: Theme.of(context)
+                      .copyWith(scaffoldBackgroundColor: Colors.transparent),
+                  child: child)
+              : child,
           if (droppable)
             Positioned.fill(
               child: IgnorePointer(
