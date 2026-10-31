@@ -60,6 +60,7 @@ void main() async {
       await scheduleAndroidReconciliation();
     } catch (_) {}
   }
+  trackPointer();
   runApp(const SnippetApp());
 }
 

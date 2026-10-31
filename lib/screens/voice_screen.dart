@@ -723,7 +723,7 @@ class _VoiceScreenState extends State<VoiceScreen> {
         onClear: () => _deleteVoiceprint(null),
       ),
       SettingsGroup(
-        header: 'Advanced',
+        header: 'Classifier',
         children: [
           key('Typesafe key', a.watcherKeySet, 'Paste your Typesafe API key',
               (k) => _saveAmbient(typesafeKey: k, done: 'Typesafe key saved'),

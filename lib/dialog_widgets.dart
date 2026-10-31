@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -309,9 +310,16 @@ Future<String?> promptText(BuildContext context,
     int maxLines = 1,
     bool anchored = false,
     Offset? point}) {
-  if (!kMobile && (anchored || point != null)) {
+  final at = point ?? (anchored ? null : lastPointerDown);
+  if (!kMobile && (anchored || at != null)) {
     return _showInlinePrompt(context,
-        title: title, initial: initial, hint: hint, point: point);
+        title: title,
+        initial: initial,
+        hint: hint,
+        point: at,
+        saveLabel: saveLabel,
+        minLines: minLines,
+        maxLines: maxLines);
   }
   final field = _TextPromptSheet(
       initial: initial,
@@ -329,11 +337,22 @@ Future<String?> promptText(BuildContext context,
   return showAppSheet<String>(context, title: title, child: field);
 }
 
-Future<String?> _showInlinePrompt(BuildContext context,
-    {required String title,
-    required String initial,
-    String? hint,
-    Offset? point}) {
+Offset? lastPointerDown;
+bool _tracking = false;
+
+void trackPointer() {
+  if (_tracking) return;
+  _tracking = true;
+  GestureBinding.instance.pointerRouter.addGlobalRoute((e) {
+    if (e is PointerDownEvent) lastPointerDown = e.position;
+  });
+}
+
+Future<T?> showPointPopover<T>(BuildContext context,
+    {required Offset? point,
+    required double width,
+    required double maxHeight,
+    required Widget child}) {
   final overlay = Overlay.of(context, rootOverlay: true)
       .context
       .findRenderObject() as RenderBox?;
@@ -345,10 +364,12 @@ Future<String?> _showInlinePrompt(BuildContext context,
       : box != null && box.attached
           ? box.localToGlobal(Offset(0, box.size.height + 6), ancestor: overlay)
           : screen.center(Offset.zero);
-  const w = 300.0;
-  final left = at.dx.clamp(8.0, screen.width - w - 8);
-  final top = at.dy.clamp(8.0, screen.height - 150);
-  return showGeneralDialog<String>(
+  final w = width.clamp(200.0, screen.width - 16);
+  final left = (at.dx - w / 2 + (point != null ? w / 2 - 24 : 0))
+      .clamp(8.0, screen.width - w - 8);
+  final top = (at.dy + 10)
+      .clamp(8.0, (screen.height - maxHeight - 8).clamp(8.0, screen.height));
+  return showGeneralDialog<T>(
     context: context,
     barrierDismissible: true,
     barrierLabel: 'Dismiss',
@@ -367,21 +388,8 @@ Future<String?> _showInlinePrompt(BuildContext context,
             borderRadius: BorderRadius.circular(12),
             side: BorderSide(color: AppColors.border2),
           ),
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: sans(12.5, color: AppColors.fg3)),
-                const SizedBox(height: 8),
-                _InlinePromptField(initial: initial, hint: hint),
-              ],
-            ),
-          ),
+          clipBehavior: Clip.antiAlias,
+          child: child,
         ),
       ),
     ]),
@@ -399,10 +407,52 @@ Future<String?> _showInlinePrompt(BuildContext context,
   );
 }
 
+Future<String?> _showInlinePrompt(BuildContext context,
+    {required String title,
+    required String initial,
+    String? hint,
+    Offset? point,
+    String saveLabel = 'Save',
+    int minLines = 1,
+    int maxLines = 1}) {
+  return showPointPopover<String>(context,
+      point: point,
+      width: maxLines > 1 ? 340 : 300,
+      maxHeight: maxLines > 1 ? 260 : 120,
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: sans(12.5, color: AppColors.fg3)),
+            const SizedBox(height: 8),
+            _InlinePromptField(
+                initial: initial,
+                hint: hint,
+                saveLabel: saveLabel,
+                minLines: minLines,
+                maxLines: maxLines),
+          ],
+        ),
+      ));
+}
+
 class _InlinePromptField extends StatefulWidget {
   final String initial;
   final String? hint;
-  const _InlinePromptField({required this.initial, this.hint});
+  final String saveLabel;
+  final int minLines;
+  final int maxLines;
+  const _InlinePromptField(
+      {required this.initial,
+      this.hint,
+      this.saveLabel = 'Save',
+      this.minLines = 1,
+      this.maxLines = 1});
 
   @override
   State<_InlinePromptField> createState() => _InlinePromptFieldState();
@@ -424,16 +474,26 @@ class _InlinePromptFieldState extends State<_InlinePromptField> {
 
   @override
   Widget build(BuildContext context) {
+    final multi = widget.maxLines > 1;
+    final field = AppField(
+        controller: _c,
+        hint: widget.hint,
+        autofocus: true,
+        minLines: widget.minLines,
+        maxLines: widget.maxLines,
+        onSubmitted: multi ? null : (_) => _done());
+    final save = Btn(widget.saveLabel, small: true, onTap: _done);
+    if (multi) {
+      return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        field,
+        const SizedBox(height: 10),
+        Align(alignment: Alignment.centerRight, child: save),
+      ]);
+    }
     return Row(children: [
-      Expanded(
-        child: AppField(
-            controller: _c,
-            hint: widget.hint,
-            autofocus: true,
-            onSubmitted: (_) => _done()),
-      ),
+      Expanded(child: field),
       const SizedBox(width: 8),
-      Btn('Save', onTap: _done),
+      save,
     ]);
   }
 }

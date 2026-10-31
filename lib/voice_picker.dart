@@ -53,6 +53,16 @@ Future<String?> showVoicePicker(BuildContext context,
     {required String title,
     required List<PickVoice> voices,
     required String selected}) {
+  if (!kMobile) {
+    return showPointPopover<String>(context,
+        point: lastPointerDown,
+        width: 360,
+        maxHeight: 520,
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: _VoicePicker(voices: voices, selected: selected),
+        ));
+  }
   return showAppSheet<String>(context,
       title: title,
       maxWidth: 420,
@@ -100,7 +110,7 @@ class _VoicePickerState extends State<_VoicePicker> {
             hintText: 'Search ${widget.voices.length} voices',
             hintStyle: sans(kMobile ? 14 : 12.5, color: AppColors.fg4),
             filled: true,
-            fillColor: AppColors.surface2,
+            fillColor: kMobile ? AppColors.surface2 : AppColors.surface1,
             prefixIcon: Padding(
               padding: const EdgeInsets.all(12),
               child: AppIcon('search', size: 14, color: AppColors.fg4),
@@ -111,7 +121,9 @@ class _VoicePickerState extends State<_VoicePicker> {
                 const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
-                borderSide: BorderSide.none),
+                borderSide: kMobile
+                    ? BorderSide.none
+                    : BorderSide(color: AppColors.lineStrong)),
           ),
         ),
         if (groups.length > 1) ...[
