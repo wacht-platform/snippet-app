@@ -18,6 +18,7 @@ import 'dialog_widgets.dart';
 import 'markdown_widgets.dart';
 import 'menu_widgets.dart';
 import 'screens/artifact_viewer.dart' show openArtifact;
+import 'screens/file_viewer.dart' show openFileForViewing, presentFileOnDesktop;
 import 'screens/session.dart' show SessionScreen;
 import 'panel.dart' show presentScreen;
 import 'screens/mobile_chrome.dart';
@@ -167,7 +168,34 @@ void openMarkdownLink(String? href, [BuildContext? context, String? text]) {
     if (context != null) _openSessionLink(context, uri, text);
     return;
   }
+  if (uri.scheme.isEmpty || uri.scheme == 'file') {
+    if (context != null) _openFileLink(context, uri);
+    return;
+  }
   launchUrl(uri, mode: LaunchMode.externalApplication);
+}
+
+void _openFileLink(BuildContext context, Uri uri) {
+  final raw = uri.scheme == 'file' ? uri.toFilePath() : Uri.decodeComponent(uri.path);
+  if (raw.isEmpty) return;
+  final client = DaemonScope.maybeOf(context) ?? DaemonScope.current;
+  if (client == null) {
+    toast(context, 'Connect to the machine to open this file.', danger: true);
+    return;
+  }
+  final scope = DaemonScope.scopeOf(context);
+  final ws = scope?.workspace ?? '';
+  final path = raw.startsWith('/') || ws.isEmpty
+      ? raw
+      : '${ws.endsWith('/') ? ws : '$ws/'}$raw';
+  final name = raw.split('/').last;
+  if (openFileForViewing(context, client: client, path: path, name: name)) return;
+  final open = scope?.onOpenFile;
+  if (open != null) {
+    open(path, name);
+  } else {
+    presentFileOnDesktop(context, client: client, path: path, name: name);
+  }
 }
 
 void _openSessionLink(BuildContext context, Uri uri, String? text) {

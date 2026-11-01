@@ -26,6 +26,9 @@ class DaemonScope extends InheritedWidget {
   /// Opens a file in a tab (desktop), when the host has tabs.
   final void Function(String path, String name)? onOpenFile;
 
+  /// The session's folder, for resolving relative file links in messages.
+  final String? workspace;
+
   /// Shows a tool batch in the desktop side pane, when the host has one.
   final void Function(ValueListenable<ToolBatch> batch)? onOpenTools;
   const DaemonScope({
@@ -33,6 +36,7 @@ class DaemonScope extends InheritedWidget {
     required this.client,
     this.onOpenFile,
     this.onOpenTools,
+    this.workspace,
     required super.child,
   });
 
@@ -48,6 +52,7 @@ class DaemonScope extends InheritedWidget {
   bool updateShouldNotify(DaemonScope old) =>
       old.client != client ||
       old.onOpenFile != onOpenFile ||
+      old.workspace != workspace ||
       old.onOpenTools != onOpenTools;
 }
 

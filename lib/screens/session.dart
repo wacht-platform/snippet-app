@@ -1586,6 +1586,7 @@ class _SessionScreenState extends State<SessionScreen>
       client: widget.client,
       onOpenFile: widget.onOpenFileTab,
       onOpenTools: widget.onOpenToolBatch,
+      workspace: _state?.workspace,
       child: scaffold,
     );
     return kMacOS
