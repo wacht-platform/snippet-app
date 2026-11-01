@@ -96,6 +96,7 @@ extension _SessionScreenRecorderExt on _SessionScreenState {
           bitRate: 96000,
           sampleRate: kMobile ? 16000 : 44100,
           numChannels: 1,
+          androidConfig: const AndroidRecordConfig(manageBluetooth: false),
         ),
         path: path,
       );

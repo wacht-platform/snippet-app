@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
@@ -104,6 +105,83 @@ class AmbientCapture {
         assistantSpeaking: _voice?.speaking.value ?? false,
       );
 
+  Future<Stream<Uint8List>> _openMic() async {
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      var external = false;
+      _earbuds = false;
+      try {
+        external = await _audio.hasExternal();
+        unawaited(AmbientDiagnostics.log('external audio: $external'));
+      } catch (e) {
+        unawaited(AmbientDiagnostics.log('external audio check failed: $e'));
+      }
+      if (external) {
+        try {
+          final route = await _audio.prepare();
+          _earbuds = route.isNotEmpty;
+          unawaited(AmbientDiagnostics.log('audio route: ${route.isEmpty ? 'phone mic, output unchanged' : route}'));
+          if (_earbuds) await Future<void>.delayed(const Duration(milliseconds: 800));
+        } catch (e) {
+          unawaited(AmbientDiagnostics.log('audio route failed: $e'));
+        }
+      }
+    }
+    InputDevice? device;
+    if (defaultTargetPlatform == TargetPlatform.android && !_earbuds) {
+      try {
+        final id = await _audio.builtinMicId();
+        if (id >= 0) {
+          for (final d in await _recorder.listInputDevices()) {
+            if (d.id == '$id') device = d;
+          }
+        }
+        unawaited(AmbientDiagnostics.log('input device chosen: ${device?.label ?? 'default'}'));
+      } catch (e) {
+        unawaited(AmbientDiagnostics.log('input device pick failed: $e'));
+      }
+    }
+    return _recorder.startStream(RecordConfig(
+        device: device,
+        encoder: AudioEncoder.pcm16bits,
+        sampleRate: 16000,
+        numChannels: 1,
+        audioInterruption: AudioInterruptionMode.none,
+        echoCancel: !_earbuds,
+        noiseSuppress: !_earbuds,
+        androidConfig: const AndroidRecordConfig(
+            manageBluetooth: false,
+            audioSource: AndroidAudioSource.voiceCommunication)));
+  }
+
+  bool _micRetried = false;
+
+  bool _earbuds = false;
+  int _winClip = 0;
+  int _winZc = 0;
+  int _winS = 0;
+  double _winSq = 0;
+  int _winN = 0;
+  double _winProb = 0;
+  double _winPeak = 0;
+  DateTime _callGrace = DateTime.fromMillisecondsSinceEpoch(0);
+
+  Future<void> _reopenMic() async {
+    if (!_running || _micRetried) return;
+    _micRetried = true;
+    _callGrace = DateTime.now().add(const Duration(seconds: 10));
+    unawaited(AmbientDiagnostics.log('microphone silent: reopening on the current route'));
+    try {
+      await _sub?.cancel();
+      await _recorder.stop();
+      final stream = await _openMic();
+      _sub = stream.listen(_onAudio, onError: (Object e) {
+        _error = AmbientDiagnostics.redact('$e');
+      });
+    } catch (e) {
+      _error = AmbientDiagnostics.redact('$e');
+    }
+  }
+
   Future<void> start() async {
     if (_running) return;
     await AmbientDiagnostics.log('uploader starting');
@@ -131,21 +209,31 @@ class AmbientCapture {
           .where((event) => event is Uint8List)
           .cast<Uint8List>();
     } else {
-      stream = await _recorder.startStream(RecordConfig(
-          encoder: AudioEncoder.pcm16bits,
-          sampleRate: 16000,
-          numChannels: 1,
-          audioInterruption: AudioInterruptionMode.none,
-          echoCancel: true,
-          noiseSuppress: true,
-          androidConfig: const AndroidRecordConfig(
-              audioSource: AndroidAudioSource.voiceCommunication)));
+      stream = await _openMic();
     }
+    _micRetried = false;
+    _callGrace = DateTime.now().add(const Duration(seconds: 10));
     _running = true;
     _error = null;
     _sub = stream.listen(_onAudio, onError: (Object e) {
       _error = AmbientDiagnostics.redact('$e');
     });
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      var probes = 0;
+      Timer.periodic(const Duration(seconds: 4), (t) async {
+        if (!_running || ++probes > 10) return t.cancel();
+        final route = await _audio.inputRoute().catchError((_) => '');
+        unawaited(AmbientDiagnostics.log(
+            'mic probe: earbuds=$_earbuds frames=$_frames speech=$_speechFrames rms=${(_winN == 0 ? 0 : math.sqrt(_winSq / _winN)).toStringAsFixed(4)} peak=${_winPeak.toStringAsFixed(3)} maxprob=${_winProb.toStringAsFixed(2)} clip=${_winS == 0 ? 0 : (_winClip * 100 / _winS).toStringAsFixed(1)}% zcr=${_winS == 0 ? 0 : (_winZc * 16000 / _winS / 2).round()}Hz input=[$route]'));
+        _winSq = 0;
+        _winN = 0;
+        _winProb = 0;
+        _winPeak = 0;
+        _winClip = 0;
+        _winZc = 0;
+        _winS = 0;
+      });
+    }
     _ticker = Timer.periodic(const Duration(milliseconds: 500), (_) {
       if (!_status.isClosed) _status.add(current);
     });
@@ -196,7 +284,7 @@ class AmbientCapture {
           uploader.flag('media', media);
         }
       }
-      final call = await _audio.inCall();
+      final call = DateTime.now().isBefore(_callGrace) ? false : await _audio.inCall();
       if (call != _callOn) {
         _callOn = call;
         unawaited(AmbientDiagnostics.log(call ? 'call started: listening paused' : 'call ended: listening resumed'));
@@ -242,7 +330,12 @@ class AmbientCapture {
       if (_probability >= threshold) _speechFrames++;
       var energy = 0.0;
       var peak = 0.0;
+      var prev = 0.0;
       for (final x in samples) {
+        if (x.abs() > 0.98) _winClip++;
+        if ((x >= 0) != (prev >= 0)) _winZc++;
+        prev = x;
+        _winS++;
         energy += x * x;
         if (x.abs() > peak) peak = x.abs();
       }
@@ -252,12 +345,17 @@ class AmbientCapture {
         _error =
             'The microphone is only sending silence. Check the input device and that microphone access is allowed for this app.';
         unawaited(AmbientDiagnostics.log('microphone silent for 3s'));
+        if (!kMacOS) unawaited(_reopenMic());
       } else if (_silentFrames == 0 &&
           _error != null &&
           _error!.startsWith('The microphone is only sending silence')) {
         _error = null;
       }
       final rms = energy / samples.length;
+      _winSq += rms;
+      _winN++;
+      if (_probability > _winProb) _winProb = _probability;
+      if (peak > _winPeak) _winPeak = peak;
       if (rms > 0.0004 && _probability < 0.3) _loudQuiet++;
       gate.addFrame(frame, _probability);
       final voiced = _probability >= threshold;

@@ -469,5 +469,13 @@ class DesktopSink implements AmbientSink {
   @override
   Future<bool> inCall() async => false;
   @override
+  Future<int> builtinMicId() async => -1;
+  @override
+  Future<String> inputRoute() async => '';
+  @override
+  Future<bool> hasExternal() async => false;
+  @override
+  Future<String> prepare() async => '';
+  @override
   Future<void> leave() async {}
 }

@@ -37,6 +37,7 @@ class AmbientAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
     @Volatile private var currentVolume = 1f
     private var commActive = false
     private var savedMode = AudioManager.MODE_NORMAL
+    private var onSpeaker = false
     private var savedCallVolume = -1
     private var raisedCallVolume = -1
     private val streamBase = HashMap<Int, Long>()
@@ -70,6 +71,15 @@ class AmbientAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
                 }
                 "mediaActive" -> result.success(audioManager()?.isMusicActive ?: false)
                 "inCall" -> result.success(inCall())
+                "inputRoute" -> result.success(inputRoute())
+                "builtinMicId" -> result.success(audioManager()?.getDevices(AudioManager.GET_DEVICES_INPUTS)?.firstOrNull { it.type == AudioDeviceInfo.TYPE_BUILTIN_MIC }?.id ?: -1)
+                "hasExternal" -> result.success(audioManager()?.let { hasA2dp(it) || hasWired(it) } ?: false)
+                "prepare" -> {
+                    val am = audioManager()
+                    val external = am != null && (hasA2dp(am) || hasWired(am))
+                    val ok = external && synchronized(lock) { commActive || enterComm() }
+                    result.success(if (ok) routeName() else "")
+                }
                 "position" -> result.success(position())
                 "volume" -> {
                     currentVolume = call.argument<Double>("volume")?.toFloat() ?: 1f
@@ -138,23 +148,25 @@ class AmbientAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
             if (Build.VERSION.SDK_INT >= 31) {
                 val devices = am.availableCommunicationDevices
                 val pick = devices.firstOrNull {
-                    it.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO || it.type == AudioDeviceInfo.TYPE_BLE_HEADSET || it.type in commTypes
+                    it.type in commTypes
                 } ?: if (hasA2dp(am)) null else devices.firstOrNull { it.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER }
                 if (pick == null) return false
                 savedMode = am.mode
                 am.mode = AudioManager.MODE_IN_COMMUNICATION
                 am.setCommunicationDevice(pick)
+                onSpeaker = pick.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER
             } else {
                 if (hasA2dp(am) && !hasWired(am)) return false
                 savedMode = am.mode
                 am.mode = AudioManager.MODE_IN_COMMUNICATION
-                if (!hasWired(am)) am.isSpeakerphoneOn = true
+                onSpeaker = !hasWired(am)
+                if (onSpeaker) am.isSpeakerphoneOn = true
             }
             val max = am.getStreamMaxVolume(AudioManager.STREAM_VOICE_CALL)
             val cur = am.getStreamVolume(AudioManager.STREAM_VOICE_CALL)
             savedCallVolume = cur
             raisedCallVolume = -1
-            if (cur < max * 7 / 10) {
+            if (onSpeaker && cur < max * 7 / 10) {
                 raisedCallVolume = max * 8 / 10
                 am.setStreamVolume(AudioManager.STREAM_VOICE_CALL, raisedCallVolume, 0)
             }
@@ -165,6 +177,24 @@ class AmbientAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
             leaveComm()
             return false
         }
+    }
+
+    private fun inputRoute(): String {
+        val am = audioManager() ?: return "none"
+        return try {
+            am.activeRecordingConfigurations.joinToString("; ") {
+                val d = it.audioDevice
+                "src=${it.clientAudioSource} dev=${d?.type ?: -1} ${d?.productName ?: ""} rate=${it.clientFormat.sampleRate}"
+            }.ifEmpty { "no active recording" }
+        } catch (e: Exception) { "error ${e.message}" }
+    }
+
+    private fun routeName(): String {
+        val am = audioManager() ?: return "none"
+        return try {
+            val d = if (Build.VERSION.SDK_INT >= 31) am.communicationDevice else null
+            "type=${d?.type ?: -1} ${d?.productName ?: ""}"
+        } catch (_: Exception) { "unknown" }
     }
 
     private fun leaveComm() {

@@ -2,7 +2,9 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:record/record.dart';
+import '../ambient/diagnostics.dart';
 import '../api.dart';
 import '../models.dart';
 import '../platform.dart';
@@ -99,6 +101,7 @@ class _VoiceScreenState extends State<VoiceScreen> {
         encoder: AudioEncoder.pcm16bits,
         sampleRate: 16000,
         numChannels: 1,
+        androidConfig: AndroidRecordConfig(manageBluetooth: false),
       ));
       _sampleSub = stream.listen((data) {
         _chunks.add(data);
@@ -707,6 +710,21 @@ class _VoiceScreenState extends State<VoiceScreen> {
         ],
       ),
       ..._recordingGroups(),
+      if (kMobile)
+        SettingsGroup(
+          header: 'Troubleshooting',
+          children: [
+            SettingsRow(
+              label: 'Ambient diagnostics',
+              sub: 'Copy the microphone log and any crash trace',
+              trailing: Btn('Copy', small: true, variant: BtnVariant.ghost, onTap: () async {
+                final text = await AmbientDiagnostics.read();
+                await Clipboard.setData(ClipboardData(text: text.isEmpty ? 'No diagnostics recorded' : text));
+                if (mounted) toast(context, 'Copied');
+              }),
+            ),
+          ],
+        ),
       VoiceprintGroup(
         ambient: a,
         phase: _phase,
