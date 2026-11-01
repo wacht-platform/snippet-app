@@ -182,7 +182,7 @@ class _AddMachineDialogState extends State<_AddMachineDialog> {
                           AppIcon('terminal', size: 13, color: AppColors.fg3),
                           const SizedBox(width: 9),
                           Expanded(
-                            child: Text('snippet serve',
+                            child: Text('snippet serve --enable',
                                 style: mono(12, color: AppColors.fg1)),
                           ),
                           IconBtn('copy',
@@ -190,7 +190,7 @@ class _AddMachineDialogState extends State<_AddMachineDialog> {
                               iconSize: 13,
                               tooltip: 'Copy command', onTap: () {
                             Clipboard.setData(
-                                const ClipboardData(text: 'snippet serve'));
+                                const ClipboardData(text: 'snippet serve --enable'));
                             toast(context, 'Command copied');
                           }),
                         ]),
@@ -464,7 +464,7 @@ class _AddInstanceScreenState extends State<AddInstanceScreen>
                   TextSpan(style: sans(12, color: AppColors.fg1), children: [
                     const TextSpan(text: 'Scan the QR from '),
                     TextSpan(
-                        text: 'snippet serve',
+                        text: 'snippet serve --enable',
                         style: mono(12, color: AppColors.fg1)),
                   ]),
                 ),

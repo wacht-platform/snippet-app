@@ -751,7 +751,7 @@ class SettingsPanelState extends State<SettingsPanel> {
     try {
       final parsed = parseConnection(raw);
       if (parsed == null) {
-        throw 'That is not a valid link. Run "snippet serve" on the other machine and paste what it prints.';
+        throw 'That is not a valid link. Run "snippet serve --enable" on the other machine, then "snippet serve --status", and paste the link it prints.';
       }
       final (url, token) = parsed;
       final cfg = await DaemonClient(url, token).getConfig();
@@ -1116,12 +1116,12 @@ class SettingsPanelState extends State<SettingsPanel> {
             'running there, snippet serve --status shows them again.',
         children: [
           SettingsRow(
-            label: 'snippet serve',
-            labelWidget: SelectableText('snippet serve',
+            label: 'snippet serve --enable',
+            labelWidget: SelectableText('snippet serve --enable',
                 style: mono(12.5, color: AppColors.fg1)),
             trailing: IconBtn('copy',
                 size: 28, iconSize: 14, tooltip: 'Copy command', onTap: () {
-              Clipboard.setData(const ClipboardData(text: 'snippet serve'));
+              Clipboard.setData(const ClipboardData(text: 'snippet serve --enable'));
               toast(context, 'Copied');
             }),
           ),
@@ -1262,12 +1262,12 @@ class SettingsPanelState extends State<SettingsPanel> {
               'running there, snippet serve --status shows them again.',
           children: [
             SettingsRow(
-              label: 'snippet serve',
-              labelWidget: SelectableText('snippet serve',
+              label: 'snippet serve --enable',
+              labelWidget: SelectableText('snippet serve --enable',
                   style: mono(12.5, color: AppColors.fg1)),
               trailing: IconBtn('copy',
                   size: 26, iconSize: 13, tooltip: 'Copy command', onTap: () {
-                Clipboard.setData(const ClipboardData(text: 'snippet serve'));
+                Clipboard.setData(const ClipboardData(text: 'snippet serve --enable'));
                 toast(context, 'Copied');
               }),
             ),

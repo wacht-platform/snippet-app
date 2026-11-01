@@ -89,6 +89,31 @@ void main() {
     debugDefaultTargetPlatformOverride = null;
   });
 
+  testWidgets('install that cannot auto-start warns before continuing',
+      (t) async {
+    Instance? got;
+    await _pump(t, TargetPlatform.linux,
+        onReady: (i) => got = i,
+        install: (_) async => const InstallResult.ok(_local, autoStart: false));
+    await t.tap(find.text('Install on this computer'));
+    await t.pump();
+    await t.pump();
+    expect(got, isNull);
+    expect(find.text('Running, but not set to start automatically'),
+        findsOneWidget);
+    expect(find.text(enableCommand), findsOneWidget);
+    await t.tap(find.text('Continue'));
+    expect(got, _local);
+    debugDefaultTargetPlatformOverride = null;
+  });
+
+  testWidgets('manual steps recommend serve --enable', (t) async {
+    await _pump(t, TargetPlatform.windows);
+    expect(find.text(enableCommand), findsOneWidget);
+    expect(find.text('snippet serve --status'), findsOneWidget);
+    debugDefaultTargetPlatformOverride = null;
+  });
+
   testWidgets('windows has no install button', (t) async {
     await _pump(t, TargetPlatform.windows);
     expect(find.text('Snippet needs a service'), findsOneWidget);

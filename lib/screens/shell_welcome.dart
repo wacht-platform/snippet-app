@@ -67,6 +67,7 @@ class _ShellWelcomeViewState extends State<ShellWelcomeView> {
   InstallStage _stage = InstallStage.download;
   String _detail = '';
   String? _error;
+  Instance? _pending;
 
   @override
   void initState() {
@@ -102,8 +103,13 @@ class _ShellWelcomeViewState extends State<ShellWelcomeView> {
       }
     });
     if (!mounted) return;
-    if (r.instance != null) {
+    if (r.instance != null && r.autoStart) {
       widget.onLocalReady?.call(r.instance!);
+    } else if (r.instance != null) {
+      setState(() {
+        _installing = false;
+        _pending = r.instance;
+      });
     } else {
       setState(() {
         _installing = false;
@@ -244,7 +250,25 @@ class _ShellWelcomeViewState extends State<ShellWelcomeView> {
             : _installed
                 ? 'The service is installed but not running.'
                 : 'One install, no account. It runs in the background '
-                    'for your user and starts at login.';
+                    'and starts automatically with your computer.';
+    if (_pending != null) {
+      return [
+        _card(
+          icon: 'server',
+          title: 'Running, but not set to start automatically',
+          subtitle: 'The service works now, but will stop when this '
+              'computer restarts.',
+          children: [
+            const Text('To make it start automatically, run:'),
+            const SizedBox(height: 8),
+            const _CommandBox(enableCommand),
+            const SizedBox(height: 16),
+            _wideButton('Continue', 'check',
+                () => widget.onLocalReady?.call(_pending!)),
+          ],
+        ),
+      ];
+    }
     return [
       _card(
         icon: 'server',
@@ -313,12 +337,20 @@ class _ShellWelcomeViewState extends State<ShellWelcomeView> {
             const _WelcomeStep(
               n: '2',
               title: 'Start it',
-              command: 'snippet serve',
-              note: 'It prints a link and a QR code.',
+              command: enableCommand,
+              note: 'Keeps it running in the background, including after '
+                  'you close the terminal or restart.',
+            ),
+            const SizedBox(height: 14),
+            const _WelcomeStep(
+              n: '3',
+              title: 'Show its link',
+              command: 'snippet serve --status',
+              note: 'Prints the link and a QR code.',
             ),
             const SizedBox(height: 14),
             _WelcomeStep(
-              n: '3',
+              n: '4',
               title: kMobile
                   ? 'Scan the QR code, or paste the link'
                   : 'Paste the link here',

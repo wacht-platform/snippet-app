@@ -9,6 +9,7 @@ import 'api.dart';
 import 'models.dart';
 import 'platform.dart';
 
+const enableCommand = 'snippet serve --enable';
 const installCommand = 'curl -fsSL https://snippet.wacht.dev/install.sh | sh';
 
 /// The installer ships Linux x86_64 and macOS Apple Silicon only.
@@ -47,8 +48,14 @@ enum InstallStage { download, install, start, connect }
 class InstallResult {
   final Instance? instance;
   final String? error;
-  const InstallResult.ok(Instance this.instance) : error = null;
-  const InstallResult.failed(String this.error) : instance = null;
+
+  /// False when the OS service could not be enabled, so the daemon will not survive a restart.
+  final bool autoStart;
+  const InstallResult.ok(Instance this.instance, {this.autoStart = true})
+      : error = null;
+  const InstallResult.failed(String this.error)
+      : instance = null,
+        autoStart = false;
 }
 
 /// Installs the binary if missing, starts the daemon and waits for it to answer.
@@ -86,10 +93,12 @@ Future<InstallResult> installLocalService(
     }
   }
   onStage(InstallStage.start, 'Starting the service');
-  await Process.run(localBinaryPath, ['serve', '--enable']);
+  final enabled = await Process.run(localBinaryPath, ['serve', '--enable']);
+  var autoStart = enabled.exitCode == 0;
   onStage(InstallStage.connect, 'Waiting for it to answer');
   var inst = await _waitForLocal(const Duration(seconds: 15));
   if (inst == null) {
+    autoStart = false;
     await Process.run(localBinaryPath, ['serve']);
     inst = await _waitForLocal(const Duration(seconds: 15));
   }
@@ -97,7 +106,7 @@ Future<InstallResult> installLocalService(
     return const InstallResult.failed(
         'Installed, but the service did not start. Run snippet serve in a terminal to see why.');
   }
-  return InstallResult.ok(inst);
+  return InstallResult.ok(inst, autoStart: autoStart);
 }
 
 Future<Instance?> _waitForLocal(Duration total) async {
