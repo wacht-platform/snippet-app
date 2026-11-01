@@ -417,13 +417,13 @@ class _ShellWelcomeViewState extends State<ShellWelcomeView>
   }
 
   Widget _artFor(int index, double h) => index == 0
-      ? ServiceArt(time: _clock, hover: h)
-      : RemoteArt(time: _clock, hover: h);
+      ? UnboxArt(time: _clock, hover: h)
+      : PlugArt(time: _clock, hover: h);
 
   Widget _desktop() => LayoutBuilder(builder: (context, box) {
         final stacked = box.maxWidth < 760;
         final artHeight =
-            stacked ? 170.0 : (box.maxHeight * 0.44).clamp(190.0, 380.0);
+            stacked ? 170.0 : (box.maxHeight * 0.5).clamp(190.0, 400.0);
         return _split(box, stacked, artHeight);
       });
 

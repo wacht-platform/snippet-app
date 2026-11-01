@@ -84,16 +84,19 @@ class MochiIcon extends StatelessWidget {
       {super.key,
       required this.color,
       this.size = 18,
-      this.shape = MascotShape.mochi});
+      this.shape = MascotShape.mochi,
+      this.eyes = MochiEyes.dot});
 
   final Color color;
   final double size;
   final MascotShape shape;
+  final MochiEyes eyes;
 
   @override
   Widget build(BuildContext context) => SizedBox.square(
         dimension: size,
-        child: CustomPaint(painter: _MochiPainter(color, size, shape: shape)),
+        child: CustomPaint(
+            painter: _MochiPainter(color, size, shape: shape, eyes: eyes)),
       );
 }
 
