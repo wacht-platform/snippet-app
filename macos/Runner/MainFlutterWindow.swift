@@ -1000,7 +1000,14 @@ final class MacosVoiceProcessingEngine: NSObject, FlutterStreamHandler {
   func onCancel(withArguments arguments: Any?) -> FlutterError? {
     self.eventSink = nil
     removeMicTap()
+    stopEngineIfIdle()
     return nil
+  }
+
+  // A running VoiceProcessingIO engine burns CPU and holds the mic even when nothing uses it.
+  private func stopEngineIfIdle() {
+    guard !micTapInstalled, !playerNode.isPlaying, !ttsPaused, engine.isRunning else { return }
+    engine.stop()
   }
 
   private func installMicTapIfNeeded() {
