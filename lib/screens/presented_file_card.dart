@@ -165,14 +165,10 @@ class MediaRow extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(12, 8, 10, 8),
           child: Row(children: [
             Container(
-              width: 36,
+              width: 28,
               height: 36,
               alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: AppColors.surface3,
-                borderRadius: BorderRadius.circular(9),
-              ),
-              child: AppIcon(icon, size: 17, color: AppColors.fg2),
+              child: AppIcon(icon, size: 20, color: AppColors.fg2),
             ),
             const SizedBox(width: 12),
             Expanded(
