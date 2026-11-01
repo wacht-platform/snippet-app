@@ -214,6 +214,7 @@ Future<void> notifySessionEvent({
   FlutterLocalNotificationsPlugin? plugin,
 }) async {
   if ((!kMobile && !kMacOS) || (!kCanNotify && !kMacOS)) return;
+  if (kind != 'waiting' && plainNotificationText(body).isEmpty) return;
   final data = jsonDecode(payload) as Map<String, dynamic>;
   final notifier = plugin ?? _mainNotif;
   final session = _sessionOf(data);
@@ -615,6 +616,7 @@ Future<void> initNotifications() async {
     'error' => ('${inst.label} hit an error', title),
     'idle' => (title.isEmpty ? 'Session' : title, stoppedSummary(e['lanes_running'])),
     'ping' => (title.isEmpty ? 'Mission Control' : title, message),
+    'direct_message.sent' || 'task.message' => ('Message', _payloadBody(e)),
     'term' => (
         message.isEmpty ? '${inst.label} · $title' : message,
         message.isEmpty ? 'Terminal' : title,
@@ -635,6 +637,13 @@ Future<void> initNotifications() async {
     'message': message,
   });
   return (head: head, body: body, payload: payload);
+}
+
+String _payloadBody(Map<String, dynamic> e) {
+  final p = e['payload'];
+  final body = p is Map ? p['body'] : null;
+  final text = plainNotificationText('${body ?? ''}');
+  return text.length > 240 ? '${text.substring(0, 240)}…' : text;
 }
 
 String stoppedSummary(Object? lanes) {
