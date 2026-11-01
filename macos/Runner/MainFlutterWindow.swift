@@ -3557,7 +3557,7 @@ final class NotchHomeController {
     collapseTimer?.invalidate()
     hoverTimer?.invalidate()
     if inside {
-      if !expanded {
+      if !expanded && !model.title.isEmpty {
         hoverTimer = Timer.scheduledTimer(withTimeInterval: 0.08, repeats: false) { [weak self] _ in
           guard let self = self else { return }
           self.expanded = true
