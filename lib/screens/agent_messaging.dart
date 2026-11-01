@@ -12,6 +12,7 @@ import 'package:record/record.dart';
 
 import '../api.dart';
 import '../composer_strip.dart';
+import '../crew_widgets.dart';
 import '../media_views.dart';
 import '../motion.dart';
 import '../desktop_pick.dart';
@@ -1039,6 +1040,30 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
                   ),
                 ],
               ],
+            ),
+          ),
+          Builder(
+            builder: (ctx) => IconBtn(
+              'more-horizontal',
+              size: M.minTarget,
+              iconSize: 18,
+              tooltip: 'Agent actions',
+              onTap: () async {
+                try {
+                  final all = await widget.client.coordinationAgents();
+                  final agent =
+                      all.where((x) => x.id == widget.agentId).firstOrNull;
+                  if (agent == null || !ctx.mounted) return;
+                  await showCrewAgentMenu(ctx,
+                      client: widget.client,
+                      agent: agent,
+                      onDeleted: () => widget.onClose != null
+                          ? widget.onClose!()
+                          : Navigator.of(ctx).maybePop());
+                } catch (e) {
+                  if (ctx.mounted) toast(ctx, '$e', danger: true);
+                }
+              },
             ),
           ),
           IconBtn(

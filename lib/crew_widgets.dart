@@ -563,7 +563,7 @@ Future<void> _pickCrewModel(
     showAppSheet(context,
         title: '$name works on',
         child: SheetActions([
-          SheetAction('sparkles', "Session's own model", () {
+          SheetAction('sparkles', 'Default (from Routing)', () {
             Navigator.pop(context);
             c.complete('');
           }),
@@ -589,7 +589,8 @@ Future<void> _pickCrewModel(
         appMenuRow<String>(
             value: '',
             icon: 'sparkles',
-            label: "Session's own model",
+            label: 'Default (from Routing)',
+            description: "The session's model, or your Routing settings",
             selected: agent.profile == null),
         for (final p in cfg.profiles)
           appMenuRow<String>(
