@@ -12,10 +12,32 @@ import 'platform.dart';
 const enableCommand = 'snippet serve --enable';
 const installCommand = 'curl -fsSL https://snippet.wacht.dev/install.sh | sh';
 
-/// The installer ships Linux x86_64 and macOS Apple Silicon only.
-bool get canInstallLocalService => !kIsWeb && !kMobile && !kWindows;
+/// The macOS sandbox gives the app a private HOME and blocks writing outside it.
+bool get sandboxedApp =>
+    (Platform.environment['HOME'] ?? '').contains('/Library/Containers/');
 
-String get _home => Platform.environment['HOME'] ?? '';
+/// The installer ships Linux x86_64 and macOS Apple Silicon only, and cannot run in the sandbox.
+bool get canInstallLocalService =>
+    !kIsWeb && !kMobile && !kWindows && !sandboxedApp;
+
+String get _home {
+  final h = Platform.environment['HOME'] ?? '';
+  final i = h.indexOf('/Library/Containers/');
+  return i < 0 ? h : h.substring(0, i);
+}
+
+/// True when something answers snippet's health check on this machine, token or not.
+Future<bool> localServiceUp(
+    {Duration timeout = const Duration(milliseconds: 900)}) async {
+  try {
+    final r = await http
+        .get(Uri.parse('http://127.0.0.1:8787/health'))
+        .timeout(timeout);
+    return r.statusCode == 200;
+  } catch (_) {
+    return false;
+  }
+}
 
 String get localBinaryPath => '$_home/.local/bin/snippet';
 

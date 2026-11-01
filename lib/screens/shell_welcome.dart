@@ -1,8 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../diff_counts.dart';
 import '../api.dart';
+import '../diff_counts.dart';
 import '../local_service.dart';
 import '../mochi.dart';
 import '../models.dart';
@@ -59,9 +61,11 @@ class ShellWelcomeView extends StatefulWidget {
   final ValueChanged<Instance>? onConnected;
   final Future<Instance> Function(String raw) connectRemote;
   final Future<Instance?> Function() probeLocal;
+  final Future<bool> Function() probeRunning;
   final Future<InstallResult> Function(
       void Function(InstallStage stage, String detail) onStage) install;
   final bool Function() binaryInstalled;
+  final Duration recheck;
 
   const ShellWelcomeView({
     super.key,
@@ -69,8 +73,10 @@ class ShellWelcomeView extends StatefulWidget {
     this.onConnected,
     this.connectRemote = _defaultConnect,
     this.probeLocal = _defaultProbe,
+    this.probeRunning = localServiceUp,
     this.install = installLocalService,
     this.binaryInstalled = localBinaryInstalled,
+    this.recheck = const Duration(seconds: 3),
   });
 
   @override
@@ -78,13 +84,15 @@ class ShellWelcomeView extends StatefulWidget {
 }
 
 class _ShellWelcomeViewState extends State<ShellWelcomeView> {
-  bool _connecting = false;
+  Instance? _found;
+  bool _runningUnreadable = false;
   bool _installed = false;
   bool _installing = false;
   InstallStage _stage = InstallStage.download;
   String _detail = '';
   String? _error;
   Instance? _pending;
+  Timer? _timer;
   final _paste = TextEditingController();
   bool _remoteBusy = false;
   String? _remoteError;
@@ -92,25 +100,30 @@ class _ShellWelcomeViewState extends State<ShellWelcomeView> {
   @override
   void initState() {
     super.initState();
-    if (canInstallLocalService) _probeLocal();
-  }
-
-  Future<void> _probeLocal() async {
-    _installed = widget.binaryInstalled();
-    final i = await widget.probeLocal();
-    if (!mounted) return;
-    if (i != null && widget.onConnected != null) {
-      setState(() => _connecting = true);
-      widget.onConnected!(i);
-    } else {
-      setState(() {});
+    if (!kMobile) {
+      _installed = widget.binaryInstalled();
+      _probe();
+      _timer = Timer.periodic(widget.recheck, (_) => _probe());
     }
   }
 
   @override
   void dispose() {
+    _timer?.cancel();
     _paste.dispose();
     super.dispose();
+  }
+
+  Future<void> _probe() async {
+    if (_installing || _found != null || _pending != null) return;
+    final i = await widget.probeLocal();
+    final up = i != null || await widget.probeRunning();
+    if (!mounted) return;
+    setState(() {
+      _found = i;
+      _runningUnreadable = i == null && up;
+      if (i != null) _timer?.cancel();
+    });
   }
 
   Future<void> _connectRemote(String raw) async {
@@ -163,6 +176,191 @@ class _ShellWelcomeViewState extends State<ShellWelcomeView> {
       });
     }
   }
+
+  Widget _progress() {
+    final stages = [
+      if (!_installed) ...[
+        (InstallStage.download, 'Download'),
+        (InstallStage.install, 'Install'),
+      ],
+      (InstallStage.start, 'Start the service'),
+      (InstallStage.connect, 'Connect'),
+    ];
+    return Column(children: [
+      for (final (s, label) in stages)
+        _StageRow(
+          label: label,
+          detail: s == _stage ? _detail : '',
+          state: s.index < _stage.index
+              ? _StageState.done
+              : s == _stage
+                  ? _StageState.active
+                  : _StageState.pending,
+        ),
+    ]);
+  }
+
+  Widget _half(String title, List<Widget> children) => Padding(
+        padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(title, style: sans(13, weight: W.label, color: AppColors.fg1)),
+            const SizedBox(height: 6),
+            ...children,
+          ],
+        ),
+      );
+
+  Text _body(String text) =>
+      Text(text, style: sans(12, height: 1.5, color: AppColors.fg3));
+
+  Widget _localHalf() {
+    if (_found != null) {
+      return _half('This computer', [
+        Row(children: [
+          Container(
+            width: 7,
+            height: 7,
+            decoration:
+                BoxDecoration(color: AppColors.ok, shape: BoxShape.circle),
+          ),
+          const SizedBox(width: 8),
+          Text('Snippet is running', style: sans(12.5, color: AppColors.fg1)),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(_found!.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: mono(11, color: AppColors.fg4)),
+          ),
+        ]),
+        const SizedBox(height: 14),
+        Btn('Connect',
+            small: true, onTap: () => widget.onConnected?.call(_found!)),
+      ]);
+    }
+    if (_pending != null) {
+      return _half('Not set to start automatically', [
+        _body('It works now, but will stop when this computer restarts. '
+            'To fix that, run:'),
+        const SizedBox(height: 10),
+        const _CommandBox(enableCommand),
+        const SizedBox(height: 12),
+        Btn('Continue',
+            small: true, onTap: () => widget.onConnected?.call(_pending!)),
+      ]);
+    }
+    if (_installing) {
+      return _half('Setting up', [_progress()]);
+    }
+    if (_runningUnreadable) {
+      return _half('This computer', [
+        _body('Snippet is running here, but this app cannot read its link. '
+            'Run snippet serve --status and paste the link on the right.'),
+      ]);
+    }
+    if (!canInstallLocalService) {
+      return _half('This computer', [
+        _body('Run these in a terminal. This screen picks the service up '
+            'as soon as it is running.'),
+        const SizedBox(height: 10),
+        if (!_installed) ...[
+          const _CommandBox(installCommand),
+          const SizedBox(height: 6),
+        ],
+        const _CommandBox(enableCommand),
+      ]);
+    }
+    return _half('This computer', [
+      _body(_installed
+          ? 'Snippet is installed but not running.'
+          : 'Install the service here. It runs in the background and '
+              'starts with your computer.'),
+      if (_error != null) ...[
+        const SizedBox(height: 10),
+        Text(_error!, style: sans(11.5, height: 1.45, color: AppColors.danger)),
+        const SizedBox(height: 8),
+        const _CommandBox(installCommand),
+      ],
+      const SizedBox(height: 14),
+      Btn(
+          _error != null
+              ? 'Try again'
+              : _installed
+                  ? 'Start the service'
+                  : 'Install',
+          small: true,
+          icon: _installed ? null : 'download',
+          onTap: _install),
+    ]);
+  }
+
+  Widget _remoteHalf() => _half('Another computer', [
+        SelectableText.rich(
+          TextSpan(
+              style: sans(12, height: 1.5, color: AppColors.fg3),
+              children: [
+                const TextSpan(text: 'There, run '),
+                TextSpan(
+                    text: enableCommand, style: mono(11, color: AppColors.fg1)),
+                const TextSpan(text: ', then '),
+                TextSpan(
+                    text: 'snippet serve --status',
+                    style: mono(11, color: AppColors.fg1)),
+                const TextSpan(text: ' and paste the link.'),
+              ]),
+        ),
+        const SizedBox(height: 14),
+        Row(children: [
+          Expanded(
+              child: AppField(
+                  controller: _paste,
+                  mono: true,
+                  hint: 'https://\u2026?token=\u2026',
+                  onSubmitted: _connectRemote)),
+          const SizedBox(width: 8),
+          Btn('Connect',
+              small: true,
+              disabled: _remoteBusy,
+              onTap: () => _connectRemote(_paste.text)),
+        ]),
+        if (_remoteError != null) ...[
+          const SizedBox(height: 8),
+          Text(_remoteError!,
+              style: sans(11.5, height: 1.4, color: AppColors.danger)),
+        ],
+      ]);
+
+  Widget _desktopPanel() => LayoutBuilder(builder: (context, box) {
+        final stacked = box.maxWidth < 600;
+        final line = Container(
+            width: stacked ? null : 1,
+            height: stacked ? 1 : null,
+            color: AppColors.border);
+        return Container(
+          decoration: BoxDecoration(
+            color: AppColors.surface1,
+            borderRadius: BorderRadius.circular(R.lg),
+            border: Border.all(color: AppColors.border),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: stacked
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [_localHalf(), line, _remoteHalf()])
+              : IntrinsicHeight(
+                  child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Expanded(child: _localHalf()),
+                        line,
+                        Expanded(child: _remoteHalf()),
+                      ]),
+                ),
+        );
+      });
 
   Widget _card({
     required String icon,
@@ -237,217 +435,6 @@ class _ShellWelcomeViewState extends State<ShellWelcomeView> {
         ),
       );
 
-  Widget _remoteLink() => Padding(
-        padding: const EdgeInsets.only(top: 22),
-        child: Wrap(
-          alignment: WrapAlignment.center,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            Text('Already running on another computer?  ',
-                style: sans(13, color: AppColors.fg3)),
-            InkWell(
-              onTap: widget.onAddInstance,
-              borderRadius: BorderRadius.circular(R.sm),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 2),
-                child: Text('Connect to a remote',
-                    style: sans(13, weight: W.label, color: AppColors.accent)),
-              ),
-            ),
-          ],
-        ),
-      );
-
-  Widget _progress() {
-    final stages = [
-      if (!_installed) ...[
-        (InstallStage.download, 'Download snippet'),
-        (InstallStage.install, 'Install'),
-      ],
-      (InstallStage.start, 'Start the service'),
-      (InstallStage.connect, 'Connect'),
-    ];
-    return Column(children: [
-      for (final (s, label) in stages)
-        _StageRow(
-          label: label,
-          detail: s == _stage ? _detail : '',
-          state: s.index < _stage.index
-              ? _StageState.done
-              : s == _stage
-                  ? _StageState.active
-                  : _StageState.pending,
-        ),
-    ]);
-  }
-
-  List<Widget> _localCard({bool withRemoteLink = true}) {
-    final title = _connecting
-        ? 'Found it on this computer'
-        : _installing
-            ? 'Setting up on this computer'
-            : _installed
-                ? 'Installed on this computer'
-                : 'Run it on this computer';
-    final subtitle = _connecting
-        ? 'The service is already running. Connecting now.'
-        : _installing
-            ? 'This takes under a minute.'
-            : _installed
-                ? 'The service is installed but not running.'
-                : 'One install, no account. It runs in the background '
-                    'and starts automatically with your computer.';
-    if (_pending != null) {
-      return [
-        _card(
-          icon: 'server',
-          title: 'Running, but not set to start automatically',
-          subtitle: 'The service works now, but will stop when this '
-              'computer restarts.',
-          children: [
-            const Text('To make it start automatically, run:'),
-            const SizedBox(height: 8),
-            const _CommandBox(enableCommand),
-            const SizedBox(height: 16),
-            _wideButton(
-                'Continue', 'check', () => widget.onConnected?.call(_pending!)),
-          ],
-        ),
-      ];
-    }
-    return [
-      _card(
-        icon: 'server',
-        title: title,
-        subtitle: subtitle,
-        children: [
-          if (_connecting)
-            const _StageRow(
-                label: 'Connecting to this computer', state: _StageState.active)
-          else if (_installing)
-            _progress()
-          else ...[
-            if (_error != null) ...[
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: AppColors.dangerBg,
-                  borderRadius: BorderRadius.circular(R.md),
-                ),
-                child: Text(_error!,
-                    style: sans(12.5, height: 1.45, color: AppColors.danger)),
-              ),
-              const SizedBox(height: 12),
-            ],
-            _wideButton(
-              _error != null
-                  ? 'Try again'
-                  : _installed
-                      ? 'Start the service'
-                      : 'Install on this computer',
-              _error != null
-                  ? 'refresh'
-                  : _installed
-                      ? 'play'
-                      : 'download',
-              _install,
-            ),
-            if (_error != null) ...[
-              const SizedBox(height: 14),
-              Text('Or run the installer yourself',
-                  style: sans(12, color: AppColors.fg4)),
-              const SizedBox(height: 6),
-              const _CommandBox(installCommand),
-            ],
-          ],
-        ],
-      ),
-      if (withRemoteLink && !_connecting && !_installing) _remoteLink(),
-    ];
-  }
-
-  Widget _remotePane() => _card(
-        icon: 'globe',
-        title: 'Connect to another computer',
-        subtitle: 'Link this app to a service already running elsewhere.',
-        children: [
-          if (!canInstallLocalService) ...[
-            Text('1. Install snippet on a Linux or macOS computer',
-                style: sans(12.5, color: AppColors.fg2)),
-            const SizedBox(height: 6),
-            const _CommandBox(installCommand),
-            const SizedBox(height: 12),
-          ],
-          if (canInstallLocalService) ...[
-            SelectableText.rich(
-              TextSpan(
-                  style: sans(12, height: 1.5, color: AppColors.fg3),
-                  children: [
-                    const TextSpan(text: 'On that computer run '),
-                    TextSpan(
-                        text: enableCommand,
-                        style: mono(11.5, color: AppColors.fg1)),
-                    const TextSpan(text: ', then '),
-                    TextSpan(
-                        text: 'snippet serve --status',
-                        style: mono(11.5, color: AppColors.fg1)),
-                    const TextSpan(text: ' for the link.'),
-                  ]),
-            ),
-          ] else ...[
-            Text('2. Start it and show its link',
-                style: sans(12.5, color: AppColors.fg2)),
-            const SizedBox(height: 6),
-            const _CommandBox(enableCommand),
-            const SizedBox(height: 6),
-            const _CommandBox('snippet serve --status'),
-          ],
-          const SizedBox(height: 14),
-          AppField(
-              controller: _paste,
-              mono: true,
-              hint: 'Paste the link it prints',
-              onSubmitted: _connectRemote),
-          if (_remoteError != null) ...[
-            const SizedBox(height: 8),
-            Text(_remoteError!,
-                style: sans(12, height: 1.4, color: AppColors.danger)),
-          ],
-          const SizedBox(height: 12),
-          _remoteBusy
-              ? Row(children: [
-                  Spinner(size: 13, color: AppColors.fg3),
-                  const SizedBox(width: 9),
-                  Text('Connecting', style: sans(12.5, color: AppColors.fg3)),
-                ])
-              : _wideButton(
-                  'Connect', 'plus', () => _connectRemote(_paste.text)),
-        ],
-      );
-
-  Widget _desktopPanes() => LayoutBuilder(builder: (context, box) {
-        final remote = _remotePane();
-        if (!canInstallLocalService) {
-          return Center(
-              child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 420),
-                  child: remote));
-        }
-        final local = _localCard(withRemoteLink: false).first;
-        if (box.maxWidth < 640) {
-          return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [local, const SizedBox(height: 12), remote]);
-        }
-        return IntrinsicHeight(
-          child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Expanded(child: local),
-            const SizedBox(width: 12),
-            Expanded(child: remote),
-          ]),
-        );
-      });
-
   List<Widget> _manualCard() => [
         _card(
           icon: 'server',
@@ -500,7 +487,7 @@ class _ShellWelcomeViewState extends State<ShellWelcomeView> {
           padding:
               EdgeInsets.symmetric(horizontal: kMobile ? 20 : 28, vertical: 32),
           child: ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: kMobile ? 460 : 780),
+            constraints: BoxConstraints(maxWidth: kMobile ? 460 : 660),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -508,26 +495,23 @@ class _ShellWelcomeViewState extends State<ShellWelcomeView> {
                 Center(
                     child: MochiIcon(
                         color: const Color(0xFFB9C6FF),
-                        size: kMobile ? 56 : 40)),
-                const SizedBox(height: 20),
+                        size: kMobile ? 56 : 28)),
+                SizedBox(height: kMobile ? 20 : 12),
                 Text(
                   'Snippet needs a service',
                   textAlign: TextAlign.center,
-                  style: display(kMobile ? 26 : 24),
+                  style: display(kMobile ? 26 : 17),
                 ),
-                const SizedBox(height: 10),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  child: Text(
-                    'It does its work in a small service that runs in the '
-                    'background. This app is the window onto it.',
-                    textAlign: TextAlign.center,
-                    style: sans(kMobile ? 14.5 : 13.5,
-                        height: 1.5, color: AppColors.fg3),
-                  ),
+                const SizedBox(height: 6),
+                Text(
+                  'It does its work in a small service that runs in the '
+                  'background. This app is the window onto it.',
+                  textAlign: TextAlign.center,
+                  style: sans(kMobile ? 14.5 : 12.5,
+                      height: 1.5, color: AppColors.fg3),
                 ),
-                SizedBox(height: kMobile ? 26 : 22),
-                if (kMobile) ..._manualCard() else _desktopPanes(),
+                SizedBox(height: kMobile ? 26 : 20),
+                if (kMobile) ..._manualCard() else _desktopPanel(),
               ],
             ),
           ),
@@ -549,7 +533,7 @@ class _StageRow extends StatelessWidget {
   Widget build(BuildContext context) {
     Theme.of(context);
     final lead = switch (state) {
-      _StageState.done => AppIcon('check', size: 16, color: AppColors.ok),
+      _StageState.done => AppIcon('check', size: 14, color: AppColors.ok),
       _StageState.active => SizedBox(
           width: 14,
           height: 14,
@@ -564,16 +548,16 @@ class _StageRow extends StatelessWidget {
           )),
     };
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 7),
+      padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        SizedBox(width: 22, height: 20, child: Center(child: lead)),
-        const SizedBox(width: 10),
+        SizedBox(width: 18, height: 18, child: Center(child: lead)),
+        const SizedBox(width: 8),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(label,
-                  style: sans(13.5,
+                  style: sans(12.5,
                       color: state == _StageState.pending
                           ? AppColors.fg4
                           : AppColors.fg1)),
@@ -583,7 +567,7 @@ class _StageRow extends StatelessWidget {
                   child: Text(detail,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: mono(11, color: AppColors.fg3)),
+                      style: mono(10.5, color: AppColors.fg3)),
                 ),
             ],
           ),

@@ -11,71 +11,62 @@ const _local =
 Future<void> _pump(
   WidgetTester t,
   TargetPlatform p, {
-  VoidCallback? onAdd,
   ValueChanged<Instance>? onReady,
-  Future<Instance?> Function()? probe,
+  Instance? found,
+  bool up = false,
+  Future<Instance> Function(String)? remote,
   Future<InstallResult> Function(void Function(InstallStage, String))? install,
   bool installed = false,
-  Future<Instance> Function(String)? remote,
 }) async {
   debugDefaultTargetPlatformOverride = p;
   t.view.physicalSize = const Size(1200, 900);
   t.view.devicePixelRatio = 1;
   await t.pumpWidget(MaterialApp(
     home: Scaffold(
-        body: ShellWelcomeView(
-      onAddInstance: onAdd ?? () {},
-      onConnected: onReady,
-      connectRemote: remote ?? (_) async => _local,
-      probeLocal: probe ?? () async => null,
-      install: install ?? (_) async => const InstallResult.failed('unused'),
-      binaryInstalled: () => installed,
-    )),
+      body: ShellWelcomeView(
+        onAddInstance: () {},
+        onConnected: onReady,
+        probeLocal: () async => found,
+        probeRunning: () async => up,
+        recheck: const Duration(hours: 1),
+        connectRemote: remote ?? (_) async => _local,
+        install: install ?? (_) async => const InstallResult.failed('unused'),
+        binaryInstalled: () => installed,
+      ),
+    ),
   ));
+  await t.pump();
   await t.pump();
   await t.pump();
 }
 
 void main() {
-  testWidgets('desktop shows install and remote side by side', (t) async {
+  testWidgets('desktop shows this computer and another computer', (t) async {
     await _pump(t, TargetPlatform.macOS);
     expect(find.text('Snippet needs a service'), findsOneWidget);
-    expect(find.text('Install on this computer'), findsOneWidget);
-    expect(find.text('Connect to another computer'), findsOneWidget);
+    expect(find.text('This computer'), findsOneWidget);
+    expect(find.text('Another computer'), findsOneWidget);
+    expect(find.text('Install'), findsOneWidget);
     debugDefaultTargetPlatformOverride = null;
   });
 
-  testWidgets('pasting a link connects to the remote', (t) async {
+  testWidgets('a running local service offers one click connect', (t) async {
     Instance? got;
     await _pump(t, TargetPlatform.macOS,
-        onReady: (i) => got = i, remote: (raw) async => _local);
-    await t.enterText(find.byType(TextField), 'https://box.example?token=abc');
-    await t.tap(find.text('Connect'));
-    await t.pump();
-    await t.pump();
-    expect(got, _local);
-    debugDefaultTargetPlatformOverride = null;
-  });
-
-  testWidgets('a bad remote link shows the error and stays', (t) async {
-    Instance? got;
-    await _pump(t, TargetPlatform.macOS,
-        onReady: (i) => got = i, remote: (raw) async => throw 'refused');
-    await t.enterText(find.byType(TextField), 'nonsense');
-    await t.tap(find.text('Connect'));
-    await t.pump();
-    await t.pump();
+        found: _local, up: true, onReady: (i) => got = i);
     expect(got, isNull);
-    expect(find.text('Could not connect: refused'), findsOneWidget);
+    expect(find.text('Snippet is running'), findsOneWidget);
+    expect(find.text('Install'), findsNothing);
+    await t.tap(find.text('Connect').first);
+    expect(got, _local);
     debugDefaultTargetPlatformOverride = null;
   });
 
-  testWidgets('a running local service connects without a click', (t) async {
-    Instance? got;
-    await _pump(t, TargetPlatform.macOS,
-        probe: () async => _local, onReady: (i) => got = i);
-    expect(got, _local);
-    expect(find.text('Connecting to this computer'), findsOneWidget);
+  testWidgets('running but unreadable tells the user to paste the link',
+      (t) async {
+    await _pump(t, TargetPlatform.macOS, up: true);
+    expect(find.textContaining('cannot read its link'), findsOneWidget);
+    expect(find.text('Install'), findsNothing);
     debugDefaultTargetPlatformOverride = null;
   });
 
@@ -93,7 +84,7 @@ void main() {
           on(InstallStage.download, 'downloading snippet.tar.gz');
           return const InstallResult.ok(_local);
         });
-    await t.tap(find.text('Install on this computer'));
+    await t.tap(find.text('Install'));
     await t.pump();
     expect(got, _local);
     debugDefaultTargetPlatformOverride = null;
@@ -104,7 +95,7 @@ void main() {
     await _pump(t, TargetPlatform.linux,
         install: (_) async =>
             const InstallResult.failed('glibc 2.31 is too old'));
-    await t.tap(find.text('Install on this computer'));
+    await t.tap(find.text('Install'));
     await t.pump();
     await t.pump();
     expect(find.text('glibc 2.31 is too old'), findsOneWidget);
@@ -119,36 +110,51 @@ void main() {
     await _pump(t, TargetPlatform.linux,
         onReady: (i) => got = i,
         install: (_) async => const InstallResult.ok(_local, autoStart: false));
-    await t.tap(find.text('Install on this computer'));
+    await t.tap(find.text('Install'));
     await t.pump();
     await t.pump();
     expect(got, isNull);
-    expect(find.text('Running, but not set to start automatically'),
-        findsOneWidget);
-    expect(find.text(enableCommand), findsOneWidget);
+    expect(find.text('Not set to start automatically'), findsOneWidget);
     await t.tap(find.text('Continue'));
     expect(got, _local);
     debugDefaultTargetPlatformOverride = null;
   });
 
-  testWidgets('manual steps recommend serve --enable', (t) async {
-    await _pump(t, TargetPlatform.windows);
-    expect(find.text(enableCommand), findsOneWidget);
-    expect(find.text('snippet serve --status'), findsOneWidget);
+  testWidgets('pasting a link connects to the remote', (t) async {
+    Instance? got;
+    await _pump(t, TargetPlatform.macOS, onReady: (i) => got = i);
+    await t.enterText(find.byType(TextField), 'https://box.example?token=abc');
+    await t.tap(find.text('Connect').last);
+    await t.pump();
+    await t.pump();
+    expect(got, _local);
     debugDefaultTargetPlatformOverride = null;
   });
 
-  testWidgets('windows has no install button', (t) async {
+  testWidgets('a bad remote link shows the error and stays', (t) async {
+    Instance? got;
+    await _pump(t, TargetPlatform.macOS,
+        onReady: (i) => got = i, remote: (_) async => throw 'refused');
+    await t.enterText(find.byType(TextField), 'nonsense');
+    await t.tap(find.text('Connect').last);
+    await t.pump();
+    await t.pump();
+    expect(got, isNull);
+    expect(find.text('Could not connect: refused'), findsOneWidget);
+    debugDefaultTargetPlatformOverride = null;
+  });
+
+  testWidgets('windows gets terminal commands, no install button', (t) async {
     await _pump(t, TargetPlatform.windows);
-    expect(find.text('Snippet needs a service'), findsOneWidget);
-    expect(find.text('Install on this computer'), findsNothing);
-    expect(find.text('Connect'), findsOneWidget);
+    expect(find.text('Install'), findsNothing);
+    expect(find.text(installCommand), findsOneWidget);
+    expect(find.text(enableCommand), findsOneWidget);
     debugDefaultTargetPlatformOverride = null;
   });
 
   testWidgets('phone shows the remote steps only', (t) async {
     await _pump(t, TargetPlatform.android);
-    expect(find.text('Install on this computer'), findsNothing);
+    expect(find.text('Another computer'), findsNothing);
     expect(find.text('Scan or paste'), findsOneWidget);
     debugDefaultTargetPlatformOverride = null;
   });
