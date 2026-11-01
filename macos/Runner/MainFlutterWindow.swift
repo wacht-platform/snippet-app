@@ -49,7 +49,7 @@ private func snippetHotKeyCallback(
   return noErr
 }
 
-// MARK: - Snippet Theme & Bundled Font Loader (JetBrainsMono + Graphite Palette)
+// MARK: - Snippet Theme & Bundled Font Loader (Geist + Graphite Palette)
 
 enum SnippetTheme {
   static var fontsRegistered = false
@@ -86,11 +86,11 @@ enum SnippetTheme {
     ensureFontsRegistered()
     let name: String
     if weight.rawValue >= NSFont.Weight.semibold.rawValue {
-      name = "JetBrainsMono-SemiBold"
+      name = "GeistMono-SemiBold"
     } else if weight.rawValue >= NSFont.Weight.medium.rawValue {
-      name = "JetBrainsMono-Medium"
+      name = "GeistMono-Medium"
     } else {
-      name = "JetBrainsMono-Regular"
+      name = "GeistMono-Regular"
     }
     if let font = NSFont(name: name, size: size) {
       return font
@@ -2877,17 +2877,17 @@ struct NotchHomeModel {
   }
 }
 
-/// The app's own faces: Inter at 400/500/600 and JetBrains Mono, never heavier.
+/// The app's own faces: Geist at 400/500/600 and Geist Mono, never heavier.
 enum NotchHomeType {
   static func sans(_ size: CGFloat, weight: NSFont.Weight = .regular) -> NSFont {
     SnippetTheme.ensureFontsRegistered()
     let name: String
     if weight.rawValue >= NSFont.Weight.semibold.rawValue {
-      name = "Inter-SemiBold"
+      name = "Geist-SemiBold"
     } else if weight.rawValue >= NSFont.Weight.medium.rawValue {
-      name = "Inter-Medium"
+      name = "Geist-Medium"
     } else {
-      name = "Inter-Regular"
+      name = "Geist-Regular"
     }
     return NSFont(name: name, size: size) ?? NSFont.systemFont(ofSize: size, weight: weight)
   }

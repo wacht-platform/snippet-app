@@ -482,7 +482,7 @@ class M {
 const double kComposerGutter = 16;
 
 // ---------------------------------------------------------------------------
-// Typography — Instrument Sans for UI, JetBrains Mono for code.
+// Typography — Geist for UI, Geist Mono for code.
 //
 // The ceiling is 500. `600` exists as `strong` only for the single large page
 // title; everything else is 400 with 500 reserved for controls and row titles,
@@ -505,9 +505,10 @@ FontWeight weightFor(FontWeight w) =>
         ? FontWeight.w500
         : FontWeight.w400;
 
-/// Inter's published dynamic metrics (rsms.me/inter/dynmetrics).
+/// Geist is drawn with comfortable default spacing, so body text keeps it and
+/// only larger sizes tighten, up to -2% from 28px.
 double _tracking(double size) =>
-    size * (-0.0223 + 0.185 * math.exp(-0.1745 * size));
+    size <= 13 ? 0 : size * -0.02 * ((size - 13) / 15).clamp(0.0, 1.0);
 
 TextStyle sans(double size,
         {FontWeight weight = W.body,
@@ -523,7 +524,7 @@ TextStyle sans(double size,
       letterSpacing: spacing ?? _tracking(size),
       color: color ?? AppColors.fg2,
       // Proportional digits have different widths, so a ticking timer or a
-      // counter shimmers and reflows as it updates. Inter ships `tnum`
+      // counter shimmers and reflows as it updates. Geist ships `tnum`
       // (verified in the font's GSUB table), so this is a real substitution.
       fontFeatures: tabular ? const [FontFeature.tabularFigures()] : null,
     );
@@ -569,7 +570,7 @@ TextStyle caps(double size,
         {Color? color, double spacing = 0.5, FontWeight weight = W.label}) =>
     sans(size, weight: weight, color: color, spacing: spacing);
 
-String get kSansFamily => 'Inter';
+String get kSansFamily => 'Geist';
 const kSerifFamily = 'Literata';
 
 /// The agent's own writing on a phone: a screen serif at a reading size, so a
@@ -583,7 +584,7 @@ TextStyle serif(double size,
       height: height ?? 1.6,
       color: color ?? AppColors.fg1,
     );
-const kMonoFamily = 'JetBrainsMono';
+const kMonoFamily = 'GeistMono';
 
 String get monoFamily => kMonoFamily;
 

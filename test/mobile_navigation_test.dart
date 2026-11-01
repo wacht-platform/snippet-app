@@ -40,7 +40,7 @@ void main() {
     try {
       SharedPreferences.setMockInitialValues({});
       await _pumpShell(tester);
-      expect(find.text('Connect your computer'), findsOneWidget);
+      expect(find.text('Snippet needs a service'), findsOneWidget);
       expect(_visible(find.text('Scan or paste')), findsOneWidget);
       expect(find.byType(MobileTopBar), findsNothing);
       for (final text in [_chats, _tasks, _agents, _settings]) {

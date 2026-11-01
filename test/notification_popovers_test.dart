@@ -18,16 +18,18 @@ void main() {
       builder: (_, child) => NotificationPopovers(child: child!),
       home: const DesktopShell(),
     ));
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(seconds: 1));
     expect(onNotifTap, isNotNull);
     foregroundNotifications.add({
       'title': 'Desktop alert',
       'url': 'missing-machine',
       'session': 'chat',
     });
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(seconds: 1));
     await tester.tap(find.text('Desktop alert'));
-    await tester.pumpAndSettle();
+    for (var i = 0; i < 20; i++) {
+      await tester.pump(const Duration(milliseconds: 200));
+    }
     expect(find.text('That machine is no longer saved.'), findsOneWidget);
     expect(find.text('Desktop alert'), findsNothing);
     await tester.pumpWidget(const SizedBox());

@@ -61,13 +61,13 @@ flutter:
   assets:
     - assets/providers/
   fonts:
-    - family: Inter
+    - family: Geist
       fonts:
-        - asset: assets/fonts/Inter-400.ttf
+        - asset: assets/fonts/Geist-400.ttf
           weight: 400
-        - asset: assets/fonts/Inter-500.ttf
+        - asset: assets/fonts/Geist-500.ttf
           weight: 500
-        - asset: assets/fonts/Inter-600.ttf
+        - asset: assets/fonts/Geist-600.ttf
           weight: 600
     - family: Literata
       fonts:
@@ -76,15 +76,15 @@ flutter:
         - asset: assets/fonts/Literata-400-italic.ttf
           weight: 400
           style: italic
-    - family: JetBrainsMono
+    - family: GeistMono
       fonts:
-        - asset: assets/fonts/JetBrainsMono-400.ttf
+        - asset: assets/fonts/GeistMono-400.ttf
           weight: 400
-        - asset: assets/fonts/JetBrainsMono-500.ttf
+        - asset: assets/fonts/GeistMono-500.ttf
           weight: 500
-        - asset: assets/fonts/JetBrainsMono-600.ttf
+        - asset: assets/fonts/GeistMono-600.ttf
           weight: 600
-        - asset: assets/fonts/JetBrainsMono-700.ttf
+        - asset: assets/fonts/GeistMono-700.ttf
           weight: 700
 
 flutter_launcher_icons:
