@@ -754,41 +754,6 @@ class SidebarState extends State<Sidebar> {
     );
   }
 
-  /// Grows and shrinks its child with the content kept visible while the size
-  /// eases, so expanding and collapsing reads as one motion.
-  Widget _reveal(bool show, Widget child) => Reveal(show: show, child: child);
-
-  /// [pinned] is the bottom bar shown while collapsed on desktop; otherwise
-  /// the group lives in the list (phones always, desktop once expanded).
-  Widget _settledGroup(List<SessionInfo> rows,
-      {required bool mobile, bool pinned = false}) {
-    final open = _settledOpen || _filterQuery.trim().isNotEmpty;
-    Widget list() =>
-        Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          for (var i = 0; i < rows.length; i++)
-            mobile
-                ? _mobileSessionRow(rows[i], divider: i + 1 < rows.length)
-                : _desktopChatRow(rows[i]),
-        ]);
-    if (pinned) {
-      return _reveal(!open, _settledHeader(rows, mobile: false, open: false));
-    }
-    if (mobile) {
-      return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        _settledHeader(rows, mobile: true, open: open),
-        _reveal(open, list()),
-      ]);
-    }
-    return _reveal(
-      open,
-      Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        const SizedBox(height: 32),
-        _settledHeader(rows, mobile: false, open: true),
-        list(),
-      ]),
-    );
-  }
-
   Future<void> _setSettled(SessionInfo s, bool settle) async {
     final c = widget.client;
     if (c == null) return;
@@ -883,20 +848,27 @@ class SidebarState extends State<Sidebar> {
           child: _mobileSessionRow(rows[i], divider: i + 1 < rows.length),
         ));
       }
-      if (settledRows.isNotEmpty) {
-        mobileChildren.add(_settledGroup(settledRows, mobile: true));
-      }
-      if (mobileChildren.isEmpty) {
+      if (mobileChildren.isEmpty && settledRows.isEmpty) {
         mobileChildren
             .add(_emptySessions(searching: _filterQuery.trim().isNotEmpty));
       }
-      return PullToRefresh(
+      final refreshList = PullToRefresh(
         onRefresh: () async => widget.onRefreshSessions(),
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(M.gutter, 4, M.gutter, 120),
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: EdgeInsets.fromLTRB(
+              M.gutter, 4, M.gutter, settledRows.isEmpty ? 120 : 16),
           children: mobileChildren,
         ),
       );
+      if (settledRows.isEmpty) return refreshList;
+      return LayoutBuilder(builder: (context, box) {
+        final panelMax = box.maxHeight.isFinite ? box.maxHeight * 0.5 : 320.0;
+        return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Expanded(child: refreshList),
+          _mobileSettledPanel(settledRows, panelMax),
+        ]);
+      });
     }
     final children = <Widget>[];
     if (mc.isNotEmpty) {
@@ -1102,6 +1074,36 @@ class SidebarState extends State<Sidebar> {
         ),
       ]);
     });
+  }
+
+  /// Phones: Settled pinned above the search bar, opening upward over the list.
+  Widget _mobileSettledPanel(List<SessionInfo> rows, double maxHeight) {
+    final open = _settledOpen || _filterQuery.trim().isNotEmpty;
+    return AnimatedContainer(
+      duration: Motion.base,
+      margin: const EdgeInsets.symmetric(horizontal: M.gutter),
+      decoration: BoxDecoration(
+          border: Border(
+              top: BorderSide(
+                  color: open ? AppColors.line : Colors.transparent))),
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        _settledHeader(rows, mobile: true, open: open),
+        Reveal(
+          show: open,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: maxHeight),
+            child: ListView(
+              shrinkWrap: true,
+              children: [
+                for (var i = 0; i < rows.length; i++)
+                  _mobileSessionRow(rows[i], divider: i + 1 < rows.length),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 96),
+      ]),
+    );
   }
 
   Widget _settledPanel(List<SessionInfo> rows, double maxHeight) {
