@@ -38,6 +38,8 @@ Every push to `main` updates the rolling [latest release](https://github.com/wac
 | Windows 10+ (x86_64) | `snippet-windows.zip` |
 | Linux (x86_64, GTK 3) | `snippet-linux-x64.tar.gz` |
 
+The macOS app is an unsigned binary, so Gatekeeper blocks it on first launch. After unzipping, right-click `snippet.app` and choose Open, or run `xattr -dr com.apple.quarantine snippet.app`.
+
 The Android build is self-signed, so remove an older install before updating if the update is refused.
 
 ## Connect
