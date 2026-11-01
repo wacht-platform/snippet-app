@@ -29,90 +29,141 @@ List<ToolStep> sessionChangeSteps(List<Map<String, dynamic>> events) {
   return i < 0 ? (path, '') : (path.substring(i + 1), path.substring(0, i));
 }
 
+class ShellChange {
+  ShellChange(this.path);
+  final String path;
+  int add = 0;
+  int del = 0;
+}
+
+/// Files the daemon saw change on disk (turn_changes) that no change_files call explains,
+/// i.e. edits made through shell commands, scripts and formatters.
+List<ShellChange> shellChanges(
+    List<Map<String, dynamic>> events, Iterable<FileChange> covered) {
+  final byPath = <String, ShellChange>{};
+  for (final e in events) {
+    if (e['kind'] != 'turn_changes') continue;
+    for (final f in (e['files'] as List? ?? const [])) {
+      if (f is! Map) continue;
+      final rel = f['path']?.toString() ?? '';
+      if (rel.isEmpty) continue;
+      if (covered.any((c) => c.path == rel || c.path.endsWith('/$rel'))) {
+        continue;
+      }
+      final c = byPath.putIfAbsent(rel, () => ShellChange(rel));
+      c.add += (f['add'] as num?)?.toInt() ?? 0;
+      c.del += (f['del'] as num?)?.toInt() ?? 0;
+    }
+  }
+  return byPath.values.toList();
+}
+
 class FileChangesScreen extends StatelessWidget {
-  const FileChangesScreen({super.key, required this.steps});
+  const FileChangesScreen(
+      {super.key, required this.steps, this.shell = const [], this.onOpenFile});
 
   final List<ToolStep> steps;
+  final List<ShellChange> shell;
+  final void Function(String path)? onOpenFile;
+
+  Widget _row(BuildContext context,
+      {required String path,
+      required bool last,
+      required Widget trailing,
+      required VoidCallback? onTap}) {
+    final (name, dir) = _split(path);
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(4, 12, 4, 12),
+        decoration: BoxDecoration(
+          border: Border(
+            bottom:
+                BorderSide(color: last ? Colors.transparent : AppColors.line),
+          ),
+        ),
+        child: Row(children: [
+          FileGlyph(name, size: 18),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: sans(15.5, color: AppColors.fg1)),
+                if (dir.isNotEmpty)
+                  Text(dir,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: sans(12.5, color: AppColors.fg4)),
+              ],
+            ),
+          ),
+          trailing,
+          const SizedBox(width: 8),
+          AppIcon('chevron-right', size: 14, color: AppColors.fg4),
+        ]),
+      ),
+    );
+  }
+
+  Widget _delta(int add, int del) =>
+      Row(mainAxisSize: MainAxisSize.min, children: [
+        Text('+$add', style: mono(12.5, color: AppColors.ok)),
+        const SizedBox(width: 6),
+        Text('\u2212$del', style: mono(12.5, color: AppColors.danger)),
+      ]);
 
   @override
   Widget build(BuildContext context) {
     final changes = fileChanges(steps);
+    final total = changes.length + shell.length;
     return Scaffold(
       backgroundColor: AppColors.bg,
       body: SafeArea(
-        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        child:
+            Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           MobileBackBar(
             title: 'File changes',
-            subtitle:
-                '${changes.length} file${changes.length == 1 ? '' : 's'} in this session',
+            subtitle: '$total file${total == 1 ? '' : 's'} in this session',
             onTitleTap: () {},
           ),
           Expanded(
-            child: changes.isEmpty
+            child: total == 0
                 ? const EmptyState(
                     icon: 'file',
                     title: 'No file changes yet',
                     body: 'Files this session edits show up here.')
                 : ListView.builder(
                     padding: const EdgeInsets.fromLTRB(16, 6, 16, 32),
-                    itemCount: changes.length,
+                    itemCount: total,
                     itemBuilder: (_, i) {
+                      if (i >= changes.length) {
+                        final c = shell[i - changes.length];
+                        return _row(context,
+                            path: c.path,
+                            last: i + 1 == total,
+                            trailing: _delta(c.add, c.del),
+                            onTap: onOpenFile == null
+                                ? null
+                                : () => onOpenFile!(c.path));
+                      }
                       final c = changes[i];
-                      final (name, dir) = _split(c.path);
-                      return InkWell(
-                        onTap: () => Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) =>
-                                FileChangeDetail(path: c.path, steps: steps),
-                          ),
-                        ),
-                        child: Container(
-                          padding: const EdgeInsets.fromLTRB(4, 12, 4, 12),
-                          decoration: BoxDecoration(
-                            border: Border(
-                              bottom: BorderSide(
-                                  color: i + 1 < changes.length
-                                      ? AppColors.line
-                                      : Colors.transparent),
-                            ),
-                          ),
-                          child: Row(children: [
-                            FileGlyph(name, size: 18),
-                            const SizedBox(width: 14),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(name,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: sans(15.5, color: AppColors.fg1)),
-                                  if (dir.isNotEmpty)
-                                    Text(dir,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: sans(12.5,
-                                            color: AppColors.fg4)),
-                                ],
-                              ),
-                            ),
-                            if (c.kind == FileChangeKind.deleted)
-                              Text('deleted',
-                                  style:
-                                      sans(13, color: AppColors.danger))
-                            else ...[
-                              Text('+${c.added}',
-                                  style: mono(12.5, color: AppColors.ok)),
-                              const SizedBox(width: 6),
-                              Text('−${c.removed}',
-                                  style: mono(12.5, color: AppColors.danger)),
-                            ],
-                            const SizedBox(width: 8),
-                            AppIcon('chevron-right',
-                                size: 14, color: AppColors.fg4),
-                          ]),
-                        ),
-                      );
+                      return _row(context,
+                          path: c.path,
+                          last: i + 1 == total,
+                          trailing: c.kind == FileChangeKind.deleted
+                              ? Text('deleted',
+                                  style: sans(13, color: AppColors.danger))
+                              : _delta(c.added, c.removed),
+                          onTap: () => Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => FileChangeDetail(
+                                      path: c.path, steps: steps),
+                                ),
+                              ));
                     },
                   ),
           ),
@@ -148,8 +199,7 @@ class FileChangeDetail extends StatelessWidget {
         for (final l in lines)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 10),
-            child: Text('$sign $l',
-                style: mono(12, height: 1.55, color: fg)),
+            child: Text('$sign $l', style: mono(12, height: 1.55, color: fg)),
           ),
       ]),
     );
@@ -205,7 +255,8 @@ class FileChangeDetail extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppColors.bg,
       body: SafeArea(
-        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        child:
+            Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           MobileBackBar(
             title: name,
             subtitle: dir.isEmpty

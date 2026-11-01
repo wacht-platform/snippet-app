@@ -43,8 +43,8 @@ class ShellWelcomeView extends StatefulWidget {
   final VoidCallback onAddInstance;
   final ValueChanged<Instance>? onLocalReady;
   final Future<Instance?> Function() probeLocal;
-  final Future<InstallResult> Function(void Function(String line) onLine)
-      install;
+  final Future<InstallResult> Function(
+      void Function(InstallStage stage, String detail) onStage) install;
   final bool Function() binaryInstalled;
 
   const ShellWelcomeView({
@@ -64,7 +64,8 @@ class _ShellWelcomeViewState extends State<ShellWelcomeView> {
   bool _connecting = false;
   bool _installed = false;
   bool _installing = false;
-  String _progress = '';
+  InstallStage _stage = InstallStage.download;
+  String _detail = '';
   String? _error;
 
   @override
@@ -89,10 +90,16 @@ class _ShellWelcomeViewState extends State<ShellWelcomeView> {
     setState(() {
       _installing = true;
       _error = null;
-      _progress = 'Starting';
+      _stage = _installed ? InstallStage.start : InstallStage.download;
+      _detail = '';
     });
-    final r = await widget.install((l) {
-      if (mounted) setState(() => _progress = l);
+    final r = await widget.install((s, d) {
+      if (mounted) {
+        setState(() {
+          _stage = s;
+          _detail = d;
+        });
+      }
     });
     if (!mounted) return;
     if (r.instance != null) {
@@ -105,142 +112,221 @@ class _ShellWelcomeViewState extends State<ShellWelcomeView> {
     }
   }
 
-  Widget _secondary(String label, VoidCallback onTap) => Pressable(
-        child: Material(
-          color: Colors.transparent,
-          borderRadius: BorderRadius.circular(R.md),
-          child: InkWell(
-            onTap: onTap,
-            borderRadius: BorderRadius.circular(R.md),
-            child: Container(
-              height: 36,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(R.md),
-                border: Border.all(color: AppColors.border2),
-              ),
-              child: Center(
-                  widthFactor: 1,
-                  child: Text(label, style: sans(13, color: AppColors.fg1))),
-            ),
-          ),
-        ),
-      );
-
-  Widget _option({
+  Widget _card({
+    required String icon,
     required String title,
-    required String body,
-    required List<Widget> actions,
+    required String subtitle,
+    required List<Widget> children,
   }) =>
       Container(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(kMobile ? 18 : 20),
         decoration: BoxDecoration(
           color: AppColors.surface1,
           borderRadius: BorderRadius.circular(R.lg),
           border: Border.all(color: AppColors.border),
         ),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(title, style: sans(14, weight: W.label, color: AppColors.fg1)),
-            const SizedBox(height: 4),
-            Text(body, style: sans(12.5, height: 1.45, color: AppColors.fg3)),
-            const SizedBox(height: 14),
-            ...actions,
+            Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Container(
+                width: 38,
+                height: 38,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: AppColors.accentBg,
+                  borderRadius: BorderRadius.circular(R.md),
+                ),
+                child: AppIcon(icon, size: 18, color: AppColors.accent),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title,
+                        style: sans(kMobile ? 15.5 : 14.5,
+                            weight: W.label, color: AppColors.fg1)),
+                    const SizedBox(height: 3),
+                    Text(subtitle,
+                        style: sans(kMobile ? 13.5 : 12.5,
+                            height: 1.45, color: AppColors.fg3)),
+                  ],
+                ),
+              ),
+            ]),
+            const SizedBox(height: 18),
+            ...children,
           ],
         ),
       );
 
-  List<Widget> _desktopOptions() {
-    return [
-      _option(
-        title: 'On this computer',
-        body: _connecting
-            ? 'The service is already running here.'
-            : _installed
-                ? 'The service is installed but not running.'
-                : 'Installs the snippet service for your user and starts it. '
-                    'It keeps running in the background and starts at login.',
-        actions: [
-          if (_connecting || _installing)
-            Row(children: [
-              const SizedBox(
-                  width: 14,
-                  height: 14,
-                  child: CircularProgressIndicator(strokeWidth: 2)),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                    _connecting ? 'Connecting to this computer' : _progress,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: mono(11.5, color: AppColors.fg3)),
-              ),
-            ])
-          else
-            Align(
-              alignment: Alignment.centerLeft,
-              child: PillBtn(
-                _installed
-                    ? 'Start the service on this computer'
-                    : 'Install on this computer',
-                icon: _installed ? 'play' : 'download',
-                onTap: _install,
+  Widget _wideButton(String label, String icon, VoidCallback? onTap) =>
+      Pressable(
+        enabled: onTap != null,
+        child: Material(
+          color: AppColors.accentFill,
+          borderRadius: BorderRadius.circular(R.md),
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(R.md),
+            child: SizedBox(
+              height: kMobile ? 50 : 42,
+              child:
+                  Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                AppIcon(icon, size: 16, color: AppColors.accentFg),
+                const SizedBox(width: 8),
+                Text(label,
+                    style: sans(kMobile ? 15 : 13.5,
+                        weight: W.label, color: AppColors.accentFg)),
+              ]),
+            ),
+          ),
+        ),
+      );
+
+  Widget _remoteLink() => Padding(
+        padding: const EdgeInsets.only(top: 22),
+        child: Wrap(
+          alignment: WrapAlignment.center,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            Text('Already running on another computer?  ',
+                style: sans(13, color: AppColors.fg3)),
+            InkWell(
+              onTap: widget.onAddInstance,
+              borderRadius: BorderRadius.circular(R.sm),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 2),
+                child: Text('Connect to a remote',
+                    style: sans(13, weight: W.label, color: AppColors.accent)),
               ),
             ),
-          if (_error != null) ...[
-            const SizedBox(height: 10),
-            Text(_error!,
-                style: sans(12, height: 1.4, color: AppColors.danger)),
-            const SizedBox(height: 6),
-            Text('You can also install it yourself:',
-                style: sans(12, color: AppColors.fg4)),
-            const SizedBox(height: 6),
-            _CommandBox(installCommand),
+          ],
+        ),
+      );
+
+  Widget _progress() {
+    final stages = [
+      if (!_installed) ...[
+        (InstallStage.download, 'Download snippet'),
+        (InstallStage.install, 'Install'),
+      ],
+      (InstallStage.start, 'Start the service'),
+      (InstallStage.connect, 'Connect'),
+    ];
+    return Column(children: [
+      for (final (s, label) in stages)
+        _StageRow(
+          label: label,
+          detail: s == _stage ? _detail : '',
+          state: s.index < _stage.index
+              ? _StageState.done
+              : s == _stage
+                  ? _StageState.active
+                  : _StageState.pending,
+        ),
+    ]);
+  }
+
+  List<Widget> _localCard() {
+    final title = _connecting
+        ? 'Found it on this computer'
+        : _installing
+            ? 'Setting up on this computer'
+            : _installed
+                ? 'Installed on this computer'
+                : 'Run it on this computer';
+    final subtitle = _connecting
+        ? 'The service is already running. Connecting now.'
+        : _installing
+            ? 'This takes under a minute.'
+            : _installed
+                ? 'The service is installed but not running.'
+                : 'One install, no account. It runs in the background '
+                    'for your user and starts at login.';
+    return [
+      _card(
+        icon: 'server',
+        title: title,
+        subtitle: subtitle,
+        children: [
+          if (_connecting)
+            const _StageRow(
+                label: 'Connecting to this computer', state: _StageState.active)
+          else if (_installing)
+            _progress()
+          else ...[
+            if (_error != null) ...[
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.dangerBg,
+                  borderRadius: BorderRadius.circular(R.md),
+                ),
+                child: Text(_error!,
+                    style: sans(12.5, height: 1.45, color: AppColors.danger)),
+              ),
+              const SizedBox(height: 12),
+            ],
+            _wideButton(
+              _error != null
+                  ? 'Try again'
+                  : _installed
+                      ? 'Start the service'
+                      : 'Install on this computer',
+              _error != null
+                  ? 'refresh'
+                  : _installed
+                      ? 'play'
+                      : 'download',
+              _install,
+            ),
+            if (_error != null) ...[
+              const SizedBox(height: 14),
+              Text('Or run the installer yourself',
+                  style: sans(12, color: AppColors.fg4)),
+              const SizedBox(height: 6),
+              const _CommandBox(installCommand),
+            ],
           ],
         ],
       ),
-      const SizedBox(height: 12),
-      _option(
-        title: 'On another computer',
-        body: 'Run snippet serve there, then paste the link it prints.',
-        actions: [
-          Align(
-            alignment: Alignment.centerLeft,
-            child: _secondary('Connect to a remote', widget.onAddInstance),
-          ),
-        ],
-      ),
+      if (!_connecting && !_installing) _remoteLink(),
     ];
   }
 
-  List<Widget> _stepsOnly() => [
-        _WelcomeStep(
-          n: '1',
-          title: 'Install snippet on your computer',
-          command: installCommand,
-        ),
-        const SizedBox(height: 14),
-        const _WelcomeStep(
-          n: '2',
-          title: 'Start it',
-          command: 'snippet serve',
-          note: 'It prints a link and a QR code.',
-        ),
-        const SizedBox(height: 14),
-        _WelcomeStep(
-          n: '3',
-          title: kMobile
-              ? 'Scan the QR code, or paste the link'
-              : 'Paste the link here',
-        ),
-        const SizedBox(height: 24),
-        Center(
-          child: PillBtn(
-            kMobile ? 'Scan or paste' : 'Connect',
-            icon: kMobile ? 'scan' : 'plus',
-            onTap: widget.onAddInstance,
-          ),
+  List<Widget> _manualCard() => [
+        _card(
+          icon: 'server',
+          title: 'Run it on a computer',
+          subtitle: kMobile
+              ? 'Install snippet on your computer, then connect this phone to it.'
+              : 'Install snippet on a Linux or macOS computer, then connect here.',
+          children: [
+            const _WelcomeStep(
+              n: '1',
+              title: 'Install',
+              command: installCommand,
+            ),
+            const SizedBox(height: 14),
+            const _WelcomeStep(
+              n: '2',
+              title: 'Start it',
+              command: 'snippet serve',
+              note: 'It prints a link and a QR code.',
+            ),
+            const SizedBox(height: 14),
+            _WelcomeStep(
+              n: '3',
+              title: kMobile
+                  ? 'Scan the QR code, or paste the link'
+                  : 'Paste the link here',
+            ),
+            const SizedBox(height: 18),
+            _wideButton(kMobile ? 'Scan or paste' : 'Connect',
+                kMobile ? 'scan' : 'plus', widget.onAddInstance),
+          ],
         ),
       ];
 
@@ -252,9 +338,9 @@ class _ShellWelcomeViewState extends State<ShellWelcomeView> {
       child: Center(
         child: SingleChildScrollView(
           padding:
-              EdgeInsets.symmetric(horizontal: kMobile ? 22 : 28, vertical: 32),
+              EdgeInsets.symmetric(horizontal: kMobile ? 20 : 28, vertical: 32),
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 440),
+            constraints: const BoxConstraints(maxWidth: 460),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -262,36 +348,90 @@ class _ShellWelcomeViewState extends State<ShellWelcomeView> {
                 Center(
                     child: MochiIcon(
                         color: const Color(0xFFB9C6FF),
-                        size: kMobile ? 64 : 56)),
-                const SizedBox(height: 18),
+                        size: kMobile ? 56 : 48)),
+                const SizedBox(height: 20),
                 Text(
                   'Snippet needs a service',
                   textAlign: TextAlign.center,
-                  style: display(kMobile ? 24 : 21),
+                  style: display(kMobile ? 26 : 24),
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  kMobile
-                      ? 'The work happens in a service that runs on your own '
-                          'computer. This app connects to it, so you can ask '
-                          'Mission Control and follow the work from here.'
-                      : 'The work happens in a service that runs on a computer. '
-                          'This app needs one: run it on this computer, or '
-                          'connect to one already running somewhere else.',
-                  textAlign: TextAlign.center,
-                  style: sans(kMobile ? 14 : 13,
-                      height: 1.5, color: AppColors.fg3),
+                const SizedBox(height: 10),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: Text(
+                    'It does its work in a small service that runs in the '
+                    'background. This app is the window onto it.',
+                    textAlign: TextAlign.center,
+                    style: sans(kMobile ? 14.5 : 13.5,
+                        height: 1.5, color: AppColors.fg3),
+                  ),
                 ),
-                const SizedBox(height: 26),
+                SizedBox(height: kMobile ? 26 : 30),
                 if (canInstallLocalService)
-                  ..._desktopOptions()
+                  ..._localCard()
                 else
-                  ..._stepsOnly(),
+                  ..._manualCard(),
               ],
             ),
           ),
         ),
       ),
+    );
+  }
+}
+
+enum _StageState { done, active, pending }
+
+class _StageRow extends StatelessWidget {
+  const _StageRow({required this.label, required this.state, this.detail = ''});
+  final String label;
+  final String detail;
+  final _StageState state;
+
+  @override
+  Widget build(BuildContext context) {
+    Theme.of(context);
+    final lead = switch (state) {
+      _StageState.done => AppIcon('check', size: 16, color: AppColors.ok),
+      _StageState.active => SizedBox(
+          width: 14,
+          height: 14,
+          child: CircularProgressIndicator(
+              strokeWidth: 2, color: AppColors.accent)),
+      _StageState.pending => Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(color: AppColors.border2, width: 1.5),
+          )),
+    };
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 7),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        SizedBox(width: 22, height: 20, child: Center(child: lead)),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label,
+                  style: sans(13.5,
+                      color: state == _StageState.pending
+                          ? AppColors.fg4
+                          : AppColors.fg1)),
+              if (detail.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 3),
+                  child: Text(detail,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: mono(11, color: AppColors.fg3)),
+                ),
+            ],
+          ),
+        ),
+      ]),
     );
   }
 }
@@ -356,25 +496,7 @@ class _WelcomeStep extends StatelessWidget {
             ),
             if (command != null) ...[
               const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.fromLTRB(12, 6, 4, 6),
-                decoration: BoxDecoration(
-                  color: AppColors.surface1,
-                  borderRadius: BorderRadius.circular(R.sm),
-                  border: Border.all(color: AppColors.border),
-                ),
-                child: Row(children: [
-                  Expanded(
-                    child: SelectableText(command!,
-                        style: mono(kMobile ? 12 : 11.5, color: AppColors.fg1)),
-                  ),
-                  IconBtn('copy', size: 30, iconSize: 13, tooltip: 'Copy',
-                      onTap: () {
-                    Clipboard.setData(ClipboardData(text: command!));
-                    toast(context, 'Copied');
-                  }),
-                ]),
-              ),
+              _CommandBox(command!),
             ],
             if (note != null) ...[
               const SizedBox(height: 6),
@@ -387,7 +509,6 @@ class _WelcomeStep extends StatelessWidget {
   }
 }
 
-/// No session selected placeholder: recent sessions preview + new chat encouragement.
 class ShellRecentPlaceholder extends StatelessWidget {
   final List<SessionInfo>? sessions;
   final bool sessionsLoading;

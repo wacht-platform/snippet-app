@@ -42,6 +42,8 @@ Future<Instance?> localInstance(
   }
 }
 
+enum InstallStage { download, install, start, connect }
+
 class InstallResult {
   final Instance? instance;
   final String? error;
@@ -51,9 +53,9 @@ class InstallResult {
 
 /// Installs the binary if missing, starts the daemon and waits for it to answer.
 Future<InstallResult> installLocalService(
-    void Function(String line) onLine) async {
+    void Function(InstallStage stage, String detail) onStage) async {
   if (!localBinaryInstalled()) {
-    onLine('Downloading snippet');
+    onStage(InstallStage.download, 'Fetching the latest release');
     final p = await Process.start('sh', ['-c', installCommand],
         environment: {'SNIPPET_INSTALL_DEPS': 'no'});
     final tail = <String>[];
@@ -62,7 +64,12 @@ Future<InstallResult> installLocalService(
         final t = l.replaceAll(RegExp(r'\x1B\[[0-9;]*m'), '').trim();
         if (t.isEmpty) continue;
         tail.add(t);
-        onLine(t);
+        onStage(
+            RegExp(r'verifying|extracting|installing', caseSensitive: false)
+                    .hasMatch(t)
+                ? InstallStage.install
+                : InstallStage.download,
+            t);
       }
     }
 
@@ -78,8 +85,9 @@ Future<InstallResult> installLocalService(
       return InstallResult.failed(last);
     }
   }
-  onLine('Starting the service');
+  onStage(InstallStage.start, 'Starting the service');
   await Process.run(localBinaryPath, ['serve', '--enable']);
+  onStage(InstallStage.connect, 'Waiting for it to answer');
   var inst = await _waitForLocal(const Duration(seconds: 15));
   if (inst == null) {
     await Process.run(localBinaryPath, ['serve']);

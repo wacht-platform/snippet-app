@@ -371,6 +371,25 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
             ));
   }
 
+  void _openChangedFile(String rel) {
+    final ws = _state?.workspace ?? '';
+    final full = rel.startsWith('/') || ws.isEmpty
+        ? rel
+        : '${ws.endsWith('/') ? ws : '$ws/'}$rel';
+    final name = rel.split('/').last;
+    if (openFileForViewing(context,
+        client: widget.client, path: full, name: name)) {
+      return;
+    }
+    final open = widget.onOpenFileTab;
+    if (open != null) {
+      open(full, name);
+    } else {
+      presentFileOnDesktop(context,
+          client: widget.client, path: full, name: name);
+    }
+  }
+
   Widget _mobileHeader(HarnessState? s) {
     final ws = s?.workspace.trim() ?? '';
     final folder = ws.isEmpty ? '' : lastPathSegment(ws, ifEmpty: ws);
@@ -826,15 +845,19 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
         }
         return;
       case 'file_changes':
-        final steps = sessionChangeSteps(_state?.events ?? const []);
+        final events = _state?.events ?? const <Map<String, dynamic>>[];
+        final steps = sessionChangeSteps(events);
+        final shell = shellChanges(events, fileChanges(steps));
         if (kMobile) {
           Navigator.of(context).push(MaterialPageRoute(
-              builder: (_) => FileChangesScreen(steps: steps)));
+              builder: (_) => FileChangesScreen(
+                  steps: steps, shell: shell, onOpenFile: _openChangedFile)));
         } else {
           presentScreen<void>(context,
               maxWidth: 760,
               maxHeight: 640,
-              builder: (_, close) => FileChangesScreen(steps: steps));
+              builder: (_, close) => FileChangesScreen(
+                  steps: steps, shell: shell, onOpenFile: _openChangedFile));
         }
         return;
       case 'memory':
@@ -908,12 +931,17 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
     navigate ??= run;
     final ws = s?.workspace ?? '';
     final changeSteps = sessionChangeSteps(s?.events ?? const []);
+    final shell = shellChanges(
+        s?.events ?? const <Map<String, dynamic>>[], fileChanges(changeSteps));
     return _SessionActionsPanel(
       session: s,
-      fileChangeCount: fileChanges(changeSteps).length,
+      fileChangeCount: fileChanges(changeSteps).length + shell.length,
       onFileChanges: () => navigate!(() => Navigator.of(context).push(
           MaterialPageRoute(
-              builder: (_) => FileChangesScreen(steps: changeSteps)))),
+              builder: (_) => FileChangesScreen(
+                  steps: changeSteps,
+                  shell: shell,
+                  onOpenFile: _openChangedFile)))),
       hideWorkspace: _isMissionControl,
       hideGoal: _isMissionControl,
       hideCheckpoints: _isMissionControl,

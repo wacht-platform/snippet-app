@@ -14,20 +14,21 @@ Future<void> _pump(
   VoidCallback? onAdd,
   ValueChanged<Instance>? onReady,
   Future<Instance?> Function()? probe,
-  Future<InstallResult> Function(void Function(String))? install,
+  Future<InstallResult> Function(void Function(InstallStage, String))? install,
   bool installed = false,
 }) async {
   debugDefaultTargetPlatformOverride = p;
   t.view.physicalSize = const Size(1200, 900);
   t.view.devicePixelRatio = 1;
   await t.pumpWidget(MaterialApp(
-    home: ShellWelcomeView(
+    home: Scaffold(
+        body: ShellWelcomeView(
       onAddInstance: onAdd ?? () {},
       onLocalReady: onReady,
       probeLocal: probe ?? () async => null,
       install: install ?? (_) async => const InstallResult.failed('unused'),
       binaryInstalled: () => installed,
-    ),
+    )),
   ));
   await t.pump();
   await t.pump();
@@ -56,7 +57,7 @@ void main() {
 
   testWidgets('installed but stopped offers to start it', (t) async {
     await _pump(t, TargetPlatform.macOS, installed: true);
-    expect(find.text('Start the service on this computer'), findsOneWidget);
+    expect(find.text('Start the service'), findsOneWidget);
     debugDefaultTargetPlatformOverride = null;
   });
 
@@ -65,7 +66,7 @@ void main() {
     await _pump(t, TargetPlatform.linux,
         onReady: (i) => got = i,
         install: (on) async {
-          on('downloading snippet-x86_64-unknown-linux-gnu.tar.gz');
+          on(InstallStage.download, 'downloading snippet.tar.gz');
           return const InstallResult.ok(_local);
         });
     await t.tap(find.text('Install on this computer'));
@@ -83,6 +84,7 @@ void main() {
     await t.pump();
     await t.pump();
     expect(find.text('glibc 2.31 is too old'), findsOneWidget);
+    expect(find.text('Try again'), findsOneWidget);
     expect(find.text(installCommand), findsOneWidget);
     debugDefaultTargetPlatformOverride = null;
   });
