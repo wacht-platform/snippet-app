@@ -1101,7 +1101,7 @@ class SidebarState extends State<Sidebar> {
             ),
           ),
         ),
-        const SizedBox(height: 96),
+        const SizedBox(height: 62),
       ]),
     );
   }
