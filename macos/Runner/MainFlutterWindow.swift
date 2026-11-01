@@ -434,7 +434,12 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
     }
     self.notchHUD = hud
 
-    let home = NotchHomeController(hudBusy: { [weak hud] in hud?.isShowing ?? false })
+    let home = NotchHomeController(
+      hudBusy: { [weak hud] in hud?.isShowing ?? false },
+      appOpen: { [weak self] in
+        guard let w = self else { return false }
+        return w.isVisible && !w.isMiniaturized
+      })
     home.onAction = { [weak self] id, action in
       if action.hasPrefix("open") { self?.restoreFromMenuBar() }
       self?.notchChannel?.invokeMethod("homeAction", arguments: ["id": id, "action": action])
@@ -3485,11 +3490,13 @@ final class NotchHomeController {
   private var collapseTimer: Timer?
   private var visibilityTimer: Timer?
   private var hudBusy: () -> Bool
+  private var appOpen: () -> Bool
   var onAction: ((String, String) -> Void)?
   var onOpenApp: (() -> Void)?
 
-  init(hudBusy: @escaping () -> Bool) {
+  init(hudBusy: @escaping () -> Bool, appOpen: @escaping () -> Bool = { false }) {
     self.hudBusy = hudBusy
+    self.appOpen = appOpen
     let rect = NSRect(x: 0, y: 0, width: 260, height: 32)
     let p = NotchPanel(
       contentRect: rect, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered,
@@ -3545,10 +3552,12 @@ final class NotchHomeController {
   }
 
   private func syncVisibility() {
-    let busy = hudBusy()
-    if busy && panel.isVisible {
+    let hide = hudBusy() || appOpen()
+    if hide && panel.isVisible {
+      expanded = false
+      detailId = nil
       panel.orderOut(nil)
-    } else if !busy && !panel.isVisible {
+    } else if !hide && !panel.isVisible {
       refresh(animated: false)
     }
   }
@@ -3597,7 +3606,7 @@ final class NotchHomeController {
   }
 
   private func refresh(animated: Bool) {
-    if hudBusy() { return }
+    if hudBusy() || appOpen() { return }
     guard let screen = NSScreen.main ?? NSScreen.screens.first else { return }
     let hw = measure(screen)
     let detail = detailId.flatMap { id in model.items.first { $0.id == id } }
