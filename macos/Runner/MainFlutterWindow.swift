@@ -314,11 +314,15 @@ enum MochiRenderer {
     }
   }()
 
-  static func makeMenuBarIcon(playTime: Double) -> NSImage {
+  static func makeMenuBarFrame(playTime: Double) -> (Int, NSImage) {
     let period = 1.4
     let norm = (playTime.truncatingRemainder(dividingBy: period)) / period
     let idx = max(0, min(menuBarFrames.count - 1, Int(norm * Double(menuBarFrames.count))))
-    return menuBarFrames[idx]
+    return (idx, menuBarFrames[idx])
+  }
+
+  static func makeMenuBarIcon(playTime: Double) -> NSImage {
+    return makeMenuBarFrame(playTime: playTime).1
   }
 }
 
@@ -582,11 +586,14 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
     backdropTimer = Timer.scheduledTimer(withTimeInterval: 0.75, repeats: true) { [weak self] _ in
       self?.updateBackdropTransparency()
     }
-    menuMochiTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { [weak self] _ in
+    var lastMochiIdx = -1
+    menuMochiTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 30.0, repeats: true) { [weak self] _ in
       guard let self = self else { return }
-      self.statusItem?.button?.image = MochiRenderer.makeMenuBarIcon(
-        playTime: CACurrentMediaTime()
-      )
+      let (idx, img) = MochiRenderer.makeMenuBarFrame(playTime: CACurrentMediaTime())
+      if idx != lastMochiIdx {
+        lastMochiIdx = idx
+        self.statusItem?.button?.image = img
+      }
     }
     if let timer = menuMochiTimer {
       RunLoop.main.add(timer, forMode: .common)
@@ -1161,6 +1168,7 @@ final class MacosVoiceProcessingEngine: NSObject, FlutterStreamHandler {
     lock.lock()
     completedFrames = scheduledFrames
     lock.unlock()
+    stopEngineIfIdle()
   }
 }
 

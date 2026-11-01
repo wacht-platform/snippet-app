@@ -79,24 +79,26 @@ class _NodeState2 extends State<_Node> with SingleTickerProviderStateMixin {
       ),
     );
     if (widget.state != _NodeState.running) return Center(child: dot);
-    return Center(
-      child: AnimatedBuilder(
-        animation: _c,
-        builder: (_, __) => Stack(
-          alignment: Alignment.center,
-          clipBehavior: Clip.none,
-          children: [
-            Opacity(
-              opacity: (1 - _c.value) * 0.45,
-              child: Container(
-                width: size + 8 * _c.value,
-                height: size + 8 * _c.value,
-                decoration: BoxDecoration(
-                    color: AppColors.accent, shape: BoxShape.circle),
+    return RepaintBoundary(
+      child: Center(
+        child: AnimatedBuilder(
+          animation: _c,
+          builder: (_, __) => Stack(
+            alignment: Alignment.center,
+            clipBehavior: Clip.none,
+            children: [
+              Opacity(
+                opacity: (1 - _c.value) * 0.45,
+                child: Container(
+                  width: size + 8 * _c.value,
+                  height: size + 8 * _c.value,
+                  decoration: BoxDecoration(
+                      color: AppColors.accent, shape: BoxShape.circle),
+                ),
               ),
-            ),
-            dot,
-          ],
+              dot,
+            ],
+          ),
         ),
       ),
     );

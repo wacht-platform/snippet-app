@@ -128,14 +128,16 @@ class _PulsingDotState extends State<PulsingDot>
 
   @override
   Widget build(BuildContext context) {
-    return FadeTransition(
-      opacity: _ctrl.drive(Tween(begin: 0.4, end: 1.0)),
-      child: Container(
-        width: 7,
-        height: 7,
-        decoration: BoxDecoration(
-          color: AppColors.ok,
-          shape: BoxShape.circle,
+    return RepaintBoundary(
+      child: FadeTransition(
+        opacity: _ctrl.drive(Tween(begin: 0.4, end: 1.0)),
+        child: Container(
+          width: 7,
+          height: 7,
+          decoration: BoxDecoration(
+            color: AppColors.ok,
+            shape: BoxShape.circle,
+          ),
         ),
       ),
     );

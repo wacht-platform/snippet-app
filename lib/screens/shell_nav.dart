@@ -157,11 +157,13 @@ class _SessionStateIconState extends State<SessionStateIcon>
     if (!_shouldPulse) return icon;
     // A gentle opacity breath — enough to read as "working" at a glance without
     // a spinner's constant motion competing with the transcript.
-    return FadeTransition(
-      opacity: Tween<double>(begin: 0.45, end: 1.0).animate(
-        CurvedAnimation(parent: _c, curve: Motion.move),
+    return RepaintBoundary(
+      child: FadeTransition(
+        opacity: Tween<double>(begin: 0.45, end: 1.0).animate(
+          CurvedAnimation(parent: _c, curve: Motion.move),
+        ),
+        child: icon,
       ),
-      child: icon,
     );
   }
 }

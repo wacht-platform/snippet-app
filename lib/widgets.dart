@@ -556,8 +556,10 @@ class _StatusDotState extends State<StatusDot>
       ),
     );
     if (_pulses) {
-      return FadeTransition(
-          opacity: Tween(begin: 0.45, end: 1.0).animate(_c), child: dot);
+      return RepaintBoundary(
+        child: FadeTransition(
+            opacity: Tween(begin: 0.45, end: 1.0).animate(_c), child: dot),
+      );
     }
     return dot;
   }

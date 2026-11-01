@@ -185,7 +185,7 @@ class _WorkingMochiState extends State<WorkingMochi>
     if (still) {
       return MochiIcon(color: color, size: size, shape: widget.shape);
     }
-    return AnimatedBuilder(
+    final anim = AnimatedBuilder(
       animation: _c,
       builder: (_, __) {
         final t = _c.value;
@@ -240,6 +240,7 @@ class _WorkingMochiState extends State<WorkingMochi>
         );
       },
     );
+    return RepaintBoundary(child: anim);
   }
 }
 
