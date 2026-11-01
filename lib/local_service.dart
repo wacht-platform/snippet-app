@@ -10,7 +10,7 @@ import 'models.dart';
 import 'platform.dart';
 
 const enableCommand = 'snippet serve --enable';
-const installCommand = 'curl -fsSL https://snippet.wacht.dev/install.sh | sh';
+const installCommand = 'curl -fsSL https://snippet.fyi/install.sh | sh';
 
 /// The macOS sandbox gives the app a private HOME and blocks writing outside it.
 bool get sandboxedApp =>
