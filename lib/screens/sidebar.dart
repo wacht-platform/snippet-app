@@ -1207,7 +1207,7 @@ class SidebarState extends State<Sidebar> {
                             const SizedBox.shrink()),
                     if (_profileProviders[s.profile] != null)
                       ProviderLogo(_profileProviders[s.profile],
-                          size: 14, color: AppColors.fg3),
+                          size: 14),
                   ]),
                 ),
               ],
@@ -1712,7 +1712,7 @@ class SidebarState extends State<Sidebar> {
                         const SizedBox(width: 8),
                         if (_profileProviders[s.profile] != null)
                           ProviderLogo(_profileProviders[s.profile],
-                              size: 15, color: AppColors.fg3)
+                              size: 15)
                         else
                           Text(s.profile!,
                               style: sans(13, color: AppColors.fg3)),

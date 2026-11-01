@@ -378,7 +378,7 @@ class AppIcon extends StatelessWidget {
   Widget build(BuildContext context) {
     if (name.startsWith('provider:')) {
       return ProviderLogo(name.substring(9),
-          size: size * visualScale, color: color ?? AppColors.fg2);
+          size: size * visualScale, color: color);
     }
     final line = _lucide[name];
     if (line != null) {
@@ -2293,6 +2293,19 @@ String? providerLogoAsset(String? provider) {
   return key == null ? null : 'assets/providers/$key.svg';
 }
 
+Color providerBrandColor(String? provider) {
+  final key = providerLogoAsset(provider)?.split('/').last.split('.').first;
+  return switch (key) {
+    'claude' || 'anthropic' => const Color(0xFFD97757),
+    'openai' => const Color(0xFF10A37F),
+    'gemini' => const Color(0xFF4C8DF6),
+    'antigravity' => const Color(0xFF8B7CF6),
+    'openrouter' => const Color(0xFF6D78F7),
+    'xai' => AppColors.fg1,
+    _ => AppColors.fg2,
+  };
+}
+
 class ProviderLogo extends StatelessWidget {
   const ProviderLogo(this.provider, {super.key, this.size = 16, this.color});
 
@@ -2303,7 +2316,7 @@ class ProviderLogo extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final asset = providerLogoAsset(provider);
-    final tint = color ?? AppColors.fg2;
+    final tint = color ?? providerBrandColor(provider);
     if (asset == null) return AppIcon('cpu', size: size, color: tint);
     return SizedBox.square(
       dimension: size,
