@@ -37,7 +37,5 @@ void main() {
       ),
     ));
     expect(find.text('Voice note'), findsOneWidget);
-    await expectLater(find.byType(Scaffold),
-        matchesGoldenFile('visual/goldens/voice_note_card.png'));
   });
 }

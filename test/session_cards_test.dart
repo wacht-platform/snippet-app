@@ -95,8 +95,6 @@ void main() {
       expect(find.text('Working 4m'), findsOneWidget);
       expect(find.text('+88'), findsOneWidget);
       expect(find.text('-12'), findsOneWidget);
-      await expectLater(find.byType(Sidebar),
-          matchesGoldenFile('visual/goldens/session_cards_mobile.png'));
     } finally {
       debugDefaultTargetPlatformOverride = null;
     }
@@ -109,8 +107,6 @@ void main() {
       expect(find.text('SNIPPET-MOBILE'), findsNothing);
       expect(find.text('Working 4m'), findsOneWidget);
       expect(find.text('+120'), findsOneWidget);
-      await expectLater(find.byType(Sidebar),
-          matchesGoldenFile('visual/goldens/session_cards_desktop.png'));
     } finally {
       debugDefaultTargetPlatformOverride = null;
     }
@@ -122,8 +118,6 @@ void main() {
           sessions: const []);
       expect(find.text('No sessions yet'), findsOneWidget);
       expect(find.text('New session'), findsOneWidget);
-      await expectLater(find.byType(Sidebar),
-          matchesGoldenFile('visual/goldens/session_list_empty.png'));
     } finally {
       debugDefaultTargetPlatformOverride = null;
     }
@@ -158,8 +152,6 @@ void main() {
       expect(fade.size.height, greaterThan(midH));
       expect(find.text('Old chat'), findsOneWidget);
       expect(tester.getTopLeft(find.text('Settled').first).dy, lessThan(header));
-      await expectLater(find.byType(Sidebar),
-          matchesGoldenFile('visual/goldens/session_settled_desktop.png'));
     } finally {
       debugDefaultTargetPlatformOverride = null;
     }

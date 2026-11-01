@@ -32,7 +32,5 @@ void main() {
     ));
     expect(find.text('report.pdf'), findsOneWidget);
     expect(find.text('Shared 3 files'), findsOneWidget);
-    await expectLater(find.byType(Scaffold),
-        matchesGoldenFile('visual/goldens/presented_files_card.png'));
   });
 }

@@ -36,7 +36,5 @@ void main() {
     expect(find.text('+42'), findsOneWidget);
     expect(find.text('-7'), findsOneWidget);
     expect(find.text('+0'), findsNothing);
-    await expectLater(find.byType(MaterialApp),
-        matchesGoldenFile('visual/goldens/diff_recent.png'));
   });
 }

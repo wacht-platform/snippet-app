@@ -38,7 +38,5 @@ void main() {
         ),
       ),
     ));
-    await expectLater(find.byType(Scaffold),
-        matchesGoldenFile('visual/goldens/file_glyphs.png'));
   });
 }

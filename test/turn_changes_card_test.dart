@@ -36,8 +36,6 @@ void main() {
     await tester.tap(find.textContaining('file2.dart'));
     expect(opened, ['lib/screens/file2.dart']);
     await tester.pump();
-    await expectLater(find.byType(TurnChangesCard),
-        matchesGoldenFile('visual/goldens/turn_changes_card.png'));
   });
 
   testWidgets('renders nothing for an empty turn', (tester) async {

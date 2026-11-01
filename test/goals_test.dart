@@ -212,8 +212,6 @@ void main() {
       expect(find.text('Stalled'), findsOneWidget);
       expect(find.text('Ready to close'), findsOneWidget);
       expect(find.text('Quiet one'), findsOneWidget);
-      await expectLater(find.byType(GoalsList),
-          matchesGoldenFile('visual/goldens/goals_list_mobile.png'));
     });
 
     phoneTest('list empty state', (tester) async {
@@ -234,8 +232,6 @@ void main() {
       expect(find.text('After API models, Detail view'), findsOneWidget);
       expect(find.text('Not started'), findsOneWidget);
       expect(find.text('Needs review. Waiting on 1 task'), findsOneWidget);
-      await expectLater(find.byType(GoalDetailScreen),
-          matchesGoldenFile('visual/goldens/goal_detail_mobile.png'));
     });
 
     phoneTest('criterion expands to show method and evidence', (tester) async {

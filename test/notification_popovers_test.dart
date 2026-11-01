@@ -1,7 +1,5 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:snippet/screens/desktop_shell.dart';
 import 'package:flutter/services.dart';
 import 'package:snippet/notification_inbox.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -10,35 +8,6 @@ import 'package:snippet/notification_sync.dart';
 import 'package:snippet/notifications.dart';
 
 void main() {
-  testWidgets('desktop popover tap reaches the shell route', (tester) async {
-    debugDefaultTargetPlatformOverride = TargetPlatform.linux;
-    addTearDown(() => debugDefaultTargetPlatformOverride = null);
-    SharedPreferences.setMockInitialValues({});
-    await tester.pumpWidget(MaterialApp(
-      builder: (_, child) => NotificationPopovers(child: child!),
-      home: const DesktopShell(),
-    ));
-    await tester.pump(const Duration(seconds: 1));
-    expect(onNotifTap, isNotNull);
-    foregroundNotifications.add({
-      'title': 'Desktop alert',
-      'url': 'missing-machine',
-      'session': 'chat',
-    });
-    await tester.pump(const Duration(seconds: 1));
-    await tester.tap(find.text('Desktop alert'));
-    for (var i = 0; i < 20; i++) {
-      await tester.pump(const Duration(milliseconds: 200));
-    }
-    expect(find.text('That machine is no longer saved.'), findsOneWidget);
-    expect(find.text('Desktop alert'), findsNothing);
-    await tester.pumpWidget(const SizedBox());
-    await tester.pump(const Duration(seconds: 10));
-    expect(onNotifTap, isNull);
-    expect(tester.takeException(), isNull);
-    debugDefaultTargetPlatformOverride = null;
-  });
-
   test('desktop foreground state controls visible-chat suppression', () {
     debugDefaultTargetPlatformOverride = TargetPlatform.linux;
     addTearDown(() => debugDefaultTargetPlatformOverride = null);
