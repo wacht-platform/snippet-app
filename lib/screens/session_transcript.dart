@@ -459,6 +459,10 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
                       ? rel
                       : '${ws.endsWith('/') ? ws : '$ws/'}$rel';
                   final name = rel.split('/').last;
+                  if (openFileForViewing(context,
+                      client: widget.client, path: full, name: name)) {
+                    return;
+                  }
                   final open = widget.onOpenFileTab;
                   if (open != null) {
                     open(full, name);
