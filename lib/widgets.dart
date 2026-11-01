@@ -1639,23 +1639,43 @@ class _LongPressCopyState extends State<_LongPressCopy> {
 class NoteLine extends StatelessWidget {
   final String text;
   final bool error;
+  final String? icon;
 
   /// What went wrong, as the card's header (errors only).
   final String? label;
   final int count;
   const NoteLine(this.text,
-      {super.key, this.error = false, this.label, this.count = 1});
+      {super.key, this.error = false, this.icon, this.label, this.count = 1});
   @override
   Widget build(BuildContext context) {
     Theme.of(context); // Rebuild on theme change
     if (!error) {
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 3),
-        child: Text(text,
-            maxLines: 3,
-            overflow: TextOverflow.ellipsis,
-            style:
-                sans(kMobile ? 13 : 12.5, height: 1.4, color: AppColors.fg3)),
+        child: icon == null
+            ? Text(text,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: sans(kMobile ? 13 : 12.5,
+                    height: 1.4, color: AppColors.fg3))
+            : Row(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2.5),
+                    child: AppIcon(icon!, size: 13, color: AppColors.fg3),
+                  ),
+                  const SizedBox(width: 7),
+                  Flexible(
+                    child: Text(text,
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                        style: sans(kMobile ? 13 : 12.5,
+                            height: 1.4, color: AppColors.fg3)),
+                  ),
+                ],
+              ),
       );
     }
     final limit = text.toLowerCase().contains('session limit') ||

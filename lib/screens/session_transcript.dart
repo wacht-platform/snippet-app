@@ -283,6 +283,15 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
             addEvent(key, const NoteLine('Resumed after background noise'));
             break;
           }
+          final routingNote = parseRoutingNote(text);
+          if (routingNote != null) {
+            final prevSwitched = idx > 0 &&
+                events[idx - 1]['kind'] == 'profile_switched';
+            if (!prevSwitched) {
+              addEvent(key, NoteLine(routingNote, icon: 'transfer'));
+            }
+            break;
+          }
           if (text.trimLeft().startsWith('<ambient_context_alert')) {
             addEvent(
                 key, const NoteLine('Voice classifier flagged out-of-context speech'));
@@ -398,15 +407,18 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
           addEvent(
               key,
               NoteLine(
-                  '${_s(e['from'])} hit its usage limit. Continuing on ${_s(e['to'])}.'));
+                  '${_s(e['from'])} hit its usage limit. Continuing on ${_s(e['to'])}.',
+                  icon: 'transfer'));
         case 'limit_wait':
           endTools(key);
           final at = (e['resets_at'] as num?)?.toInt() ?? 0;
           addEvent(
               key,
-              NoteLine(at > 0
-                  ? 'Waiting for ${_s(e['profile'])} to reset at ${limitLabel(at)}.'
-                  : 'Waiting for ${_s(e['profile'])} to reset.'));
+              NoteLine(
+                  at > 0
+                      ? 'Waiting for ${_s(e['profile'])} to reset at ${limitLabel(at)}.'
+                      : 'Waiting for ${_s(e['profile'])} to reset.',
+                  icon: 'clock'));
         case 'limit_reached':
           endTools(key);
           const later = {

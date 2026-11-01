@@ -23,6 +23,7 @@ import 'screens/mission_control/mission_control_state.dart'
         parseDirectMessage,
         parseMissionEnvelope,
         parseParentMessage,
+        parseRoutingNote,
         parseWorkerQuestion,
         supersededAmbientTurns,
         userQuestionLead;
@@ -566,6 +567,7 @@ class MacosNotch {
         final text = _cleanUserText(raw);
         if (text.isEmpty ||
             isAmbientResume(text) ||
+            parseRoutingNote(text) != null ||
             text.startsWith('<ambient_context_alert') ||
             text.startsWith('<ambient_check_in') ||
             parseMissionEnvelope(text) != null ||

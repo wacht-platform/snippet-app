@@ -46,9 +46,11 @@ class _LimitCardState extends State<LimitCard> {
   Widget build(BuildContext context) {
     final reset = widget.resetsAt > 0 ? limitLabel(widget.resetsAt) : null;
     if (widget.settled) {
-      return NoteLine(reset == null
-          ? '${widget.profile} hit its usage limit. Handled.'
-          : '${widget.profile} hit its usage limit. Resets at $reset.');
+      return NoteLine(
+          reset == null
+              ? '${widget.profile} hit its usage limit. Handled.'
+              : '${widget.profile} hit its usage limit. Resets at $reset.',
+          icon: 'clock');
     }
     return TranscriptCard(
       icon: 'clock',

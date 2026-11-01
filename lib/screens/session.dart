@@ -78,6 +78,7 @@ import 'mission_control/mission_control_state.dart'
         supersededAmbientTurns,
         userQuestionLead,
         isAmbientResume,
+        parseRoutingNote,
         voiceClassifierNote;
 
 part 'session_socket.dart';

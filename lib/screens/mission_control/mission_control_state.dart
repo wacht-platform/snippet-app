@@ -757,6 +757,28 @@ Set<String> supersededAmbientTurns(Iterable<String> texts) {
 
 bool isAmbientResume(String text) => text.trimLeft().startsWith('<ambient_resume');
 
+/// Daemon-written routing instructions (`[routing] …`) sent to the model when a
+/// profile hits its usage limit or resets. Returns a clean one-line status for
+/// the transcript when no `profile_switched` event already rendered it.
+String? parseRoutingNote(String text) {
+  final t = text.trim();
+  if (!t.startsWith('[routing]')) return null;
+  final body = t
+      .substring('[routing]'.length)
+      .trim()
+      .replaceFirst(
+          RegExp(r'\s*Pick up where the last turn stopped and finish it\.?$'),
+          '')
+      .trim();
+  final switched = RegExp(
+          r'^(.+?) hit its usage limit, so this session now runs on (.+?)\.?$')
+      .firstMatch(body);
+  if (switched != null) {
+    return '${switched.group(1)} hit its usage limit. Continuing on ${switched.group(2)}.';
+  }
+  return body.isEmpty ? 'Resumed after usage limit' : body;
+}
+
 /// Daemon-written voice notes addressed to the model, never to the reader.
 bool isAmbientNote(String text) {
   final t = text.trimLeft();
@@ -802,6 +824,16 @@ List<FeedItem> feedItemsFromEvents(List<Map<String, dynamic>> events) {
           break;
         }
         if (isAmbientNote(text)) break;
+        final routingNote = parseRoutingNote(text);
+        if (routingNote != null) {
+          final prevSwitched =
+              i > 0 && events[i - 1]['kind'] == 'profile_switched';
+          if (!prevSwitched) {
+            out.add(
+                SystemNoteItem(id: 'h-rt-$i', timestamp: now, text: routingNote));
+          }
+          break;
+        }
         final workerQuestion = parseWorkerQuestion(text);
         if (workerQuestion != null) {
           out.add(WorkerQuestionItem(
@@ -868,6 +900,15 @@ List<FeedItem> feedItemsFromEvents(List<Map<String, dynamic>> events) {
         final note = voiceClassifierNote((e['agent_id'] ?? '').toString(), (e['body'] ?? '').toString());
         if (note == null) break;
         out.add(SystemNoteItem(id: 'h-n-$i', timestamp: now, text: note));
+      case 'profile_switched':
+        final from = (e['from'] ?? '').toString().trim();
+        final to = (e['to'] ?? '').toString().trim();
+        if (from.isNotEmpty && to.isNotEmpty) {
+          out.add(SystemNoteItem(
+              id: 'h-ps-$i',
+              timestamp: now,
+              text: '$from hit its usage limit. Continuing on $to.'));
+        }
       case 'model_error':
         final msg = (e['message'] ?? '').toString().trim();
         if (msg.isEmpty) break;
