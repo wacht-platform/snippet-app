@@ -405,6 +405,7 @@ class AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
                         agent: ordered[i],
                         onOpen: () => widget.onOpenAgent?.call(ordered[i]),
                         onDelete: () => _deleteAgent(ordered[i]),
+                        onChanged: refresh,
                       ),
                     ),
                   );
@@ -428,6 +429,7 @@ class AgentsSidebarPanelState extends State<AgentsSidebarPanel> {
             agent: ordered[i],
             onOpen: () => widget.onOpenAgent?.call(ordered[i]),
             onDelete: () => _deleteAgent(ordered[i]),
+            onChanged: refresh,
           ),
         ),
     ];

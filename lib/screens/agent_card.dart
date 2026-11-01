@@ -7,6 +7,7 @@ import '../theme.dart';
 import '../widgets.dart';
 import '../motion.dart';
 import '../mochi.dart';
+import 'agent_wake_panel.dart';
 import 'mochi_color_picker.dart';
 
 /// One agent on the phone's Agents page, in the Mission Control card's shape:
@@ -16,6 +17,7 @@ class AgentCard extends StatefulWidget {
   final CoordinationAgent agent;
   final VoidCallback onOpen;
   final VoidCallback? onDelete;
+  final VoidCallback? onChanged;
 
   const AgentCard({
     super.key,
@@ -23,6 +25,7 @@ class AgentCard extends StatefulWidget {
     required this.agent,
     required this.onOpen,
     this.onDelete,
+    this.onChanged,
   });
 
   @override
@@ -108,6 +111,36 @@ class _AgentCardState extends State<AgentCard> {
     _setProfile(picked.isEmpty ? null : picked);
   }
 
+  String get _nicknameLabel =>
+      widget.agent.nickname == null ? 'Set nickname' : 'Edit nickname';
+
+  Future<void> _editNickname({Offset? point}) async {
+    final agent = widget.agent;
+    final full = agent.fullName.trim().isEmpty ? agent.id : agent.fullName.trim();
+    final next = await promptText(context,
+        title: 'Nickname for $full',
+        initial: agent.nickname ?? '',
+        hint: 'Leave empty to use the name',
+        anchored: true,
+        point: point);
+    if (next == null || next == (agent.nickname ?? '') || !mounted) return;
+    try {
+      await widget.client.setAgentNickname(agent.id, next.isEmpty ? null : next);
+      widget.onChanged?.call();
+    } catch (e) {
+      if (mounted) toast(context, '$e', danger: true);
+    }
+  }
+
+  Future<void> _openWakes(String name, Offset? point) => showAgentWakeSettings(
+      context,
+      client: widget.client,
+      owner: widget.agent.id,
+      name: name,
+      agent: widget.agent,
+      point: point,
+      onChanged: widget.onChanged);
+
   Future<void> _actions(Offset? point) async {
     final name = widget.agent.displayName.trim().isEmpty
         ? widget.agent.id
@@ -116,10 +149,20 @@ class _AgentCardState extends State<AgentCard> {
       showAppSheet(context,
           title: name,
           child: SheetActions([
+            if (!widget.agent.isMissionControl)
+              SheetAction('pencil', _nicknameLabel, () {
+                Navigator.pop(context);
+                _editNickname();
+              }),
             SheetAction('sparkles', 'Change colour', () {
               Navigator.pop(context);
               showMochiColorPicker(context, widget.client, widget.agent.id, name);
             }),
+            if (!widget.agent.isMissionControl)
+              SheetAction('calendar-clock', 'Wakes and reporting', () {
+                Navigator.pop(context);
+                _openWakes(name, null);
+              }),
             if (!widget.agent.isMissionControl)
               SheetAction('cpu', 'Change inference profile', () {
                 Navigator.pop(context);
@@ -138,15 +181,22 @@ class _AgentCardState extends State<AgentCard> {
       point: point,
       anchor: point == null ? context : null,
       items: [
+        if (!widget.agent.isMissionControl)
+          appMenuItem(value: 'nickname', icon: 'pencil', label: _nicknameLabel),
         appMenuItem(value: 'color', icon: 'sparkles', label: 'Change colour'),
         if (!widget.agent.isMissionControl)
           appMenuItem(value: 'model', icon: 'cpu', label: 'Change inference profile'),
+        if (!widget.agent.isMissionControl)
+          appMenuItem(
+              value: 'wakes', icon: 'calendar-clock', label: 'Wakes and reporting'),
         if (widget.onDelete != null)
           appMenuItem(
               value: 'delete', icon: 'trash', label: 'Delete agent', danger: true),
       ],
     );
     if (picked == 'delete') widget.onDelete?.call();
+    if (picked == 'nickname' && mounted) _editNickname(point: point);
+    if (picked == 'wakes' && mounted) _openWakes(name, point);
     if (picked == 'model' && mounted) _pickProfile(name, point: point);
     if (picked == 'color' && mounted) {
       showMochiColorPicker(context, widget.client, widget.agent.id, name,

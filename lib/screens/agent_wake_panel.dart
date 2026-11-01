@@ -379,7 +379,8 @@ class _AgentWakePanelState extends State<AgentWakePanel> {
                 child: CircularProgressIndicator(strokeWidth: 2))),
       );
     }
-    return Column(
+    return FlatGroupScope(
+        child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -390,14 +391,13 @@ class _AgentWakePanelState extends State<AgentWakePanel> {
           ),
         _wakeSection(),
         if (widget.agent != null) ...[
-          const SizedBox(height: S.s16),
+          const SizedBox(height: S.s12),
           _contextSection(),
         ],
-        const SizedBox(height: S.s16),
+        const SizedBox(height: S.s12),
         _warmSection(),
-        const SizedBox(height: S.s4),
       ],
-    );
+    ));
   }
 
   Widget _head(String text, {Widget? trailing}) => Padding(
