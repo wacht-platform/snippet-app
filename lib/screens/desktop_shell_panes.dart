@@ -630,7 +630,7 @@ extension _DesktopShellPanesExt on _DesktopShellState {
 
   Widget _welcome() => ShellWelcomeView(
         onAddInstance: _addInstanceFlow,
-        onLocalReady: _onInstanceAdded,
+        onConnected: _onInstanceAdded,
       );
 
   Future<void> _addInstanceFlow() async {

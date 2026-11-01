@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../diff_counts.dart';
+import '../api.dart';
 import '../local_service.dart';
 import '../mochi.dart';
 import '../models.dart';
 import '../platform.dart';
 import '../theme.dart';
 import '../widgets.dart';
+import 'add_instance.dart' show parseConnection;
 
 /// Overlay a sidebar-toggle on the welcome/empty states when the sidebar is collapsed.
 class ShellWithMenu extends StatelessWidget {
@@ -36,12 +38,26 @@ class ShellWithMenu extends StatelessWidget {
   }
 }
 
+Future<Instance> _defaultConnect(String raw) async {
+  final parsed = parseConnection(raw);
+  if (parsed == null) {
+    throw 'That is not a valid link. Run snippet serve --status on the other computer.';
+  }
+  final (url, token) = parsed;
+  final cfg = await DaemonClient(url, token).getConfig();
+  return Instance(
+      name: cfg.hostname.isNotEmpty ? cfg.hostname : Uri.parse(url).host,
+      url: url,
+      token: token);
+}
+
 Future<Instance?> _defaultProbe() =>
     localInstance(timeout: const Duration(milliseconds: 900));
 
 class ShellWelcomeView extends StatefulWidget {
   final VoidCallback onAddInstance;
-  final ValueChanged<Instance>? onLocalReady;
+  final ValueChanged<Instance>? onConnected;
+  final Future<Instance> Function(String raw) connectRemote;
   final Future<Instance?> Function() probeLocal;
   final Future<InstallResult> Function(
       void Function(InstallStage stage, String detail) onStage) install;
@@ -50,7 +66,8 @@ class ShellWelcomeView extends StatefulWidget {
   const ShellWelcomeView({
     super.key,
     required this.onAddInstance,
-    this.onLocalReady,
+    this.onConnected,
+    this.connectRemote = _defaultConnect,
     this.probeLocal = _defaultProbe,
     this.install = installLocalService,
     this.binaryInstalled = localBinaryInstalled,
@@ -68,6 +85,9 @@ class _ShellWelcomeViewState extends State<ShellWelcomeView> {
   String _detail = '';
   String? _error;
   Instance? _pending;
+  final _paste = TextEditingController();
+  bool _remoteBusy = false;
+  String? _remoteError;
 
   @override
   void initState() {
@@ -79,11 +99,37 @@ class _ShellWelcomeViewState extends State<ShellWelcomeView> {
     _installed = widget.binaryInstalled();
     final i = await widget.probeLocal();
     if (!mounted) return;
-    if (i != null && widget.onLocalReady != null) {
+    if (i != null && widget.onConnected != null) {
       setState(() => _connecting = true);
-      widget.onLocalReady!(i);
+      widget.onConnected!(i);
     } else {
       setState(() {});
+    }
+  }
+
+  @override
+  void dispose() {
+    _paste.dispose();
+    super.dispose();
+  }
+
+  Future<void> _connectRemote(String raw) async {
+    if (_remoteBusy || raw.trim().isEmpty) return;
+    setState(() {
+      _remoteBusy = true;
+      _remoteError = null;
+    });
+    try {
+      final inst = await widget.connectRemote(raw.trim());
+      if (mounted) widget.onConnected?.call(inst);
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _remoteBusy = false;
+          _remoteError =
+              '$e'.startsWith('That is not') ? '$e' : 'Could not connect: $e';
+        });
+      }
     }
   }
 
@@ -104,7 +150,7 @@ class _ShellWelcomeViewState extends State<ShellWelcomeView> {
     });
     if (!mounted) return;
     if (r.instance != null && r.autoStart) {
-      widget.onLocalReady?.call(r.instance!);
+      widget.onConnected?.call(r.instance!);
     } else if (r.instance != null) {
       setState(() {
         _installing = false;
@@ -235,7 +281,7 @@ class _ShellWelcomeViewState extends State<ShellWelcomeView> {
     ]);
   }
 
-  List<Widget> _localCard() {
+  List<Widget> _localCard({bool withRemoteLink = true}) {
     final title = _connecting
         ? 'Found it on this computer'
         : _installing
@@ -263,8 +309,8 @@ class _ShellWelcomeViewState extends State<ShellWelcomeView> {
             const SizedBox(height: 8),
             const _CommandBox(enableCommand),
             const SizedBox(height: 16),
-            _wideButton('Continue', 'check',
-                () => widget.onLocalReady?.call(_pending!)),
+            _wideButton(
+                'Continue', 'check', () => widget.onConnected?.call(_pending!)),
           ],
         ),
       ];
@@ -316,9 +362,91 @@ class _ShellWelcomeViewState extends State<ShellWelcomeView> {
           ],
         ],
       ),
-      if (!_connecting && !_installing) _remoteLink(),
+      if (withRemoteLink && !_connecting && !_installing) _remoteLink(),
     ];
   }
+
+  Widget _remotePane() => _card(
+        icon: 'globe',
+        title: 'Connect to another computer',
+        subtitle: 'Link this app to a service already running elsewhere.',
+        children: [
+          if (!canInstallLocalService) ...[
+            Text('1. Install snippet on a Linux or macOS computer',
+                style: sans(12.5, color: AppColors.fg2)),
+            const SizedBox(height: 6),
+            const _CommandBox(installCommand),
+            const SizedBox(height: 12),
+          ],
+          if (canInstallLocalService) ...[
+            SelectableText.rich(
+              TextSpan(
+                  style: sans(12, height: 1.5, color: AppColors.fg3),
+                  children: [
+                    const TextSpan(text: 'On that computer run '),
+                    TextSpan(
+                        text: enableCommand,
+                        style: mono(11.5, color: AppColors.fg1)),
+                    const TextSpan(text: ', then '),
+                    TextSpan(
+                        text: 'snippet serve --status',
+                        style: mono(11.5, color: AppColors.fg1)),
+                    const TextSpan(text: ' for the link.'),
+                  ]),
+            ),
+          ] else ...[
+            Text('2. Start it and show its link',
+                style: sans(12.5, color: AppColors.fg2)),
+            const SizedBox(height: 6),
+            const _CommandBox(enableCommand),
+            const SizedBox(height: 6),
+            const _CommandBox('snippet serve --status'),
+          ],
+          const SizedBox(height: 14),
+          AppField(
+              controller: _paste,
+              mono: true,
+              hint: 'Paste the link it prints',
+              onSubmitted: _connectRemote),
+          if (_remoteError != null) ...[
+            const SizedBox(height: 8),
+            Text(_remoteError!,
+                style: sans(12, height: 1.4, color: AppColors.danger)),
+          ],
+          const SizedBox(height: 12),
+          _remoteBusy
+              ? Row(children: [
+                  Spinner(size: 13, color: AppColors.fg3),
+                  const SizedBox(width: 9),
+                  Text('Connecting', style: sans(12.5, color: AppColors.fg3)),
+                ])
+              : _wideButton(
+                  'Connect', 'plus', () => _connectRemote(_paste.text)),
+        ],
+      );
+
+  Widget _desktopPanes() => LayoutBuilder(builder: (context, box) {
+        final remote = _remotePane();
+        if (!canInstallLocalService) {
+          return Center(
+              child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 420),
+                  child: remote));
+        }
+        final local = _localCard(withRemoteLink: false).first;
+        if (box.maxWidth < 640) {
+          return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [local, const SizedBox(height: 12), remote]);
+        }
+        return IntrinsicHeight(
+          child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Expanded(child: local),
+            const SizedBox(width: 12),
+            Expanded(child: remote),
+          ]),
+        );
+      });
 
   List<Widget> _manualCard() => [
         _card(
@@ -372,7 +500,7 @@ class _ShellWelcomeViewState extends State<ShellWelcomeView> {
           padding:
               EdgeInsets.symmetric(horizontal: kMobile ? 20 : 28, vertical: 32),
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 460),
+            constraints: BoxConstraints(maxWidth: kMobile ? 460 : 780),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -380,7 +508,7 @@ class _ShellWelcomeViewState extends State<ShellWelcomeView> {
                 Center(
                     child: MochiIcon(
                         color: const Color(0xFFB9C6FF),
-                        size: kMobile ? 56 : 48)),
+                        size: kMobile ? 56 : 40)),
                 const SizedBox(height: 20),
                 Text(
                   'Snippet needs a service',
@@ -398,11 +526,8 @@ class _ShellWelcomeViewState extends State<ShellWelcomeView> {
                         height: 1.5, color: AppColors.fg3),
                   ),
                 ),
-                SizedBox(height: kMobile ? 26 : 30),
-                if (canInstallLocalService)
-                  ..._localCard()
-                else
-                  ..._manualCard(),
+                SizedBox(height: kMobile ? 26 : 22),
+                if (kMobile) ..._manualCard() else _desktopPanes(),
               ],
             ),
           ),

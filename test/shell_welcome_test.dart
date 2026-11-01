@@ -16,6 +16,7 @@ Future<void> _pump(
   Future<Instance?> Function()? probe,
   Future<InstallResult> Function(void Function(InstallStage, String))? install,
   bool installed = false,
+  Future<Instance> Function(String)? remote,
 }) async {
   debugDefaultTargetPlatformOverride = p;
   t.view.physicalSize = const Size(1200, 900);
@@ -24,7 +25,8 @@ Future<void> _pump(
     home: Scaffold(
         body: ShellWelcomeView(
       onAddInstance: onAdd ?? () {},
-      onLocalReady: onReady,
+      onConnected: onReady,
+      connectRemote: remote ?? (_) async => _local,
       probeLocal: probe ?? () async => null,
       install: install ?? (_) async => const InstallResult.failed('unused'),
       binaryInstalled: () => installed,
@@ -35,14 +37,36 @@ Future<void> _pump(
 }
 
 void main() {
-  testWidgets('desktop explains the service and offers install or remote',
-      (t) async {
-    var added = 0;
-    await _pump(t, TargetPlatform.macOS, onAdd: () => added++);
+  testWidgets('desktop shows install and remote side by side', (t) async {
+    await _pump(t, TargetPlatform.macOS);
     expect(find.text('Snippet needs a service'), findsOneWidget);
     expect(find.text('Install on this computer'), findsOneWidget);
-    await t.tap(find.text('Connect to a remote'));
-    expect(added, 1);
+    expect(find.text('Connect to another computer'), findsOneWidget);
+    debugDefaultTargetPlatformOverride = null;
+  });
+
+  testWidgets('pasting a link connects to the remote', (t) async {
+    Instance? got;
+    await _pump(t, TargetPlatform.macOS,
+        onReady: (i) => got = i, remote: (raw) async => _local);
+    await t.enterText(find.byType(TextField), 'https://box.example?token=abc');
+    await t.tap(find.text('Connect'));
+    await t.pump();
+    await t.pump();
+    expect(got, _local);
+    debugDefaultTargetPlatformOverride = null;
+  });
+
+  testWidgets('a bad remote link shows the error and stays', (t) async {
+    Instance? got;
+    await _pump(t, TargetPlatform.macOS,
+        onReady: (i) => got = i, remote: (raw) async => throw 'refused');
+    await t.enterText(find.byType(TextField), 'nonsense');
+    await t.tap(find.text('Connect'));
+    await t.pump();
+    await t.pump();
+    expect(got, isNull);
+    expect(find.text('Could not connect: refused'), findsOneWidget);
     debugDefaultTargetPlatformOverride = null;
   });
 
