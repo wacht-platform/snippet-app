@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:http/http.dart' as http;
 
 import '../diff_counts.dart';
+import '../local_service.dart';
 import '../mochi.dart';
 import '../models.dart';
 import '../platform.dart';
@@ -36,34 +36,213 @@ class ShellWithMenu extends StatelessWidget {
   }
 }
 
-const _installCommand = 'curl -fsSL https://snippet.wacht.dev/install.sh | sh';
+Future<Instance?> _defaultProbe() =>
+    localInstance(timeout: const Duration(milliseconds: 900));
 
 class ShellWelcomeView extends StatefulWidget {
   final VoidCallback onAddInstance;
+  final ValueChanged<Instance>? onLocalReady;
+  final Future<Instance?> Function() probeLocal;
+  final Future<InstallResult> Function(void Function(String line) onLine)
+      install;
+  final bool Function() binaryInstalled;
 
-  const ShellWelcomeView({super.key, required this.onAddInstance});
+  const ShellWelcomeView({
+    super.key,
+    required this.onAddInstance,
+    this.onLocalReady,
+    this.probeLocal = _defaultProbe,
+    this.install = installLocalService,
+    this.binaryInstalled = localBinaryInstalled,
+  });
 
   @override
   State<ShellWelcomeView> createState() => _ShellWelcomeViewState();
 }
 
 class _ShellWelcomeViewState extends State<ShellWelcomeView> {
-  bool _localRunning = false;
+  bool _connecting = false;
+  bool _installed = false;
+  bool _installing = false;
+  String _progress = '';
+  String? _error;
 
   @override
   void initState() {
     super.initState();
-    if (!kMobile) _probeLocal();
+    if (canInstallLocalService) _probeLocal();
   }
 
   Future<void> _probeLocal() async {
-    try {
-      final r = await http
-          .get(Uri.parse('http://127.0.0.1:8787/health'))
-          .timeout(const Duration(milliseconds: 900));
-      if (mounted && r.statusCode == 200) setState(() => _localRunning = true);
-    } catch (_) {}
+    _installed = widget.binaryInstalled();
+    final i = await widget.probeLocal();
+    if (!mounted) return;
+    if (i != null && widget.onLocalReady != null) {
+      setState(() => _connecting = true);
+      widget.onLocalReady!(i);
+    } else {
+      setState(() {});
+    }
   }
+
+  Future<void> _install() async {
+    setState(() {
+      _installing = true;
+      _error = null;
+      _progress = 'Starting';
+    });
+    final r = await widget.install((l) {
+      if (mounted) setState(() => _progress = l);
+    });
+    if (!mounted) return;
+    if (r.instance != null) {
+      widget.onLocalReady?.call(r.instance!);
+    } else {
+      setState(() {
+        _installing = false;
+        _error = r.error;
+      });
+    }
+  }
+
+  Widget _secondary(String label, VoidCallback onTap) => Pressable(
+        child: Material(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(R.md),
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(R.md),
+            child: Container(
+              height: 36,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(R.md),
+                border: Border.all(color: AppColors.border2),
+              ),
+              child: Center(
+                  widthFactor: 1,
+                  child: Text(label, style: sans(13, color: AppColors.fg1))),
+            ),
+          ),
+        ),
+      );
+
+  Widget _option({
+    required String title,
+    required String body,
+    required List<Widget> actions,
+  }) =>
+      Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.surface1,
+          borderRadius: BorderRadius.circular(R.lg),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title, style: sans(14, weight: W.label, color: AppColors.fg1)),
+            const SizedBox(height: 4),
+            Text(body, style: sans(12.5, height: 1.45, color: AppColors.fg3)),
+            const SizedBox(height: 14),
+            ...actions,
+          ],
+        ),
+      );
+
+  List<Widget> _desktopOptions() {
+    return [
+      _option(
+        title: 'On this computer',
+        body: _connecting
+            ? 'The service is already running here.'
+            : _installed
+                ? 'The service is installed but not running.'
+                : 'Installs the snippet service for your user and starts it. '
+                    'It keeps running in the background and starts at login.',
+        actions: [
+          if (_connecting || _installing)
+            Row(children: [
+              const SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(strokeWidth: 2)),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                    _connecting ? 'Connecting to this computer' : _progress,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: mono(11.5, color: AppColors.fg3)),
+              ),
+            ])
+          else
+            Align(
+              alignment: Alignment.centerLeft,
+              child: PillBtn(
+                _installed
+                    ? 'Start the service on this computer'
+                    : 'Install on this computer',
+                icon: _installed ? 'play' : 'download',
+                onTap: _install,
+              ),
+            ),
+          if (_error != null) ...[
+            const SizedBox(height: 10),
+            Text(_error!,
+                style: sans(12, height: 1.4, color: AppColors.danger)),
+            const SizedBox(height: 6),
+            Text('You can also install it yourself:',
+                style: sans(12, color: AppColors.fg4)),
+            const SizedBox(height: 6),
+            _CommandBox(installCommand),
+          ],
+        ],
+      ),
+      const SizedBox(height: 12),
+      _option(
+        title: 'On another computer',
+        body: 'Run snippet serve there, then paste the link it prints.',
+        actions: [
+          Align(
+            alignment: Alignment.centerLeft,
+            child: _secondary('Connect to a remote', widget.onAddInstance),
+          ),
+        ],
+      ),
+    ];
+  }
+
+  List<Widget> _stepsOnly() => [
+        _WelcomeStep(
+          n: '1',
+          title: 'Install snippet on your computer',
+          command: installCommand,
+        ),
+        const SizedBox(height: 14),
+        const _WelcomeStep(
+          n: '2',
+          title: 'Start it',
+          command: 'snippet serve',
+          note: 'It prints a link and a QR code.',
+        ),
+        const SizedBox(height: 14),
+        _WelcomeStep(
+          n: '3',
+          title: kMobile
+              ? 'Scan the QR code, or paste the link'
+              : 'Paste the link here',
+        ),
+        const SizedBox(height: 24),
+        Center(
+          child: PillBtn(
+            kMobile ? 'Scan or paste' : 'Connect',
+            icon: kMobile ? 'scan' : 'plus',
+            onTap: widget.onAddInstance,
+          ),
+        ),
+      ];
 
   @override
   Widget build(BuildContext context) {
@@ -72,8 +251,8 @@ class _ShellWelcomeViewState extends State<ShellWelcomeView> {
       color: AppColors.bg,
       child: Center(
         child: SingleChildScrollView(
-          padding: EdgeInsets.symmetric(
-              horizontal: kMobile ? 22 : 28, vertical: 32),
+          padding:
+              EdgeInsets.symmetric(horizontal: kMobile ? 22 : 28, vertical: 32),
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 440),
             child: Column(
@@ -82,51 +261,32 @@ class _ShellWelcomeViewState extends State<ShellWelcomeView> {
               children: [
                 Center(
                     child: MochiIcon(
-                        color: const Color(0xFFB9C6FF), size: kMobile ? 64 : 56)),
+                        color: const Color(0xFFB9C6FF),
+                        size: kMobile ? 64 : 56)),
                 const SizedBox(height: 18),
                 Text(
-                  'Connect your computer',
+                  'Snippet needs a service',
                   textAlign: TextAlign.center,
                   style: display(kMobile ? 24 : 21),
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'snippet runs on your own computer. This app connects to it, '
-                  'so you can ask Mission Control and follow the work from here.',
+                  kMobile
+                      ? 'The work happens in a service that runs on your own '
+                          'computer. This app connects to it, so you can ask '
+                          'Mission Control and follow the work from here.'
+                      : 'The work happens in a service that runs on a computer. '
+                          'This app needs one: run it on this computer, or '
+                          'connect to one already running somewhere else.',
                   textAlign: TextAlign.center,
                   style: sans(kMobile ? 14 : 13,
                       height: 1.5, color: AppColors.fg3),
                 ),
                 const SizedBox(height: 26),
-                _WelcomeStep(
-                  n: '1',
-                  title: 'Install snippet on your computer',
-                  command: _installCommand,
-                ),
-                const SizedBox(height: 14),
-                _WelcomeStep(
-                  n: '2',
-                  title: _localRunning
-                      ? 'snippet is already running here. Show its link with'
-                      : 'Start it',
-                  command: _localRunning ? 'snippet serve --status' : 'snippet serve',
-                  note: _localRunning ? null : 'It prints a link and a QR code.',
-                ),
-                const SizedBox(height: 14),
-                _WelcomeStep(
-                  n: '3',
-                  title: kMobile
-                      ? 'Scan the QR code, or paste the link'
-                      : 'Paste the link here',
-                ),
-                const SizedBox(height: 24),
-                Center(
-                  child: PillBtn(
-                    kMobile ? 'Scan or paste' : 'Connect',
-                    icon: kMobile ? 'scan' : 'plus',
-                    onTap: widget.onAddInstance,
-                  ),
-                ),
+                if (canInstallLocalService)
+                  ..._desktopOptions()
+                else
+                  ..._stepsOnly(),
               ],
             ),
           ),
@@ -136,8 +296,34 @@ class _ShellWelcomeViewState extends State<ShellWelcomeView> {
   }
 }
 
+class _CommandBox extends StatelessWidget {
+  const _CommandBox(this.command);
+  final String command;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.fromLTRB(12, 6, 4, 6),
+        decoration: BoxDecoration(
+          color: AppColors.bg,
+          borderRadius: BorderRadius.circular(R.sm),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Row(children: [
+          Expanded(
+            child: SelectableText(command,
+                style: mono(kMobile ? 12 : 11.5, color: AppColors.fg1)),
+          ),
+          IconBtn('copy', size: 30, iconSize: 13, tooltip: 'Copy', onTap: () {
+            Clipboard.setData(ClipboardData(text: command));
+            toast(context, 'Copied');
+          }),
+        ]),
+      );
+}
+
 class _WelcomeStep extends StatelessWidget {
-  const _WelcomeStep({required this.n, required this.title, this.command, this.note});
+  const _WelcomeStep(
+      {required this.n, required this.title, this.command, this.note});
   final String n;
   final String title;
   final String? command;
@@ -182,7 +368,8 @@ class _WelcomeStep extends StatelessWidget {
                     child: SelectableText(command!,
                         style: mono(kMobile ? 12 : 11.5, color: AppColors.fg1)),
                   ),
-                  IconBtn('copy', size: 30, iconSize: 13, tooltip: 'Copy', onTap: () {
+                  IconBtn('copy', size: 30, iconSize: 13, tooltip: 'Copy',
+                      onTap: () {
                     Clipboard.setData(ClipboardData(text: command!));
                     toast(context, 'Copied');
                   }),

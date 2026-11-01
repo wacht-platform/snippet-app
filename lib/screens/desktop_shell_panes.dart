@@ -628,7 +628,10 @@ extension _DesktopShellPanesExt on _DesktopShellState {
         onOpenSession: _openSession,
       );
 
-  Widget _welcome() => ShellWelcomeView(onAddInstance: _addInstanceFlow);
+  Widget _welcome() => ShellWelcomeView(
+        onAddInstance: _addInstanceFlow,
+        onLocalReady: _onInstanceAdded,
+      );
 
   Future<void> _addInstanceFlow() async {
     final inst = kMobile
