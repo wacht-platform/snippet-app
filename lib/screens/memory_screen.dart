@@ -142,7 +142,7 @@ class _MemoryScreenState extends State<MemoryScreen> {
       ],
     );
     if (widget.embedded) {
-      final page = widget.initialKey != null;
+      final page = widget.initialKey != null || kMobile;
       return Material(
         color: page ? AppColors.bg : Colors.transparent,
         child: page ? SafeArea(bottom: false, child: content) : content,
