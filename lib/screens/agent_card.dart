@@ -120,7 +120,7 @@ class _AgentCardState extends State<AgentCard> {
               showMochiColorPicker(context, widget.client, widget.agent.id, name);
             }),
             if (!widget.agent.isMissionControl)
-              SheetAction('cpu', 'Change model', () {
+              SheetAction('cpu', 'Change inference profile', () {
                 Navigator.pop(context);
                 _pickProfile(name);
               }),
@@ -139,7 +139,7 @@ class _AgentCardState extends State<AgentCard> {
       items: [
         appMenuItem(value: 'color', icon: 'sparkles', label: 'Change colour'),
         if (!widget.agent.isMissionControl)
-          appMenuItem(value: 'model', icon: 'cpu', label: 'Change model'),
+          appMenuItem(value: 'model', icon: 'cpu', label: 'Change inference profile'),
         if (widget.onDelete != null)
           appMenuItem(
               value: 'delete', icon: 'trash', label: 'Delete agent', danger: true),

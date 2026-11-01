@@ -484,7 +484,7 @@ Future<void> showCrewAgentMenu(
           icon: 'pencil',
           label: agent.nickname == null ? 'Set nickname' : 'Edit nickname'),
       appMenuItem(value: 'color', icon: 'sparkles', label: 'Change colour'),
-      appMenuItem(value: 'model', icon: 'cpu', label: 'Change model'),
+      appMenuItem(value: 'model', icon: 'cpu', label: 'Change inference profile'),
       appMenuItem(
           value: 'wakes',
           icon: 'calendar-clock',

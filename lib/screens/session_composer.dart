@@ -912,7 +912,9 @@ extension _SessionScreenComposerExt on _SessionScreenState {
                   ),
                 ]),
                 () => _switchModel(ctx),
-                tip: _modelLabel == null ? 'Model' : 'Model · $_modelLabel');
+                tip: _modelLabel == null
+                    ? 'Inference profile'
+                    : 'Inference profile · $_modelLabel');
           },
         );
 
