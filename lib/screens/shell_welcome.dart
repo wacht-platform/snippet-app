@@ -12,6 +12,7 @@ import '../platform.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'add_instance.dart' show parseConnection;
+import 'welcome_art.dart';
 
 /// Overlay a sidebar-toggle on the welcome/empty states when the sidebar is collapsed.
 class ShellWithMenu extends StatelessWidget {
@@ -83,7 +84,8 @@ class ShellWelcomeView extends StatefulWidget {
   State<ShellWelcomeView> createState() => _ShellWelcomeViewState();
 }
 
-class _ShellWelcomeViewState extends State<ShellWelcomeView> {
+class _ShellWelcomeViewState extends State<ShellWelcomeView>
+    with SingleTickerProviderStateMixin {
   Instance? _found;
   bool _runningUnreadable = false;
   bool _installed = false;
@@ -93,6 +95,8 @@ class _ShellWelcomeViewState extends State<ShellWelcomeView> {
   String? _error;
   Instance? _pending;
   Timer? _timer;
+  int? _hover;
+  late final AnimationController _clock;
   final _paste = TextEditingController();
   bool _remoteBusy = false;
   String? _remoteError;
@@ -100,7 +104,10 @@ class _ShellWelcomeViewState extends State<ShellWelcomeView> {
   @override
   void initState() {
     super.initState();
+    _clock =
+        AnimationController(vsync: this, duration: const Duration(seconds: 9));
     if (!kMobile) {
+      _clock.repeat();
       _installed = widget.binaryInstalled();
       _probe();
       _timer = Timer.periodic(widget.recheck, (_) => _probe());
@@ -110,6 +117,7 @@ class _ShellWelcomeViewState extends State<ShellWelcomeView> {
   @override
   void dispose() {
     _timer?.cancel();
+    _clock.dispose();
     _paste.dispose();
     super.dispose();
   }
@@ -200,26 +208,21 @@ class _ShellWelcomeViewState extends State<ShellWelcomeView> {
     ]);
   }
 
-  Widget _half(String title, List<Widget> children) => Padding(
-        padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(title, style: sans(13, weight: W.label, color: AppColors.fg1)),
-            const SizedBox(height: 6),
-            ...children,
-          ],
-        ),
+  Widget _label(String text) => Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Text(text,
+            textAlign: TextAlign.center,
+            style: sans(12.5, weight: W.label, color: AppColors.fg1)),
       );
 
-  Text _body(String text) =>
-      Text(text, style: sans(12, height: 1.5, color: AppColors.fg3));
+  Text _body(String text) => Text(text,
+      textAlign: TextAlign.center,
+      style: sans(12, height: 1.5, color: AppColors.fg3));
 
-  Widget _localHalf() {
+  Widget _localControls() {
     if (_found != null) {
-      return _half('This computer', [
-        Row(children: [
+      return Column(mainAxisSize: MainAxisSize.min, children: [
+        Row(mainAxisSize: MainAxisSize.min, children: [
           Container(
             width: 7,
             height: 7,
@@ -227,7 +230,8 @@ class _ShellWelcomeViewState extends State<ShellWelcomeView> {
                 BoxDecoration(color: AppColors.ok, shape: BoxShape.circle),
           ),
           const SizedBox(width: 8),
-          Text('Snippet is running', style: sans(12.5, color: AppColors.fg1)),
+          Text('Snippet is running here',
+              style: sans(12.5, color: AppColors.fg1)),
           const SizedBox(width: 8),
           Flexible(
             child: Text(_found!.name,
@@ -236,14 +240,15 @@ class _ShellWelcomeViewState extends State<ShellWelcomeView> {
                 style: mono(11, color: AppColors.fg4)),
           ),
         ]),
-        const SizedBox(height: 14),
+        const SizedBox(height: 12),
         Btn('Connect',
             small: true, onTap: () => widget.onConnected?.call(_found!)),
       ]);
     }
     if (_pending != null) {
-      return _half('Not set to start automatically', [
-        _body('It works now, but will stop when this computer restarts. '
+      return Column(mainAxisSize: MainAxisSize.min, children: [
+        _label('Not set to start automatically'),
+        _body('It works now, but stops when this computer restarts. '
             'To fix that, run:'),
         const SizedBox(height: 10),
         const _CommandBox(enableCommand),
@@ -253,16 +258,17 @@ class _ShellWelcomeViewState extends State<ShellWelcomeView> {
       ]);
     }
     if (_installing) {
-      return _half('Setting up', [_progress()]);
-    }
-    if (_runningUnreadable) {
-      return _half('This computer', [
-        _body('Snippet is running here, but this app cannot read its link. '
-            'Run snippet serve --status and paste the link on the right.'),
+      return Column(mainAxisSize: MainAxisSize.min, children: [
+        _label('Setting up'),
+        Align(alignment: Alignment.center, child: _progress()),
       ]);
     }
+    if (_runningUnreadable) {
+      return _body('Snippet is running here, but this app cannot read its '
+          'link. Run snippet serve --status and paste the link on the right.');
+    }
     if (!canInstallLocalService) {
-      return _half('This computer', [
+      return Column(mainAxisSize: MainAxisSize.min, children: [
         _body('Run these in a terminal. This screen picks the service up '
             'as soon as it is running.'),
         const SizedBox(height: 10),
@@ -273,18 +279,19 @@ class _ShellWelcomeViewState extends State<ShellWelcomeView> {
         const _CommandBox(enableCommand),
       ]);
     }
-    return _half('This computer', [
-      _body(_installed
-          ? 'Snippet is installed but not running.'
-          : 'Install the service here. It runs in the background and '
-              'starts with your computer.'),
+    return Column(mainAxisSize: MainAxisSize.min, children: [
+      if (_installed) ...[
+        _body('Snippet is installed but not running.'),
+        const SizedBox(height: 12),
+      ],
       if (_error != null) ...[
-        const SizedBox(height: 10),
-        Text(_error!, style: sans(11.5, height: 1.45, color: AppColors.danger)),
+        Text(_error!,
+            textAlign: TextAlign.center,
+            style: sans(11.5, height: 1.45, color: AppColors.danger)),
         const SizedBox(height: 8),
         const _CommandBox(installCommand),
+        const SizedBox(height: 12),
       ],
-      const SizedBox(height: 14),
       Btn(
           _error != null
               ? 'Try again'
@@ -297,22 +304,7 @@ class _ShellWelcomeViewState extends State<ShellWelcomeView> {
     ]);
   }
 
-  Widget _remoteHalf() => _half('Another computer', [
-        SelectableText.rich(
-          TextSpan(
-              style: sans(12, height: 1.5, color: AppColors.fg3),
-              children: [
-                const TextSpan(text: 'There, run '),
-                TextSpan(
-                    text: enableCommand, style: mono(11, color: AppColors.fg1)),
-                const TextSpan(text: ', then '),
-                TextSpan(
-                    text: 'snippet serve --status',
-                    style: mono(11, color: AppColors.fg1)),
-                const TextSpan(text: ' and paste the link.'),
-              ]),
-        ),
-        const SizedBox(height: 14),
+  Widget _remoteControls() => Column(mainAxisSize: MainAxisSize.min, children: [
         Row(children: [
           Expanded(
               child: AppField(
@@ -326,41 +318,169 @@ class _ShellWelcomeViewState extends State<ShellWelcomeView> {
               disabled: _remoteBusy,
               onTap: () => _connectRemote(_paste.text)),
         ]),
-        if (_remoteError != null) ...[
-          const SizedBox(height: 8),
+        const SizedBox(height: 8),
+        if (_remoteError != null)
           Text(_remoteError!,
-              style: sans(11.5, height: 1.4, color: AppColors.danger)),
-        ],
+              textAlign: TextAlign.center,
+              style: sans(11.5, height: 1.4, color: AppColors.danger))
+        else
+          SelectableText.rich(
+            TextSpan(
+                style: sans(11.5, height: 1.5, color: AppColors.fg4),
+                children: [
+                  const TextSpan(text: 'On that computer: '),
+                  TextSpan(
+                      text: enableCommand,
+                      style: mono(11, color: AppColors.fg3)),
+                  const TextSpan(text: ', then '),
+                  TextSpan(
+                      text: 'snippet serve --status',
+                      style: mono(11, color: AppColors.fg3)),
+                ]),
+            textAlign: TextAlign.center,
+          ),
       ]);
 
-  Widget _desktopPanel() => LayoutBuilder(builder: (context, box) {
-        final stacked = box.maxWidth < 600;
-        final line = Container(
-            width: stacked ? null : 1,
-            height: stacked ? 1 : null,
-            color: AppColors.border);
-        return Container(
-          decoration: BoxDecoration(
-            color: AppColors.surface1,
-            borderRadius: BorderRadius.circular(R.lg),
-            border: Border.all(color: AppColors.border),
+  int? get _active {
+    if (_hover != null) return _hover;
+    if (_installing || _pending != null || _error != null) return 0;
+    if (_remoteBusy || _remoteError != null || _paste.text.isNotEmpty) {
+      return 1;
+    }
+    return null;
+  }
+
+  Widget _side(int index,
+      {required String title,
+      required String body,
+      required double artHeight,
+      required Widget controls}) {
+    final active = _active;
+    final on = active == index;
+    final dim = active != null && !on;
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hover = index),
+      onExit: (_) => setState(() {
+        if (_hover == index) _hover = null;
+      }),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 380),
+        curve: Curves.easeOutCubic,
+        color: on ? AppColors.surface1 : AppColors.bg,
+        child: AnimatedOpacity(
+          duration: const Duration(milliseconds: 380),
+          opacity: dim ? 0.55 : 1,
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(vertical: 24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(
+                    height: artHeight,
+                    width: double.infinity,
+                    child: TweenAnimationBuilder<double>(
+                      tween: Tween(end: on ? 1.0 : 0.0),
+                      duration: const Duration(milliseconds: 500),
+                      curve: Curves.easeOutCubic,
+                      builder: (_, h, __) => _artFor(index, h),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 36),
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 380),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(title,
+                              textAlign: TextAlign.center, style: display(18)),
+                          const SizedBox(height: 8),
+                          Text(body,
+                              textAlign: TextAlign.center,
+                              style: sans(12.5,
+                                  height: 1.55, color: AppColors.fg3)),
+                          const SizedBox(height: 22),
+                          controls,
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
-          clipBehavior: Clip.antiAlias,
-          child: stacked
-              ? Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [_localHalf(), line, _remoteHalf()])
-              : IntrinsicHeight(
-                  child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Expanded(child: _localHalf()),
-                        line,
-                        Expanded(child: _remoteHalf()),
-                      ]),
-                ),
-        );
+        ),
+      ),
+    );
+  }
+
+  Widget _artFor(int index, double h) => index == 0
+      ? ServiceArt(time: _clock, hover: h)
+      : RemoteArt(time: _clock, hover: h);
+
+  Widget _desktop() => LayoutBuilder(builder: (context, box) {
+        final stacked = box.maxWidth < 760;
+        final artHeight =
+            stacked ? 170.0 : (box.maxHeight * 0.44).clamp(190.0, 380.0);
+        return _split(box, stacked, artHeight);
       });
+
+  Widget _split(BoxConstraints box, bool stacked, double artHeight) {
+    final left = _side(0,
+        title: 'On this computer',
+        body: 'Install the service here. It runs in the background, starts '
+            'with your computer, and your work stays on this machine.',
+        artHeight: artHeight,
+        controls: _localControls());
+    final right = _side(1,
+        title: 'On another computer',
+        body: 'Already running snippet on a server or another machine? '
+            'Paste its link and work with it from here.',
+        artHeight: artHeight,
+        controls: _remoteControls());
+    {
+      final active = _active;
+      final lf = active == null ? 0.5 : (active == 0 ? 0.56 : 0.44);
+      const d = Duration(milliseconds: 420);
+      final line = Container(
+          width: stacked ? null : 1,
+          height: stacked ? 1 : null,
+          color: AppColors.border);
+      return Stack(children: [
+        Positioned.fill(
+          child: stacked
+              ? SingleChildScrollView(
+                  padding: const EdgeInsets.only(top: 40),
+                  child: Column(children: [left, line, right]))
+              : Row(children: [
+                  AnimatedContainer(
+                      key: const ValueKey('welcome-left'),
+                      duration: d,
+                      curve: Curves.easeOutCubic,
+                      width: box.maxWidth * lf,
+                      child: left),
+                  line,
+                  Expanded(child: right),
+                ]),
+        ),
+        Positioned(
+          top: 14,
+          left: 0,
+          right: 0,
+          child: IgnorePointer(
+            child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+              MochiIcon(color: const Color(0xFFB9C6FF), size: 16),
+              const SizedBox(width: 8),
+              Text('Snippet needs a service',
+                  style: sans(12.5, color: AppColors.fg3)),
+            ]),
+          ),
+        ),
+      ]);
+    }
+  }
 
   Widget _card({
     required String icon,
@@ -477,46 +597,41 @@ class _ShellWelcomeViewState extends State<ShellWelcomeView> {
         ),
       ];
 
-  @override
-  Widget build(BuildContext context) {
-    Theme.of(context);
-    return ColoredBox(
-      color: AppColors.bg,
-      child: Center(
+  Widget _phone() => Center(
         child: SingleChildScrollView(
-          padding:
-              EdgeInsets.symmetric(horizontal: kMobile ? 20 : 28, vertical: 32),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 32),
           child: ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: kMobile ? 460 : 660),
+            constraints: const BoxConstraints(maxWidth: 460),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Center(
-                    child: MochiIcon(
-                        color: const Color(0xFFB9C6FF),
-                        size: kMobile ? 56 : 28)),
-                SizedBox(height: kMobile ? 20 : 12),
-                Text(
-                  'Snippet needs a service',
-                  textAlign: TextAlign.center,
-                  style: display(kMobile ? 26 : 17),
-                ),
+                    child: MochiIcon(color: const Color(0xFFB9C6FF), size: 56)),
+                const SizedBox(height: 20),
+                Text('Snippet needs a service',
+                    textAlign: TextAlign.center, style: display(26)),
                 const SizedBox(height: 6),
                 Text(
                   'It does its work in a small service that runs in the '
                   'background. This app is the window onto it.',
                   textAlign: TextAlign.center,
-                  style: sans(kMobile ? 14.5 : 12.5,
-                      height: 1.5, color: AppColors.fg3),
+                  style: sans(14.5, height: 1.5, color: AppColors.fg3),
                 ),
-                SizedBox(height: kMobile ? 26 : 20),
-                if (kMobile) ..._manualCard() else _desktopPanel(),
+                const SizedBox(height: 26),
+                ..._manualCard(),
               ],
             ),
           ),
         ),
-      ),
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    Theme.of(context);
+    return ColoredBox(
+      color: AppColors.bg,
+      child: kMobile ? _phone() : _desktop(),
     );
   }
 }

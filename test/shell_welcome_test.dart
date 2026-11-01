@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:snippet/local_service.dart';
@@ -44,9 +45,29 @@ void main() {
   testWidgets('desktop shows this computer and another computer', (t) async {
     await _pump(t, TargetPlatform.macOS);
     expect(find.text('Snippet needs a service'), findsOneWidget);
-    expect(find.text('This computer'), findsOneWidget);
-    expect(find.text('Another computer'), findsOneWidget);
+    expect(find.text('On this computer'), findsOneWidget);
+    expect(find.text('On another computer'), findsOneWidget);
     expect(find.text('Install'), findsOneWidget);
+    debugDefaultTargetPlatformOverride = null;
+  });
+
+  testWidgets('hovering a side widens it', (t) async {
+    await _pump(t, TargetPlatform.macOS);
+    final idle = t.getSize(find.byKey(const ValueKey('welcome-left'))).width;
+    final g = await t.createGesture(kind: PointerDeviceKind.mouse);
+    await g.addPointer(location: const Offset(900, 400));
+    await g.moveTo(const Offset(900, 400));
+    await t.pump();
+    await t.pump(const Duration(milliseconds: 700));
+    final overRight =
+        t.getSize(find.byKey(const ValueKey('welcome-left'))).width;
+    expect(overRight, lessThan(idle));
+    await g.moveTo(const Offset(200, 400));
+    await t.pump();
+    await t.pump(const Duration(milliseconds: 700));
+    final overLeft =
+        t.getSize(find.byKey(const ValueKey('welcome-left'))).width;
+    expect(overLeft, greaterThan(idle));
     debugDefaultTargetPlatformOverride = null;
   });
 
@@ -55,7 +76,7 @@ void main() {
     await _pump(t, TargetPlatform.macOS,
         found: _local, up: true, onReady: (i) => got = i);
     expect(got, isNull);
-    expect(find.text('Snippet is running'), findsOneWidget);
+    expect(find.text('Snippet is running here'), findsOneWidget);
     expect(find.text('Install'), findsNothing);
     await t.tap(find.text('Connect').first);
     expect(got, _local);
@@ -154,7 +175,7 @@ void main() {
 
   testWidgets('phone shows the remote steps only', (t) async {
     await _pump(t, TargetPlatform.android);
-    expect(find.text('Another computer'), findsNothing);
+    expect(find.text('On another computer'), findsNothing);
     expect(find.text('Scan or paste'), findsOneWidget);
     debugDefaultTargetPlatformOverride = null;
   });
