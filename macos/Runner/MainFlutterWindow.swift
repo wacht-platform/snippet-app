@@ -3146,13 +3146,10 @@ final class NotchHomeView: NSView {
   }
 
   private func chip(_ text: String) -> NSView {
-    let l = label(text, size: 10.5, color: NotchHomePalette.muted, mono: true)
+    let l = label(text, size: 11.5, color: NotchHomePalette.muted)
     l.sizeToFit()
-    let v = NSView(frame: NSRect(x: 0, y: 0, width: l.frame.width + 12, height: 16))
-    v.wantsLayer = true
-    v.layer?.backgroundColor = NotchHomePalette.chip.cgColor
-    v.layer?.cornerRadius = 6
-    l.frame = NSRect(x: 6, y: 1, width: l.frame.width, height: 14)
+    let v = NSView(frame: NSRect(x: 0, y: 0, width: l.frame.width, height: 16))
+    l.frame = NSRect(x: 0, y: 0, width: l.frame.width, height: 16)
     v.addSubview(l)
     return v
   }
