@@ -378,7 +378,7 @@ class AppIcon extends StatelessWidget {
   Widget build(BuildContext context) {
     if (name.startsWith('provider:')) {
       return ProviderLogo(name.substring(9),
-          size: size * visualScale, color: color);
+          size: size * visualScale);
     }
     final line = _lucide[name];
     if (line != null) {
@@ -2290,20 +2290,16 @@ String? providerLogoAsset(String? provider) {
     'opencode-zen' || 'opencode-go' || 'opencode' => 'opencode',
     _ => null,
   };
-  return key == null ? null : 'assets/providers/$key.svg';
+  if (key == null) return null;
+  return 'assets/providers/$key.${key == 'antigravity' ? 'png' : 'svg'}';
 }
 
-Color providerBrandColor(String? provider) {
-  final key = providerLogoAsset(provider)?.split('/').last.split('.').first;
-  return switch (key) {
-    'claude' || 'anthropic' => const Color(0xFFD97757),
-    'openai' => const Color(0xFF10A37F),
-    'gemini' => const Color(0xFF4C8DF6),
-    'antigravity' => const Color(0xFF8B7CF6),
-    'openrouter' => const Color(0xFF6D78F7),
-    'xai' => AppColors.fg1,
-    _ => AppColors.fg2,
-  };
+/// Marks that ship in their own colours; the rest are single-colour and follow the theme.
+bool providerLogoIsColour(String? provider) {
+  final a = providerLogoAsset(provider) ?? '';
+  return a.endsWith('claude.svg') ||
+      a.endsWith('gemini.svg') ||
+      a.endsWith('antigravity.png');
 }
 
 class ProviderLogo extends StatelessWidget {
@@ -2316,8 +2312,20 @@ class ProviderLogo extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final asset = providerLogoAsset(provider);
-    final tint = color ?? providerBrandColor(provider);
+    final tint = color ?? AppColors.fg1;
     if (asset == null) return AppIcon('cpu', size: size, color: tint);
+    final inner = size * 0.86;
+    if (color == null && providerLogoIsColour(provider)) {
+      return SizedBox.square(
+        dimension: size,
+        child: Center(
+          child: asset.endsWith('.png')
+              ? Image.asset(asset,
+                  width: inner, height: inner, filterQuality: FilterQuality.high)
+              : SvgPicture.asset(asset, width: inner, height: inner),
+        ),
+      );
+    }
     return SizedBox.square(
       dimension: size,
       child: Center(
