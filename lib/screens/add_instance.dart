@@ -27,8 +27,9 @@ const _badLink =
   }
   try {
     final m = jsonDecode(raw);
-    if (m is Map && m['url'] is String && m['token'] is String)
+    if (m is Map && m['url'] is String && m['token'] is String) {
       return (m['url'] as String, m['token'] as String);
+    }
   } catch (_) {}
   return null;
 }
@@ -96,8 +97,9 @@ class _AddMachineDialogState extends State<_AddMachineDialog> {
       final (url, token) = parsed;
       final cfg = await DaemonClient(url, token).getConfig();
       final name = cfg.hostname.isNotEmpty ? cfg.hostname : hostOf(url);
-      if (mounted)
+      if (mounted) {
         Navigator.pop(context, Instance(name: name, url: url, token: token));
+      }
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -349,8 +351,9 @@ class _AddInstanceScreenState extends State<AddInstanceScreen>
       final client = DaemonClient(url, token);
       final cfg = await client.getConfig();
       final name = cfg.hostname.isNotEmpty ? cfg.hostname : hostOf(url);
-      if (mounted)
+      if (mounted) {
         Navigator.pop(context, Instance(name: name, url: url, token: token));
+      }
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -443,8 +446,9 @@ class _AddInstanceScreenState extends State<AddInstanceScreen>
             scanDelay: const Duration(milliseconds: 300),
             onScan: (code) {
               final raw = code.text;
-              if (code.isValid && raw != null && raw.trim().isNotEmpty)
+              if (code.isValid && raw != null && raw.trim().isNotEmpty) {
                 _connect(raw);
+              }
             },
           ),
           const IgnorePointer(child: Center(child: _Reticle())),

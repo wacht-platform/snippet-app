@@ -26,7 +26,7 @@ class _CreateTaskFormState extends State<CreateTaskForm> {
   List<SessionInfo> _sessions = const [];
   String? _sessionId;
   String? _sessionLabel;
-  bool _busy = false;
+  final bool _busy = false;
   String? _error;
 
   @override

@@ -1,27 +1,15 @@
 import 'dart:async';
-import 'dart:io';
 
-import 'package:audioplayers/audioplayers.dart';
-import 'package:chewie/chewie.dart';
 import 'package:flutter/material.dart';
-import 'package:media_store_plus/media_store_plus.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:re_editor/re_editor.dart';
-import 'package:share_plus/share_plus.dart';
-import 'package:video_player/video_player.dart';
 
 import '../api.dart';
 import '../file_icons.dart';
 import '../desktop_pick.dart';
-import '../file_actions.dart';
-import '../highlight.dart';
 import '../models.dart';
-import '../notifications.dart';
 import '../panel.dart';
 import '../platform.dart';
 import '../theme.dart';
 import '../widgets.dart';
-import 'editor.dart';
 import 'git.dart';
 import 'file_viewer.dart';
 export 'file_viewer.dart';
@@ -189,8 +177,9 @@ class _FileExplorerState extends State<FileExplorer> {
     var uploaded = 0;
     for (var i = 0; i < files.length; i++) {
       final f = files[i];
-      if (mounted)
+      if (mounted) {
         setState(() => _busy = 'Uploading ${i + 1}/${files.length}…');
+      }
       try {
         final bytes = await f.readAsBytes();
         await widget.client.uploadFile(bytes, name: f.name, dir: cwd);

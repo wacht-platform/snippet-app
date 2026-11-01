@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:ui';
 
 import 'package:flutter/material.dart';
 
@@ -1142,7 +1141,6 @@ class SidebarState extends State<Sidebar> {
     }
     final checked = _selected.contains(s.id);
     final draft = _hasDraft(s);
-    final settled = s.settled;
     final on = _selecting ? checked : selected;
     return HoverSurface(
       selected: on,

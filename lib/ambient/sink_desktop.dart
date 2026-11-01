@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:collection';
 import 'dart:io' show Platform;
-import 'dart:typed_data';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_soloud/flutter_soloud.dart';

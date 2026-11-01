@@ -1640,8 +1640,9 @@ class DaemonClient {
     int limit = 50,
   }) async {
     final query = <String, String>{'limit': '$limit'};
-    if (workspace != null && workspace.isNotEmpty)
+    if (workspace != null && workspace.isNotEmpty) {
       query['workspace'] = workspace;
+    }
     if (contains != null && contains.isNotEmpty) query['contains'] = contains;
     if (kind != null && kind.isNotEmpty) query['kind'] = kind;
     final r = await http

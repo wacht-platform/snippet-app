@@ -1194,8 +1194,9 @@ class _DesktopShellState extends State<DesktopShell>
     _shells.setClient(_client);
     _connectEventsWatch();
     final notificationId = m['notification_id'] as String?;
-    if (notificationId != null)
+    if (notificationId != null) {
       await (await NotificationInbox.open()).markRead(notificationId);
+    }
     if (!mounted) return;
     final destination = m['destination'];
     if (destination is Map && destination['type'] == 'task') {
@@ -1204,13 +1205,15 @@ class _DesktopShellState extends State<DesktopShell>
       try {
         final opened = await openNotificationConversation(
             context, _client!, '${destination['id']}');
-        if (!opened && mounted)
+        if (!opened && mounted) {
           toast(
               context, 'This conversation is not available in the human inbox.',
               danger: true);
+        }
       } catch (_) {
-        if (mounted)
+        if (mounted) {
           toast(context, 'Could not resolve this conversation.', danger: true);
+        }
       }
     } else if (sid.isNotEmpty) {
       _openSession(sid, '${m['title'] ?? 'session'}', null,

@@ -295,7 +295,9 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
           final ambient = parseAmbientTurn(text);
           if (ambient != null) {
             if (ambient.ids.isNotEmpty &&
-                ambient.ids.every(superseded.contains)) break;
+                ambient.ids.every(superseded.contains)) {
+              break;
+            }
             addEvent(
                 key,
                 Padding(

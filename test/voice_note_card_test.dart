@@ -3,7 +3,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:snippet/api.dart';
 import 'package:snippet/media_views.dart';
 import 'package:snippet/theme.dart';
-import 'package:snippet/widgets.dart';
 
 void main() {
   testWidgets('voice note with transcript', (tester) async {

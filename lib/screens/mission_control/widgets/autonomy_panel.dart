@@ -45,8 +45,9 @@ String autonomyStatusLine(Map<String, dynamic>? autonomy) {
   final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
   final parts = <String>['Wakes on'];
   if (autonomy['in_quiet_hours'] == true) parts.add('quiet hours');
-  if (next != null && next > now)
+  if (next != null && next > now) {
     parts.add('next wake ${_relative(next, future: true)}');
+  }
   return parts.join(' · ');
 }
 

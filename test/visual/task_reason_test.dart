@@ -4,7 +4,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:snippet/models.dart';
 import 'package:snippet/screens/tasks/task_common.dart';
 import 'package:snippet/screens/tasks/task_list.dart';
-import 'package:snippet/task_reason.dart';
 import 'package:snippet/theme.dart';
 
 import 'golden.dart';

@@ -331,8 +331,9 @@ class AutonomousRound {
     section('Changed since last wake', changed);
     section('Open work', open);
     section('Scheduled', scheduled);
-    if (quiet)
+    if (quiet) {
       out.writeln('_Quiet hours: non-urgent pings wait until morning._');
+    }
     final text = out.toString().trim();
     return text.isEmpty ? 'Nothing changed, nothing open.' : text;
   }
@@ -377,8 +378,9 @@ AutonomousRound? parseAutonomousRound(String text) {
       final line = l.trim();
       if (line.startsWith('## ') ||
           line.startsWith('[/automated_wake]') ||
-          line.startsWith('[/autonomous_round]'))
+          line.startsWith('[/autonomous_round]')) {
         break;
+      }
       if (line.startsWith('- ')) items.add(line.substring(2));
     }
     return items;

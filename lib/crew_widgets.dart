@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'api.dart';
-import 'dialog_widgets.dart';
 import 'screens/agent_wake_panel.dart';
 import 'screens/mochi_color_picker.dart';
 import 'crew_status.dart';

@@ -1195,7 +1195,7 @@ extension _SessionScreenComposerExt on _SessionScreenState {
                                                               left: 6,
                                                               right: 2),
                                                       child: Text(
-                                                          '${_contextLeftPct}% left',
+                                                          '$_contextLeftPct% left',
                                                           style: sans(12,
                                                               tabular: true,
                                                               color: AppColors

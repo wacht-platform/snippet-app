@@ -231,8 +231,9 @@ class InferenceProfileEditorState extends State<InferenceProfileEditor> {
   void _applyPick(CatalogModel m) {
     _model.text = m.id;
     // A reported context window beats whatever was there — it's authoritative.
-    if (m.contextWindow != null && m.contextWindow! > 0)
+    if (m.contextWindow != null && m.contextWindow! > 0) {
       _ctx.text = '${m.contextWindow}';
+    }
     final bits = <String>[];
     if (m.efforts != null) {
       bits.add(m.efforts!.isEmpty
@@ -241,8 +242,9 @@ class InferenceProfileEditorState extends State<InferenceProfileEditor> {
     } else if (m.reasoning != null) {
       bits.add(m.reasoning! ? 'supports reasoning' : 'no reasoning');
     }
-    if (m.contextWindow != null && m.contextWindow! > 0)
+    if (m.contextWindow != null && m.contextWindow! > 0) {
       bits.add(_fmtCtx(m.contextWindow!));
+    }
     setState(() => _modelHint = bits.isEmpty ? null : bits.join(' · '));
   }
 
@@ -525,8 +527,9 @@ class InferenceProfileEditorState extends State<InferenceProfileEditor> {
     Theme.of(context); // Rebuild on theme change
     // include the current provider as a pill even if it's outside the standard list (e.g. chatgpt)
     final pills = [..._providers];
-    if (!pills.any((p) => p.$1 == _provider))
+    if (!pills.any((p) => p.$1 == _provider)) {
       pills.insert(0, (_provider, _provider));
+    }
     if (!kMobile && widget.embedded) return _deskDialogBuild(pills);
     final title = _isEdit ? 'Edit profile' : 'Add profile';
     final footer = kMobile
@@ -1366,17 +1369,19 @@ class _CliAgentStatusState extends State<_CliAgentStatus> {
     });
     try {
       final s = await widget.client.cliAgentStatus(widget.provider);
-      if (mounted)
+      if (mounted) {
         setState(() {
           _status = s;
           _loading = false;
         });
+      }
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _err = '$e';
           _loading = false;
         });
+      }
     }
   }
 
@@ -1497,11 +1502,12 @@ class _SubSignInState extends State<_SubSignIn> {
 
   Future<void> _refresh() async {
     final on = await widget.signedIn(widget.client);
-    if (mounted)
+    if (mounted) {
       setState(() {
         _signedIn = on;
         _loading = false;
       });
+    }
   }
 
   Future<void> _begin() async {
@@ -1521,20 +1527,22 @@ class _SubSignInState extends State<_SubSignIn> {
       _poll = Timer.periodic(const Duration(seconds: 3), (_) async {
         if (await widget.signedIn(widget.client)) {
           _poll?.cancel();
-          if (mounted)
+          if (mounted) {
             setState(() {
               _signedIn = true;
               _code = null;
               _url = null;
             });
+          }
         }
       });
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _err = '$e';
           _loading = false;
         });
+      }
     }
   }
 
