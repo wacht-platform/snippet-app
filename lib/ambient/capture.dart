@@ -105,20 +105,13 @@ class AmbientCapture {
 
   Future<Stream<Uint8List>> _openMic() async {
     if (defaultTargetPlatform == TargetPlatform.android) {
-      var external = false;
       _earbuds = false;
       try {
-        external = await _audio.hasExternal();
+        _earbuds = await _audio.hasExternal();
       } catch (_) {}
-      if (external) {
-        try {
-          _earbuds = await _audio.prepare();
-          if (_earbuds) await Future<void>.delayed(const Duration(milliseconds: 800));
-        } catch (_) {}
-      }
     }
     InputDevice? device;
-    if (defaultTargetPlatform == TargetPlatform.android && !_earbuds) {
+    if (defaultTargetPlatform == TargetPlatform.android) {
       try {
         final id = await _audio.builtinMicId();
         if (id >= 0) {
@@ -138,7 +131,7 @@ class AmbientCapture {
         noiseSuppress: !_earbuds,
         androidConfig: const AndroidRecordConfig(
             manageBluetooth: false,
-            audioSource: AndroidAudioSource.voiceCommunication)));
+            audioSource: AndroidAudioSource.mic)));
   }
 
   bool _micRetried = false;
@@ -247,6 +240,15 @@ class AmbientCapture {
       final call = DateTime.now().isBefore(_callGrace) ? false : await _audio.inCall();
       if (call != _callOn) {
         _callOn = call;
+        if (!kMacOS) {
+          try {
+            if (call) {
+              await _recorder.pause();
+            } else {
+              await _recorder.resume();
+            }
+          } catch (_) {}
+        }
       }
     } catch (_) {
     } finally {
@@ -308,8 +310,8 @@ class AmbientCapture {
       if (rms > 0.0004 && _probability < 0.3) _loudQuiet++;
       gate.addFrame(frame, _probability);
       final voiced = _probability >= threshold;
-      if (defaultTargetPlatform == TargetPlatform.android ||
-          defaultTargetPlatform == TargetPlatform.macOS) {
+      if (defaultTargetPlatform == TargetPlatform.macOS ||
+          (defaultTargetPlatform == TargetPlatform.android && _earbuds)) {
         _duckCheck(voiced);
       } else if (_playOn) {
         if (_echoRms == 0) {
