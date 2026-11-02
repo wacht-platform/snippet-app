@@ -88,7 +88,7 @@ class _CardMarkdownBodyState extends State<CardMarkdownBody> {
                         child: SingleChildScrollView(
                           physics: const NeverScrollableScrollPhysics(),
                           child: MarkdownBody(
-                            data: body,
+                            data: unwrapCodedLinks(body),
                             selectable: _open || !long,
                             styleSheet: sheet,
                             builders: {'pre': PreBlockBuilder()},

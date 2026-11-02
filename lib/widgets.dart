@@ -152,9 +152,66 @@ class Pills<T> extends StatelessWidget {
 const _linkColor = Color(0xFF8AB4FF);
 
 final _codedLink = RegExp(r'`(\[[^\]`]+\]\((?:session|artifact):[^)\s`]+\))`');
+final _diffFenceOpenRe = RegExp(r'^([ \t]{0,3})(`{3,})(diff|patch)\s*$');
+final _innerBacktickLineRe = RegExp(r'^[ +\-]?[ \t]*`{3,}');
 
 String unwrapCodedLinks(String md) =>
-    md.replaceAllMapped(_codedLink, (m) => m.group(1)!);
+    _widenDiffFences(md.replaceAllMapped(_codedLink, (m) => m.group(1)!));
+
+/// Unified diffs of Markdown files often contain unchanged context lines like
+/// ` ``` ` (1 leading space + 3 backticks), which CommonMark treats as closing
+/// an outer 3-backtick ```diff fence mid-diff. Widening the outer diff fence
+/// to outrank any inner backtick run keeps the entire diff inside one block.
+String _widenDiffFences(String text) {
+  if (!text.contains('```diff') && !text.contains('```patch')) return text;
+  final lines = text.split('\n');
+  for (var i = 0; i < lines.length; i++) {
+    final open = _diffFenceOpenRe.firstMatch(lines[i]);
+    if (open == null) continue;
+    final indent = open.group(1)!;
+    final fence = open.group(2)!;
+    final lang = open.group(3)!;
+    int? closeIdx;
+    var maxInnerTicks = fence.length;
+    for (var j = i + 1; j < lines.length; j++) {
+      final line = lines[j];
+      final trimmed = line.trim();
+      // A true closing fence has no diff prefix ('+', '-', or context space paired with diff lines)
+      // and matches the outer fence at the end of the diff section, or before a blank line + heading/prose.
+      if (RegExp('^\\s*`{${fence.length},}\\s*\$').hasMatch(line) &&
+          !line.startsWith(' ') &&
+          !line.startsWith('+') &&
+          !line.startsWith('-')) {
+        final nextNonEmpty = lines
+            .skip(j + 1)
+            .map((l) => l.trimRight())
+            .firstWhere((l) => l.isNotEmpty, orElse: () => '');
+        final looksLikeMoreDiff = nextNonEmpty.startsWith('@@ ') ||
+            nextNonEmpty.startsWith('diff --git ') ||
+            nextNonEmpty.startsWith('+') ||
+            nextNonEmpty.startsWith('-');
+        if (!looksLikeMoreDiff) {
+          closeIdx = j;
+          break;
+        }
+      }
+      if (_innerBacktickLineRe.hasMatch(line) || trimmed.startsWith('```')) {
+        for (final m in RegExp(r'`{3,}').allMatches(line)) {
+          if (m.group(0)!.length >= maxInnerTicks) {
+            maxInnerTicks = m.group(0)!.length + 1;
+          }
+        }
+      }
+    }
+    if (closeIdx != null && maxInnerTicks > fence.length) {
+      final wider = '`' * maxInnerTicks;
+      lines[i] = '$indent$wider$lang';
+      lines[closeIdx] = '$indent$wider';
+      i = closeIdx;
+    }
+  }
+  return lines.join('\n');
+}
 
 void openMarkdownLink(String? href, [BuildContext? context, String? text]) {
   if (href == null || href.isEmpty) return;
@@ -1379,7 +1436,7 @@ void _messageActions(BuildContext context, String text) {
                 padding: const EdgeInsets.symmetric(horizontal: S.s4),
                 child: SelectionArea(
                   child: MarkdownBody(
-                    data: text,
+                    data: unwrapCodedLinks(text),
                     styleSheet: markdownStyle(context),
                     builders: {'pre': PreBlockBuilder()},
                   ),

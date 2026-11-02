@@ -122,16 +122,39 @@ class PreBlockBuilder extends MarkdownElementBuilder {
   }
 }
 
-class _MdCodeBlock extends StatelessWidget {
+class _MdCodeBlock extends StatefulWidget {
   final String code;
   final String language;
   const _MdCodeBlock({required this.code, this.language = ''});
 
   @override
+  State<_MdCodeBlock> createState() => _MdCodeBlockState();
+}
+
+class _MdCodeBlockState extends State<_MdCodeBlock> {
+  late bool _wrap = const {'diff', 'patch', 'md', 'markdown', 'mdx', 'text', 'txt'}
+      .contains(widget.language.trim().toLowerCase());
+
+  @override
   Widget build(BuildContext context) {
     Theme.of(context);
-    final lines = code.split('\n');
-    final lang = language.trim().isEmpty ? 'code' : language.trim();
+    final lines = widget.code.split('\n');
+    final lang =
+        widget.language.trim().isEmpty ? 'code' : widget.language.trim();
+    final content = SelectableText.rich(
+      TextSpan(children: [
+        for (var i = 0; i < lines.length; i++) ...[
+          TextSpan(
+            text: '${i + 1}'.padLeft(3),
+            style: mono(12, height: 1.55, color: AppColors.fg3),
+          ),
+          const TextSpan(text: '  '),
+          highlightedCodeSpan(
+              i == lines.length - 1 ? lines[i] : '${lines[i]}\n',
+              language: widget.language),
+        ],
+      ]),
+    );
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Container(
@@ -156,12 +179,21 @@ class _MdCodeBlock extends StatelessWidget {
                 Text(lang, style: mono(11, color: AppColors.fg3)),
                 const Spacer(),
                 IconBtn(
+                  'wrap',
+                  size: 28,
+                  iconSize: 13,
+                  active: _wrap,
+                  tooltip: _wrap ? 'Unwrap lines' : 'Wrap lines',
+                  onTap: () => setState(() => _wrap = !_wrap),
+                ),
+                const SizedBox(width: 2),
+                IconBtn(
                   'clipboard',
                   size: 28,
                   iconSize: 13,
                   tooltip: 'Copy',
                   onTap: () {
-                    Clipboard.setData(ClipboardData(text: code));
+                    Clipboard.setData(ClipboardData(text: widget.code));
                     toast(context, 'Copied');
                   },
                 ),
@@ -169,27 +201,20 @@ class _MdCodeBlock extends StatelessWidget {
             ),
             Divider(
                 height: 1, color: kMobile ? AppColors.line : AppColors.border),
-            NotificationListener<ScrollNotification>(
-              onNotification: (_) => true,
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
+            if (_wrap)
+              Padding(
                 padding: const EdgeInsets.fromLTRB(8, 8, 12, 10),
-                child: SelectableText.rich(
-                  TextSpan(children: [
-                    for (var i = 0; i < lines.length; i++) ...[
-                      TextSpan(
-                        text: '${i + 1}'.padLeft(3),
-                        style: mono(12, height: 1.55, color: AppColors.fg3),
-                      ),
-                      const TextSpan(text: '  '),
-                      highlightedCodeSpan(
-                          i == lines.length - 1 ? lines[i] : '${lines[i]}\n',
-                          language: language),
-                    ],
-                  ]),
+                child: content,
+              )
+            else
+              NotificationListener<ScrollNotification>(
+                onNotification: (_) => true,
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.fromLTRB(8, 8, 12, 10),
+                  child: content,
                 ),
               ),
-            ),
           ],
         ),
       ),
