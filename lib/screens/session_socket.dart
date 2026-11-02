@@ -311,6 +311,11 @@ extension _SessionScreenSocketExt on _SessionScreenState {
         final offset = (j['event_offset'] as num?)?.toInt();
         _transcriptStart = offset ?? 0;
       }
+      final cache = _SessionScreenState._sessionStateCache;
+      if (cache.length >= 16 && !cache.containsKey(_cacheKey)) {
+        cache.remove(cache.keys.first);
+      }
+      cache[_cacheKey] = (next, _transcriptStart);
       _setState(() {
         _state = next;
         if (!_isMissionControl) {

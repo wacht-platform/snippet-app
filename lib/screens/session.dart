@@ -599,6 +599,10 @@ class _SessionScreenState extends State<SessionScreen>
   /// it. Kept separate from `_state.events` because these are DEVICE events —
   /// they belong to the agent and the coordination plane, not to this session's
   /// transcript, and folding them in would put them in the model's history.
+  static final Map<String, (HarnessState, int)> _sessionStateCache = {};
+
+  String get _cacheKey => '${widget.client.baseUrl}|${widget.sessionId}';
+
   final List<Map<String, dynamic>> _agentEvents = [];
   StreamSubscription<dynamic>? _agentEventsSub;
   int _transcriptStart = 0;
@@ -810,8 +814,11 @@ class _SessionScreenState extends State<SessionScreen>
         if (mounted) _publishTerminals();
       });
     }
-    _loadGithubStatus();
-    _loadSettled();
+    final cached = _sessionStateCache[_cacheKey];
+    if (cached != null) {
+      _state = cached.$1;
+      _transcriptStart = cached.$2;
+    }
     _lastInput = _input.text;
     _input.addListener(_interceptBigPaste);
     _restoreDraft();
@@ -847,9 +854,13 @@ class _SessionScreenState extends State<SessionScreen>
     if (!widget.acceptDrops && _state != null) _parked = true;
     _startSession();
     _startAgentEvents();
-    _loadModel();
     modelsRevision.addListener(_loadModel);
-    unawaited(widget.client.getConfig());
+    Future<void>.delayed(const Duration(milliseconds: 250), () {
+      if (!mounted || _closed) return;
+      _loadGithubStatus();
+      _loadSettled();
+      _loadModel();
+    });
     if (widget.inboundShare != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _consumeInboundShare(widget.inboundShare!);
@@ -959,13 +970,13 @@ class _SessionScreenState extends State<SessionScreen>
   }
 
   Future<void> _startSession() async {
-    if (_isMissionControl) {
-      try {
-        await widget.client.mcOpen().timeout(const Duration(seconds: 8));
-      } catch (_) {}
-      if (!mounted || _closed) return;
-    }
     _connect();
+    if (_isMissionControl) {
+      unawaited(widget.client
+          .mcOpen()
+          .timeout(const Duration(seconds: 8))
+          .catchError((_) => ''));
+    }
   }
 
   @override
@@ -1015,7 +1026,10 @@ class _SessionScreenState extends State<SessionScreen>
       _lastInput = '';
       _restoreDraft();
       _consumedShare = null;
-      _state = null;
+      final cached = _sessionStateCache[_cacheKey];
+      _state = cached?.$1;
+      _transcriptStart = cached?.$2 ?? 0;
+      _transcriptDirty = true;
       unawaited(_startSession());
     }
     if (widget.inboundShare != null &&
