@@ -224,18 +224,38 @@ class _NotificationMessageCardState extends State<NotificationMessageCard> {
       SizedBox(width: kMobile ? 18 : 14),
     ]);
 
+    final attention = p['attention'];
+    final attentionTool = attention is Map ? '${attention['tool'] ?? ''}' : '';
+    final isApproval = action == CardAction.approval;
+
+    final link = sans(12.5, weight: W.label, color: AppColors.fg3);
+    Widget textLink(String label, VoidCallback onTap) => InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(R.xs),
+          child: Padding(
+            padding:
+                EdgeInsets.symmetric(horizontal: 4, vertical: kMobile ? 6 : 3),
+            child: Text(label, style: link),
+          ),
+        );
+
     final choices = _choices;
     final Widget? actions = switch (action) {
-      CardAction.approval => Wrap(spacing: S.s8, runSpacing: S.s8, children: [
-          Btn('Approve',
-              small: true,
-              disabled: busy,
-              onTap: () => _send(const QuickApprove())),
+      CardAction.approval => Row(children: [
+          Transform.translate(
+              offset: const Offset(-4, 0),
+              child: textLink('Open chat', widget.onOpen)),
+          const Spacer(),
           Btn('Deny',
               small: true,
               variant: BtnVariant.secondary,
               disabled: busy,
               onTap: () => _send(const QuickDeny())),
+          const SizedBox(width: S.s6),
+          Btn('Approve',
+              small: true,
+              disabled: busy,
+              onTap: () => _send(const QuickApprove())),
         ]),
       CardAction.answer when choices.isNotEmpty =>
         Wrap(spacing: S.s8, runSpacing: S.s8, children: [
@@ -257,24 +277,28 @@ class _NotificationMessageCardState extends State<NotificationMessageCard> {
       _ => null,
     };
 
-    final link = sans(12.5, weight: W.label, color: AppColors.accent);
-    Widget textLink(String label, VoidCallback onTap) => InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(R.xs),
-          child: Padding(
-            padding:
-                EdgeInsets.symmetric(horizontal: 4, vertical: kMobile ? 8 : 3),
-            child: Text(label, style: link),
-          ),
-        );
-
     final expanded = Padding(
-      padding: const EdgeInsets.only(left: 18, right: S.s12),
+      padding: const EdgeInsets.only(left: 18, right: S.s12, top: S.s6),
       child: Column(
         mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (showBody)
+          if (showBody && isApproval)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+              decoration: BoxDecoration(
+                color: AppColors.surface1,
+                borderRadius: BorderRadius.circular(R.sm),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: Text(
+                attentionTool == 'bash' ? '\$ $body' : body,
+                maxLines: 5,
+                overflow: TextOverflow.ellipsis,
+                style: mono(12, height: 1.4, color: AppColors.fg2),
+              ),
+            )
+          else if (showBody)
             Text(body,
                 maxLines: 10,
                 overflow: TextOverflow.ellipsis,
@@ -288,24 +312,25 @@ class _NotificationMessageCardState extends State<NotificationMessageCard> {
                   style: sans(12, color: AppColors.fg3)),
             ),
           if (actions != null && _moreQuestions == 0)
-            Padding(padding: const EdgeInsets.only(top: 10), child: actions),
+            Padding(padding: const EdgeInsets.only(top: 8), child: actions),
           if (_state == _Send.failed)
             Padding(
               padding: const EdgeInsets.only(top: S.s6),
               child: Text("Couldn't send. Open chat",
                   style: sans(12, color: AppColors.danger)),
             ),
-          Padding(
-            padding: const EdgeInsets.only(top: S.s4),
-            child: Wrap(
-                crossAxisAlignment: WrapCrossAlignment.center,
-                spacing: S.s8,
-                children: [
-                  Transform.translate(
-                      offset: const Offset(-4, 0),
-                      child: textLink('Open chat', widget.onOpen)),
-                ]),
-          ),
+          if (!isApproval || _moreQuestions > 0)
+            Padding(
+              padding: const EdgeInsets.only(top: S.s4),
+              child: Wrap(
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: S.s8,
+                  children: [
+                    Transform.translate(
+                        offset: const Offset(-4, 0),
+                        child: textLink('Open chat', widget.onOpen)),
+                  ]),
+            ),
         ],
       ),
     );

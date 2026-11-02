@@ -280,7 +280,10 @@ Map<String, dynamic> notificationDestination(
           : event['title']);
   final nestedPayload = event['payload'];
   final nestedBody = nestedPayload is Map ? nestedPayload['body'] : null;
-  final rawBody = event['body'] ?? event['message'] ?? nestedBody;
+  final attention = event['attention'];
+  final attentionText = attention is Map ? attention['text'] : null;
+  final rawBody =
+      event['body'] ?? event['message'] ?? nestedBody ?? attentionText;
   final body =
       (rawBody == null || '$rawBody'.trim().isEmpty) && kind == 'idle'
           ? _stoppedSummary(event['lanes_running'])

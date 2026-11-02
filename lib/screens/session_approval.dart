@@ -278,91 +278,89 @@ class ApprovalBarState extends State<ApprovalBar> {
       padding: const EdgeInsets.fromLTRB(0, S.s4, 0, S.s6),
       child: Container(
         width: double.infinity,
-        padding: const EdgeInsets.all(S.s12),
         decoration: BoxDecoration(
-          color: AppColors.raised,
-          borderRadius: BorderRadius.circular(R.lg),
-          border: Border.all(
-              color: (isVault ? AppColors.run : AppColors.accent)
-                  .withValues(alpha: 0.35)),
+          color: AppColors.surface1,
+          borderRadius: BorderRadius.circular(R.card),
+          border: Border.all(color: AppColors.lineStrong),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Row(children: [
-              AppIcon(isVault ? 'lock-key' : toolIcon(tool),
-                  size: 15, color: isVault ? AppColors.run : AppColors.accent),
-              const SizedBox(width: S.s8),
-              Expanded(
-                  child: Text(question,
-                      style: TS
-                          .ui(AppColors.fg1)
-                          .copyWith(fontWeight: weightFor(FontWeight.w600)))),
-              if (total > 1) ...[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(S.s12, 10, S.s12, 8),
+              child: Row(children: [
+                AppIcon(isVault ? 'lock-key' : toolIcon(tool),
+                    size: 14, color: isVault ? AppColors.run : AppColors.fg2),
                 const SizedBox(width: S.s8),
-                Tag('$index of $total', mono: true),
-              ],
-            ]),
-            if (detail.isNotEmpty) ...[
-              const SizedBox(height: S.s8),
+                Expanded(
+                  child: Text(question,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: sans(13, weight: W.label, color: AppColors.fg1)),
+                ),
+                if (isVault)
+                  for (final name in secrets.take(2)) ...[
+                    const SizedBox(width: S.s6),
+                    Tag(name, tone: Tone.run, icon: 'key', mono: true),
+                  ],
+                if (total > 1) ...[
+                  const SizedBox(width: S.s6),
+                  Tag('$index/$total', mono: true),
+                ],
+              ]),
+            ),
+            if (detail.isNotEmpty)
               Flexible(
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxHeight: 140),
+                  constraints: const BoxConstraints(maxHeight: 120),
                   child: Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.fromLTRB(S.s8, S.s6, S.s8, S.s6),
+                    margin: const EdgeInsets.symmetric(horizontal: S.s12),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 7),
                     decoration: BoxDecoration(
-                      color: AppColors.canvas,
-                      borderRadius: BorderRadius.circular(R.sm + 2),
+                      color: AppColors.bg,
+                      borderRadius: BorderRadius.circular(R.sm),
+                      border: Border.all(color: AppColors.border),
                     ),
                     child: SingleChildScrollView(
                       child: SelectableText.rich(TextSpan(children: [
                         if (isShell)
                           TextSpan(
                               text: '\$ ',
-                              style: mono(12,
-                                  height: 1.45, color: AppColors.accent)),
+                              style:
+                                  mono(12, height: 1.4, color: AppColors.fg4)),
                         TextSpan(
                             text: detail,
                             style:
-                                mono(12, height: 1.45, color: AppColors.fg1)),
+                                mono(12, height: 1.4, color: AppColors.fg2)),
                       ])),
                     ),
                   ),
                 ),
               ),
-            ],
-            if (isVault) ...[
-              const SizedBox(height: S.s8),
-              InsetPanel(
-                tone: Tone.run,
-                padding: const EdgeInsets.all(S.s8),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Uses vault secrets · values stay on the machine',
-                        style: TS.meta(AppColors.run)),
-                    const SizedBox(height: S.s6),
-                    Wrap(spacing: S.s6, runSpacing: S.s6, children: [
-                      for (final name in secrets)
-                        Tag(name, tone: Tone.run, icon: 'key', mono: true),
-                    ]),
-                  ],
-                ),
-              ),
-            ],
-            const SizedBox(height: S.s8),
-            Row(children: [
-              if (canAlways)
-                TextAction('Always allow',
-                    onTap:
-                        _sent ? null : () => _decide({'kind': 'approve_all'})),
-              const Spacer(),
-              reject,
-              const SizedBox(width: S.s8),
-              allow,
-            ]),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(S.s12, 8, S.s12, 10),
+              child: Row(children: [
+                if (canAlways)
+                  TextAction('Always allow',
+                      onTap: _sent
+                          ? null
+                          : () => _decide({'kind': 'approve_all'}))
+                else if (isVault)
+                  Flexible(
+                    child: Text('Vault values stay on machine',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: sans(11.5, color: AppColors.fg3)),
+                  ),
+                const Spacer(),
+                reject,
+                const SizedBox(width: S.s6),
+                allow,
+              ]),
+            ),
           ],
         ),
       ),
