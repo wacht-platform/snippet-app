@@ -288,10 +288,10 @@ class ApprovalBarState extends State<ApprovalBar> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(S.s12, 10, S.s12, 8),
+              padding: const EdgeInsets.fromLTRB(S.s12, 10, S.s12, 6),
               child: Row(children: [
                 AppIcon(isVault ? 'lock-key' : toolIcon(tool),
-                    size: 14, color: isVault ? AppColors.run : AppColors.fg2),
+                    size: 14, color: isVault ? AppColors.run : AppColors.fg3),
                 const SizedBox(width: S.s8),
                 Expanded(
                   child: Text(question,
@@ -299,11 +299,6 @@ class ApprovalBarState extends State<ApprovalBar> {
                       overflow: TextOverflow.ellipsis,
                       style: sans(13, weight: W.label, color: AppColors.fg1)),
                 ),
-                if (isVault)
-                  for (final name in secrets.take(2)) ...[
-                    const SizedBox(width: S.s6),
-                    Tag(name, tone: Tone.run, icon: 'key', mono: true),
-                  ],
                 if (total > 1) ...[
                   const SizedBox(width: S.s6),
                   Tag('$index/$total', mono: true),
@@ -314,47 +309,40 @@ class ApprovalBarState extends State<ApprovalBar> {
               Flexible(
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxHeight: 120),
-                  child: Container(
-                    width: double.infinity,
-                    margin: const EdgeInsets.symmetric(horizontal: S.s12),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 7),
-                    decoration: BoxDecoration(
-                      color: AppColors.bg,
-                      borderRadius: BorderRadius.circular(R.sm),
-                      border: Border.all(color: AppColors.border),
-                    ),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(S.s12, 2, S.s12, 4),
                     child: SingleChildScrollView(
                       child: SelectableText.rich(TextSpan(children: [
                         if (isShell)
                           TextSpan(
                               text: '\$ ',
                               style:
-                                  mono(12, height: 1.4, color: AppColors.fg4)),
+                                  mono(12, height: 1.45, color: AppColors.fg4)),
                         TextSpan(
                             text: detail,
                             style:
-                                mono(12, height: 1.4, color: AppColors.fg2)),
+                                mono(12, height: 1.45, color: AppColors.fg2)),
                       ])),
                     ),
                   ),
                 ),
               ),
+            if (isVault)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(S.s12, 4, S.s12, 2),
+                child: Wrap(spacing: S.s6, runSpacing: S.s4, children: [
+                  for (final name in secrets)
+                    Tag(name, tone: Tone.run, icon: 'key', mono: true),
+                ]),
+              ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(S.s12, 8, S.s12, 10),
+              padding: const EdgeInsets.fromLTRB(S.s12, 6, S.s12, 10),
               child: Row(children: [
                 if (canAlways)
                   TextAction('Always allow',
                       onTap: _sent
                           ? null
-                          : () => _decide({'kind': 'approve_all'}))
-                else if (isVault)
-                  Flexible(
-                    child: Text('Vault values stay on machine',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: sans(11.5, color: AppColors.fg3)),
-                  ),
+                          : () => _decide({'kind': 'approve_all'})),
                 const Spacer(),
                 reject,
                 const SizedBox(width: S.s6),

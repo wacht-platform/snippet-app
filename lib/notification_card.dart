@@ -284,19 +284,11 @@ class _NotificationMessageCardState extends State<NotificationMessageCard> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           if (showBody && isApproval)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-              decoration: BoxDecoration(
-                color: AppColors.surface1,
-                borderRadius: BorderRadius.circular(R.sm),
-                border: Border.all(color: AppColors.border),
-              ),
-              child: Text(
-                attentionTool == 'bash' ? '\$ $body' : body,
-                maxLines: 5,
-                overflow: TextOverflow.ellipsis,
-                style: mono(12, height: 1.4, color: AppColors.fg2),
-              ),
+            Text(
+              attentionTool == 'bash' ? '\$ $body' : body,
+              maxLines: 5,
+              overflow: TextOverflow.ellipsis,
+              style: mono(12, height: 1.45, color: AppColors.fg2),
             )
           else if (showBody)
             Text(body,
