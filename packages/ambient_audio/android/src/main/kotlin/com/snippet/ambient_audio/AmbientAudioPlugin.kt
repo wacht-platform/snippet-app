@@ -71,14 +71,13 @@ class AmbientAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
                 }
                 "mediaActive" -> result.success(audioManager()?.isMusicActive ?: false)
                 "inCall" -> result.success(inCall())
-                "inputRoute" -> result.success(inputRoute())
                 "builtinMicId" -> result.success(audioManager()?.getDevices(AudioManager.GET_DEVICES_INPUTS)?.firstOrNull { it.type == AudioDeviceInfo.TYPE_BUILTIN_MIC }?.id ?: -1)
                 "hasExternal" -> result.success(audioManager()?.let { hasA2dp(it) || hasWired(it) } ?: false)
                 "prepare" -> {
                     val am = audioManager()
                     val external = am != null && (hasA2dp(am) || hasWired(am))
                     val ok = external && synchronized(lock) { commActive || enterComm() }
-                    result.success(if (ok) routeName() else "")
+                    result.success(ok)
                 }
                 "position" -> result.success(position())
                 "volume" -> {
@@ -177,24 +176,6 @@ class AmbientAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
             leaveComm()
             return false
         }
-    }
-
-    private fun inputRoute(): String {
-        val am = audioManager() ?: return "none"
-        return try {
-            am.activeRecordingConfigurations.joinToString("; ") {
-                val d = it.audioDevice
-                "src=${it.clientAudioSource} dev=${d?.type ?: -1} ${d?.productName ?: ""} rate=${it.clientFormat.sampleRate}"
-            }.ifEmpty { "no active recording" }
-        } catch (e: Exception) { "error ${e.message}" }
-    }
-
-    private fun routeName(): String {
-        val am = audioManager() ?: return "none"
-        return try {
-            val d = if (Build.VERSION.SDK_INT >= 31) am.communicationDevice else null
-            "type=${d?.type ?: -1} ${d?.productName ?: ""}"
-        } catch (_: Exception) { "unknown" }
     }
 
     private fun leaveComm() {

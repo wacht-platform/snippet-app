@@ -27,8 +27,7 @@ abstract class AmbientSink {
   Future<bool> inCall();
   Future<bool> hasExternal();
   Future<int> builtinMicId();
-  Future<String> inputRoute();
-  Future<String> prepare();
+  Future<bool> prepare();
   Future<void> leave();
 }
 
@@ -69,11 +68,9 @@ class _ChannelSink implements AmbientSink {
   @override
   Future<int> builtinMicId() async => await _c.invokeMethod<int>('builtinMicId') ?? -1;
   @override
-  Future<String> inputRoute() async => await _c.invokeMethod<String>('inputRoute') ?? '';
-  @override
   Future<bool> hasExternal() async => await _c.invokeMethod<bool>('hasExternal') == true;
   @override
-  Future<String> prepare() async => await _c.invokeMethod<String>('prepare') ?? '';
+  Future<bool> prepare() async => await _c.invokeMethod<bool>('prepare') == true;
   @override
   Future<void> leave() => _c.invokeMethod('leave');
 }
@@ -111,11 +108,9 @@ class _NullSink implements AmbientSink {
   @override
   Future<int> builtinMicId() async => -1;
   @override
-  Future<String> inputRoute() async => '';
-  @override
   Future<bool> hasExternal() async => false;
   @override
-  Future<String> prepare() async => '';
+  Future<bool> prepare() async => false;
   @override
   Future<void> leave() async {}
 }

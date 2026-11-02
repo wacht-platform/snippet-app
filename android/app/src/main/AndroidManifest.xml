@@ -16,7 +16,7 @@
         android:maxSdkVersion="29" tools:replace="android:maxSdkVersion"/>
     <application
         android:label="snippet"
-        android:name=".SnippetApplication"
+        android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:usesCleartextTraffic="true">
         <service

@@ -9,11 +9,12 @@ import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'diagnostics.dart';
-
 import 'segment.dart';
 import 'stream.dart';
 import 'wav.dart';
+
+String redactToken(String text) =>
+    text.replaceAll(RegExp(r'token=[^&\s,)\]]+'), 'token=…');
 
 String newSegmentId() {
   final random = Random.secure();
@@ -229,9 +230,7 @@ class AmbientUploader {
           (jsonDecode(response.body) as Map<String, dynamic>)['held'] == false) {
         await _giveUp();
       }
-    } catch (e) {
-      await AmbientDiagnostics.log('heartbeat failed: $e');
-    }
+    } catch (_) {}
   }
 
   Future<void> _giveUp() async {
@@ -247,7 +246,7 @@ class AmbientUploader {
 
   Future<void> enqueue(AmbientSegment segment) {
     final next = _writes.then((_) => _write(segment)).catchError((Object e) {
-      lastError.value = 'Could not save a segment: ${AmbientDiagnostics.redact('$e')}';
+      lastError.value = 'Could not save a segment: ${redactToken('$e')}';
     });
     _writes = next;
     return next;
@@ -395,7 +394,7 @@ class AmbientUploader {
           : 'Upload failed (${response.code})';
       return false;
     } catch (e) {
-      lastError.value = 'Upload failed: ${AmbientDiagnostics.redact('$e')}';
+      lastError.value = 'Upload failed: ${redactToken('$e')}';
       return false;
     }
   }

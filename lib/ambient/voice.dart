@@ -4,7 +4,6 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
-import 'diagnostics.dart';
 import 'sink.dart';
 import 'stream.dart';
 
@@ -93,9 +92,7 @@ class AmbientVoice {
         case 'ambient_speech_interrupt':
           unawaited(stopStream());
       }
-    } catch (e) {
-      AmbientDiagnostics.log('voice: bad frame $e');
-    }
+    } catch (_) {}
   }
 
   void attach(AmbientStream duplex) {
@@ -146,9 +143,7 @@ class AmbientVoice {
     st.lastFrame = DateTime.now();
     unawaited(_sink.enqueueFrame(turn, data).then((_) {
       if (_streamDead.contains(turn)) unawaited(_sink.stopStream(turn));
-    }).catchError((Object e) {
-      AmbientDiagnostics.log('voice: stream frame failed $e');
-    }));
+    }).catchError((Object _) {}));
   }
 
   void _streamChanged() {
@@ -172,9 +167,7 @@ class AmbientVoice {
       Map<String, dynamic> pos = const {};
       try {
         pos = await _sink.streamPosition();
-      } catch (e) {
-        AmbientDiagnostics.log('voice: stream position failed $e');
-      }
+      } catch (_) {}
       final played = _playedMap(pos);
       final heard = pos['turn'] as int? ?? -1;
       final active = pos['active'] == 1;
@@ -201,7 +194,6 @@ class AmbientVoice {
           continue;
         }
         if (!st.ended && caughtUp && !(active && heard == turn) && now.difference(st.lastFrame) > quietLimit) {
-          AmbientDiagnostics.log('voice: stream turn $turn stalled at ${ms}ms');
           _duplex?.ttsPos(turn, ms, false);
           _endStream(turn);
           continue;
@@ -233,7 +225,6 @@ class AmbientVoice {
           final generation = st.pauseGeneration;
           Timer(const Duration(seconds: 3), () => _resumeLocal(st, entry.key, generation));
           await _sink.pauseTts();
-          unawaited(AmbientDiagnostics.log('voice: local TTS pause turn ${entry.key}'));
         }
       } else if (st.locallyPaused && st.speechEndedAt == null) {
         st.speechEndedAt = DateTime.now();
@@ -246,22 +237,16 @@ class AmbientVoice {
   Future<void> _resumeLocal(_StreamTurn st, int turn, int generation) async {
     if (!st.locallyPaused || st.pauseGeneration != generation || _streamDead.contains(turn)) return;
     if (st.speechEndedAt == null && DateTime.now().difference(st.pauseStarted!) < const Duration(seconds: 3)) return;
-    final elapsed = DateTime.now().difference(st.pauseStarted ?? DateTime.now()).inMilliseconds;
     st.locallyPaused = false;
     st.pauseTimer?.cancel();
     await _sink.resumeTts();
     await _sink.volume(1);
-    unawaited(AmbientDiagnostics.log('voice: local TTS resume turn $turn after ${elapsed}ms'));
   }
 
   Future<void> stopStream([int turn = 0]) async {
     final stopped = turn == 0 ? _streams.keys.toList() : [turn];
     for (final t in stopped) {
       final st = _streams[t];
-      if (st?.locallyPaused == true) {
-        final elapsed = DateTime.now().difference(st!.pauseStarted ?? DateTime.now()).inMilliseconds;
-        unawaited(AmbientDiagnostics.log('voice: server TTS stop turn $t after ${elapsed}ms local pause'));
-      }
       st?.pauseGeneration++;
       st?.pauseTimer?.cancel();
       st?.locallyPaused = false;
@@ -271,9 +256,7 @@ class AmbientVoice {
     Map<String, dynamic> pos = const {};
     try {
       pos = await _sink.stopStream(turn, fadeMs: 25);
-    } catch (e) {
-      AmbientDiagnostics.log('voice: stream stop failed $e');
-    }
+    } catch (_) {}
     final played = _playedMap(pos);
     for (final t in stopped) {
       _duplex?.ttsPos(t, played[t] ?? 0, false);

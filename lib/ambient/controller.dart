@@ -10,7 +10,6 @@ import '../models.dart';
 import '../platform.dart';
 import 'capture.dart';
 import 'voice.dart';
-import 'diagnostics.dart';
 import 'hold.dart';
 import 'uploader.dart';
 
@@ -25,14 +24,12 @@ class _AmbientTaskHandler extends TaskHandler {
 
   @override
   Future<void> onStart(DateTime timestamp, TaskStarter starter) async {
-    await AmbientDiagnostics.log('service started (${starter.name})');
     try {
       final url = await FlutterForegroundTask.getData<String>(key: 'ambient_url');
       final token = await FlutterForegroundTask.getData<String>(key: 'ambient_token');
       final device = await FlutterForegroundTask.getData<String>(key: 'ambient_device');
       final label = await FlutterForegroundTask.getData<String>(key: 'ambient_label');
       if (url == null || token == null) {
-        await AmbientDiagnostics.log('service has no server details, stopping');
         await FlutterForegroundTask.stopService();
         return;
       }
@@ -53,13 +50,10 @@ class _AmbientTaskHandler extends TaskHandler {
           );
         }
       });
-      await AmbientDiagnostics.log('starting capture');
       await capture.start();
-      await AmbientDiagnostics.log('capture running');
-    } catch (e, st) {
-      await AmbientDiagnostics.log('service failed to start: $e\n$st');
+    } catch (e) {
       FlutterForegroundTask.sendDataToMain(
-          AmbientStatus(error: 'Could not start listening: ${AmbientDiagnostics.redact('$e')}').toMap());
+          AmbientStatus(error: 'Could not start listening: ${redactToken('$e')}').toMap());
       await FlutterForegroundTask.stopService();
     }
   }
@@ -167,14 +161,13 @@ class AmbientController extends ChangeNotifier {
     try {
       await client.claimAmbientLease(deviceId, deviceLabel);
     } catch (e) {
-      return 'Could not claim listening: ${AmbientDiagnostics.redact('$e')}';
+      return 'Could not claim listening: ${redactToken('$e')}';
     }
     if (_android) {
       final notifications = await FlutterForegroundTask.checkNotificationPermission();
       if (notifications != NotificationPermission.granted) {
         await FlutterForegroundTask.requestNotificationPermission();
       }
-      await AmbientDiagnostics.log('start requested');
       await FlutterForegroundTask.saveData(key: 'ambient_url', value: client.baseUrl);
       await FlutterForegroundTask.saveData(key: 'ambient_token', value: client.token);
       await FlutterForegroundTask.saveData(key: 'ambient_device', value: deviceId);
@@ -212,7 +205,7 @@ class AmbientController extends ChangeNotifier {
       await _localSub?.cancel();
       await _local?.dispose();
       _local = null;
-      return 'Could not start listening: ${AmbientDiagnostics.redact('$e')}';
+      return 'Could not start listening: ${redactToken('$e')}';
     }
   }
 
