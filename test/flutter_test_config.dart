@@ -30,6 +30,16 @@ Future<void> _loadBundledFonts() async {
     'Geist': 'Geist',
     'Literata': 'Literata',
   };
+  for (final pkg in const [
+    ('packages/lucide_icons_flutter/lucide', 'packages/lucide_icons_flutter/assets/lucide.ttf'),
+    ('packages/hugeicons/HugeIconsStrokeRounded', 'packages/hugeicons/assets/fonts/HugeIcons-Stroke-Rounded.otf'),
+  ]) {
+    try {
+      final data = await rootBundle.load(pkg.$2);
+      final loader = FontLoader(pkg.$1)..addFont(Future.value(data));
+      await loader.load();
+    } catch (_) {}
+  }
   for (final entry in families.entries) {
     final loader = FontLoader(entry.key);
     for (final weight in const [400, 500, 600, 700]) {

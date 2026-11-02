@@ -390,35 +390,64 @@ class _AgentWakePanelState extends State<AgentWakePanel> {
           ),
         _wakeSection(),
         if (widget.agent != null) ...[
-          const SizedBox(height: S.s12),
+          _divider(),
           _contextSection(),
         ],
-        const SizedBox(height: S.s12),
+        _divider(),
         _warmSection(),
       ],
     ));
   }
 
-  Widget _head(String text, {Widget? trailing}) => Padding(
-        padding: const EdgeInsets.fromLTRB(S.s4, 0, S.s4, S.s6),
+  Widget _divider() => Padding(
+        padding: const EdgeInsets.symmetric(vertical: S.s12),
+        child: Divider(height: 1, thickness: 1, color: AppColors.border),
+      );
+
+  Widget _head(String text, {String? icon, Widget? trailing}) => Padding(
+        padding: const EdgeInsets.fromLTRB(S.s4, 0, S.s4, S.s8),
         child: Row(children: [
-          Expanded(child: Text(text, style: TS.label(AppColors.fg2))),
+          if (icon != null) ...[
+            AppIcon(icon, size: 14, color: AppColors.fg3),
+            const SizedBox(width: S.s8),
+          ],
+          Expanded(
+              child: Text(text,
+                  style: sans(13, weight: FontWeight.w600, color: AppColors.fg1))),
           if (trailing != null) trailing,
         ]),
       );
 
+  Widget _actionLink(String label, VoidCallback onTap, {String? icon}) =>
+      GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 2, horizontal: S.s4),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            if (icon != null) ...[
+              AppIcon(icon, size: 12, color: AppColors.accent),
+              const SizedBox(width: 4),
+            ],
+            Text(label,
+                style: sans(12.5,
+                    weight: FontWeight.w500, color: AppColors.accent)),
+          ]),
+        ),
+      );
+
   Widget _line(String label, String value, {Color? color, Key? key}) => Padding(
         key: key,
-        padding: const EdgeInsets.symmetric(horizontal: S.s4, vertical: 3),
+        padding: const EdgeInsets.symmetric(horizontal: S.s4, vertical: 3.5),
         child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
           SizedBox(
-              width: 76,
-              child: Text(label, style: sans(13, color: AppColors.fg4))),
+              width: 82,
+              child: Text(label, style: sans(12.5, color: AppColors.fg4))),
           Expanded(
               child: Text(value,
                   maxLines: 3,
                   overflow: TextOverflow.ellipsis,
-                  style: sans(13, color: color ?? AppColors.fg1))),
+                  style: sans(12.5, color: color ?? AppColors.fg1))),
         ]),
       );
 
@@ -426,25 +455,24 @@ class _AgentWakePanelState extends State<AgentWakePanel> {
     final w = _wake;
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       _head('Wakes and reporting',
+          icon: 'scheduled',
           trailing: _editing
               ? null
-              : GestureDetector(
-                  onTap: _startEdit,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: S.s4),
-                    child: Text(w == null ? 'Set schedule' : 'Edit',
-                        style: sans(13, color: AppColors.accent)),
-                  ),
+              : _actionLink(
+                  w == null ? 'Set schedule' : 'Edit',
+                  _startEdit,
+                  icon: w == null ? 'plus' : 'edit',
                 )),
       if (w == null && !_editing)
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: S.s4),
           child: Text(
               'No wake schedule. A wake gives ${widget.name} a brief on a timetable and reports back.',
-              style: sans(13, color: AppColors.fg3)),
+              style: sans(12.5, color: AppColors.fg3, height: 1.45)),
         ),
       if (w != null && !_editing) ...[
-        _line('Schedule', w.scheduleText.isEmpty ? w.schedule : w.scheduleText,
+        _line('Schedule',
+            w.scheduleText.isEmpty ? w.schedule : w.scheduleText,
             key: const ValueKey('wake-schedule')),
         if (w.brief.isNotEmpty) _line('Brief', w.brief),
         _line('Quiet hours', w.quietHours?.label ?? 'None'),
@@ -472,16 +500,24 @@ class _AgentWakePanelState extends State<AgentWakePanel> {
           _line('Result', w.lastResult!),
         _line('Today', '${w.runsLastDay} of ${w.maxRunsPerDay} runs'),
         const SizedBox(height: S.s4),
-        AppToggle(
-            on: w.enabled,
-            onChanged: _toggleWake,
-            label: 'Wake enabled',
-            sub: w.setBy.isEmpty ? null : 'Set by ${w.setBy}'),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: S.s4),
+          child: AppToggle(
+              flat: true,
+              on: w.enabled,
+              onChanged: _toggleWake,
+              label: 'Wake enabled',
+              sub: w.setBy.isEmpty ? null : 'Set by ${w.setBy}'),
+        ),
       ],
       Reveal(show: _editing, child: _form()),
       if (_runs.isNotEmpty && !_editing) ...[
         const SizedBox(height: S.s8),
-        _head('Recent runs'),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(S.s4, 0, S.s4, S.s4),
+          child: Text('Recent runs',
+              style: sans(11.5, weight: FontWeight.w600, color: AppColors.fg3)),
+        ),
         for (final r in _runs) _runRow(r),
       ],
     ]);
@@ -566,12 +602,14 @@ class _AgentWakePanelState extends State<AgentWakePanel> {
       ),
       const SizedBox(height: S.s8),
       AppToggle(
+          flat: true,
           on: _onlyOnChange,
           onChanged: (v) => setState(() => _onlyOnChange = v),
           label: 'Report only on change',
           sub: 'Skip reports when nothing is new'),
-      const SizedBox(height: S.s8),
+      const SizedBox(height: S.s4),
       AppToggle(
+          flat: true,
           on: _enabled,
           onChanged: (v) => setState(() => _enabled = v),
           label: 'Enabled'),
@@ -629,23 +667,30 @@ class _AgentWakePanelState extends State<AgentWakePanel> {
         if (h >= 1 && h <= _warmLimits.maxIdleHoursCeiling) h
     }.toList()
       ..sort();
+    final statusText = reason ??
+        (w?.lastWarmAt != null
+            ? 'Warmed ${wakeWhen(w!.lastWarmAt!)}${w.lastCacheReadTokens == null ? '' : ', ${tokensLabel(w.lastCacheReadTokens!)} tokens read from cache'}.'
+            : 'Most providers cannot be warmed. If this one cannot, the reason appears here.');
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      _head('Keep warm'),
-      AppToggle(
-          on: on,
-          onChanged: _setWarm,
-          label: 'Keep prompt cache warm',
-          sub: 'Pings the idle session so its cached prefix is not re-billed'),
+      _head('Keep warm', icon: 'activity'),
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: S.s4),
+        child: AppToggle(
+            flat: true,
+            on: on,
+            onChanged: _setWarm,
+            label: 'Keep prompt cache warm',
+            sub: 'Pings the idle session so its cached prefix is not re-billed'),
+      ),
       Padding(
         key: const ValueKey('warm-reason'),
-        padding: const EdgeInsets.fromLTRB(S.s4, S.s6, S.s4, 0),
+        padding: const EdgeInsets.fromLTRB(S.s4, S.s4, S.s4, 0),
         child: Text(
-            reason ??
-                (w?.lastWarmAt != null
-                    ? 'Warmed ${wakeWhen(w!.lastWarmAt!)}${w.lastCacheReadTokens == null ? '' : ', ${tokensLabel(w.lastCacheReadTokens!)} tokens read from cache'}.'
-                    : 'Most providers cannot be warmed. If this one cannot, the reason appears here.'),
-            style: sans(12.5,
-                color: reason != null ? AppColors.fg2 : AppColors.fg4)),
+          statusText,
+          style: sans(12,
+              color: reason != null ? AppColors.fg2 : AppColors.fg4,
+              height: 1.4),
+        ),
       ),
       Reveal(
         show: w != null && on,
@@ -655,7 +700,7 @@ class _AgentWakePanelState extends State<AgentWakePanel> {
             builder: (ctx) => ListRow(
               title: 'Ping every',
               trailing: Text('${w?.intervalMinutes ?? 0} min',
-                  style: sans(13, color: AppColors.fg3)),
+                  style: mono(12.5, color: AppColors.fg2)),
               onTap: () => _pickWarmNumber(ctx, true, ints),
             ),
           ),
@@ -663,7 +708,7 @@ class _AgentWakePanelState extends State<AgentWakePanel> {
             builder: (ctx) => ListRow(
               title: 'Stop after idle for',
               trailing: Text('${w?.maxIdleHours ?? 0} h',
-                  style: sans(13, color: AppColors.fg3)),
+                  style: mono(12.5, color: AppColors.fg2)),
               onTap: () => _pickWarmNumber(ctx, false, idles),
             ),
           ),
@@ -674,16 +719,41 @@ class _AgentWakePanelState extends State<AgentWakePanel> {
 
   Widget _contextSection() {
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      _head('Context length'),
+      _head('Context length', icon: 'layers'),
       Builder(
-        builder: (ctx) => ListRow(
-          title: 'Compact above',
-          subtitle: 'Smaller ceilings compact sooner and cost less per turn',
-          trailing: Text(
-              _context == null ? 'Model window' : tokensLabel(_context!),
-              key: const ValueKey('context-value'),
-              style: sans(13, color: AppColors.fg3)),
+        builder: (ctx) => GestureDetector(
           onTap: () => _editContext(ctx),
+          behavior: HitTestBehavior.opaque,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: S.s4, vertical: S.s4),
+            child: Row(children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Compact above',
+                        style: sans(13.5,
+                            weight: FontWeight.w500, color: AppColors.fg1)),
+                    const SizedBox(height: 3),
+                    Text(
+                      'Smaller ceilings compact sooner and cost less per turn',
+                      style: sans(12.5, color: AppColors.fg3, height: 1.38),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: S.s12),
+              Row(mainAxisSize: MainAxisSize.min, children: [
+                Text(
+                  _context == null ? 'Model window' : tokensLabel(_context!),
+                  key: const ValueKey('context-value'),
+                  style: mono(12.5, color: AppColors.fg2),
+                ),
+                const SizedBox(width: 4),
+                AppIcon('chevron-right', size: 14, color: AppColors.fg4),
+              ]),
+            ]),
+          ),
         ),
       ),
     ]);
