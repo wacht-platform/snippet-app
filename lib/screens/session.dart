@@ -644,6 +644,7 @@ class _SessionScreenState extends State<SessionScreen>
   // (1) a fresh connection resends anything still unacked against the authoritative
   // snapshot; (2) a watchdog forces a resync if _pending doesn't clear in time.
   bool _freshConn = false;
+  bool _serverSupportsHeartbeat = false;
 
   /// Hidden / backgrounded: no attach socket. Background watching is the
   /// per-instance `/events` notify path, not a live transcript attach.
@@ -869,6 +870,10 @@ class _SessionScreenState extends State<SessionScreen>
     _agentEventsSub?.cancel();
     _agentEventsSub = widget.client.events().stream.listen((raw) {
       if (!mounted || _closed) return;
+      if (!_parked && _channel == null) {
+        _reconnectAttempt = 0;
+        _connect();
+      }
       final Map<String, dynamic> frame;
       try {
         final decoded = jsonDecode(raw as String);
@@ -876,6 +881,13 @@ class _SessionScreenState extends State<SessionScreen>
         frame = decoded.cast<String, dynamic>();
       } catch (_) {
         return;
+      }
+      if (frame['session']?.toString() == widget.sessionId &&
+          !_parked &&
+          _channel != null) {
+        try {
+          _channel!.sink.add('{"kind":"ping"}');
+        } catch (_) {}
       }
       final entry = _agentEventFor(frame);
       if (entry == null) return;
@@ -1016,19 +1028,27 @@ class _SessionScreenState extends State<SessionScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.paused ||
-        state == AppLifecycleState.hidden ||
-        state == AppLifecycleState.detached) {
-      // Drop the live attach while backgrounded. The per-instance `/events`
-      // watcher is what notifies — not a transcript socket per open chat.
+    if (state == AppLifecycleState.detached ||
+        (kMobile && state == AppLifecycleState.paused)) {
+      // Drop the live attach while backgrounded on mobile. Desktop windows stay
+      // visible beside other apps, so never park an active desktop tab on blur.
       _park();
       return;
     }
-    if (state == AppLifecycleState.resumed && !_closed) {
-      if (!_githubKnown) _loadGithubStatus();
+    if ((state == AppLifecycleState.resumed ||
+            state == AppLifecycleState.inactive) &&
+        !_closed) {
+      if (!_githubKnown && state == AppLifecycleState.resumed) {
+        _loadGithubStatus();
+      }
       if (widget.acceptDrops) {
-        _unpark();
-        _loadModel();
+        if (_parked) {
+          _unpark();
+        } else if (_channel == null) {
+          _reconnectAttempt = 0;
+          _connect();
+        }
+        if (state == AppLifecycleState.resumed) _loadModel();
       } else if (_pending.isNotEmpty || _optimisticQueued.isNotEmpty) {
         _unpark();
       }

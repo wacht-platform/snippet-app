@@ -15,20 +15,15 @@ extension _SessionScreenSocketExt on _SessionScreenState {
     _channel?.sink.close();
     if (mounted) _setState(() => _connError = null);
     _freshConn = true;
+    _serverSupportsHeartbeat = false;
     _decodeQueue = null;
     final ch = widget.client.attach(widget.sessionId);
     _channel = ch;
-    _connectionWatchdog?.cancel();
-    _connectionWatchdog = Timer(Duration(seconds: _state == null ? 4 : 12), () {
-      if (!_closed && identical(ch, _channel)) {
-        _resync(ch);
-      }
-    });
+    _armLivenessWatchdog(ch, initial: true);
     _sub = ch.stream.listen(
       (msg) {
         if (!identical(ch, _channel)) return; // stale socket — ignore
-        _connectionWatchdog?.cancel();
-        _connectionWatchdog = null;
+        _armLivenessWatchdog(ch);
         // Any frame means a healthy socket — reset backoff + clear the banner.
         if (_reconnectAttempt != 0 || _connError != null) {
           _reconnectAttempt = 0;
@@ -88,6 +83,13 @@ extension _SessionScreenSocketExt on _SessionScreenState {
       // fromJson wiped the transcript to empty until the next real state
       // frame (often only after a TUI-side persist).
       final wire = j['wire'] as String? ?? 'snapshot';
+      if (wire == 'hb') {
+        _serverSupportsHeartbeat = true;
+        return;
+      }
+      if (j['total_events'] is int) {
+        _serverSupportsHeartbeat = true;
+      }
       if (wire == 'history') {
         final rawEvents = j['events'];
         final older = rawEvents is List
@@ -194,9 +196,14 @@ extension _SessionScreenSocketExt on _SessionScreenState {
           : HarnessState.fromJson(j);
       // Drift check: our event log must line up with the server's count — a
       // mismatch (dropped/bad frame) resyncs via reconnect, since a fresh
-      // socket's first frame is always a full snapshot.
+      // socket's first frame is always a full snapshot. Account for older
+      // history pages prepended onto `next.events` (`_transcriptStart`).
+      final totalEvents = j['total_events'];
       final ec = j['event_count'];
-      if (wire == 'delta' && ec is int && next.events.length != ec) {
+      final expectedLen = totalEvents is int
+          ? (totalEvents - _transcriptStart)
+          : (ec is int ? ec : next.events.length);
+      if (wire == 'delta' && next.events.length != expectedLen) {
         _resync(ch);
         return;
       }
@@ -383,6 +390,32 @@ extension _SessionScreenSocketExt on _SessionScreenState {
     }
   }
 
+  void _armLivenessWatchdog(WebSocketChannel ch, {bool initial = false}) {
+    _connectionWatchdog?.cancel();
+    final wait = initial
+        ? Duration(seconds: _state == null ? 4 : 8)
+        : const Duration(seconds: 8);
+    _connectionWatchdog = Timer(wait, () {
+      if (_closed || _parked || !identical(ch, _channel)) return;
+      if (initial) {
+        _resync(ch);
+        return;
+      }
+      try {
+        ch.sink.add('{"kind":"ping"}');
+      } catch (_) {
+        _resync(ch);
+        return;
+      }
+      if (!_serverSupportsHeartbeat) return;
+      _connectionWatchdog = Timer(const Duration(seconds: 3), () {
+        if (!_closed && !_parked && identical(ch, _channel)) {
+          _resync(ch);
+        }
+      });
+    });
+  }
+
   // Tear down this socket and rejoin — the fresh connection opens with a full
   // snapshot, which reconciles any local drift.
   void _resync(WebSocketChannel ch) {
@@ -391,16 +424,18 @@ extension _SessionScreenSocketExt on _SessionScreenState {
     _scheduleReconnect(ch);
   }
 
-  // Reconnect with exponential backoff (1,2,4,8,15,30s). Deduped so onError+onDone
-  // don't double-schedule; reset to 0 on any healthy frame or app-resume. Only the
-  // CURRENT channel may schedule — a detached socket's late onDone is ignored.
+  // Reconnect with fast initial retry (200ms, 800ms, 2s, 4s, 8s, 12s). Deduped
+  // so onError+onDone don't double-schedule; reset to 0 on any healthy frame or
+  // app-resume. Only the CURRENT channel may schedule.
   void _scheduleReconnect(WebSocketChannel ch) {
     if (_closed || _parked) return;
     if (!identical(ch, _channel)) return; // stale socket
     if (_reconnectTimer?.isActive ?? false) return; // already pending
+    _connectionWatchdog?.cancel();
+    _connectionWatchdog = null;
     _channel = null;
-    const steps = [1, 2, 4, 8, 15, 30];
-    final delay = steps[_reconnectAttempt.clamp(0, steps.length - 1)];
+    const stepsMs = [200, 800, 2000, 4000, 8000, 12000];
+    final delayMs = stepsMs[_reconnectAttempt.clamp(0, stepsMs.length - 1)];
     _reconnectAttempt++;
     // Delay the banner briefly so transient handoffs do not flash a warning.
     _bannerTimer?.cancel();
@@ -409,7 +444,7 @@ extension _SessionScreenSocketExt on _SessionScreenState {
         _setState(() => _connError = 'Reconnecting…');
       }
     });
-    _reconnectTimer = Timer(Duration(seconds: delay), () {
+    _reconnectTimer = Timer(Duration(milliseconds: delayMs), () {
       if (!_closed) _connect();
     });
   }
@@ -476,6 +511,6 @@ extension _SessionScreenSocketExt on _SessionScreenState {
   }
 }
 
-const int _kInlineDecodeLimit = 64 * 1024;
+const int _kInlineDecodeLimit = 256 * 1024;
 
 Object? _decodeFrame(String raw) => jsonDecode(raw);
