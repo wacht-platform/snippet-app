@@ -271,17 +271,43 @@ Map<String, dynamic> notificationDestination(
     String url, Map<String, dynamic> event) {
   final destination =
       (event['destination'] as Map?)?.cast<String, dynamic>() ?? {};
+  final kind = event['kind']?.toString() ?? '';
+  final rawTitle = event['title']?.toString().trim() ?? '';
+  final title = rawTitle.isNotEmpty
+      ? rawTitle
+      : (kind == 'direct_message.sent' || kind == 'task.message'
+          ? 'Message'
+          : event['title']);
+  final nestedPayload = event['payload'];
+  final nestedBody = nestedPayload is Map ? nestedPayload['body'] : null;
+  final rawBody = event['body'] ?? event['message'] ?? nestedBody;
+  final body =
+      (rawBody == null || '$rawBody'.trim().isEmpty) && kind == 'idle'
+          ? _stoppedSummary(event['lanes_running'])
+          : rawBody;
   return {
     'url': url,
     'notification_id': event['notification_id'],
-    'title': event['title'],
+    'title': title,
     'kind': event['kind'],
-    'body': event['body'] ?? event['message'],
+    'body': body,
     'destination': destination,
+    if (event['created_at'] != null) 'created_at': event['created_at'],
     if (event['workspace'] != null) 'workspace': event['workspace'],
     if (event['attention'] is Map) 'attention': event['attention'],
     'session': destination['type'] == 'session'
         ? destination['id']
         : destination['session'] ?? event['session']
   };
+}
+
+String _stoppedSummary(Object? lanes) {
+  final names = lanes is List
+      ? lanes.map((l) => l.toString().trim()).where((l) => l.isNotEmpty).toList()
+      : const <String>[];
+  if (names.isEmpty) return 'Finished · standing by';
+  if (names.length == 1) return 'Paused while a lane works: ${names.first}';
+  final shown = names.take(2).join(', ');
+  final rest = names.length > 2 ? ' +${names.length - 2}' : '';
+  return 'Paused while ${names.length} lanes work: $shown$rest';
 }

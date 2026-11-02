@@ -57,7 +57,10 @@ String plainPreview(String raw) => raw
     .join(' · ');
 
 String _ago(Object? createdAt) {
-  final t = DateTime.tryParse('${createdAt ?? ''}');
+  final DateTime? t = switch (createdAt) {
+    final int s => DateTime.fromMillisecondsSinceEpoch(s * 1000),
+    _ => DateTime.tryParse('${createdAt ?? ''}'),
+  };
   if (t == null) return '';
   final d = DateTime.now().difference(t);
   if (d.inMinutes < 1) return 'now';
