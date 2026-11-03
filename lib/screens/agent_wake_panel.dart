@@ -109,6 +109,7 @@ class _AgentWakePanelState extends State<AgentWakePanel> {
   WakeSchedule? _wake;
   WakeLimits _wakeLimits = const WakeLimits();
   List<WakeRun> _runs = const [];
+  List<TaskItem> _tasks = const [];
   KeepWarmEntry? _warm;
   KeepWarmLimits _warmLimits = const KeepWarmLimits();
   int? _context;
@@ -160,6 +161,7 @@ class _AgentWakePanelState extends State<AgentWakePanel> {
       final lists = await Future.wait<Object?>([
         c.wakes().then<Object?>((l) => l.limits).catchError((_) => null),
         c.keepWarm().then<Object?>((l) => l.limits).catchError((_) => null),
+        c.tasks().then<Object?>((t) => t).catchError((_) => const <TaskItem>[]),
       ]);
       if (!mounted) return;
       setState(() {
@@ -168,6 +170,7 @@ class _AgentWakePanelState extends State<AgentWakePanel> {
         _warm = warm;
         _wakeLimits = lists[0] as WakeLimits? ?? _wakeLimits;
         _warmLimits = lists[1] as KeepWarmLimits? ?? _warmLimits;
+        _tasks = lists[2] as List<TaskItem>? ?? const [];
         _loading = false;
         _error = null;
       });
@@ -289,7 +292,93 @@ class _AgentWakePanelState extends State<AgentWakePanel> {
               selected: v == _reportTo),
       ],
     );
-    if (picked != null && mounted) setState(() => _reportTo = picked);
+    if (picked != null && mounted) {
+      setState(() => _reportTo = picked);
+      if (picked == 'task_room' && _taskId.text.trim().isEmpty && _tasks.isNotEmpty) {
+        final active = _tasks.where((t) => !t.status.isTerminal).toList();
+        final first = active.isNotEmpty ? active.first : _tasks.first;
+        setState(() => _taskId.text = first.id);
+      }
+    }
+  }
+
+  String _selectedTaskLabel() {
+    final id = _taskId.text.trim();
+    if (id.isEmpty) return 'Select task…';
+    for (final t in _tasks) {
+      if (t.id == id) return t.title.isNotEmpty ? t.title : t.id;
+    }
+    return id.length > 12 ? '${id.substring(0, 8)}…' : id;
+  }
+
+  Future<void> _pickTask(BuildContext anchor) async {
+    final current = _taskId.text.trim();
+    final open = _tasks.where((t) => !t.status.isTerminal).toList();
+    final closed = _tasks.where((t) => t.status.isTerminal).take(8).toList();
+    final ordered = [...open, ...closed];
+    if (ordered.isEmpty) {
+      final manual = await promptText(
+        context,
+        title: 'Task ID',
+        initial: current,
+        hint: 'Task ID for wake reports',
+        anchored: true,
+      );
+      if (manual != null && mounted) {
+        setState(() => _taskId.text = manual.trim());
+      }
+      return;
+    }
+    final picked = await showAppMenu<String>(
+      context,
+      anchor: anchor,
+      minWidth: 260,
+      maxWidth: 340,
+      items: [
+        if (open.isNotEmpty) appMenuHeading<String>('Open tasks'),
+        for (final t in open)
+          appMenuRow<String>(
+            value: t.id,
+            icon: 'task',
+            label: t.title.isEmpty ? t.id : t.title,
+            description:
+                '${t.status.label} · ${t.id.length > 8 ? t.id.substring(0, 8) : t.id}',
+            selected: t.id == current,
+          ),
+        if (closed.isNotEmpty) appMenuHeading<String>('Recent tasks'),
+        for (final t in closed)
+          appMenuRow<String>(
+            value: t.id,
+            icon: 'check-circle',
+            label: t.title.isEmpty ? t.id : t.title,
+            description:
+                '${t.status.label} · ${t.id.length > 8 ? t.id.substring(0, 8) : t.id}',
+            selected: t.id == current,
+          ),
+        const PopupMenuDivider(height: 9),
+        appMenuRow<String>(
+          value: '__custom__',
+          icon: 'edit',
+          label: 'Enter task ID…',
+          description: 'Paste a task ID manually',
+        ),
+      ],
+    );
+    if (picked == null || !mounted) return;
+    if (picked == '__custom__') {
+      final manual = await promptText(
+        context,
+        title: 'Task ID',
+        initial: current,
+        hint: 'Task ID for wake reports',
+        anchored: true,
+      );
+      if (manual != null && mounted) {
+        setState(() => _taskId.text = manual.trim());
+      }
+      return;
+    }
+    setState(() => _taskId.text = picked);
   }
 
   Future<void> _setWarm(bool on) async {
@@ -595,9 +684,29 @@ class _AgentWakePanelState extends State<AgentWakePanel> {
       Reveal(
         show: _reportTo == 'task_room',
         child: Padding(
-          padding: const EdgeInsets.only(top: S.s8),
-          child: AppField(
-              label: 'Task id', controller: _taskId, mono: true, hint: 'T-123'),
+          padding: const EdgeInsets.only(top: S.s4),
+          child: Builder(
+            builder: (ctx) => ListRow(
+              title: 'Task',
+              trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 180),
+                  child: Text(
+                    _selectedTaskLabel(),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: sans(13,
+                        color: _taskId.text.trim().isEmpty
+                            ? AppColors.fg4
+                            : AppColors.fg2),
+                  ),
+                ),
+                const SizedBox(width: S.s6),
+                AppIcon('chevron-down', size: 15, color: AppColors.fg4),
+              ]),
+              onTap: () => _pickTask(ctx),
+            ),
+          ),
         ),
       ),
       const SizedBox(height: S.s8),

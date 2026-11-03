@@ -643,6 +643,12 @@ class SettingsPanelState extends State<SettingsPanel> {
           nav(SettingsPage.webSearch, 'Web search', 'Let agents search the web',
               'globe'),
         ]),
+        label('Appearance'),
+        ListGroup(children: const [
+          ThemePickerRow(),
+          FontPickerRow(),
+          MonoFontPickerRow(),
+        ]),
         if (kCanNotify) ...[
           label('Phone'),
           ListGroup(children: [_notifRow()]),
@@ -1226,6 +1232,16 @@ class SettingsPanelState extends State<SettingsPanel> {
             padding: EdgeInsets.fromLTRB(S.s4, 0, S.s4, S.s6)),
         ListGroup(children: [ApprovalsRow(client: widget.client)]),
       ],
+      if (includeNotifications) ...[
+        const SizedBox(height: S.s24),
+        const SectionHeader('Appearance',
+            padding: EdgeInsets.fromLTRB(S.s4, 0, S.s4, S.s6)),
+        ListGroup(children: const [
+          ThemePickerRow(),
+          FontPickerRow(),
+          MonoFontPickerRow(),
+        ]),
+      ],
       if (includeNotifications && kCanNotify) ...[
         const SizedBox(height: S.s24),
         const SectionHeader('Notifications',
@@ -1515,6 +1531,156 @@ class _ApprovalsRowState extends State<ApprovalsRow> {
         trailing: Row(mainAxisSize: MainAxisSize.min, children: [
           Text(manual == null ? '' : (manual ? 'Ask' : 'Yolo'),
               style: sans(13, color: AppColors.fg3)),
+          const SizedBox(width: S.s6),
+          AppIcon('chevron-down', size: 15, color: AppColors.fg4),
+        ]),
+      ),
+    );
+  }
+}
+
+class ThemePickerRow extends StatelessWidget {
+  const ThemePickerRow({super.key});
+
+  Future<void> _pick(BuildContext context, BuildContext anchor) async {
+    final current = ThemeManager.instance.current.name;
+    final picked = await showAppMenu<String>(
+      context,
+      anchor: anchor,
+      minWidth: 240,
+      maxWidth: 320,
+      items: [
+        appMenuHeading<String>('Color theme'),
+        for (final preset in allPresets)
+          appMenuRow<String>(
+            value: preset.name,
+            icon: 'sparkles',
+            label: preset.label,
+            selected: preset.name == current,
+          ),
+      ],
+    );
+    if (picked != null && picked != current) {
+      await ThemeManager.instance.setName(picked);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final current = ThemeManager.instance.current;
+    return Builder(
+      builder: (anchor) => ListRow(
+        title: 'Theme',
+        subtitle: kMobile ? null : 'Saved on this device',
+        leading: Container(
+          width: 19,
+          height: 19,
+          alignment: Alignment.center,
+          child: Container(
+            width: 13,
+            height: 13,
+            decoration: BoxDecoration(
+              color: current.accent,
+              shape: BoxShape.circle,
+              border: Border.all(color: AppColors.border2, width: 1.5),
+            ),
+          ),
+        ),
+        onTap: () => _pick(context, anchor),
+        trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+          Text(current.label, style: sans(13, color: AppColors.fg3)),
+          const SizedBox(width: S.s6),
+          AppIcon('chevron-down', size: 15, color: AppColors.fg4),
+        ]),
+      ),
+    );
+  }
+}
+
+class FontPickerRow extends StatelessWidget {
+  const FontPickerRow({super.key});
+
+  Future<void> _pick(BuildContext context, BuildContext anchor) async {
+    final current = ThemeManager.instance.currentFont.family;
+    final picked = await showAppMenu<String>(
+      context,
+      anchor: anchor,
+      minWidth: 260,
+      maxWidth: 340,
+      items: [
+        appMenuHeading<String>('UI typeface'),
+        for (final font in allFonts)
+          appMenuRow<String>(
+            value: font.family,
+            icon: 'file-text',
+            label: font.label,
+            description: font.description,
+            selected: font.family == current,
+          ),
+      ],
+    );
+    if (picked != null && picked != current) {
+      await ThemeManager.instance.setFontFamily(picked);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final current = ThemeManager.instance.currentFont;
+    return Builder(
+      builder: (anchor) => ListRow(
+        title: 'Typeface',
+        subtitle: kMobile ? null : current.description,
+        leading: AppIcon('file-text', size: 19, color: AppColors.fg3),
+        onTap: () => _pick(context, anchor),
+        trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+          Text(current.label, style: sans(13, color: AppColors.fg3)),
+          const SizedBox(width: S.s6),
+          AppIcon('chevron-down', size: 15, color: AppColors.fg4),
+        ]),
+      ),
+    );
+  }
+}
+
+class MonoFontPickerRow extends StatelessWidget {
+  const MonoFontPickerRow({super.key});
+
+  Future<void> _pick(BuildContext context, BuildContext anchor) async {
+    final current = ThemeManager.instance.currentMonoFont.family;
+    final picked = await showAppMenu<String>(
+      context,
+      anchor: anchor,
+      minWidth: 260,
+      maxWidth: 340,
+      items: [
+        appMenuHeading<String>('Code typeface'),
+        for (final font in allMonoFonts)
+          appMenuRow<String>(
+            value: font.family,
+            icon: 'code',
+            label: font.label,
+            description: font.description,
+            selected: font.family == current,
+          ),
+      ],
+    );
+    if (picked != null && picked != current) {
+      await ThemeManager.instance.setMonoFontFamily(picked);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final current = ThemeManager.instance.currentMonoFont;
+    return Builder(
+      builder: (anchor) => ListRow(
+        title: 'Code font',
+        subtitle: kMobile ? null : current.description,
+        leading: AppIcon('code', size: 19, color: AppColors.fg3),
+        onTap: () => _pick(context, anchor),
+        trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+          Text(current.label, style: mono(12.5, color: AppColors.fg3)),
           const SizedBox(width: S.s6),
           AppIcon('chevron-down', size: 15, color: AppColors.fg4),
         ]),

@@ -79,6 +79,106 @@ flutter:
           weight: 500
         - asset: assets/fonts/Geist-600.ttf
           weight: 600
+    - family: Halden
+      fonts:
+        - asset: assets/fonts/Halden-400.ttf
+          weight: 400
+        - asset: assets/fonts/Halden-500.ttf
+          weight: 500
+        - asset: assets/fonts/Halden-600.ttf
+          weight: 600
+        - asset: assets/fonts/Halden-700.ttf
+          weight: 700
+    - family: Tessera
+      fonts:
+        - asset: assets/fonts/Tessera-400.ttf
+          weight: 400
+        - asset: assets/fonts/Tessera-500.ttf
+          weight: 500
+        - asset: assets/fonts/Tessera-600.ttf
+          weight: 600
+        - asset: assets/fonts/Tessera-700.ttf
+          weight: 700
+    - family: Pebble
+      fonts:
+        - asset: assets/fonts/Pebble-400.ttf
+          weight: 400
+        - asset: assets/fonts/Pebble-500.ttf
+          weight: 500
+        - asset: assets/fonts/Pebble-600.ttf
+          weight: 600
+        - asset: assets/fonts/Pebble-700.ttf
+          weight: 700
+    - family: Beacon
+      fonts:
+        - asset: assets/fonts/Beacon-400.ttf
+          weight: 400
+        - asset: assets/fonts/Beacon-500.ttf
+          weight: 500
+        - asset: assets/fonts/Beacon-600.ttf
+          weight: 600
+        - asset: assets/fonts/Beacon-700.ttf
+          weight: 700
+    - family: Mallow
+      fonts:
+        - asset: assets/fonts/Mallow-400.ttf
+          weight: 400
+        - asset: assets/fonts/Mallow-500.ttf
+          weight: 500
+        - asset: assets/fonts/Mallow-600.ttf
+          weight: 600
+        - asset: assets/fonts/Mallow-700.ttf
+          weight: 700
+    - family: Rondel
+      fonts:
+        - asset: assets/fonts/Rondel-400.ttf
+          weight: 400
+        - asset: assets/fonts/Rondel-500.ttf
+          weight: 500
+        - asset: assets/fonts/Rondel-600.ttf
+          weight: 600
+        - asset: assets/fonts/Rondel-700.ttf
+          weight: 700
+    - family: Alder
+      fonts:
+        - asset: assets/fonts/Alder-400.ttf
+          weight: 400
+        - asset: assets/fonts/Alder-500.ttf
+          weight: 500
+        - asset: assets/fonts/Alder-600.ttf
+          weight: 600
+        - asset: assets/fonts/Alder-700.ttf
+          weight: 700
+    - family: Signal
+      fonts:
+        - asset: assets/fonts/Signal-400.ttf
+          weight: 400
+        - asset: assets/fonts/Signal-500.ttf
+          weight: 500
+        - asset: assets/fonts/Signal-600.ttf
+          weight: 600
+        - asset: assets/fonts/Signal-700.ttf
+          weight: 700
+    - family: Fathom
+      fonts:
+        - asset: assets/fonts/Fathom-400.ttf
+          weight: 400
+        - asset: assets/fonts/Fathom-500.ttf
+          weight: 500
+        - asset: assets/fonts/Fathom-600.ttf
+          weight: 600
+        - asset: assets/fonts/Fathom-700.ttf
+          weight: 700
+    - family: Tally
+      fonts:
+        - asset: assets/fonts/Tally-400.ttf
+          weight: 400
+        - asset: assets/fonts/Tally-500.ttf
+          weight: 500
+        - asset: assets/fonts/Tally-600.ttf
+          weight: 600
+        - asset: assets/fonts/Tally-700.ttf
+          weight: 700
     - family: Literata
       fonts:
         - asset: assets/fonts/Literata-400.ttf

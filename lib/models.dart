@@ -1467,6 +1467,8 @@ enum TaskStatus {
   final String wire;
   final String label;
 
+  bool get isTerminal => this == done || this == failed || this == cancelled;
+
   static TaskStatus parse(String? value) => TaskStatus.values.firstWhere(
         (s) => s.wire == value,
         // An unknown status from a newer daemon must not crash the board; Todo

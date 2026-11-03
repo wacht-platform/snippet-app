@@ -160,6 +160,25 @@ class FakeWakeClient extends DaemonClient {
   }
 
   @override
+  Future<List<TaskItem>> tasks({
+    String? status,
+    String? agentId,
+    int? limit,
+  }) async =>
+      [
+        TaskItem.fromJson({
+          'id': '63f9ce5c-9728-4364-9eb0-349c4e889ea9',
+          'title': 'Secure Access walkthrough v6',
+          'status': 'in_progress',
+        }),
+        TaskItem.fromJson({
+          'id': '9c2f52a7-4aed-4533-ab43-47c44057099f',
+          'title': 'De-slop Secure Access policy checker blog',
+          'status': 'done',
+        }),
+      ];
+
+  @override
   Future<void> setAgentContext(String agentId, int? tokens) async {
     contexts.add(tokens);
   }

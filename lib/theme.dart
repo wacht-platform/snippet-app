@@ -97,125 +97,311 @@ class ThemePreset {
 // Helper: build the palette. Surfaces follow a "surface ladder" — hierarchy
 // comes from surface lift + hairlines, not drop shadows. Text follows a strict
 // brightness ladder so fg1 > fg2 > fg3 > fg4 always holds.
-ThemePreset _dark({
+ThemePreset _palette({
   required String name,
   required String label,
+  required Color bg,
+  required Color surface1,
+  required Color surface2,
+  required Color surface3,
+  required Color border,
+  required Color border2,
   required Color accent,
-  required Color accentFill,
-  required Color accentFillHover,
-  required Color ink,
-  required Color inkMuted,
-  required Color inkSubtle,
-  required Color inkFaint,
-  required Color success,
-  required Color danger,
-  required Color warn,
+  required Color accentFg,
+  Color fg1 = const Color(0xFFFFFFFF),
+  Color fg2 = const Color(0xFFDCDCDC),
+  Color fg3 = const Color(0xFFABABAB),
+  Color fg4 = const Color(0xFF7A7A7A),
 }) {
-  const canvas = Color(0xFF060606);
-  const bg = Color(0xFF0B0B0B);
-  const floor = Color(0xFF060606);
-  const surface1 = Color(0xFF151515);
-  const surface2 = Color(0xFF1F1F1F);
-  const surface3 = Color(0xFF2B2B2B);
-
+  final hover = _lighten(accent, 0.06);
+  const ok = Color(0xFF34D399);
+  const run = Color(0xFFF59E0B);
+  const danger = Color(0xFFFF5C5C);
   return ThemePreset(
     name: name,
     label: label,
     bg: bg,
-    canvas: canvas,
-    floor: floor,
+    canvas: bg,
+    floor: bg,
     surface1: surface1,
     surface2: surface2,
     surface3: surface3,
-    fg1: ink,
-    fg2: inkMuted,
-    fg3: inkSubtle,
-    fg4: inkFaint,
-    border: const Color(0xFF222222),
-    border2: const Color(0xFF303030),
+    fg1: fg1,
+    fg2: fg2,
+    fg3: fg3,
+    fg4: fg4,
+    border: border,
+    border2: border2,
     accent: accent,
-    accentHover: _lighten(accent, 0.06),
-    accentFg: const Color(0xFF000000),
-    accentBg: _withAlpha(accent, 0.14),
-    accentLine: _withAlpha(accent, 0.38),
-    accentRing: _withAlpha(accent, 0.45),
-    accentFill: accentFill,
-    accentFillHover: accentFillHover,
-    ok: success,
-    okBg: _withAlpha(success, 0.13),
-    run: warn,
-    runBg: _withAlpha(warn, 0.13),
+    accentHover: hover,
+    accentFg: accentFg,
+    accentBg: accent.withValues(alpha: 0.14),
+    accentLine: accent.withValues(alpha: 0.38),
+    accentRing: accent.withValues(alpha: 0.45),
+    accentFill: accent,
+    accentFillHover: hover,
+    ok: ok,
+    okBg: ok.withValues(alpha: 0.13),
+    run: run,
+    runBg: run.withValues(alpha: 0.13),
     danger: danger,
-    dangerBg: _withAlpha(danger, 0.13),
-    diffAddBg: _withAlpha(success, 0.10),
-    diffDelBg: _withAlpha(danger, 0.10),
-    diffAddFg: _lighten(success, 0.14),
-    diffDelFg: _lighten(danger, 0.14),
-    diffGutter: const Color(0xFF303030),
+    dangerBg: danger.withValues(alpha: 0.13),
+    diffAddBg: ok.withValues(alpha: 0.10),
+    diffDelBg: danger.withValues(alpha: 0.10),
+    diffAddFg: const Color(0xFF6EE7B7),
+    diffDelFg: const Color(0xFFFF8A8A),
+    diffGutter: border2,
   );
 }
 
-// The only client theme.
-final _amoled = _dark(
-  name: 'amoled',
-  label: 'Charcoal',
-  accent: const Color(0xFFA78BFA),
-  accentFill: const Color(0xFFA78BFA),
-  accentFillHover: const Color(0xFFBBA5FB),
-  ink: const Color(0xFFFFFFFF),
-  inkMuted: const Color(0xFFDCDCDC),
-  inkSubtle: const Color(0xFFABABAB),
-  inkFaint: const Color(0xFF7A7A7A),
-  success: const Color(0xFF34D399),
-  danger: const Color(0xFFFF5C5C),
-  warn: const Color(0xFFF59E0B),
-);
-
-// The theme in use on every platform: true black with a violet accent; colour is kept for status (amber, green, red).
-const _emberCanvas = Color(0xFF0B0B0B);
-final _ember = ThemePreset(
+final _ember = _palette(
   name: 'ember',
-  label: 'Charcoal',
-  bg: _emberCanvas,
-  canvas: _emberCanvas,
-  floor: _emberCanvas,
+  label: 'Charcoal Violet',
+  bg: const Color(0xFF0B0B0B),
   surface1: const Color(0xFF151515),
   surface2: const Color(0xFF1F1F1F),
   surface3: const Color(0xFF2B2B2B),
-  fg1: const Color(0xFFFFFFFF),
-  fg2: const Color(0xFFDCDCDC),
-  fg3: const Color(0xFFABABAB),
-  fg4: const Color(0xFF7A7A7A),
   border: const Color(0xFF222222),
   border2: const Color(0xFF303030),
   accent: const Color(0xFFA78BFA),
-  accentHover: const Color(0xFFBBA5FB),
   accentFg: const Color(0xFF140E2E),
-  accentBg: const Color(0xFFA78BFA).withValues(alpha: 0.14),
-  accentLine: const Color(0xFFA78BFA).withValues(alpha: 0.38),
-  accentRing: const Color(0xFFA78BFA).withValues(alpha: 0.45),
-  accentFill: const Color(0xFFA78BFA),
-  accentFillHover: const Color(0xFFBBA5FB),
-  ok: const Color(0xFF34D399),
-  okBg: const Color(0xFF34D399).withValues(alpha: 0.13),
-  run: const Color(0xFFF59E0B),
-  runBg: const Color(0xFFF59E0B).withValues(alpha: 0.13),
-  danger: const Color(0xFFFF5C5C),
-  dangerBg: const Color(0xFFFF5C5C).withValues(alpha: 0.13),
-  diffAddBg: const Color(0xFF34D399).withValues(alpha: 0.10),
-  diffDelBg: const Color(0xFFFF5C5C).withValues(alpha: 0.10),
-  diffAddFg: const Color(0xFF6EE7B7),
-  diffDelFg: const Color(0xFFFF8A8A),
-  diffGutter: const Color(0xFF303030),
 );
 
-final List<ThemePreset> allPresets = [_amoled];
+final _stone = _palette(
+  name: 'stone',
+  label: 'Warm Stone',
+  bg: const Color(0xFF121110),
+  surface1: const Color(0xFF1B1917),
+  surface2: const Color(0xFF221F1B),
+  surface3: const Color(0xFF2A2621),
+  border: const Color(0xFF262320),
+  border2: const Color(0xFF332F2A),
+  accent: const Color(0xFF9DB0FF),
+  accentFg: const Color(0xFF10142A),
+  fg1: const Color(0xFFEDE7DD),
+  fg2: const Color(0xFFCFC8BC),
+  fg3: const Color(0xFFA39C90),
+  fg4: const Color(0xFF7A7368),
+);
+
+final _amber = _palette(
+  name: 'amber',
+  label: 'Obsidian Amber',
+  bg: const Color(0xFF0D0B09),
+  surface1: const Color(0xFF171411),
+  surface2: const Color(0xFF211D18),
+  surface3: const Color(0xFF2D2720),
+  border: const Color(0xFF26211B),
+  border2: const Color(0xFF362F26),
+  accent: const Color(0xFFF59E0B),
+  accentFg: const Color(0xFF1F1200),
+);
+
+final _midnight = _palette(
+  name: 'midnight',
+  label: 'Midnight Cyan',
+  bg: const Color(0xFF080C10),
+  surface1: const Color(0xFF10161E),
+  surface2: const Color(0xFF17202B),
+  surface3: const Color(0xFF202C3B),
+  border: const Color(0xFF1D2733),
+  border2: const Color(0xFF2A3848),
+  accent: const Color(0xFF38BDF8),
+  accentFg: const Color(0xFF041A26),
+);
+
+final _emerald = _palette(
+  name: 'emerald',
+  label: 'Forest Emerald',
+  bg: const Color(0xFF080D0B),
+  surface1: const Color(0xFF101915),
+  surface2: const Color(0xFF17241E),
+  surface3: const Color(0xFF203129),
+  border: const Color(0xFF1C2B24),
+  border2: const Color(0xFF293E34),
+  accent: const Color(0xFF34D399),
+  accentFg: const Color(0xFF032015),
+);
+
+final _rose = _palette(
+  name: 'rose',
+  label: 'Carbon Rose',
+  bg: const Color(0xFF0E0A0C),
+  surface1: const Color(0xFF181215),
+  surface2: const Color(0xFF231A1F),
+  surface3: const Color(0xFF30232A),
+  border: const Color(0xFF281D23),
+  border2: const Color(0xFF382931),
+  accent: const Color(0xFFFB7185),
+  accentFg: const Color(0xFF28060C),
+);
+
+final _tokyo = _palette(
+  name: 'tokyo',
+  label: 'Tokyo Night',
+  bg: const Color(0xFF0F111A),
+  surface1: const Color(0xFF161926),
+  surface2: const Color(0xFF1E2233),
+  surface3: const Color(0xFF282E44),
+  border: const Color(0xFF23283B),
+  border2: const Color(0xFF323952),
+  accent: const Color(0xFF7AA2F7),
+  accentFg: const Color(0xFF08132B),
+  fg1: const Color(0xFFE6EDF8),
+  fg2: const Color(0xFFC0CAF5),
+  fg3: const Color(0xFF9AA5CE),
+  fg4: const Color(0xFF6B7499),
+);
+
+final _mocha = _palette(
+  name: 'mocha',
+  label: 'Catppuccin Mocha',
+  bg: const Color(0xFF11111B),
+  surface1: const Color(0xFF181825),
+  surface2: const Color(0xFF1E1E2E),
+  surface3: const Color(0xFF313244),
+  border: const Color(0xFF292A3C),
+  border2: const Color(0xFF3B3D54),
+  accent: const Color(0xFFCBA6F7),
+  accentFg: const Color(0xFF1E1030),
+  fg1: const Color(0xFFCDD6F4),
+  fg2: const Color(0xFFBAC2DE),
+  fg3: const Color(0xFFA6ADC8),
+  fg4: const Color(0xFF6C7086),
+);
+
+final _nord = _palette(
+  name: 'nord',
+  label: 'Nordic Frost',
+  bg: const Color(0xFF11151C),
+  surface1: const Color(0xFF191F28),
+  surface2: const Color(0xFF222A36),
+  surface3: const Color(0xFF2E3846),
+  border: const Color(0xFF27303D),
+  border2: const Color(0xFF374354),
+  accent: const Color(0xFF88C0D0),
+  accentFg: const Color(0xFF081C24),
+  fg1: const Color(0xFFECEFF4),
+  fg2: const Color(0xFFD8DEE9),
+  fg3: const Color(0xFF9AA5B8),
+  fg4: const Color(0xFF6C788C),
+);
+
+final _gruvbox = _palette(
+  name: 'gruvbox',
+  label: 'Gruvbox Warm',
+  bg: const Color(0xFF141311),
+  surface1: const Color(0xFF1D1B18),
+  surface2: const Color(0xFF282521),
+  surface3: const Color(0xFF36312C),
+  border: const Color(0xFF2E2A25),
+  border2: const Color(0xFF403A33),
+  accent: const Color(0xFFFABD2F),
+  accentFg: const Color(0xFF221600),
+  fg1: const Color(0xFFEBDBB2),
+  fg2: const Color(0xFFD5C4A1),
+  fg3: const Color(0xFFA89984),
+  fg4: const Color(0xFF7C6F64),
+);
+
+final List<ThemePreset> allPresets = [
+  _ember,
+  _stone,
+  _tokyo,
+  _mocha,
+  _nord,
+  _gruvbox,
+  _amber,
+  _midnight,
+  _emerald,
+  _rose,
+];
+
+class FontPreset {
+  final String family;
+  final String label;
+  final String description;
+  const FontPreset({
+    required this.family,
+    required this.label,
+    required this.description,
+  });
+}
+
+const List<FontPreset> allFonts = [
+  FontPreset(
+    family: 'Cove',
+    label: 'Cove',
+    description: 'Rounded geometric with single-storey a',
+  ),
+  FontPreset(
+    family: 'Geist',
+    label: 'Geist',
+    description: 'Crisp technical neo-grotesque',
+  ),
+  FontPreset(
+    family: 'Halden',
+    label: 'Halden',
+    description: 'Neutral neo-grotesque interface workhorse',
+  ),
+  FontPreset(
+    family: 'Tessera',
+    label: 'Tessera',
+    description: 'Squared technical grotesque',
+  ),
+  FontPreset(
+    family: 'Beacon',
+    label: 'Beacon',
+    description: 'High-legibility sans with tailed l and serifed I',
+  ),
+  FontPreset(
+    family: 'Pebble',
+    label: 'Pebble',
+    description: 'Warm soft-square geometric sans',
+  ),
+  FontPreset(
+    family: 'Mallow',
+    label: 'Mallow',
+    description: 'Friendly rounded sans with single-storey a',
+  ),
+  FontPreset(
+    family: 'Rondel',
+    label: 'Rondel',
+    description: 'Poised geometric sans with tall ascenders',
+  ),
+  FontPreset(
+    family: 'Alder',
+    label: 'Alder',
+    description: 'Warm humanist sans with open forms',
+  ),
+];
+
+const List<FontPreset> allMonoFonts = [
+  FontPreset(
+    family: 'GeistMono',
+    label: 'Geist Mono',
+    description: 'Technical Swiss monospace',
+  ),
+  FontPreset(
+    family: 'Signal',
+    label: 'Signal',
+    description: 'Clean sans monospace with slab i, l and r',
+  ),
+  FontPreset(
+    family: 'Fathom',
+    label: 'Fathom',
+    description: 'Squared geometric monospace with square dots',
+  ),
+  FontPreset(
+    family: 'Tally',
+    label: 'Tally',
+    description: 'Warm slab monospace for code and logs',
+  ),
+];
 
 // ---------------------------------------------------------------------------
 // Color helpers
 // ---------------------------------------------------------------------------
-
-Color _withAlpha(Color c, double a) => c.withValues(alpha: a);
 
 Color _lighten(Color c, double amount) {
   final hsl = HSLColor.fromColor(c);
@@ -226,36 +412,79 @@ Color _lighten(Color c, double amount) {
 }
 
 // ---------------------------------------------------------------------------
-// ThemeManager — singleton, persists to SharedPreferences, notifies listeners
+// ThemeManager — singleton, persists theme & font to SharedPreferences
 // ---------------------------------------------------------------------------
 
 class ThemeManager extends ChangeNotifier {
   static const _prefsKey = 'theme_index';
-  static const _defaultIndex = 0; // AMOLED Black — the only remaining preset
+  static const _fontPrefsKey = 'ui_font_family';
+  static const _monoFontPrefsKey = 'mono_font_family';
 
   static final ThemeManager instance = ThemeManager._();
   ThemeManager._();
 
-  int _index = _defaultIndex;
-  int get index => _index;
-  ThemePreset get current => _ember;
+  int _themeIndex = 0;
+  int _fontIndex = 0;
+  int _monoFontIndex = 0;
+
+  int get themeIndex => _themeIndex;
+  int get fontIndex => _fontIndex;
+  int get monoFontIndex => _monoFontIndex;
+
+  /// Combined cache key so markdown style caches invalidate on theme, sans, or mono change.
+  int get index => _themeIndex * 1000 + _fontIndex * 10 + _monoFontIndex;
+
+  ThemePreset get current => allPresets[_themeIndex.clamp(0, allPresets.length - 1)];
+  FontPreset get currentFont => allFonts[_fontIndex.clamp(0, allFonts.length - 1)];
+  FontPreset get currentMonoFont =>
+      allMonoFonts[_monoFontIndex.clamp(0, allMonoFonts.length - 1)];
 
   Future<void> init() async {
-    _index = 0;
     final p = await SharedPreferences.getInstance();
-    await p.setInt(_prefsKey, 0);
+    final savedTheme = p.getInt(_prefsKey) ?? 0;
+    _themeIndex = savedTheme.clamp(0, allPresets.length - 1);
+    final savedFont = p.getString(_fontPrefsKey);
+    if (savedFont != null) {
+      final fi = allFonts.indexWhere((f) => f.family == savedFont);
+      if (fi >= 0) _fontIndex = fi;
+    }
+    final savedMono = p.getString(_monoFontPrefsKey);
+    if (savedMono != null) {
+      final mi = allMonoFonts.indexWhere((f) => f.family == savedMono);
+      if (mi >= 0) _monoFontIndex = mi;
+    }
+    notifyListeners();
   }
 
   Future<void> setIndex(int i) async {
-    if (i != 0) return;
-    _index = 0;
+    if (i < 0 || i >= allPresets.length || i == _themeIndex) return;
+    _themeIndex = i;
+    notifyListeners();
     final p = await SharedPreferences.getInstance();
-    await p.setInt(_prefsKey, 0);
+    await p.setInt(_prefsKey, i);
   }
 
   Future<void> setName(String name) async {
     final i = allPresets.indexWhere((p) => p.name == name);
     if (i >= 0) await setIndex(i);
+  }
+
+  Future<void> setFontFamily(String family) async {
+    final i = allFonts.indexWhere((f) => f.family == family);
+    if (i < 0 || i == _fontIndex) return;
+    _fontIndex = i;
+    notifyListeners();
+    final p = await SharedPreferences.getInstance();
+    await p.setString(_fontPrefsKey, family);
+  }
+
+  Future<void> setMonoFontFamily(String family) async {
+    final i = allMonoFonts.indexWhere((f) => f.family == family);
+    if (i < 0 || i == _monoFontIndex) return;
+    _monoFontIndex = i;
+    notifyListeners();
+    final p = await SharedPreferences.getInstance();
+    await p.setString(_monoFontPrefsKey, family);
   }
 }
 
@@ -548,8 +777,8 @@ TextStyle mono(double size,
     // A monospace face is fixed-width already, so `tabular` defaults on and is
     // accepted only so call sites can share one signature with `sans()`.
     TextStyle(
-      fontFamily: kMonoFamily,
-      fontFamilyFallback: const ['monospace'],
+      fontFamily: monoFamily,
+      fontFamilyFallback: const ['GeistMono', 'monospace'],
       fontSize: size,
       fontWeight: weightFor(weight),
       height: height ?? 1.45,
@@ -569,7 +798,7 @@ TextStyle caps(double size,
         {Color? color, double spacing = 0.5, FontWeight weight = W.label}) =>
     sans(size, weight: weight, color: color, spacing: spacing);
 
-String get kSansFamily => 'Cove';
+String get kSansFamily => ThemeManager.instance.currentFont.family;
 const kSerifFamily = 'Literata';
 
 /// The agent's own writing on a phone: a screen serif at a reading size, so a
@@ -585,7 +814,7 @@ TextStyle serif(double size,
     );
 const kMonoFamily = 'GeistMono';
 
-String get monoFamily => kMonoFamily;
+String get monoFamily => ThemeManager.instance.currentMonoFont.family;
 
 /// Type roles. Screens use these, not raw sizes.
 class TS {
@@ -671,7 +900,7 @@ ThemeData buildAppTheme() {
     }),
     dividerColor: c.border,
     textSelectionTheme: TextSelectionThemeData(
-      selectionColor: _withAlpha(c.accent, 0.35),
+      selectionColor: c.accent.withValues(alpha: 0.35),
       cursorColor: c.accent,
       selectionHandleColor: c.accent,
     ),

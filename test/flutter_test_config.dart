@@ -27,6 +27,16 @@ void _stubMediaPlugins() {
 Future<void> _loadBundledFonts() async {
   const families = {
     'Cove': 'Cove',
+    'Halden': 'Halden',
+    'Tessera': 'Tessera',
+    'Pebble': 'Pebble',
+    'Beacon': 'Beacon',
+    'Mallow': 'Mallow',
+    'Rondel': 'Rondel',
+    'Alder': 'Alder',
+    'Signal': 'Signal',
+    'Fathom': 'Fathom',
+    'Tally': 'Tally',
     'GeistMono': 'GeistMono',
     'Geist': 'Geist',
     'Literata': 'Literata',
