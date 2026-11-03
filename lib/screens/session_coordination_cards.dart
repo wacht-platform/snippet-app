@@ -636,12 +636,14 @@ class _AmbientTurnCardState extends State<AmbientTurnCard> {
                     : const EdgeInsets.fromLTRB(14, 9, 14, 10),
                 decoration: BoxDecoration(
                   color: AppColors.surface2,
-                  borderRadius: BorderRadius.only(
-                    topLeft: Radius.circular(kMobile ? 20 : 16),
-                    topRight: Radius.circular(kMobile ? 20 : 16),
-                    bottomLeft: Radius.circular(kMobile ? 20 : 16),
-                    bottomRight: const Radius.circular(6),
-                  ),
+                  borderRadius: kMobile
+                      ? const BorderRadius.only(
+                          topLeft: Radius.circular(20),
+                          topRight: Radius.circular(20),
+                          bottomLeft: Radius.circular(20),
+                          bottomRight: Radius.circular(6),
+                        )
+                      : BorderRadius.circular(20),
                 ),
                 child: SelectionArea(
                   child: Text(

@@ -759,12 +759,14 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                       padding: const EdgeInsets.fromLTRB(15, 10, 15, 11),
                       decoration: BoxDecoration(
                         color: AppColors.surface2,
-                        borderRadius: const BorderRadius.only(
-                          topLeft: Radius.circular(20),
-                          topRight: Radius.circular(20),
-                          bottomLeft: Radius.circular(20),
-                          bottomRight: Radius.circular(6),
-                        ),
+                        borderRadius: kMobile
+                            ? const BorderRadius.only(
+                                topLeft: Radius.circular(20),
+                                topRight: Radius.circular(20),
+                                bottomLeft: Radius.circular(20),
+                                bottomRight: Radius.circular(6),
+                              )
+                            : BorderRadius.circular(20),
                       ),
                       child: md,
                     ),

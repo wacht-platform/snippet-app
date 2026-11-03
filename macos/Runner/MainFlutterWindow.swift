@@ -2462,7 +2462,8 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
           let bubble = NSView(frame: NSRect(x: bubbleX, y: y, width: bubbleW, height: bubbleH))
           bubble.wantsLayer = true
           bubble.layer?.backgroundColor = SnippetTheme.surface2.cgColor
-          bubble.layer?.cornerRadius = 14
+          bubble.layer?.cornerRadius = 18
+          bubble.layer?.cornerCurve = .continuous
 
           textView.frame = NSRect(x: padX, y: padTop, width: textSize.width, height: textSize.height)
           bubble.addSubview(textView)
