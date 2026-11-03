@@ -173,7 +173,7 @@ class _CoordinationAgentDirectoryState
       ]);
     }
     return Material(
-      color: AppColors.windowBg,
+      color: kMobile ? AppColors.bg : Colors.transparent,
       child: MasterDetail(
         master: MasterPane(
           title: 'Agents',

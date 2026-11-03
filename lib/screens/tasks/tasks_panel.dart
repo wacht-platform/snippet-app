@@ -375,7 +375,7 @@ class TasksPanelState extends State<TasksPanel> {
     // the list the room instead.
     if (widget.onOpenTask != null) {
       return ColoredBox(
-        color: AppColors.windowBg,
+        color: kMobile ? AppColors.bg : Colors.transparent,
         child: Align(
           alignment: Alignment.topCenter,
           child: ConstrainedBox(
@@ -384,7 +384,7 @@ class TasksPanelState extends State<TasksPanel> {
       );
     }
     return ColoredBox(
-      color: AppColors.windowBg,
+      color: kMobile ? AppColors.bg : Colors.transparent,
       child: MasterDetail(masterWidth: 380, master: master, detail: detail),
     );
   }
@@ -392,7 +392,7 @@ class TasksPanelState extends State<TasksPanel> {
   Widget _stacked() {
     if (!kMobile && _selectedTaskId != null) {
       return ColoredBox(
-        color: AppColors.windowBg,
+        color: kMobile ? AppColors.bg : Colors.transparent,
         child: TaskDetailScreen(
           key: ValueKey('sidebar-task-$_selectedTaskId'),
           client: widget.client,
@@ -407,7 +407,7 @@ class TasksPanelState extends State<TasksPanel> {
     }
     if (!kMobile && _creatingTask) {
       return ColoredBox(
-        color: AppColors.windowBg,
+        color: kMobile ? AppColors.bg : Colors.transparent,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
