@@ -967,6 +967,12 @@ class _DesktopShellState extends State<DesktopShell>
           ['machines', 'connection', 'notifications', 'approvals']
         ),
         (
+          SettingsPage.appearance,
+          'sliders',
+          'Settings: Appearance',
+          ['theme', 'accent', 'color', 'font', 'typeface', 'cove', 'geist']
+        ),
+        (
           SettingsPage.models,
           'sparkles',
           'Settings: Profiles',

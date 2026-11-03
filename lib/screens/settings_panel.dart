@@ -171,6 +171,7 @@ class _MachineListState extends State<MachineList> {
 
 enum SettingsPage {
   general,
+  appearance,
   models,
   routing,
   memory,
@@ -316,6 +317,7 @@ class SettingsPanelState extends State<SettingsPanel> {
           _vaultKey.currentState?.add();
         case SettingsPage.scheduled:
           _recurringKey.currentState?.add();
+        case SettingsPage.appearance:
         case SettingsPage.usage:
         case SettingsPage.wakes:
         case SettingsPage.memory:
@@ -330,6 +332,7 @@ class SettingsPanelState extends State<SettingsPanel> {
 
   static const _nav = [
     (SettingsPage.general, 'server', 'General'),
+    (SettingsPage.appearance, 'sliders', 'Appearance'),
     (SettingsPage.models, 'sparkles', 'Profiles'),
     (SettingsPage.routing, 'route', 'Routing'),
     (SettingsPage.usage, 'gauge', 'Usage'),
@@ -644,12 +647,17 @@ class SettingsPanelState extends State<SettingsPanel> {
               'globe'),
         ]),
         label('Appearance'),
-        ListGroup(children: const [
-          ThemePickerRow(),
-          AccentPickerRow(),
-          FontPickerRow(),
-          MonoFontPickerRow(),
-        ]),
+        ListenableBuilder(
+          listenable: ThemeManager.instance,
+          builder: (context, _) => ListGroup(children: [
+            nav(
+              SettingsPage.appearance,
+              'Appearance',
+              '${ThemeManager.instance.baseTheme.label} · ${ThemeManager.instance.currentFont.label}',
+              'sliders',
+            ),
+          ]),
+        ),
         if (kCanNotify) ...[
           label('Phone'),
           ListGroup(children: [_notifRow()]),
@@ -671,6 +679,10 @@ class SettingsPanelState extends State<SettingsPanel> {
             ]),
             Expanded(child: _generalPage(includeNotifications: false)),
           ],
+        ),
+      SettingsPage.appearance => AppearanceScreen(
+          embedded: true,
+          onBack: back,
         ),
       SettingsPage.models => InferenceProfilesScreen(
           client: widget.client,
@@ -813,6 +825,7 @@ class SettingsPanelState extends State<SettingsPanel> {
 
   String _pageTitle(SettingsPage page) => switch (page) {
         SettingsPage.general => 'General',
+        SettingsPage.appearance => 'Appearance',
         SettingsPage.models => 'Profiles',
         SettingsPage.routing => 'Routing',
         SettingsPage.memory => 'Memory',
@@ -915,6 +928,7 @@ class SettingsPanelState extends State<SettingsPanel> {
 
   static const _plainPages = {
     SettingsPage.general,
+    SettingsPage.appearance,
     SettingsPage.routing,
     SettingsPage.usage,
     SettingsPage.voice,
@@ -924,6 +938,8 @@ class SettingsPanelState extends State<SettingsPanel> {
   String _pageSubtitle(SettingsPage page) => switch (page) {
         SettingsPage.general =>
           'Machines this app connects to, and how sessions behave.',
+        SettingsPage.appearance =>
+          'Theme palette, accent colour, UI typeface and code font saved on this device.',
         SettingsPage.routing =>
           'Which model does each kind of work, and who steps in when it hits a limit.',
         SettingsPage.usage =>
@@ -961,6 +977,9 @@ class SettingsPanelState extends State<SettingsPanel> {
 
   List<Widget> _plainBody(SettingsPage page) => switch (page) {
         SettingsPage.general => _nativeGeneral(),
+        SettingsPage.appearance => [
+            const AppearanceScreen(embedded: true),
+          ],
         SettingsPage.routing => [
             RoutingScreen(client: widget.client, embedded: true)
           ],
@@ -979,6 +998,7 @@ class SettingsPanelState extends State<SettingsPanel> {
   Widget _pageBody() {
     return switch (_page) {
       SettingsPage.general => _generalPage(),
+      SettingsPage.appearance => const AppearanceScreen(embedded: true),
       SettingsPage.models => InferenceProfilesScreen(
           key: _modelsKey,
           client: widget.client,
@@ -1232,17 +1252,6 @@ class SettingsPanelState extends State<SettingsPanel> {
         const SectionHeader('Approvals',
             padding: EdgeInsets.fromLTRB(S.s4, 0, S.s4, S.s6)),
         ListGroup(children: [ApprovalsRow(client: widget.client)]),
-      ],
-      if (includeNotifications) ...[
-        const SizedBox(height: S.s24),
-        const SectionHeader('Appearance',
-            padding: EdgeInsets.fromLTRB(S.s4, 0, S.s4, S.s6)),
-        ListGroup(children: const [
-          ThemePickerRow(),
-          AccentPickerRow(),
-          FontPickerRow(),
-          MonoFontPickerRow(),
-        ]),
       ],
       if (includeNotifications && kCanNotify) ...[
         const SizedBox(height: S.s24),
@@ -1541,15 +1550,327 @@ class _ApprovalsRowState extends State<ApprovalsRow> {
   }
 }
 
+class AppearanceScreen extends StatelessWidget {
+  const AppearanceScreen({super.key, this.embedded = false, this.onBack});
+  final bool embedded;
+  final VoidCallback? onBack;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: ThemeManager.instance,
+      builder: (context, _) {
+        final tm = ThemeManager.instance;
+        final base = tm.baseTheme;
+        final custom = tm.customAccent;
+        final uiFont = tm.currentFont;
+        final monoFont = tm.currentMonoFont;
+
+        if (kMobile) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (onBack != null)
+                NavBackRow(title: 'Appearance', onBack: onBack!),
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.fromLTRB(S.s16, S.s8, S.s16, S.s40),
+                  children: [
+                    _AppearancePreviewCard(),
+                    const SizedBox(height: S.s16),
+                    ListGroup(children: const [
+                      ThemePickerRow(),
+                      AccentPickerRow(),
+                      FontPickerRow(),
+                      MonoFontPickerRow(),
+                    ]),
+                    const SizedBox(height: S.s20),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+                      child: Text('ACCENT SWATCHES',
+                          style: sans(11.5,
+                              weight: W.label,
+                              spacing: 0.7,
+                              color: AppColors.fg4)),
+                    ),
+                    const _AccentSwatchStrip(),
+                  ],
+                ),
+              ),
+            ],
+          );
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _AppearancePreviewCard(),
+            const SizedBox(height: S.s16),
+            SettingsGroup(
+              header: 'Palette',
+              footer:
+                  'Theme and accent colour are saved locally on this device.',
+              children: [
+                Builder(
+                  builder: (anchor) => SettingsRow(
+                    label: 'Theme',
+                    sub: '${base.label} surface palette',
+                    trailing: _DropdownButton(
+                      label: base.label,
+                      dotColor: base.accent,
+                      dotFill: base.surface2,
+                      onTap: () => ThemePickerRow.pick(context, anchor),
+                    ),
+                  ),
+                ),
+                Builder(
+                  builder: (anchor) => SettingsRow(
+                    label: 'Accent colour',
+                    sub: custom == null
+                        ? 'Using ${base.label} default highlight'
+                        : 'Custom highlight (${custom.label})',
+                    trailing: _DropdownButton(
+                      label: custom?.label ?? 'Theme default',
+                      dotColor: tm.current.accent,
+                      onTap: () => AccentPickerRow.pick(context, anchor),
+                    ),
+                  ),
+                ),
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(14, 10, 14, 12),
+                  child: _AccentSwatchStrip(),
+                ),
+              ],
+            ),
+            SettingsGroup(
+              header: 'Typography',
+              footer:
+                  'UI typeface applies to headings, chat and controls; code font applies to diffs, terminals and IDs.',
+              children: [
+                Builder(
+                  builder: (anchor) => SettingsRow(
+                    label: 'UI typeface',
+                    sub: uiFont.description,
+                    trailing: _DropdownButton(
+                      label: uiFont.label,
+                      onTap: () => FontPickerRow.pick(context, anchor),
+                    ),
+                  ),
+                ),
+                Builder(
+                  builder: (anchor) => SettingsRow(
+                    label: 'Code font',
+                    sub: monoFont.description,
+                    trailing: _DropdownButton(
+                      label: monoFont.label,
+                      monoFont: true,
+                      onTap: () => MonoFontPickerRow.pick(context, anchor),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _DropdownButton extends StatelessWidget {
+  const _DropdownButton({
+    required this.label,
+    required this.onTap,
+    this.dotColor,
+    this.dotFill,
+    this.monoFont = false,
+  });
+
+  final String label;
+  final VoidCallback onTap;
+  final Color? dotColor;
+  final Color? dotFill;
+  final bool monoFont;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: AppColors.surface2,
+          borderRadius: BorderRadius.circular(R.sm),
+          border: Border.all(color: AppColors.border2),
+        ),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          if (dotColor != null) ...[
+            Container(
+              width: 11,
+              height: 11,
+              decoration: BoxDecoration(
+                color: dotFill ?? dotColor,
+                shape: BoxShape.circle,
+                border: dotFill != null
+                    ? Border.all(color: dotColor!, width: 2)
+                    : Border.all(color: AppColors.border2, width: 1),
+              ),
+            ),
+            const SizedBox(width: 7),
+          ],
+          Text(
+            label,
+            style: monoFont
+                ? mono(12.5, color: AppColors.fg1)
+                : sans(12.5, weight: W.label, color: AppColors.fg1),
+          ),
+          const SizedBox(width: 6),
+          AppIcon('chevron-down', size: 14, color: AppColors.fg3),
+        ]),
+      ),
+    );
+  }
+}
+
+class _AccentSwatchStrip extends StatelessWidget {
+  const _AccentSwatchStrip();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: ThemeManager.instance,
+      builder: (context, _) {
+        final tm = ThemeManager.instance;
+        final custom = tm.customAccent;
+        return Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            GestureDetector(
+              onTap: () => tm.setAccentName(null),
+              behavior: HitTestBehavior.opaque,
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: custom == null ? AppColors.accentBg : AppColors.surface2,
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(
+                    color: custom == null
+                        ? AppColors.accentLine
+                        : AppColors.border,
+                  ),
+                ),
+                child: Text(
+                  'Default',
+                  style: sans(12,
+                      weight: custom == null ? W.label : W.body,
+                      color: custom == null ? AppColors.accent : AppColors.fg2),
+                ),
+              ),
+            ),
+            for (final a in allAccents)
+              GestureDetector(
+                onTap: () => tm.setAccentName(a.name),
+                behavior: HitTestBehavior.opaque,
+                child: Tooltip(
+                  message: a.label,
+                  child: Container(
+                    width: 28,
+                    height: 28,
+                    decoration: BoxDecoration(
+                      color: a.accent,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: custom?.name == a.name
+                            ? AppColors.fg1
+                            : AppColors.border2,
+                        width: custom?.name == a.name ? 2.2 : 1.2,
+                      ),
+                    ),
+                    alignment: Alignment.center,
+                    child: custom?.name == a.name
+                        ? Icon(Icons.check, size: 14, color: a.accentFg)
+                        : null,
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _AppearancePreviewCard extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final tm = ThemeManager.instance;
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.surface1,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            Container(
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(
+                color: AppColors.accent,
+                shape: BoxShape.circle,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                '${tm.baseTheme.label} · ${tm.currentFont.label}',
+                style: sans(13.5, weight: W.strong, color: AppColors.fg1),
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: AppColors.accentBg,
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: AppColors.accentLine),
+              ),
+              child: Text(
+                tm.currentMonoFont.label,
+                style: mono(11, color: AppColors.accent),
+              ),
+            ),
+          ]),
+          const SizedBox(height: 6),
+          Text(
+            'Round the corner, into the light — live preview of your active theme, accent and typography.',
+            style: sans(13, height: 1.4, color: AppColors.fg2),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'git commit -m "Apply ${tm.baseTheme.name} + ${tm.currentFont.family}"',
+            style: mono(12, color: AppColors.fg3),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class ThemePickerRow extends StatelessWidget {
   const ThemePickerRow({super.key});
 
-  Future<void> _pick(BuildContext context, BuildContext anchor) async {
-    final current = ThemeManager.instance.current.name;
+  static Future<void> pick(BuildContext context, BuildContext anchor) async {
+    final current = ThemeManager.instance.baseTheme.name;
     final picked = await showAppMenu<String>(
       context,
       anchor: anchor,
-      minWidth: 240,
+      minWidth: 250,
       maxWidth: 320,
       items: [
         appMenuHeading<String>('Color theme'),
@@ -1569,32 +1890,37 @@ class ThemePickerRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final base = ThemeManager.instance.baseTheme;
-    return Builder(
-      builder: (anchor) => ListRow(
-        title: 'Theme',
-        subtitle: kMobile ? null : 'Surface palette saved on this device',
-        leading: Container(
-          width: 19,
-          height: 19,
-          alignment: Alignment.center,
-          child: Container(
-            width: 14,
-            height: 14,
-            decoration: BoxDecoration(
-              color: base.surface2,
-              shape: BoxShape.circle,
-              border: Border.all(color: base.accent, width: 2),
+    return ListenableBuilder(
+      listenable: ThemeManager.instance,
+      builder: (context, _) {
+        final base = ThemeManager.instance.baseTheme;
+        return Builder(
+          builder: (anchor) => ListRow(
+            title: 'Theme',
+            subtitle: kMobile ? null : 'Surface palette saved on this device',
+            leading: Container(
+              width: 19,
+              height: 19,
+              alignment: Alignment.center,
+              child: Container(
+                width: 14,
+                height: 14,
+                decoration: BoxDecoration(
+                  color: base.surface2,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: base.accent, width: 2),
+                ),
+              ),
             ),
+            onTap: () => pick(context, anchor),
+            trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+              Text(base.label, style: sans(13, color: AppColors.fg3)),
+              const SizedBox(width: S.s6),
+              AppIcon('chevron-down', size: 15, color: AppColors.fg4),
+            ]),
           ),
-        ),
-        onTap: () => _pick(context, anchor),
-        trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-          Text(base.label, style: sans(13, color: AppColors.fg3)),
-          const SizedBox(width: S.s6),
-          AppIcon('chevron-down', size: 15, color: AppColors.fg4),
-        ]),
-      ),
+        );
+      },
     );
   }
 }
@@ -1602,13 +1928,13 @@ class ThemePickerRow extends StatelessWidget {
 class AccentPickerRow extends StatelessWidget {
   const AccentPickerRow({super.key});
 
-  Future<void> _pick(BuildContext context, BuildContext anchor) async {
+  static Future<void> pick(BuildContext context, BuildContext anchor) async {
     final custom = ThemeManager.instance.customAccent;
     final current = custom?.name ?? '__theme__';
     final picked = await showAppMenu<String>(
       context,
       anchor: anchor,
-      minWidth: 240,
+      minWidth: 250,
       maxWidth: 320,
       items: [
         appMenuHeading<String>('Accent colour'),
@@ -1636,34 +1962,40 @@ class AccentPickerRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final custom = ThemeManager.instance.customAccent;
-    final activeAccent = ThemeManager.instance.current.accent;
-    return Builder(
-      builder: (anchor) => ListRow(
-        title: 'Accent colour',
-        subtitle: kMobile ? null : 'Override the active theme highlight colour',
-        leading: Container(
-          width: 19,
-          height: 19,
-          alignment: Alignment.center,
-          child: Container(
-            width: 13,
-            height: 13,
-            decoration: BoxDecoration(
-              color: activeAccent,
-              shape: BoxShape.circle,
-              border: Border.all(color: AppColors.border2, width: 1.5),
+    return ListenableBuilder(
+      listenable: ThemeManager.instance,
+      builder: (context, _) {
+        final custom = ThemeManager.instance.customAccent;
+        final activeAccent = ThemeManager.instance.current.accent;
+        return Builder(
+          builder: (anchor) => ListRow(
+            title: 'Accent colour',
+            subtitle:
+                kMobile ? null : 'Override the active theme highlight colour',
+            leading: Container(
+              width: 19,
+              height: 19,
+              alignment: Alignment.center,
+              child: Container(
+                width: 13,
+                height: 13,
+                decoration: BoxDecoration(
+                  color: activeAccent,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: AppColors.border2, width: 1.5),
+                ),
+              ),
             ),
+            onTap: () => pick(context, anchor),
+            trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+              Text(custom?.label ?? 'Theme default',
+                  style: sans(13, color: AppColors.fg3)),
+              const SizedBox(width: S.s6),
+              AppIcon('chevron-down', size: 15, color: AppColors.fg4),
+            ]),
           ),
-        ),
-        onTap: () => _pick(context, anchor),
-        trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-          Text(custom?.label ?? 'Theme default',
-              style: sans(13, color: AppColors.fg3)),
-          const SizedBox(width: S.s6),
-          AppIcon('chevron-down', size: 15, color: AppColors.fg4),
-        ]),
-      ),
+        );
+      },
     );
   }
 }
@@ -1671,7 +2003,7 @@ class AccentPickerRow extends StatelessWidget {
 class FontPickerRow extends StatelessWidget {
   const FontPickerRow({super.key});
 
-  Future<void> _pick(BuildContext context, BuildContext anchor) async {
+  static Future<void> pick(BuildContext context, BuildContext anchor) async {
     final current = ThemeManager.instance.currentFont.family;
     final picked = await showAppMenu<String>(
       context,
@@ -1697,19 +2029,24 @@ class FontPickerRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final current = ThemeManager.instance.currentFont;
-    return Builder(
-      builder: (anchor) => ListRow(
-        title: 'Typeface',
-        subtitle: kMobile ? null : current.description,
-        leading: AppIcon('file-text', size: 19, color: AppColors.fg3),
-        onTap: () => _pick(context, anchor),
-        trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-          Text(current.label, style: sans(13, color: AppColors.fg3)),
-          const SizedBox(width: S.s6),
-          AppIcon('chevron-down', size: 15, color: AppColors.fg4),
-        ]),
-      ),
+    return ListenableBuilder(
+      listenable: ThemeManager.instance,
+      builder: (context, _) {
+        final current = ThemeManager.instance.currentFont;
+        return Builder(
+          builder: (anchor) => ListRow(
+            title: 'Typeface',
+            subtitle: kMobile ? null : current.description,
+            leading: AppIcon('file-text', size: 19, color: AppColors.fg3),
+            onTap: () => pick(context, anchor),
+            trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+              Text(current.label, style: sans(13, color: AppColors.fg3)),
+              const SizedBox(width: S.s6),
+              AppIcon('chevron-down', size: 15, color: AppColors.fg4),
+            ]),
+          ),
+        );
+      },
     );
   }
 }
@@ -1717,7 +2054,7 @@ class FontPickerRow extends StatelessWidget {
 class MonoFontPickerRow extends StatelessWidget {
   const MonoFontPickerRow({super.key});
 
-  Future<void> _pick(BuildContext context, BuildContext anchor) async {
+  static Future<void> pick(BuildContext context, BuildContext anchor) async {
     final current = ThemeManager.instance.currentMonoFont.family;
     final picked = await showAppMenu<String>(
       context,
@@ -1743,19 +2080,24 @@ class MonoFontPickerRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final current = ThemeManager.instance.currentMonoFont;
-    return Builder(
-      builder: (anchor) => ListRow(
-        title: 'Code font',
-        subtitle: kMobile ? null : current.description,
-        leading: AppIcon('code', size: 19, color: AppColors.fg3),
-        onTap: () => _pick(context, anchor),
-        trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-          Text(current.label, style: mono(12.5, color: AppColors.fg3)),
-          const SizedBox(width: S.s6),
-          AppIcon('chevron-down', size: 15, color: AppColors.fg4),
-        ]),
-      ),
+    return ListenableBuilder(
+      listenable: ThemeManager.instance,
+      builder: (context, _) {
+        final current = ThemeManager.instance.currentMonoFont;
+        return Builder(
+          builder: (anchor) => ListRow(
+            title: 'Code font',
+            subtitle: kMobile ? null : current.description,
+            leading: AppIcon('code', size: 19, color: AppColors.fg3),
+            onTap: () => pick(context, anchor),
+            trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+              Text(current.label, style: mono(12.5, color: AppColors.fg3)),
+              const SizedBox(width: S.s6),
+              AppIcon('chevron-down', size: 15, color: AppColors.fg4),
+            ]),
+          ),
+        );
+      },
     );
   }
 }

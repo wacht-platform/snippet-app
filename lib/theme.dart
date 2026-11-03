@@ -596,8 +596,10 @@ class ThemeManager extends ChangeNotifier {
     if (i < 0 || i >= allPresets.length || i == _themeIndex) return;
     _themeIndex = i;
     notifyListeners();
-    final p = await SharedPreferences.getInstance();
-    await p.setInt(_prefsKey, i);
+    try {
+      final p = await SharedPreferences.getInstance();
+      await p.setInt(_prefsKey, i);
+    } catch (_) {}
   }
 
   Future<void> setName(String name) async {
@@ -612,12 +614,14 @@ class ThemeManager extends ChangeNotifier {
     if (next == _accentIndex) return;
     _accentIndex = next;
     notifyListeners();
-    final p = await SharedPreferences.getInstance();
-    if (next < 0) {
-      await p.remove(_accentPrefsKey);
-    } else {
-      await p.setString(_accentPrefsKey, allAccents[next].name);
-    }
+    try {
+      final p = await SharedPreferences.getInstance();
+      if (next < 0) {
+        await p.remove(_accentPrefsKey);
+      } else {
+        await p.setString(_accentPrefsKey, allAccents[next].name);
+      }
+    } catch (_) {}
   }
 
   Future<void> setFontFamily(String family) async {
@@ -625,8 +629,10 @@ class ThemeManager extends ChangeNotifier {
     if (i < 0 || i == _fontIndex) return;
     _fontIndex = i;
     notifyListeners();
-    final p = await SharedPreferences.getInstance();
-    await p.setString(_fontPrefsKey, family);
+    try {
+      final p = await SharedPreferences.getInstance();
+      await p.setString(_fontPrefsKey, family);
+    } catch (_) {}
   }
 
   Future<void> setMonoFontFamily(String family) async {
@@ -634,8 +640,10 @@ class ThemeManager extends ChangeNotifier {
     if (i < 0 || i == _monoFontIndex) return;
     _monoFontIndex = i;
     notifyListeners();
-    final p = await SharedPreferences.getInstance();
-    await p.setString(_monoFontPrefsKey, family);
+    try {
+      final p = await SharedPreferences.getInstance();
+      await p.setString(_monoFontPrefsKey, family);
+    } catch (_) {}
   }
 }
 
@@ -880,7 +888,7 @@ class W {
 /// Phones keep every face at its regular weight: hierarchy comes from size,
 /// ink and space rather than from heavier strokes.
 FontWeight weightFor(FontWeight w) =>
-    kMobile && w.index >= FontWeight.w600.index
+    kMobile && w.value >= FontWeight.w600.value
         ? FontWeight.w500
         : FontWeight.w400;
 
