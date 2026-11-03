@@ -339,6 +339,9 @@ class MainTabsStrip extends StatelessWidget {
 
 /// The complete macOS window title bar with navigation buttons, tabs strip, and utility actions.
 class MacWindowBar extends StatelessWidget {
+  final bool sidebarHidden;
+  final VoidCallback? onToggleSidebar;
+  final VoidCallback? onNewSession;
   final bool canNavigateBack;
   final bool canNavigateForward;
   final VoidCallback onNavigateBack;
@@ -351,6 +354,9 @@ class MacWindowBar extends StatelessWidget {
 
   const MacWindowBar({
     super.key,
+    this.sidebarHidden = false,
+    this.onToggleSidebar,
+    this.onNewSession,
     required this.canNavigateBack,
     required this.canNavigateForward,
     required this.onNavigateBack,
@@ -369,11 +375,43 @@ class MacWindowBar extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(8, 0, 10, 0),
       decoration: BoxDecoration(
         color: AppColors.windowBg,
-        border: Border(bottom: BorderSide(color: AppColors.line)),
+        border: Border(
+            bottom: BorderSide(color: AppColors.line.withValues(alpha: 0.35))),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          if (sidebarHidden) ...[
+            if (reserveWindowControls) const SizedBox(width: 72),
+            Center(
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                if (onToggleSidebar != null)
+                  IconBtn('sidebar',
+                      size: 28,
+                      iconSize: 15,
+                      tooltip:
+                          kMacOS ? 'Show sidebar (⌘B)' : 'Show sidebar (Ctrl+B)',
+                      onTap: onToggleSidebar),
+                IconBtn('chevron-left',
+                    size: 28,
+                    iconSize: 16,
+                    tooltip: 'Back',
+                    onTap: canNavigateBack ? onNavigateBack : null),
+                IconBtn('chevron-right',
+                    size: 28,
+                    iconSize: 16,
+                    tooltip: 'Forward',
+                    onTap: canNavigateForward ? onNavigateForward : null),
+                if (onNewSession != null)
+                  IconBtn('plus',
+                      size: 28,
+                      iconSize: 16,
+                      tooltip: 'New session',
+                      onTap: onNewSession),
+                const SizedBox(width: 6),
+              ]),
+            ),
+          ],
           Expanded(child: Align(alignment: Alignment.centerLeft, child: tabsRow)),
           const SizedBox(width: 8),
           Center(

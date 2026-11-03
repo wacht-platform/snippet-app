@@ -11,6 +11,7 @@ class ShellSplitView extends StatefulWidget {
   const ShellSplitView({
     super.key,
     required this.sidebar,
+    this.sidebarHidden = false,
     this.sidebarHeader,
     this.sidebarTop,
     this.mainHeader,
@@ -43,6 +44,7 @@ class ShellSplitView extends StatefulWidget {
   });
 
   final Widget sidebar;
+  final bool sidebarHidden;
   final Widget? sidebarHeader;
   final Widget? sidebarTop;
   final Widget? mainHeader;
@@ -220,24 +222,25 @@ class _ShellSplitViewState extends State<ShellSplitView> {
                     widget.readouts.any((r) => r.pane == ShellPane.right)))));
     final showLeft = !(widget.leftCollapsed && widget.leftTabs.isNotEmpty);
 
-    final line = BorderSide(color: AppColors.line);
+    final subtleLine = BorderSide(color: AppColors.line.withValues(alpha: 0.35));
     return Expanded(
       child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Container(
-          width: kSidebarWidth,
-          decoration: BoxDecoration(
-            color: AppColors.windowBg,
-            border: Border(right: line),
+        if (!widget.sidebarHidden)
+          Container(
+            width: kSidebarWidth,
+            decoration: BoxDecoration(
+              color: AppColors.windowBg,
+              border: Border(right: subtleLine),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (widget.sidebarTop != null) widget.sidebarTop!,
+                if (widget.sidebarHeader != null) widget.sidebarHeader!,
+                Expanded(child: widget.sidebar),
+              ],
+            ),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (widget.sidebarTop != null) widget.sidebarTop!,
-              if (widget.sidebarHeader != null) widget.sidebarHeader!,
-              Expanded(child: widget.sidebar),
-            ],
-          ),
-        ),
         Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             if (widget.mainHeader != null) widget.mainHeader!,

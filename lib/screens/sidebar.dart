@@ -956,20 +956,33 @@ class SidebarState extends State<Sidebar> {
                                 color: mcSelected
                                     ? AppColors.fg1
                                     : AppColors.fg2)),
-                        Text(
-                            mcWaiting
-                                ? 'Waiting on you'
-                                : mcBusy
-                                    ? 'Working'
-                                    : crewLine,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: sans(12,
-                                color: mcWaiting
-                                    ? AppColors.run
+                        Row(children: [
+                          if (mcBusy && !mcWaiting) ...[
+                            SessionStateIcon(
+                              status: 'running',
+                              icon: 'activity',
+                              size: 11,
+                              activeColor: AppColors.accent,
+                            ),
+                            const SizedBox(width: 4),
+                          ],
+                          Expanded(
+                            child: Text(
+                                mcWaiting
+                                    ? 'Waiting on you'
                                     : mcBusy
-                                        ? AppColors.fg1
-                                        : AppColors.fg4)),
+                                        ? 'Working'
+                                        : crewLine,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: sans(12,
+                                    color: mcWaiting
+                                        ? AppColors.run
+                                        : mcBusy
+                                            ? AppColors.fg1
+                                            : AppColors.fg4)),
+                          ),
+                        ]),
                       ],
                     ),
                   ),
@@ -1262,9 +1275,26 @@ class SidebarState extends State<Sidebar> {
                 : draft
                     ? ('Draft', AppColors.accent, false)
                     : (relativeTime(s.lastActive), AppColors.fg4, false);
-    final label = Text(text,
-        style: sans(size,
-            weight: pill ? W.label : W.body, color: color, tabular: true));
+    final label = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (running) ...[
+          SessionStateIcon(
+            status: 'running',
+            icon: 'activity',
+            size: size,
+            activeColor: color,
+          ),
+          const SizedBox(width: 4),
+        ] else if (waiting) ...[
+          AppIcon('alert-circle', size: size, color: color),
+          const SizedBox(width: 4),
+        ],
+        Text(text,
+            style: sans(size,
+                weight: pill ? W.label : W.body, color: color, tabular: true)),
+      ],
+    );
     if (!pill || plain) return label;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 1.5),

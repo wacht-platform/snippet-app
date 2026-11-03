@@ -134,10 +134,12 @@ class _PaneResizeHandleState extends State<PaneResizeHandle> {
         clipBehavior: Clip.none,
         alignment: Alignment.center,
         children: [
-          // Razor-thin visible divider line
+          // Subtle inside divider line that blends into the background until hovered
           Positioned.fill(
             child: ColoredBox(
-              color: _hover ? kPaneSeamHoverColor : AppColors.border,
+              color: _hover
+                  ? kPaneSeamHoverColor
+                  : AppColors.line.withValues(alpha: 0.35),
             ),
           ),
           // Expanded invisible hit target for effortless grab & hover

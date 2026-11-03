@@ -332,6 +332,12 @@ class AccentPreset {
 
 const List<AccentPreset> allAccents = [
   AccentPreset(
+    name: 'white',
+    label: 'Pure White',
+    accent: Color(0xFFFFFFFF),
+    accentFg: Color(0xFF0A0A0A),
+  ),
+  AccentPreset(
     name: 'violet',
     label: 'Violet',
     accent: Color(0xFFA78BFA),

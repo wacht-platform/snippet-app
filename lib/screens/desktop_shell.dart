@@ -225,6 +225,7 @@ class _DesktopShellState extends State<DesktopShell>
   /// answerable without opening anything. Kept separate from [_sessions] so a
   /// coordination failure can never take the session list down with it.
   bool _sidebarGit = false;
+  bool _sidebarHidden = false;
 
   /// Secondary-pane width, dragged by its handle. Width-driven rather than a
   /// flex ratio because a flex ratio cannot be dragged and has no natural size.
@@ -853,7 +854,7 @@ class _DesktopShellState extends State<DesktopShell>
   Timer? _persistTabsDebounce;
 
   void _toggleSidebar() {
-    setState(() => _leftCollapsed = !_leftCollapsed);
+    setState(() => _sidebarHidden = !_sidebarHidden);
   }
 
   void _toggleSecondaryPane() {
@@ -959,6 +960,14 @@ class _DesktopShellState extends State<DesktopShell>
       cmd('mission-control', 'layers', 'Mission Control',
           _openMissionControlTab,
           keywords: const ['mc', 'orchestrator', 'tasks']),
+      cmd(
+        'toggle-sidebar',
+        'sidebar',
+        _sidebarHidden ? 'Show left sidebar' : 'Hide left sidebar',
+        _toggleSidebar,
+        shortcut: kMacOS ? '⌘ B' : 'Ctrl+B',
+        keywords: const ['sidebar', 'collapse', 'expand', 'panel', 'left'],
+      ),
       for (final (page, icon, title, keys) in const [
         (
           SettingsPage.general,

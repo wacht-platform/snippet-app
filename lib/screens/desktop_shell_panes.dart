@@ -264,6 +264,7 @@ extension _DesktopShellPanesExt on _DesktopShellState {
   }
 
   Widget _bodyRow({required bool topInset}) => ShellSplitView(
+        sidebarHidden: _sidebarHidden,
         sidebar: ShellPanelScope(
           open: _openShellPanel,
           client: _client,
@@ -697,10 +698,16 @@ extension _DesktopShellPanesExt on _DesktopShellState {
       height: 46,
       child: Row(children: [
         if (kMacOS) ...[
-          const SizedBox(width: 84),
+          const SizedBox(width: 78),
           const Spacer(),
         ] else
           const SizedBox(width: 10),
+        IconBtn('sidebar',
+            size: 28,
+            iconSize: 15,
+            tooltip: kMacOS ? 'Hide sidebar (⌘B)' : 'Hide sidebar (Ctrl+B)',
+            onTap: _toggleSidebar),
+        if (!kMacOS) const Spacer(),
         IconBtn('chevron-left',
             size: 28,
             iconSize: 16,
@@ -810,6 +817,9 @@ extension _DesktopShellPanesExt on _DesktopShellState {
   }
 
   Widget _macWindowBar() => MacWindowBar(
+        sidebarHidden: _sidebarHidden,
+        onToggleSidebar: _toggleSidebar,
+        onNewSession: _client == null ? null : _newSessionFlow,
         canNavigateBack: _canNavigateBack,
         canNavigateForward: _canNavigateForward,
         onNavigateBack: _navigateBack,

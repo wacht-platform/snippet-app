@@ -261,7 +261,7 @@ class _SessionSidePanelState extends State<SessionSidePanel> {
                   header: _segs(),
                 ),
         ),
-        Container(height: 1, color: AppColors.border),
+        Container(height: 1, color: AppColors.border.withValues(alpha: 0.35)),
         header,
         if (open)
           ConstrainedBox(
