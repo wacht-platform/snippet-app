@@ -32,6 +32,7 @@ class PaneSurface extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return ClipRect(
       child: ColoredBox(
         color: pane == ShellPane.right ? AppColors.windowBg : readingBg,
@@ -139,7 +140,7 @@ class _PaneResizeHandleState extends State<PaneResizeHandle> {
             child: ColoredBox(
               color: _hover
                   ? kPaneSeamHoverColor
-                  : AppColors.line.withValues(alpha: 0.35),
+                  : AppColors.line.withValues(alpha: 0.65),
             ),
           ),
           // Expanded invisible hit target for effortless grab & hover

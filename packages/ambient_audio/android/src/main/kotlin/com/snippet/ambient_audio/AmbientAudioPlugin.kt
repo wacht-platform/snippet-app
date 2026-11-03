@@ -135,7 +135,7 @@ class AmbientAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
                 it.clientAudioSource == MediaRecorder.AudioSource.VOICE_COMMUNICATION ||
                     it.clientAudioSource == MediaRecorder.AudioSource.VOICE_CALL
             }
-            phone || voip || callers >= 1
+            phone || voip || callers >= 2
         } catch (_: Exception) {
             false
         }
@@ -199,12 +199,12 @@ class AmbientAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
     }
 
     private fun createSink(): Sink {
-        useComm = false
+        useComm = commActive || enterComm()
         val min = AudioTrack.getMinBufferSize(24000, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT)
         val track = AudioTrack.Builder()
             .setAudioAttributes(
                 AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_MEDIA)
+                    .setUsage(if (useComm) AudioAttributes.USAGE_VOICE_COMMUNICATION else AudioAttributes.USAGE_MEDIA)
                     .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
                     .build()
             )

@@ -213,6 +213,7 @@ class _ShellSplitViewState extends State<ShellSplitView> {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     final showRight = !widget.hideRight &&
         (_dragActive ||
         widget.rightPanel != null ||
@@ -222,7 +223,7 @@ class _ShellSplitViewState extends State<ShellSplitView> {
                     widget.readouts.any((r) => r.pane == ShellPane.right)))));
     final showLeft = !(widget.leftCollapsed && widget.leftTabs.isNotEmpty);
 
-    final subtleLine = BorderSide(color: AppColors.line.withValues(alpha: 0.35));
+    final subtleLine = BorderSide(color: AppColors.line.withValues(alpha: 0.65));
     return Expanded(
       child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         if (!widget.sidebarHidden)

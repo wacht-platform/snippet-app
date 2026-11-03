@@ -105,13 +105,20 @@ class AmbientCapture {
 
   Future<Stream<Uint8List>> _openMic() async {
     if (defaultTargetPlatform == TargetPlatform.android) {
+      var external = false;
       _earbuds = false;
       try {
-        _earbuds = await _audio.hasExternal();
+        external = await _audio.hasExternal();
       } catch (_) {}
+      if (external) {
+        try {
+          _earbuds = await _audio.prepare();
+          if (_earbuds) await Future<void>.delayed(const Duration(milliseconds: 800));
+        } catch (_) {}
+      }
     }
     InputDevice? device;
-    if (defaultTargetPlatform == TargetPlatform.android) {
+    if (defaultTargetPlatform == TargetPlatform.android && !_earbuds) {
       try {
         final id = await _audio.builtinMicId();
         if (id >= 0) {
@@ -131,7 +138,7 @@ class AmbientCapture {
         noiseSuppress: !_earbuds,
         androidConfig: const AndroidRecordConfig(
             manageBluetooth: false,
-            audioSource: AndroidAudioSource.mic)));
+            audioSource: AndroidAudioSource.voiceCommunication)));
   }
 
   bool _micRetried = false;
@@ -310,8 +317,8 @@ class AmbientCapture {
       if (rms > 0.0004 && _probability < 0.3) _loudQuiet++;
       gate.addFrame(frame, _probability);
       final voiced = _probability >= threshold;
-      if (defaultTargetPlatform == TargetPlatform.macOS ||
-          (defaultTargetPlatform == TargetPlatform.android && _earbuds)) {
+      if (defaultTargetPlatform == TargetPlatform.android ||
+          defaultTargetPlatform == TargetPlatform.macOS) {
         _duckCheck(voiced);
       } else if (_playOn) {
         if (_echoRms == 0) {

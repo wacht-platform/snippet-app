@@ -304,9 +304,459 @@ final _gruvbox = _palette(
   fg4: const Color(0xFF7C6F64),
 );
 
+final _crimsonNoir = _palette(
+  name: 'crimson-noir',
+  label: 'Crimson Noir',
+  bg: const Color(0xFF0A0A0A),
+  surface1: const Color(0xFF141414),
+  surface2: const Color(0xFF1A1A1A),
+  surface3: const Color(0xFF2B2B2B),
+  border: const Color(0xFF222222),
+  border2: const Color(0xFF333333),
+  accent: const Color(0xFFFF1914),
+  accentFg: const Color(0xFFFFFFFF),
+  fg1: const Color(0xFFEEEDEE),
+  fg2: const Color(0xFFC9C9C9),
+  fg3: const Color(0xFF969696),
+  fg4: const Color(0xFF686868),
+);
+
+final _desertAdobe = _palette(
+  name: 'desert-adobe',
+  label: 'Desert Adobe',
+  bg: const Color(0xFF161412),
+  surface1: const Color(0xFF1E1A17),
+  surface2: const Color(0xFF25201C),
+  surface3: const Color(0xFF362E26),
+  border: const Color(0xFF2B241F),
+  border2: const Color(0xFF413629),
+  accent: const Color(0xFFE2A962),
+  accentFg: const Color(0xFF1A1208),
+  fg1: const Color(0xFFDCD1C0),
+  fg2: const Color(0xFFC0B5A4),
+  fg3: const Color(0xFF968C7D),
+  fg4: const Color(0xFF6E665A),
+);
+
+final _graphiteSilver = _palette(
+  name: 'graphite-silver',
+  label: 'Graphite Silver',
+  bg: const Color(0xFF131313),
+  surface1: const Color(0xFF1A1A1A),
+  surface2: const Color(0xFF232323),
+  surface3: const Color(0xFF303030),
+  border: const Color(0xFF262626),
+  border2: const Color(0xFF383838),
+  accent: const Color(0xFFF4F4F4),
+  accentFg: const Color(0xFF111111),
+  fg1: const Color(0xFFE8E8E8),
+  fg2: const Color(0xFFB4B4B4),
+  fg3: const Color(0xFF888888),
+  fg4: const Color(0xFF606060),
+);
+
+final _sageMist = _palette(
+  name: 'sage-mist',
+  label: 'Sage Mist',
+  bg: const Color(0xFF181B18),
+  surface1: const Color(0xFF1E221E),
+  surface2: const Color(0xFF242823),
+  surface3: const Color(0xFF313A33),
+  border: const Color(0xFF282D27),
+  border2: const Color(0xFF384039),
+  accent: const Color(0xFFADC7AD),
+  accentFg: const Color(0xFF111811),
+  fg1: const Color(0xFFCED5CE),
+  fg2: const Color(0xFFB6BFB6),
+  fg3: const Color(0xFF8C968C),
+  fg4: const Color(0xFF656E65),
+);
+
+final _terracottaStudio = _palette(
+  name: 'terracotta-studio',
+  label: 'Terracotta Studio',
+  bg: const Color(0xFF161616),
+  surface1: const Color(0xFF1C1C1C),
+  surface2: const Color(0xFF222222),
+  surface3: const Color(0xFF32302E),
+  border: const Color(0xFF292826),
+  border2: const Color(0xFF3A3835),
+  accent: const Color(0xFFD65F3B),
+  accentFg: const Color(0xFF1A0904),
+  fg1: const Color(0xFFD5D2CD),
+  fg2: const Color(0xFFB4B1AC),
+  fg3: const Color(0xFF8C8984),
+  fg4: const Color(0xFF66635F),
+);
+
+final _volcanicCinder = _palette(
+  name: 'volcanic-cinder',
+  label: 'Volcanic Cinder',
+  bg: const Color(0xFF141111),
+  surface1: const Color(0xFF1B1616),
+  surface2: const Color(0xFF221B1B),
+  surface3: const Color(0xFF352325),
+  border: const Color(0xFF2B2021),
+  border2: const Color(0xFF42272A),
+  accent: const Color(0xFFFF6138),
+  accentFg: const Color(0xFF1E0700),
+  fg1: const Color(0xFFDCCCC7),
+  fg2: const Color(0xFFBEB1AB),
+  fg3: const Color(0xFF948782),
+  fg4: const Color(0xFF6B605C),
+);
+
+final _steelCobalt = _palette(
+  name: 'steel-cobalt',
+  label: 'Steel Cobalt',
+  bg: const Color(0xFF10151B),
+  surface1: const Color(0xFF161B23),
+  surface2: const Color(0xFF1B2029),
+  surface3: const Color(0xFF243144),
+  border: const Color(0xFF212936),
+  border2: const Color(0xFF2E3C52),
+  accent: const Color(0xFF60A5FE),
+  accentFg: const Color(0xFF061529),
+  fg1: const Color(0xFFC5CEDA),
+  fg2: const Color(0xFFA5B0BD),
+  fg3: const Color(0xFF7D8896),
+  fg4: const Color(0xFF586270),
+);
+
+final _copperHearth = _palette(
+  name: 'copper-hearth',
+  label: 'Copper Hearth',
+  bg: const Color(0xFF161210),
+  surface1: const Color(0xFF1C1614),
+  surface2: const Color(0xFF221A17),
+  surface3: const Color(0xFF362822),
+  border: const Color(0xFF2C211D),
+  border2: const Color(0xFF44312A),
+  accent: const Color(0xFFED9353),
+  accentFg: const Color(0xFF1F0E03),
+  fg1: const Color(0xFFDED0C4),
+  fg2: const Color(0xFFBFB4A7),
+  fg3: const Color(0xFF948A7E),
+  fg4: const Color(0xFF6B6359),
+);
+
+final _orchidNebula = _palette(
+  name: 'orchid-nebula',
+  label: 'Orchid Nebula',
+  bg: const Color(0xFF13101E),
+  surface1: const Color(0xFF191528),
+  surface2: const Color(0xFF1F1A31),
+  surface3: const Color(0xFF30264B),
+  border: const Color(0xFF28213F),
+  border2: const Color(0xFF382B59),
+  accent: const Color(0xFFFE6FE1),
+  accentFg: const Color(0xFF260520),
+  fg1: const Color(0xFFDBD3EE),
+  fg2: const Color(0xFFB4ABCD),
+  fg3: const Color(0xFF8A80A6),
+  fg4: const Color(0xFF62597D),
+);
+
+final _deepIndigo = _palette(
+  name: 'deep-indigo',
+  label: 'Deep Indigo',
+  bg: const Color(0xFF111622),
+  surface1: const Color(0xFF161C2A),
+  surface2: const Color(0xFF1C2232),
+  surface3: const Color(0xFF27314A),
+  border: const Color(0xFF232B3F),
+  border2: const Color(0xFF313E5B),
+  accent: const Color(0xFF88A7F1),
+  accentFg: const Color(0xFF0A1329),
+  fg1: const Color(0xFFCED6E9),
+  fg2: const Color(0xFFADB8CF),
+  fg3: const Color(0xFF828FA8),
+  fg4: const Color(0xFF5B677E),
+);
+
+final _arcticSlate = _palette(
+  name: 'arctic-slate',
+  label: 'Arctic Slate',
+  bg: const Color(0xFF0F141B),
+  surface1: const Color(0xFF141A22),
+  surface2: const Color(0xFF18202A),
+  surface3: const Color(0xFF233040),
+  border: const Color(0xFF1F2936),
+  border2: const Color(0xFF2C3B4E),
+  accent: const Color(0xFF96B7D7),
+  accentFg: const Color(0xFF091520),
+  fg1: const Color(0xFFCBD4DD),
+  fg2: const Color(0xFFB1BCC9),
+  fg3: const Color(0xFF8592A1),
+  fg4: const Color(0xFF5E6A78),
+);
+
+final _pineCanopy = _palette(
+  name: 'pine-canopy',
+  label: 'Pine Canopy',
+  bg: const Color(0xFF141A16),
+  surface1: const Color(0xFF19201B),
+  surface2: const Color(0xFF1D2620),
+  surface3: const Color(0xFF2A372E),
+  border: const Color(0xFF243028),
+  border2: const Color(0xFF334438),
+  accent: const Color(0xFFA2C2A0),
+  accentFg: const Color(0xFF0E1A0E),
+  fg1: const Color(0xFFC7D2C6),
+  fg2: const Color(0xFFB0BBB0),
+  fg3: const Color(0xFF869186),
+  fg4: const Color(0xFF5F695F),
+);
+
+final _fernCloister = _palette(
+  name: 'fern-cloister',
+  label: 'Fern Cloister',
+  bg: const Color(0xFF101710),
+  surface1: const Color(0xFF161F16),
+  surface2: const Color(0xFF1C261B),
+  surface3: const Color(0xFF273726),
+  border: const Color(0xFF223021),
+  border2: const Color(0xFF30452F),
+  accent: const Color(0xFF99D58F),
+  accentFg: const Color(0xFF0A1C08),
+  fg1: const Color(0xFFC9D5C3),
+  fg2: const Color(0xFFADBBA8),
+  fg3: const Color(0xFF83917E),
+  fg4: const Color(0xFF5B6757),
+);
+
+final _cyberSynth = _palette(
+  name: 'cyber-synth',
+  label: 'Cyber Synth',
+  bg: const Color(0xFF0C0D15),
+  surface1: const Color(0xFF131420),
+  surface2: const Color(0xFF1A1A27),
+  surface3: const Color(0xFF282940),
+  border: const Color(0xFF222336),
+  border2: const Color(0xFF323352),
+  accent: const Color(0xFFFF26E0),
+  accentFg: const Color(0xFF24001E),
+  fg1: const Color(0xFFDADCF0),
+  fg2: const Color(0xFFB8BCD6),
+  fg3: const Color(0xFF8B90AD),
+  fg4: const Color(0xFF626682),
+);
+
+final _velvetRose = _palette(
+  name: 'velvet-rose',
+  label: 'Velvet Rose',
+  bg: const Color(0xFF181216),
+  surface1: const Color(0xFF1F171C),
+  surface2: const Color(0xFF251C21),
+  surface3: const Color(0xFF382831),
+  border: const Color(0xFF2E2229),
+  border2: const Color(0xFF402C38),
+  accent: const Color(0xFFEF7AA3),
+  accentFg: const Color(0xFF260813),
+  fg1: const Color(0xFFE0CED6),
+  fg2: const Color(0xFFC0AFB8),
+  fg3: const Color(0xFF96858E),
+  fg4: const Color(0xFF6E5E66),
+);
+
+final _burgundyStudy = _palette(
+  name: 'burgundy-study',
+  label: 'Burgundy Study',
+  bg: const Color(0xFF181012),
+  surface1: const Color(0xFF1F1518),
+  surface2: const Color(0xFF261B1D),
+  surface3: const Color(0xFF382428),
+  border: const Color(0xFF302124),
+  border2: const Color(0xFF42282C),
+  accent: const Color(0xFFD26457),
+  accentFg: const Color(0xFF210805),
+  fg1: const Color(0xFFDDCCC2),
+  fg2: const Color(0xFFBEADA4),
+  fg3: const Color(0xFF94847B),
+  fg4: const Color(0xFF6B5D55),
+);
+
+final _tealEstuary = _palette(
+  name: 'teal-estuary',
+  label: 'Teal Estuary',
+  bg: const Color(0xFF0E1618),
+  surface1: const Color(0xFF131D1F),
+  surface2: const Color(0xFF182425),
+  surface3: const Color(0xFF1F3336),
+  border: const Color(0xFF1E2E30),
+  border2: const Color(0xFF284044),
+  accent: const Color(0xFF3CD3C3),
+  accentFg: const Color(0xFF03211D),
+  fg1: const Color(0xFFC6D8D9),
+  fg2: const Color(0xFFA4B8B7),
+  fg3: const Color(0xFF7B8F8E),
+  fg4: const Color(0xFF556766),
+);
+
+final _crtTerminal = _palette(
+  name: 'crt-terminal',
+  label: 'CRT Terminal',
+  bg: const Color(0xFF0B120C),
+  surface1: const Color(0xFF101B10),
+  surface2: const Color(0xFF162414),
+  surface3: const Color(0xFF1F361C),
+  border: const Color(0xFF1C3019),
+  border2: const Color(0xFF284624),
+  accent: const Color(0xFF73F255),
+  accentFg: const Color(0xFF062102),
+  fg1: const Color(0xFFB3E4AB),
+  fg2: const Color(0xFF97C48F),
+  fg3: const Color(0xFF6E9967),
+  fg4: const Color(0xFF4A6E44),
+);
+
+final _borealGlow = _palette(
+  name: 'boreal-glow',
+  label: 'Boreal Glow',
+  bg: const Color(0xFF0B1016),
+  surface1: const Color(0xFF11161E),
+  surface2: const Color(0xFF161C26),
+  surface3: const Color(0xFF1F2C3D),
+  border: const Color(0xFF1C2532),
+  border2: const Color(0xFF28374A),
+  accent: const Color(0xFF7DF4B7),
+  accentFg: const Color(0xFF052113),
+  fg1: const Color(0xFFD2DAE2),
+  fg2: const Color(0xFFABBAC5),
+  fg3: const Color(0xFF80909C),
+  fg4: const Color(0xFF596873),
+);
+
+final _saffronTwilight = _palette(
+  name: 'saffron-twilight',
+  label: 'Saffron Twilight',
+  bg: const Color(0xFF12131F),
+  surface1: const Color(0xFF181827),
+  surface2: const Color(0xFF1E1D2F),
+  surface3: const Color(0xFF2D2B43),
+  border: const Color(0xFF27263D),
+  border2: const Color(0xFF363452),
+  accent: const Color(0xFFFFC12F),
+  accentFg: const Color(0xFF241800),
+  fg1: const Color(0xFFD9D5C9),
+  fg2: const Color(0xFFB6B3A6),
+  fg3: const Color(0xFF8C897D),
+  fg4: const Color(0xFF646257),
+);
+
+final _amethystGloaming = _palette(
+  name: 'amethyst-gloaming',
+  label: 'Amethyst Gloaming',
+  bg: const Color(0xFF161121),
+  surface1: const Color(0xFF1C152A),
+  surface2: const Color(0xFF221A33),
+  surface3: const Color(0xFF312649),
+  border: const Color(0xFF2B2140),
+  border2: const Color(0xFF3B2E57),
+  accent: const Color(0xFFC4A1EF),
+  accentFg: const Color(0xFF190D29),
+  fg1: const Color(0xFFD4CBE5),
+  fg2: const Color(0xFFB3AAC9),
+  fg3: const Color(0xFF8980A1),
+  fg4: const Color(0xFF625978),
+);
+
+final _harbourMist = _palette(
+  name: 'harbour-mist',
+  label: 'Harbour Mist',
+  bg: const Color(0xFF21222D),
+  surface1: const Color(0xFF272937),
+  surface2: const Color(0xFF2F3242),
+  surface3: const Color(0xFF3D4156),
+  border: const Color(0xFF373B4E),
+  border2: const Color(0xFF484D66),
+  accent: const Color(0xFFF7F7EF),
+  accentFg: const Color(0xFF1B1C26),
+  fg1: const Color(0xFFF7F8F0),
+  fg2: const Color(0xFFE6E6DE),
+  fg3: const Color(0xFFB8BAC7),
+  fg4: const Color(0xFF888B9C),
+);
+
+final _oceanicAbyss = _palette(
+  name: 'oceanic-abyss',
+  label: 'Oceanic Abyss',
+  bg: const Color(0xFF07101A),
+  surface1: const Color(0xFF0B1522),
+  surface2: const Color(0xFF0F1B29),
+  surface3: const Color(0xFF162B40),
+  border: const Color(0xFF142436),
+  border2: const Color(0xFF1D354F),
+  accent: const Color(0xFF56E7C0),
+  accentFg: const Color(0xFF032118),
+  fg1: const Color(0xFFD0DCE8),
+  fg2: const Color(0xFFA1B3C1),
+  fg3: const Color(0xFF748899),
+  fg4: const Color(0xFF4E6170),
+);
+
+final _volcanicBasalt = _palette(
+  name: 'volcanic-basalt',
+  label: 'Volcanic Basalt',
+  bg: const Color(0xFF15181A),
+  surface1: const Color(0xFF1A1E20),
+  surface2: const Color(0xFF202527),
+  surface3: const Color(0xFF283336),
+  border: const Color(0xFF262C2E),
+  border2: const Color(0xFF333C3F),
+  accent: const Color(0xFF87D9C5),
+  accentFg: const Color(0xFF081F1A),
+  fg1: const Color(0xFFD2DADB),
+  fg2: const Color(0xFFACB7B7),
+  fg3: const Color(0xFF828E8E),
+  fg4: const Color(0xFF5B6666),
+);
+
+final _amberPhosphor = _palette(
+  name: 'amber-phosphor',
+  label: 'Amber Phosphor',
+  bg: const Color(0xFF130F09),
+  surface1: const Color(0xFF1B150B),
+  surface2: const Color(0xFF231A0E),
+  surface3: const Color(0xFF362812),
+  border: const Color(0xFF2E2212),
+  border2: const Color(0xFF473313),
+  accent: const Color(0xFFFFB427),
+  accentFg: const Color(0xFF241500),
+  fg1: const Color(0xFFEED8B8),
+  fg2: const Color(0xFFC8B292),
+  fg3: const Color(0xFF998467),
+  fg4: const Color(0xFF6E5D45),
+);
+
 final List<ThemePreset> allPresets = [
   _ember,
   _stone,
+  _crimsonNoir,
+  _desertAdobe,
+  _graphiteSilver,
+  _sageMist,
+  _terracottaStudio,
+  _volcanicCinder,
+  _steelCobalt,
+  _copperHearth,
+  _orchidNebula,
+  _deepIndigo,
+  _arcticSlate,
+  _pineCanopy,
+  _fernCloister,
+  _cyberSynth,
+  _velvetRose,
+  _burgundyStudy,
+  _tealEstuary,
+  _crtTerminal,
+  _borealGlow,
+  _saffronTwilight,
+  _amethystGloaming,
+  _harbourMist,
+  _oceanicAbyss,
+  _volcanicBasalt,
+  _amberPhosphor,
   _tokyo,
   _mocha,
   _nord,
@@ -681,10 +1131,13 @@ class AppColors {
   static Color get lineStrong => currentTheme.border2;
 
   static const Color scrim = Color(0x99000000);
-  static Color get windowBg =>
-      kMobile ? currentTheme.bg : const Color(0xB80D0C0B);
-  static Color get sidebarPanel =>
-      kMobile ? const Color(0xFF171513) : const Color(0xBD171513);
+  static Color get windowBg => kMobile
+      ? currentTheme.bg
+      : Color.lerp(currentTheme.bg, currentTheme.surface1, 0.45)!
+          .withValues(alpha: 0.92);
+  static Color get sidebarPanel => kMobile
+      ? currentTheme.surface1
+      : currentTheme.surface1.withValues(alpha: 0.92);
   static Color get glassSurface => currentTheme.surface2;
   static Color get glassBorder => currentTheme.border;
 

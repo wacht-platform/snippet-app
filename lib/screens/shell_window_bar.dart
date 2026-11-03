@@ -374,7 +374,7 @@ class MacWindowBar extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.windowBg,
         border: Border(
-            bottom: BorderSide(color: AppColors.line.withValues(alpha: 0.35))),
+            bottom: BorderSide(color: AppColors.line.withValues(alpha: 0.65))),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
