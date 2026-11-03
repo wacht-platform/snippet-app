@@ -1860,6 +1860,81 @@ class _AppearancePreviewCard extends StatelessWidget {
   }
 }
 
+Widget _themeCardChip(ThemePreset preset) {
+  return Container(
+    width: 34,
+    height: 22,
+    padding: const EdgeInsets.symmetric(horizontal: 5),
+    decoration: BoxDecoration(
+      color: preset.bg,
+      borderRadius: BorderRadius.circular(5),
+      border: Border.all(color: preset.border2, width: 1),
+    ),
+    child: Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          'Aa',
+          style: sans(10, weight: W.strong, color: preset.fg1, height: 1),
+        ),
+        Container(
+          width: 4,
+          height: 11,
+          decoration: BoxDecoration(
+            color: preset.accent,
+            borderRadius: BorderRadius.circular(1.5),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+Widget _themePaletteDots(ThemePreset preset, {double size = 9}) {
+  final colors = [
+    preset.bg,
+    preset.surface2,
+    preset.surface3,
+    preset.fg2,
+    preset.accent,
+  ];
+  return Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      for (var i = 0; i < colors.length; i++) ...[
+        if (i > 0) const SizedBox(width: 3),
+        Container(
+          width: size,
+          height: size,
+          decoration: BoxDecoration(
+            color: colors[i],
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.16),
+              width: 0.75,
+            ),
+          ),
+        ),
+      ],
+    ],
+  );
+}
+
+Widget _accentSwatchDot(Color color) {
+  return Container(
+    width: 16,
+    height: 16,
+    decoration: BoxDecoration(
+      color: color,
+      shape: BoxShape.circle,
+      border: Border.all(
+        color: Colors.white.withValues(alpha: 0.22),
+        width: 1,
+      ),
+    ),
+  );
+}
+
 class ThemePickerRow extends StatelessWidget {
   const ThemePickerRow({super.key});
 
@@ -1870,15 +1945,17 @@ class ThemePickerRow extends StatelessWidget {
       anchor: anchor,
       below: true,
       alignEnd: true,
-      minWidth: 250,
-      maxWidth: 320,
+      minWidth: 310,
+      maxWidth: 360,
+      sheetHeightFactor: 0.72,
       items: [
         appMenuHeading<String>('Color theme'),
         for (final preset in allPresets)
           appMenuRow<String>(
             value: preset.name,
-            icon: 'sparkles',
+            leading: _themeCardChip(preset),
             label: preset.label,
+            trailingWidget: _themePaletteDots(preset),
             selected: preset.name == current,
           ),
       ],
@@ -1898,22 +1975,11 @@ class ThemePickerRow extends StatelessWidget {
           builder: (anchor) => ListRow(
             title: 'Theme',
             subtitle: kMobile ? null : 'Surface palette saved on this device',
-            leading: Container(
-              width: 19,
-              height: 19,
-              alignment: Alignment.center,
-              child: Container(
-                width: 14,
-                height: 14,
-                decoration: BoxDecoration(
-                  color: base.surface2,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: base.accent, width: 2),
-                ),
-              ),
-            ),
+            leading: _themeCardChip(base),
             onTap: () => pick(context, anchor),
             trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+              _themePaletteDots(base, size: 8),
+              const SizedBox(width: S.s8),
               Text(base.label, style: sans(13, color: AppColors.fg3)),
               const SizedBox(width: S.s6),
               AppIcon('chevron-down', size: 15, color: AppColors.fg4),
@@ -1931,18 +1997,20 @@ class AccentPickerRow extends StatelessWidget {
   static Future<void> pick(BuildContext context, BuildContext anchor) async {
     final custom = ThemeManager.instance.customAccent;
     final current = custom?.name ?? '__theme__';
+    final baseAccent = ThemeManager.instance.baseTheme.accent;
     final picked = await showAppMenu<String>(
       context,
       anchor: anchor,
       below: true,
       alignEnd: true,
-      minWidth: 250,
+      minWidth: 260,
       maxWidth: 320,
+      sheetHeightFactor: 0.68,
       items: [
         appMenuHeading<String>('Accent colour'),
         appMenuRow<String>(
           value: '__theme__',
-          icon: 'sparkles',
+          leading: _accentSwatchDot(baseAccent),
           label: 'Theme default',
           description: 'Matches ${ThemeManager.instance.baseTheme.label}',
           selected: current == '__theme__',
@@ -1951,7 +2019,7 @@ class AccentPickerRow extends StatelessWidget {
         for (final a in allAccents)
           appMenuRow<String>(
             value: a.name,
-            icon: 'check-circle',
+            leading: _accentSwatchDot(a.accent),
             label: a.label,
             selected: a.name == current,
           ),

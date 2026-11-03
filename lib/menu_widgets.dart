@@ -63,10 +63,12 @@ PopupMenuItem<T> appMenuItem<T>({
 /// menus, where the choice needs explaining rather than just naming.
 PopupMenuItem<T> appMenuRow<T>({
   required T value,
-  required String icon,
+  String icon = 'sparkles',
+  Widget? leading,
   required String label,
   String? description,
   String? trailing,
+  Widget? trailingWidget,
   bool selected = false,
   double? height,
 }) {
@@ -78,8 +80,9 @@ PopupMenuItem<T> appMenuRow<T>({
       child: Padding(
         padding: const EdgeInsets.fromLTRB(12, 11, 12, 11),
         child: Row(children: [
-          AppIcon(icon,
-              size: 19, color: selected ? AppColors.accent : AppColors.fg3),
+          leading ??
+              AppIcon(icon,
+                  size: 19, color: selected ? AppColors.accent : AppColors.fg3),
           const SizedBox(width: 14),
           Expanded(
             child: Column(
@@ -102,6 +105,10 @@ PopupMenuItem<T> appMenuRow<T>({
               ],
             ),
           ),
+          if (trailingWidget != null) ...[
+            const SizedBox(width: 8),
+            trailingWidget,
+          ],
           if (trailing != null) ...[
             const SizedBox(width: 8),
             Text(trailing, style: sans(13, color: AppColors.fg3)),
@@ -116,17 +123,18 @@ PopupMenuItem<T> appMenuRow<T>({
   }
   return PopupMenuItem<T>(
     value: value,
-    height: height ?? (description != null ? 44 : 32),
+    height: height ?? (description != null ? 44 : 34),
     padding: const EdgeInsets.symmetric(horizontal: 4),
     child: Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
       decoration: BoxDecoration(
         color: selected ? AppColors.surface2 : Colors.transparent,
         borderRadius: BorderRadius.circular(R.sm),
       ),
       child: Row(children: [
-        AppIcon(icon,
-            size: 15, color: selected ? AppColors.accent : AppColors.fg3),
+        leading ??
+            AppIcon(icon,
+                size: 15, color: selected ? AppColors.accent : AppColors.fg3),
         const SizedBox(width: 10),
         Expanded(
           child: Column(
@@ -147,6 +155,10 @@ PopupMenuItem<T> appMenuRow<T>({
             ],
           ),
         ),
+        if (trailingWidget != null) ...[
+          const SizedBox(width: 8),
+          trailingWidget,
+        ],
         if (trailing != null) ...[
           const SizedBox(width: 8),
           Text(trailing, style: sans(12, color: AppColors.fg4)),
