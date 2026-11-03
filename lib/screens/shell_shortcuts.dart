@@ -104,8 +104,10 @@ class ShellShortcutsHandler {
       return true;
     }
 
-    // New session: Cmd/Ctrl + T
-    if (key == LogicalKeyboardKey.keyT && !shiftDown && !altDown) {
+    // New session: Cmd/Ctrl + N or Cmd/Ctrl + T
+    if ((key == LogicalKeyboardKey.keyN || key == LogicalKeyboardKey.keyT) &&
+        !shiftDown &&
+        !altDown) {
       onNewSession();
       return true;
     }
@@ -235,7 +237,8 @@ void showDesktopShortcutsDialog(BuildContext context) {
     context,
     title: 'Keyboard shortcuts',
     child: Column(mainAxisSize: MainAxisSize.min, children: [
-      shortcutRow('⌘/Ctrl T', 'New session'),
+      shortcutRow('⌘/Ctrl N · ⌘/Ctrl T', 'New session'),
+      shortcutRow('⌘/Ctrl B', 'Toggle left sidebar'),
       shortcutRow('⌘/Ctrl W', 'Close active tab'),
       shortcutRow('⌘/Ctrl 1–9 · Alt 1–9', 'Switch to tab'),
       shortcutRow('Ctrl Tab · Alt ← / → · ⌘ ⇧ [ / ]', 'Previous / next tab'),
