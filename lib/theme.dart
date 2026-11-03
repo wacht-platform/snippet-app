@@ -317,6 +317,123 @@ final List<ThemePreset> allPresets = [
   _rose,
 ];
 
+class AccentPreset {
+  final String name;
+  final String label;
+  final Color accent;
+  final Color accentFg;
+  const AccentPreset({
+    required this.name,
+    required this.label,
+    required this.accent,
+    required this.accentFg,
+  });
+}
+
+const List<AccentPreset> allAccents = [
+  AccentPreset(
+    name: 'violet',
+    label: 'Violet',
+    accent: Color(0xFFA78BFA),
+    accentFg: Color(0xFF140E2E),
+  ),
+  AccentPreset(
+    name: 'periwinkle',
+    label: 'Periwinkle',
+    accent: Color(0xFF9DB0FF),
+    accentFg: Color(0xFF10142A),
+  ),
+  AccentPreset(
+    name: 'sky',
+    label: 'Electric Sky',
+    accent: Color(0xFF38BDF8),
+    accentFg: Color(0xFF041A26),
+  ),
+  AccentPreset(
+    name: 'cyan',
+    label: 'Frost Cyan',
+    accent: Color(0xFF22D3EE),
+    accentFg: Color(0xFF041E24),
+  ),
+  AccentPreset(
+    name: 'emerald',
+    label: 'Emerald',
+    accent: Color(0xFF34D399),
+    accentFg: Color(0xFF032015),
+  ),
+  AccentPreset(
+    name: 'lime',
+    label: 'Acid Lime',
+    accent: Color(0xFFA3E635),
+    accentFg: Color(0xFF142103),
+  ),
+  AccentPreset(
+    name: 'amber',
+    label: 'Solar Amber',
+    accent: Color(0xFFF59E0B),
+    accentFg: Color(0xFF1F1200),
+  ),
+  AccentPreset(
+    name: 'orange',
+    label: 'Tangerine',
+    accent: Color(0xFFFB923C),
+    accentFg: Color(0xFF241002),
+  ),
+  AccentPreset(
+    name: 'rose',
+    label: 'Coral Rose',
+    accent: Color(0xFFFB7185),
+    accentFg: Color(0xFF28060C),
+  ),
+  AccentPreset(
+    name: 'lavender',
+    label: 'Mauve Lavender',
+    accent: Color(0xFFCBA6F7),
+    accentFg: Color(0xFF1E1030),
+  ),
+];
+
+ThemePreset _withAccentOverride(ThemePreset base, AccentPreset? override) {
+  if (override == null) return base;
+  final a = override.accent;
+  final hover = _lighten(a, 0.06);
+  return ThemePreset(
+    name: base.name,
+    label: base.label,
+    bg: base.bg,
+    canvas: base.canvas,
+    floor: base.floor,
+    surface1: base.surface1,
+    surface2: base.surface2,
+    surface3: base.surface3,
+    fg1: base.fg1,
+    fg2: base.fg2,
+    fg3: base.fg3,
+    fg4: base.fg4,
+    border: base.border,
+    border2: base.border2,
+    accent: a,
+    accentHover: hover,
+    accentFg: override.accentFg,
+    accentBg: a.withValues(alpha: 0.14),
+    accentLine: a.withValues(alpha: 0.38),
+    accentRing: a.withValues(alpha: 0.45),
+    accentFill: a,
+    accentFillHover: hover,
+    ok: base.ok,
+    okBg: base.okBg,
+    run: base.run,
+    runBg: base.runBg,
+    danger: base.danger,
+    dangerBg: base.dangerBg,
+    diffAddBg: base.diffAddBg,
+    diffDelBg: base.diffDelBg,
+    diffAddFg: base.diffAddFg,
+    diffDelFg: base.diffDelFg,
+    diffGutter: base.diffGutter,
+  );
+}
+
 class FontPreset {
   final String family;
   final String label;
@@ -417,6 +534,7 @@ Color _lighten(Color c, double amount) {
 
 class ThemeManager extends ChangeNotifier {
   static const _prefsKey = 'theme_index';
+  static const _accentPrefsKey = 'accent_name';
   static const _fontPrefsKey = 'ui_font_family';
   static const _monoFontPrefsKey = 'mono_font_family';
 
@@ -424,17 +542,29 @@ class ThemeManager extends ChangeNotifier {
   ThemeManager._();
 
   int _themeIndex = 0;
+  int _accentIndex = -1; // -1 = use theme's built-in accent
   int _fontIndex = 0;
   int _monoFontIndex = 0;
 
   int get themeIndex => _themeIndex;
+  int get accentIndex => _accentIndex;
   int get fontIndex => _fontIndex;
   int get monoFontIndex => _monoFontIndex;
 
-  /// Combined cache key so markdown style caches invalidate on theme, sans, or mono change.
-  int get index => _themeIndex * 1000 + _fontIndex * 10 + _monoFontIndex;
+  /// Combined cache key so markdown style caches invalidate on theme, accent, sans, or mono change.
+  int get index =>
+      _themeIndex * 10000 +
+      (_accentIndex + 1) * 100 +
+      _fontIndex * 10 +
+      _monoFontIndex;
 
-  ThemePreset get current => allPresets[_themeIndex.clamp(0, allPresets.length - 1)];
+  ThemePreset get baseTheme =>
+      allPresets[_themeIndex.clamp(0, allPresets.length - 1)];
+  AccentPreset? get customAccent =>
+      _accentIndex >= 0 && _accentIndex < allAccents.length
+          ? allAccents[_accentIndex]
+          : null;
+  ThemePreset get current => _withAccentOverride(baseTheme, customAccent);
   FontPreset get currentFont => allFonts[_fontIndex.clamp(0, allFonts.length - 1)];
   FontPreset get currentMonoFont =>
       allMonoFonts[_monoFontIndex.clamp(0, allMonoFonts.length - 1)];
@@ -443,6 +573,12 @@ class ThemeManager extends ChangeNotifier {
     final p = await SharedPreferences.getInstance();
     final savedTheme = p.getInt(_prefsKey) ?? 0;
     _themeIndex = savedTheme.clamp(0, allPresets.length - 1);
+    final savedAccent = p.getString(_accentPrefsKey);
+    if (savedAccent != null && savedAccent.isNotEmpty) {
+      _accentIndex = allAccents.indexWhere((a) => a.name == savedAccent);
+    } else {
+      _accentIndex = -1;
+    }
     final savedFont = p.getString(_fontPrefsKey);
     if (savedFont != null) {
       final fi = allFonts.indexWhere((f) => f.family == savedFont);
@@ -467,6 +603,21 @@ class ThemeManager extends ChangeNotifier {
   Future<void> setName(String name) async {
     final i = allPresets.indexWhere((p) => p.name == name);
     if (i >= 0) await setIndex(i);
+  }
+
+  Future<void> setAccentName(String? name) async {
+    final next = (name == null || name.isEmpty)
+        ? -1
+        : allAccents.indexWhere((a) => a.name == name);
+    if (next == _accentIndex) return;
+    _accentIndex = next;
+    notifyListeners();
+    final p = await SharedPreferences.getInstance();
+    if (next < 0) {
+      await p.remove(_accentPrefsKey);
+    } else {
+      await p.setString(_accentPrefsKey, allAccents[next].name);
+    }
   }
 
   Future<void> setFontFamily(String family) async {

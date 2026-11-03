@@ -646,6 +646,7 @@ class SettingsPanelState extends State<SettingsPanel> {
         label('Appearance'),
         ListGroup(children: const [
           ThemePickerRow(),
+          AccentPickerRow(),
           FontPickerRow(),
           MonoFontPickerRow(),
         ]),
@@ -1238,6 +1239,7 @@ class SettingsPanelState extends State<SettingsPanel> {
             padding: EdgeInsets.fromLTRB(S.s4, 0, S.s4, S.s6)),
         ListGroup(children: const [
           ThemePickerRow(),
+          AccentPickerRow(),
           FontPickerRow(),
           MonoFontPickerRow(),
         ]),
@@ -1567,11 +1569,79 @@ class ThemePickerRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final current = ThemeManager.instance.current;
+    final base = ThemeManager.instance.baseTheme;
     return Builder(
       builder: (anchor) => ListRow(
         title: 'Theme',
-        subtitle: kMobile ? null : 'Saved on this device',
+        subtitle: kMobile ? null : 'Surface palette saved on this device',
+        leading: Container(
+          width: 19,
+          height: 19,
+          alignment: Alignment.center,
+          child: Container(
+            width: 14,
+            height: 14,
+            decoration: BoxDecoration(
+              color: base.surface2,
+              shape: BoxShape.circle,
+              border: Border.all(color: base.accent, width: 2),
+            ),
+          ),
+        ),
+        onTap: () => _pick(context, anchor),
+        trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+          Text(base.label, style: sans(13, color: AppColors.fg3)),
+          const SizedBox(width: S.s6),
+          AppIcon('chevron-down', size: 15, color: AppColors.fg4),
+        ]),
+      ),
+    );
+  }
+}
+
+class AccentPickerRow extends StatelessWidget {
+  const AccentPickerRow({super.key});
+
+  Future<void> _pick(BuildContext context, BuildContext anchor) async {
+    final custom = ThemeManager.instance.customAccent;
+    final current = custom?.name ?? '__theme__';
+    final picked = await showAppMenu<String>(
+      context,
+      anchor: anchor,
+      minWidth: 240,
+      maxWidth: 320,
+      items: [
+        appMenuHeading<String>('Accent colour'),
+        appMenuRow<String>(
+          value: '__theme__',
+          icon: 'sparkles',
+          label: 'Theme default',
+          description: 'Matches ${ThemeManager.instance.baseTheme.label}',
+          selected: current == '__theme__',
+        ),
+        const PopupMenuDivider(height: 9),
+        for (final a in allAccents)
+          appMenuRow<String>(
+            value: a.name,
+            icon: 'check-circle',
+            label: a.label,
+            selected: a.name == current,
+          ),
+      ],
+    );
+    if (picked == null || picked == current) return;
+    await ThemeManager.instance
+        .setAccentName(picked == '__theme__' ? null : picked);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final custom = ThemeManager.instance.customAccent;
+    final activeAccent = ThemeManager.instance.current.accent;
+    return Builder(
+      builder: (anchor) => ListRow(
+        title: 'Accent colour',
+        subtitle: kMobile ? null : 'Override the active theme highlight colour',
         leading: Container(
           width: 19,
           height: 19,
@@ -1580,7 +1650,7 @@ class ThemePickerRow extends StatelessWidget {
             width: 13,
             height: 13,
             decoration: BoxDecoration(
-              color: current.accent,
+              color: activeAccent,
               shape: BoxShape.circle,
               border: Border.all(color: AppColors.border2, width: 1.5),
             ),
@@ -1588,7 +1658,8 @@ class ThemePickerRow extends StatelessWidget {
         ),
         onTap: () => _pick(context, anchor),
         trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-          Text(current.label, style: sans(13, color: AppColors.fg3)),
+          Text(custom?.label ?? 'Theme default',
+              style: sans(13, color: AppColors.fg3)),
           const SizedBox(width: S.s6),
           AppIcon('chevron-down', size: 15, color: AppColors.fg4),
         ]),
