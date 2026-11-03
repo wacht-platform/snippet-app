@@ -316,7 +316,7 @@ class AmbientCapture {
       final rms = energy / samples.length;
       if (rms > 0.0004 && _probability < 0.3) _loudQuiet++;
       gate.addFrame(frame, _probability);
-      final voiced = _probability >= threshold;
+      final voiced = gate.speaking;
       if (defaultTargetPlatform == TargetPlatform.android ||
           defaultTargetPlatform == TargetPlatform.macOS) {
         _duckCheck(voiced);
@@ -354,8 +354,8 @@ class AmbientCapture {
       _loud = 0;
       return;
     }
-    _loud = voiced ? _loud + 1 : 0;
-    if (_loud >= 3) {
+    _loud = voiced ? _loud + 1 : (_loud > 0 ? _loud - 1 : 0);
+    if (_loud >= 2) {
       if (!_ducked) {
         _ducked = true;
         unawaited(voice.duck(true));
@@ -363,7 +363,10 @@ class AmbientCapture {
       _unduck?.cancel();
       _unduck = Timer(const Duration(milliseconds: 700), _restoreVolume);
     }
-    unawaited(voice.localSpeech(voiced, canPause: defaultTargetPlatform == TargetPlatform.macOS && _loud >= 5));
+    final canPause = (defaultTargetPlatform == TargetPlatform.macOS ||
+            defaultTargetPlatform == TargetPlatform.android) &&
+        _loud >= 4;
+    unawaited(voice.localSpeech(voiced, canPause: canPause));
   }
 
   void _restoreVolume() {

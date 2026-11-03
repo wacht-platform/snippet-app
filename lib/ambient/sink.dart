@@ -56,9 +56,9 @@ class _ChannelSink implements AmbientSink {
   @override
   Future<void> volume(double volume) => _c.invokeMethod('volume', {'volume': volume});
   @override
-  Future<void> pauseTts() async {}
+  Future<void> pauseTts() => _c.invokeMethod('pauseTts');
   @override
-  Future<void> resumeTts() async {}
+  Future<void> resumeTts() => _c.invokeMethod('resumeTts');
   @override
   Future<Map<String, dynamic>> stop() => _map('stop');
   @override

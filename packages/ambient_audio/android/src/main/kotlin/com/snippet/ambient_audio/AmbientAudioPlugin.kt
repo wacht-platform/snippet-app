@@ -85,6 +85,14 @@ class AmbientAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
                     synchronized(lock) { sink?.let { try { it.track.setVolume(currentVolume) } catch (_: Exception) {} } }
                     result.success(null)
                 }
+                "pauseTts" -> {
+                    synchronized(lock) { sink?.let { try { it.track.pause() } catch (_: Exception) {} } }
+                    result.success(null)
+                }
+                "resumeTts" -> {
+                    synchronized(lock) { sink?.let { try { it.track.play() } catch (_: Exception) {} } }
+                    result.success(null)
+                }
                 "stop" -> result.success(stopTrack())
                 "leave" -> {
                     leaveComm()
