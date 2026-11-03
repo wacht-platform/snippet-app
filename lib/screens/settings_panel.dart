@@ -1611,29 +1611,27 @@ class AppearanceScreen extends StatelessWidget {
               footer:
                   'Theme and accent colour are saved locally on this device.',
               children: [
-                Builder(
-                  builder: (anchor) => SettingsRow(
-                    label: 'Theme',
-                    sub: '${base.label} surface palette',
-                    trailing: _DropdownButton(
-                      label: base.label,
-                      dotColor: base.accent,
-                      dotFill: base.surface2,
-                      onTap: () => ThemePickerRow.pick(context, anchor),
-                    ),
+                SettingsRow(
+                  label: 'Theme',
+                  sub: '${base.label} surface palette',
+                  trailing: _DropdownButton(
+                    label: base.label,
+                    dotColor: base.accent,
+                    dotFill: base.surface2,
+                    onTapAnchor: (anchor) =>
+                        ThemePickerRow.pick(context, anchor),
                   ),
                 ),
-                Builder(
-                  builder: (anchor) => SettingsRow(
-                    label: 'Accent colour',
-                    sub: custom == null
-                        ? 'Using ${base.label} default highlight'
-                        : 'Custom highlight (${custom.label})',
-                    trailing: _DropdownButton(
-                      label: custom?.label ?? 'Theme default',
-                      dotColor: tm.current.accent,
-                      onTap: () => AccentPickerRow.pick(context, anchor),
-                    ),
+                SettingsRow(
+                  label: 'Accent colour',
+                  sub: custom == null
+                      ? 'Using ${base.label} default highlight'
+                      : 'Custom highlight (${custom.label})',
+                  trailing: _DropdownButton(
+                    label: custom?.label ?? 'Theme default',
+                    dotColor: tm.current.accent,
+                    onTapAnchor: (anchor) =>
+                        AccentPickerRow.pick(context, anchor),
                   ),
                 ),
                 const Padding(
@@ -1647,25 +1645,23 @@ class AppearanceScreen extends StatelessWidget {
               footer:
                   'UI typeface applies to headings, chat and controls; code font applies to diffs, terminals and IDs.',
               children: [
-                Builder(
-                  builder: (anchor) => SettingsRow(
-                    label: 'UI typeface',
-                    sub: uiFont.description,
-                    trailing: _DropdownButton(
-                      label: uiFont.label,
-                      onTap: () => FontPickerRow.pick(context, anchor),
-                    ),
+                SettingsRow(
+                  label: 'UI typeface',
+                  sub: uiFont.description,
+                  trailing: _DropdownButton(
+                    label: uiFont.label,
+                    onTapAnchor: (anchor) =>
+                        FontPickerRow.pick(context, anchor),
                   ),
                 ),
-                Builder(
-                  builder: (anchor) => SettingsRow(
-                    label: 'Code font',
-                    sub: monoFont.description,
-                    trailing: _DropdownButton(
-                      label: monoFont.label,
-                      monoFont: true,
-                      onTap: () => MonoFontPickerRow.pick(context, anchor),
-                    ),
+                SettingsRow(
+                  label: 'Code font',
+                  sub: monoFont.description,
+                  trailing: _DropdownButton(
+                    label: monoFont.label,
+                    monoFont: true,
+                    onTapAnchor: (anchor) =>
+                        MonoFontPickerRow.pick(context, anchor),
                   ),
                 ),
               ],
@@ -1680,24 +1676,25 @@ class AppearanceScreen extends StatelessWidget {
 class _DropdownButton extends StatelessWidget {
   const _DropdownButton({
     required this.label,
-    required this.onTap,
+    required this.onTapAnchor,
     this.dotColor,
     this.dotFill,
     this.monoFont = false,
   });
 
   final String label;
-  final VoidCallback onTap;
+  final ValueChanged<BuildContext> onTapAnchor;
   final Color? dotColor;
   final Color? dotFill;
   final bool monoFont;
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: Container(
+    return Builder(
+      builder: (anchor) => GestureDetector(
+        onTap: () => onTapAnchor(anchor),
+        behavior: HitTestBehavior.opaque,
+        child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
           color: AppColors.surface2,
@@ -1728,6 +1725,7 @@ class _DropdownButton extends StatelessWidget {
           const SizedBox(width: 6),
           AppIcon('chevron-down', size: 14, color: AppColors.fg3),
         ]),
+      ),
       ),
     );
   }
@@ -1870,6 +1868,8 @@ class ThemePickerRow extends StatelessWidget {
     final picked = await showAppMenu<String>(
       context,
       anchor: anchor,
+      below: true,
+      alignEnd: true,
       minWidth: 250,
       maxWidth: 320,
       items: [
@@ -1934,6 +1934,8 @@ class AccentPickerRow extends StatelessWidget {
     final picked = await showAppMenu<String>(
       context,
       anchor: anchor,
+      below: true,
+      alignEnd: true,
       minWidth: 250,
       maxWidth: 320,
       items: [
@@ -2008,6 +2010,8 @@ class FontPickerRow extends StatelessWidget {
     final picked = await showAppMenu<String>(
       context,
       anchor: anchor,
+      below: true,
+      alignEnd: true,
       minWidth: 260,
       maxWidth: 340,
       items: [
@@ -2059,6 +2063,8 @@ class MonoFontPickerRow extends StatelessWidget {
     final picked = await showAppMenu<String>(
       context,
       anchor: anchor,
+      below: true,
+      alignEnd: true,
       minWidth: 260,
       maxWidth: 340,
       items: [
