@@ -569,7 +569,7 @@ TextStyle caps(double size,
         {Color? color, double spacing = 0.5, FontWeight weight = W.label}) =>
     sans(size, weight: weight, color: color, spacing: spacing);
 
-String get kSansFamily => 'Geist';
+String get kSansFamily => 'Cove';
 const kSerifFamily = 'Literata';
 
 /// The agent's own writing on a phone: a screen serif at a reading size, so a

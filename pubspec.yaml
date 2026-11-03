@@ -61,6 +61,16 @@ flutter:
   assets:
     - assets/providers/
   fonts:
+    - family: Cove
+      fonts:
+        - asset: assets/fonts/Cove-400.ttf
+          weight: 400
+        - asset: assets/fonts/Cove-500.ttf
+          weight: 500
+        - asset: assets/fonts/Cove-600.ttf
+          weight: 600
+        - asset: assets/fonts/Cove-700.ttf
+          weight: 700
     - family: Geist
       fonts:
         - asset: assets/fonts/Geist-400.ttf
