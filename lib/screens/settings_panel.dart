@@ -1563,8 +1563,60 @@ class AppearanceScreen extends StatelessWidget {
         final tm = ThemeManager.instance;
         final base = tm.baseTheme;
         final custom = tm.customAccent;
-        final uiFont = tm.currentFont;
-        final monoFont = tm.currentMonoFont;
+
+        final content = <Widget>[
+          _AppearancePreviewCard(),
+          const SizedBox(height: S.s16),
+          SettingsGroup(
+            header: 'Palette',
+            footer: 'Theme and accent colour are saved locally on this device.',
+            children: [
+              const Padding(
+                padding: EdgeInsets.fromLTRB(14, 12, 14, 14),
+                child: _ThemeCardCarousel(),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        Text('Accent colour',
+                            style: sans(kMobile ? 15 : 13,
+                                weight: W.label, color: AppColors.fg1)),
+                        const SizedBox(width: 8),
+                        Text(
+                          custom == null
+                              ? 'Theme default (${base.label})'
+                              : custom.label,
+                          style: sans(12, color: AppColors.fg3),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    const _AccentSwatchStrip(),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          SettingsGroup(
+            header: 'Typography',
+            footer:
+                'UI typeface applies to headings, chat and controls; code font applies to diffs, terminals and IDs.',
+            children: const [
+              Padding(
+                padding: EdgeInsets.fromLTRB(14, 12, 14, 14),
+                child: _FontCardCarousel(mono: false),
+              ),
+              Padding(
+                padding: EdgeInsets.fromLTRB(14, 12, 14, 14),
+                child: _FontCardCarousel(mono: true),
+              ),
+            ],
+          ),
+        ];
 
         if (kMobile) {
           return Column(
@@ -1575,36 +1627,7 @@ class AppearanceScreen extends StatelessWidget {
               Expanded(
                 child: ListView(
                   padding: const EdgeInsets.fromLTRB(S.s16, S.s8, S.s16, S.s40),
-                  children: [
-                    _AppearancePreviewCard(),
-                    const SizedBox(height: S.s16),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
-                      child: Text('THEME PALETTES',
-                          style: sans(11.5,
-                              weight: W.label,
-                              spacing: 0.7,
-                              color: AppColors.fg4)),
-                    ),
-                    const _ThemeCardCarousel(),
-                    const SizedBox(height: S.s16),
-                    ListGroup(children: const [
-                      ThemePickerRow(),
-                      AccentPickerRow(),
-                      FontPickerRow(),
-                      MonoFontPickerRow(),
-                    ]),
-                    const SizedBox(height: S.s20),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
-                      child: Text('ACCENT SWATCHES',
-                          style: sans(11.5,
-                              weight: W.label,
-                              spacing: 0.7,
-                              color: AppColors.fg4)),
-                    ),
-                    const _AccentSwatchStrip(),
-                  ],
+                  children: content,
                 ),
               ),
             ],
@@ -1613,134 +1636,9 @@ class AppearanceScreen extends StatelessWidget {
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _AppearancePreviewCard(),
-            const SizedBox(height: S.s16),
-            SettingsGroup(
-              header: 'Palette',
-              footer:
-                  'Theme and accent colour are saved locally on this device.',
-              children: [
-                SettingsRow(
-                  label: 'Theme',
-                  sub: '${base.label} surface palette',
-                  trailing: _DropdownButton(
-                    label: base.label,
-                    dotColor: base.accent,
-                    dotFill: base.surface2,
-                    onTapAnchor: (anchor) =>
-                        ThemePickerRow.pick(context, anchor),
-                  ),
-                ),
-                const Padding(
-                  padding: EdgeInsets.fromLTRB(14, 12, 14, 12),
-                  child: _ThemeCardCarousel(),
-                ),
-                SettingsRow(
-                  label: 'Accent colour',
-                  sub: custom == null
-                      ? 'Using ${base.label} default highlight'
-                      : 'Custom highlight (${custom.label})',
-                  trailing: _DropdownButton(
-                    label: custom?.label ?? 'Theme default',
-                    dotColor: tm.current.accent,
-                    onTapAnchor: (anchor) =>
-                        AccentPickerRow.pick(context, anchor),
-                  ),
-                ),
-                const Padding(
-                  padding: EdgeInsets.fromLTRB(14, 10, 14, 12),
-                  child: _AccentSwatchStrip(),
-                ),
-              ],
-            ),
-            SettingsGroup(
-              header: 'Typography',
-              footer:
-                  'UI typeface applies to headings, chat and controls; code font applies to diffs, terminals and IDs.',
-              children: [
-                SettingsRow(
-                  label: 'UI typeface',
-                  sub: uiFont.description,
-                  trailing: _DropdownButton(
-                    label: uiFont.label,
-                    onTapAnchor: (anchor) =>
-                        FontPickerRow.pick(context, anchor),
-                  ),
-                ),
-                SettingsRow(
-                  label: 'Code font',
-                  sub: monoFont.description,
-                  trailing: _DropdownButton(
-                    label: monoFont.label,
-                    monoFont: true,
-                    onTapAnchor: (anchor) =>
-                        MonoFontPickerRow.pick(context, anchor),
-                  ),
-                ),
-              ],
-            ),
-          ],
+          children: content,
         );
       },
-    );
-  }
-}
-
-class _DropdownButton extends StatelessWidget {
-  const _DropdownButton({
-    required this.label,
-    required this.onTapAnchor,
-    this.dotColor,
-    this.dotFill,
-    this.monoFont = false,
-  });
-
-  final String label;
-  final ValueChanged<BuildContext> onTapAnchor;
-  final Color? dotColor;
-  final Color? dotFill;
-  final bool monoFont;
-
-  @override
-  Widget build(BuildContext context) {
-    return Builder(
-      builder: (anchor) => GestureDetector(
-        onTap: () => onTapAnchor(anchor),
-        behavior: HitTestBehavior.opaque,
-        child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: AppColors.surface2,
-          borderRadius: BorderRadius.circular(R.sm),
-          border: Border.all(color: AppColors.border2),
-        ),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          if (dotColor != null) ...[
-            Container(
-              width: 11,
-              height: 11,
-              decoration: BoxDecoration(
-                color: dotFill ?? dotColor,
-                shape: BoxShape.circle,
-                border: dotFill != null
-                    ? Border.all(color: dotColor!, width: 2)
-                    : Border.all(color: AppColors.border2, width: 1),
-              ),
-            ),
-            const SizedBox(width: 7),
-          ],
-          Text(
-            label,
-            style: monoFont
-                ? mono(12.5, color: AppColors.fg1)
-                : sans(12.5, weight: W.label, color: AppColors.fg1),
-          ),
-          const SizedBox(width: 6),
-          AppIcon('chevron-down', size: 14, color: AppColors.fg3),
-        ]),
-      ),
-      ),
     );
   }
 }
@@ -1782,16 +1680,20 @@ class _ThemeCardCarouselState extends State<_ThemeCardCarousel> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (!kMobile)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Row(
-                  children: [
-                    Text(
-                      '${allPresets.length} themes',
-                      style: sans(11.5, color: AppColors.fg4),
-                    ),
-                    const Spacer(),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Row(
+                children: [
+                  Text('Theme',
+                      style: sans(kMobile ? 15 : 13,
+                          weight: W.label, color: AppColors.fg1)),
+                  const SizedBox(width: 8),
+                  Text(
+                    '${tm.baseTheme.label} · ${allPresets.length} palettes',
+                    style: sans(12, color: AppColors.fg3),
+                  ),
+                  const Spacer(),
+                  if (!kMobile) ...[
                     IconBtn(
                       'chevron-left',
                       size: 24,
@@ -1808,8 +1710,9 @@ class _ThemeCardCarouselState extends State<_ThemeCardCarousel> {
                       onTap: () => _step(340),
                     ),
                   ],
-                ),
+                ],
               ),
+            ),
             SizedBox(
               height: 112,
               child: ListView.separated(
@@ -1924,6 +1827,190 @@ class _ThemeCardCarouselState extends State<_ThemeCardCarousel> {
                             style: sans(
                               12,
                               weight: selected ? W.label : W.body,
+                              color: selected ? AppColors.fg1 : AppColors.fg3,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _FontCardCarousel extends StatefulWidget {
+  const _FontCardCarousel({required this.mono});
+  final bool mono;
+
+  @override
+  State<_FontCardCarousel> createState() => _FontCardCarouselState();
+}
+
+class _FontCardCarouselState extends State<_FontCardCarousel> {
+  final ScrollController _scroll = ScrollController();
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  void _step(double delta) {
+    if (!_scroll.hasClients) return;
+    final target = (_scroll.offset + delta)
+        .clamp(0.0, _scroll.position.maxScrollExtent);
+    _scroll.animateTo(
+      target,
+      duration: Motion.base,
+      curve: Motion.enter,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: ThemeManager.instance,
+      builder: (context, _) {
+        final tm = ThemeManager.instance;
+        final fonts = widget.mono ? allMonoFonts : allFonts;
+        final active = widget.mono ? tm.currentMonoFont : tm.currentFont;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Row(
+                children: [
+                  Text(
+                    widget.mono ? 'Code font' : 'UI typeface',
+                    style: sans(kMobile ? 15 : 13,
+                        weight: W.label, color: AppColors.fg1),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '${active.label} · ${active.description}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: sans(12, color: AppColors.fg3),
+                    ),
+                  ),
+                  if (!kMobile) ...[
+                    const SizedBox(width: 8),
+                    IconBtn(
+                      'chevron-left',
+                      size: 24,
+                      iconSize: 14,
+                      tooltip: 'Scroll left',
+                      onTap: () => _step(-320),
+                    ),
+                    const SizedBox(width: 4),
+                    IconBtn(
+                      'chevron-right',
+                      size: 24,
+                      iconSize: 14,
+                      tooltip: 'Scroll right',
+                      onTap: () => _step(320),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            SizedBox(
+              height: 106,
+              child: ListView.separated(
+                controller: _scroll,
+                scrollDirection: Axis.horizontal,
+                itemCount: fonts.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 10),
+                itemBuilder: (context, i) {
+                  final font = fonts[i];
+                  final selected = font.family == active.family;
+                  return GestureDetector(
+                    onTap: () => widget.mono
+                        ? tm.setMonoFontFamily(font.family)
+                        : tm.setFontFamily(font.family),
+                    behavior: HitTestBehavior.opaque,
+                    child: SizedBox(
+                      width: 148,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Container(
+                            height: 76,
+                            padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                            decoration: BoxDecoration(
+                              color: AppColors.bg,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: selected
+                                    ? AppColors.fg1
+                                    : AppColors.border2,
+                                width: selected ? 1.8 : 1.0,
+                              ),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Row(
+                                  children: [
+                                    Text(
+                                      widget.mono ? '01 {}' : 'Aa',
+                                      style: TextStyle(
+                                        fontFamily: font.family,
+                                        fontSize: widget.mono ? 16 : 20,
+                                        fontWeight: FontWeight.w600,
+                                        color: AppColors.fg1,
+                                        height: 1,
+                                      ),
+                                    ),
+                                    const Spacer(),
+                                    Container(
+                                      width: 8,
+                                      height: 8,
+                                      decoration: BoxDecoration(
+                                        color: selected
+                                            ? AppColors.accent
+                                            : AppColors.surface3,
+                                        shape: BoxShape.circle,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                Text(
+                                  widget.mono
+                                      ? 'fn main() => 42;'
+                                      : 'Quick brown fox',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontFamily: font.family,
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w400,
+                                    color: AppColors.fg3,
+                                    height: 1.1,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            font.label,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontFamily: font.family,
+                              fontSize: 12,
+                              fontWeight:
+                                  selected ? FontWeight.w500 : FontWeight.w400,
                               color: selected ? AppColors.fg1 : AppColors.fg3,
                             ),
                           ),
