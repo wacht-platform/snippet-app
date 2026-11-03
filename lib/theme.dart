@@ -913,6 +913,41 @@ const List<FontPreset> allFonts = [
     description: 'Crisp technical neo-grotesque',
   ),
   FontPreset(
+    family: 'Inter',
+    label: 'Inter',
+    description: 'Classic high-legibility interface neo-grotesque',
+  ),
+  FontPreset(
+    family: 'PlusJakartaSans',
+    label: 'Plus Jakarta Sans',
+    description: 'Sharp modern geometric grotesque',
+  ),
+  FontPreset(
+    family: 'DMSans',
+    label: 'DM Sans',
+    description: 'Clean low-contrast geometric sans',
+  ),
+  FontPreset(
+    family: 'SpaceGrotesk',
+    label: 'Space Grotesk',
+    description: 'Proportional technical display grotesque',
+  ),
+  FontPreset(
+    family: 'IBMPlexSans',
+    label: 'IBM Plex Sans',
+    description: 'Engineered grotesque with crisp terminals',
+  ),
+  FontPreset(
+    family: 'Manrope',
+    label: 'Manrope',
+    description: 'Modern semi-condensed geometric sans',
+  ),
+  FontPreset(
+    family: 'Outfit',
+    label: 'Outfit',
+    description: 'Balanced geometric UI sans',
+  ),
+  FontPreset(
     family: 'Halden',
     label: 'Halden',
     description: 'Neutral neo-grotesque interface workhorse',
@@ -954,6 +989,31 @@ const List<FontPreset> allMonoFonts = [
     family: 'GeistMono',
     label: 'Geist Mono',
     description: 'Technical Swiss monospace',
+  ),
+  FontPreset(
+    family: 'JetBrainsMono',
+    label: 'JetBrains Mono',
+    description: 'Developer monospace with tall x-height',
+  ),
+  FontPreset(
+    family: 'FiraCode',
+    label: 'Fira Code',
+    description: 'Classic programming monospace',
+  ),
+  FontPreset(
+    family: 'IBMPlexMono',
+    label: 'IBM Plex Mono',
+    description: 'Engineered technical monospace',
+  ),
+  FontPreset(
+    family: 'SourceCodePro',
+    label: 'Source Code Pro',
+    description: 'Clean open-counter coding monospace',
+  ),
+  FontPreset(
+    family: 'Inconsolata',
+    label: 'Inconsolata',
+    description: 'Humanist programmer monospace',
   ),
   FontPreset(
     family: 'Signal',
@@ -1009,9 +1069,9 @@ class ThemeManager extends ChangeNotifier {
 
   /// Combined cache key so markdown style caches invalidate on theme, accent, sans, or mono change.
   int get index =>
-      _themeIndex * 10000 +
-      (_accentIndex + 1) * 100 +
-      _fontIndex * 10 +
+      _themeIndex * 100000 +
+      (_accentIndex + 1) * 1000 +
+      _fontIndex * 20 +
       _monoFontIndex;
 
   ThemePreset get baseTheme =>

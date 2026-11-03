@@ -1578,6 +1578,16 @@ class AppearanceScreen extends StatelessWidget {
                   children: [
                     _AppearancePreviewCard(),
                     const SizedBox(height: S.s16),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+                      child: Text('THEME PALETTES',
+                          style: sans(11.5,
+                              weight: W.label,
+                              spacing: 0.7,
+                              color: AppColors.fg4)),
+                    ),
+                    const _ThemeCardCarousel(),
+                    const SizedBox(height: S.s16),
                     ListGroup(children: const [
                       ThemePickerRow(),
                       AccentPickerRow(),
@@ -1621,6 +1631,10 @@ class AppearanceScreen extends StatelessWidget {
                     onTapAnchor: (anchor) =>
                         ThemePickerRow.pick(context, anchor),
                   ),
+                ),
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(14, 12, 14, 12),
+                  child: _ThemeCardCarousel(),
                 ),
                 SettingsRow(
                   label: 'Accent colour',
@@ -1727,6 +1741,202 @@ class _DropdownButton extends StatelessWidget {
         ]),
       ),
       ),
+    );
+  }
+}
+
+class _ThemeCardCarousel extends StatefulWidget {
+  const _ThemeCardCarousel();
+
+  @override
+  State<_ThemeCardCarousel> createState() => _ThemeCardCarouselState();
+}
+
+class _ThemeCardCarouselState extends State<_ThemeCardCarousel> {
+  final ScrollController _scroll = ScrollController();
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  void _step(double delta) {
+    if (!_scroll.hasClients) return;
+    final target = (_scroll.offset + delta)
+        .clamp(0.0, _scroll.position.maxScrollExtent);
+    _scroll.animateTo(
+      target,
+      duration: Motion.base,
+      curve: Motion.enter,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: ThemeManager.instance,
+      builder: (context, _) {
+        final tm = ThemeManager.instance;
+        final currentName = tm.baseTheme.name;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (!kMobile)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  children: [
+                    Text(
+                      '${allPresets.length} themes',
+                      style: sans(11.5, color: AppColors.fg4),
+                    ),
+                    const Spacer(),
+                    IconBtn(
+                      'chevron-left',
+                      size: 24,
+                      iconSize: 14,
+                      tooltip: 'Scroll left',
+                      onTap: () => _step(-340),
+                    ),
+                    const SizedBox(width: 4),
+                    IconBtn(
+                      'chevron-right',
+                      size: 24,
+                      iconSize: 14,
+                      tooltip: 'Scroll right',
+                      onTap: () => _step(340),
+                    ),
+                  ],
+                ),
+              ),
+            SizedBox(
+              height: 112,
+              child: ListView.separated(
+                controller: _scroll,
+                scrollDirection: Axis.horizontal,
+                itemCount: allPresets.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 10),
+                itemBuilder: (context, i) {
+                  final preset = allPresets[i];
+                  final selected = preset.name == currentName;
+                  final dots = [
+                    preset.surface1,
+                    preset.danger,
+                    preset.ok,
+                    preset.run,
+                    preset.accent,
+                    preset.fg2,
+                  ];
+                  return GestureDetector(
+                    onTap: () => tm.setName(preset.name),
+                    behavior: HitTestBehavior.opaque,
+                    child: SizedBox(
+                      width: 152,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Container(
+                            height: 82,
+                            padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                            decoration: BoxDecoration(
+                              color: preset.bg,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: selected
+                                    ? AppColors.fg1
+                                    : preset.border2,
+                                width: selected ? 1.8 : 1.0,
+                              ),
+                            ),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.center,
+                                  children: [
+                                    Text(
+                                      'Aa',
+                                      style: sans(
+                                        20,
+                                        weight: W.strong,
+                                        color: preset.fg1,
+                                        height: 1,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 6, vertical: 3),
+                                      decoration: BoxDecoration(
+                                        color: preset.surface3,
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      child: Text(
+                                        '~/',
+                                        style: mono(
+                                          10.5,
+                                          weight: W.label,
+                                          color: preset.fg2,
+                                          height: 1,
+                                        ),
+                                      ),
+                                    ),
+                                    const Spacer(),
+                                    Container(
+                                      width: 14,
+                                      height: 22,
+                                      decoration: BoxDecoration(
+                                        color: preset.accent,
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    for (final c in dots)
+                                      Container(
+                                        width: 10,
+                                        height: 10,
+                                        decoration: BoxDecoration(
+                                          color: c,
+                                          shape: BoxShape.circle,
+                                          border: Border.all(
+                                            color: Colors.white
+                                                .withValues(alpha: 0.14),
+                                            width: 0.75,
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            preset.label,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: sans(
+                              12,
+                              weight: selected ? W.label : W.body,
+                              color: selected ? AppColors.fg1 : AppColors.fg3,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }
@@ -2070,6 +2280,29 @@ class AccentPickerRow extends StatelessWidget {
   }
 }
 
+Widget _fontSampleChip(String family) {
+  return Container(
+    width: 30,
+    height: 22,
+    alignment: Alignment.center,
+    decoration: BoxDecoration(
+      color: AppColors.surface2,
+      borderRadius: BorderRadius.circular(5),
+      border: Border.all(color: AppColors.border2, width: 1),
+    ),
+    child: Text(
+      'Aa',
+      style: TextStyle(
+        fontFamily: family,
+        fontSize: 11.5,
+        fontWeight: FontWeight.w600,
+        color: AppColors.fg1,
+        height: 1,
+      ),
+    ),
+  );
+}
+
 class FontPickerRow extends StatelessWidget {
   const FontPickerRow({super.key});
 
@@ -2080,14 +2313,15 @@ class FontPickerRow extends StatelessWidget {
       anchor: anchor,
       below: true,
       alignEnd: true,
-      minWidth: 260,
-      maxWidth: 340,
+      minWidth: 280,
+      maxWidth: 350,
+      sheetHeightFactor: 0.72,
       items: [
         appMenuHeading<String>('UI typeface'),
         for (final font in allFonts)
           appMenuRow<String>(
             value: font.family,
-            icon: 'file-text',
+            leading: _fontSampleChip(font.family),
             label: font.label,
             description: font.description,
             selected: font.family == current,
@@ -2133,14 +2367,15 @@ class MonoFontPickerRow extends StatelessWidget {
       anchor: anchor,
       below: true,
       alignEnd: true,
-      minWidth: 260,
-      maxWidth: 340,
+      minWidth: 280,
+      maxWidth: 350,
+      sheetHeightFactor: 0.72,
       items: [
         appMenuHeading<String>('Code typeface'),
         for (final font in allMonoFonts)
           appMenuRow<String>(
             value: font.family,
-            icon: 'code',
+            leading: _fontSampleChip(font.family),
             label: font.label,
             description: font.description,
             selected: font.family == current,
