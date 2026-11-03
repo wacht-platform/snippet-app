@@ -341,7 +341,6 @@ class MainTabsStrip extends StatelessWidget {
 class MacWindowBar extends StatelessWidget {
   final bool sidebarHidden;
   final VoidCallback? onToggleSidebar;
-  final VoidCallback? onNewSession;
   final bool canNavigateBack;
   final bool canNavigateForward;
   final VoidCallback onNavigateBack;
@@ -356,7 +355,6 @@ class MacWindowBar extends StatelessWidget {
     super.key,
     this.sidebarHidden = false,
     this.onToggleSidebar,
-    this.onNewSession,
     required this.canNavigateBack,
     required this.canNavigateForward,
     required this.onNavigateBack,
@@ -402,12 +400,6 @@ class MacWindowBar extends StatelessWidget {
                     iconSize: 16,
                     tooltip: 'Forward',
                     onTap: canNavigateForward ? onNavigateForward : null),
-                if (onNewSession != null)
-                  IconBtn('plus',
-                      size: 28,
-                      iconSize: 16,
-                      tooltip: 'New session',
-                      onTap: onNewSession),
                 const SizedBox(width: 6),
               ]),
             ),

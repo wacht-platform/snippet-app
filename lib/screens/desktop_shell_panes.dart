@@ -718,11 +718,6 @@ extension _DesktopShellPanesExt on _DesktopShellState {
             iconSize: 16,
             tooltip: 'Forward',
             onTap: _canNavigateForward ? _navigateForward : null),
-        IconBtn('plus',
-            size: 28,
-            iconSize: 16,
-            tooltip: 'New session',
-            onTap: _client == null ? null : _newSessionFlow),
         const SizedBox(width: 10),
       ]),
     );
@@ -819,7 +814,6 @@ extension _DesktopShellPanesExt on _DesktopShellState {
   Widget _macWindowBar() => MacWindowBar(
         sidebarHidden: _sidebarHidden,
         onToggleSidebar: _toggleSidebar,
-        onNewSession: _client == null ? null : _newSessionFlow,
         canNavigateBack: _canNavigateBack,
         canNavigateForward: _canNavigateForward,
         onNavigateBack: _navigateBack,
