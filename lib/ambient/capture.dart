@@ -7,6 +7,7 @@ import 'package:record/record.dart';
 import 'package:silero_vad/silero_vad.dart';
 
 import '../platform.dart';
+import 'macos_mic.dart';
 import 'hold.dart';
 
 import 'gate.dart';
@@ -180,10 +181,7 @@ class AmbientCapture {
     );
     Stream<Uint8List> stream;
     if (kMacOS) {
-      stream = const EventChannel('snippet/macos_aec_mic')
-          .receiveBroadcastStream()
-          .where((event) => event is Uint8List)
-          .cast<Uint8List>();
+      stream = MacosMic.stream;
     } else {
       stream = await _openMic();
     }

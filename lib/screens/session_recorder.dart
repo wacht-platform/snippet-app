@@ -89,7 +89,7 @@ extension _SessionScreenRecorderExt on _SessionScreenState {
       }
       final tempDir = await getTemporaryDirectory();
       final path =
-          '${tempDir.path}/snippet-voice-${DateTime.now().microsecondsSinceEpoch}.m4a';
+          '${tempDir.path}/snippet-voice-${DateTime.now().microsecondsSinceEpoch}.$voiceNoteExtension';
       await _recorder.start(
         RecordConfig(
           encoder: AudioEncoder.aacLc,
@@ -148,8 +148,6 @@ extension _SessionScreenRecorderExt on _SessionScreenState {
         _toast('No recording was captured.');
         return;
       }
-      // macOS AVFoundation finishes the .m4a after stop() returns — wait
-      // for the file instead of racing PathNotFoundException on attach.
       final bytes = await _waitForRecordingFile(path);
       if (bytes == null || bytes.isEmpty) {
         await _discardRecording();
@@ -166,12 +164,12 @@ extension _SessionScreenRecorderExt on _SessionScreenState {
         _recordingBytes = bytes;
       }
     } catch (e) {
+      await _discardRecording();
       _toast('Could not finish recording: $e');
     }
   }
 
-  /// Wait until [path] exists and is non-empty. AVCaptureAudioFileOutput on
-  /// macOS writes the container asynchronously after stopRecording().
+  /// Wait until [path] exists and is non-empty: encoders can finish after stop().
   Future<Uint8List?> _waitForRecordingFile(String path) async {
     final file = File(path.startsWith('file://') ? Uri.parse(path).toFilePath() : path);
     const attempts = 120; // ~6s
@@ -226,7 +224,7 @@ extension _SessionScreenRecorderExt on _SessionScreenState {
       }
       await _ingest([
         (
-          name: 'voice-${DateTime.now().microsecondsSinceEpoch}.m4a',
+          name: 'voice-${DateTime.now().microsecondsSinceEpoch}.$voiceNoteExtension',
           localPath: null,
           readBytes: () async => bytes!,
         )

@@ -534,7 +534,7 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
       }
       final tempDir = await getTemporaryDirectory();
       final path =
-          '${tempDir.path}/snippet-agent-voice-${DateTime.now().microsecondsSinceEpoch}.m4a';
+          '${tempDir.path}/snippet-agent-voice-${DateTime.now().microsecondsSinceEpoch}.$voiceNoteExtension';
       await _recorder.start(
         RecordConfig(
           encoder: AudioEncoder.aacLc,
@@ -612,6 +612,7 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
         _recordingBytes = bytes;
       }
     } catch (e) {
+      await _discardRecording();
       if (mounted) {
         toast(context, 'Could not finish recording: $e', danger: true);
       }
@@ -679,7 +680,7 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
       }
       await _ingest([
         (
-          name: 'voice-${DateTime.now().microsecondsSinceEpoch}.m4a',
+          name: 'voice-${DateTime.now().microsecondsSinceEpoch}.$voiceNoteExtension',
           localPath: null,
           readBytes: () async => bytes,
         )
