@@ -941,6 +941,24 @@ class _DLine {
 List<_DLine> _diff(String aStr, String bStr) {
   final a = _splitLines(aStr);
   final b = _splitLines(bStr);
+  var head = 0;
+  while (head < a.length && head < b.length && a[head] == b[head]) {
+    head++;
+  }
+  var tail = 0;
+  while (tail < a.length - head &&
+      tail < b.length - head &&
+      a[a.length - 1 - tail] == b[b.length - 1 - tail]) {
+    tail++;
+  }
+  final prefix = [for (final l in a.take(head)) _DLine(_DKind.ctx, l)];
+  final suffix = [
+    for (final l in a.skip(a.length - tail)) _DLine(_DKind.ctx, l)
+  ];
+  return [...prefix, ..._diffMiddle(a.sublist(head, a.length - tail), b.sublist(head, b.length - tail)), ...suffix];
+}
+
+List<_DLine> _diffMiddle(List<String> a, List<String> b) {
   final n = a.length, m = b.length;
   if (n * m > 250000) {
     return [
@@ -990,8 +1008,19 @@ class _DiffLines extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [for (final l in diffLines) _row(l)],
+        children: [
+          for (final l in diffLines.take(_maxLines)) _row(l),
+          if (diffLines.length > _maxLines)
+            Padding(
+              padding: const EdgeInsets.all(S.s6),
+              child: Text('${diffLines.length - _maxLines} more lines',
+                  style: _code(AppColors.fg4)),
+            ),
+        ],
       );
+
+  // A transcript row can't scroll lazily; a generated file would stall the chat.
+  static const _maxLines = 400;
 
   Widget _row(_DLine l) {
     final (Color bg, Color fg, String sign) = switch (l.kind) {

@@ -22,6 +22,41 @@ String prAgo(String iso) {
   return relativeTime(t.millisecondsSinceEpoch ~/ 1000);
 }
 
+List<PrSummary> appendPrs(List<PrSummary>? have, List<PrSummary> page) {
+  final seen = {for (final p in have ?? const <PrSummary>[]) p.number};
+  return [...?have, ...page.where((p) => seen.add(p.number))];
+}
+
+// Unbuilt files only have an estimated offset, so the first jump lands near and
+// the second, once they are laid out, lands exactly.
+void prReveal(GlobalKey? key) {
+  final ctx = key?.currentContext;
+  if (ctx == null) return;
+  Scrollable.ensureVisible(ctx);
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    final again = key?.currentContext;
+    if (again != null) Scrollable.ensureVisible(again);
+  });
+}
+
+bool prNearEnd(ScrollNotification n, VoidCallback load) {
+  if (n.metrics.axis == Axis.vertical && n.metrics.extentAfter < 600) load();
+  return false;
+}
+
+Widget prLoadMore(bool busy, VoidCallback onTap) => SizedBox(
+      height: 56,
+      child: Center(
+        child: busy
+            ? Spinner(size: 16, color: AppColors.fg3)
+            : TextButton(
+                onPressed: onTap,
+                child: Text('Load more',
+                    style: sans(13, weight: W.label, color: AppColors.accent)),
+              ),
+      ),
+    );
+
 Widget prMessage(String text) => Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -672,7 +707,8 @@ class PullRequestScreen extends StatefulWidget {
 
 class _PullRequestScreenState extends State<PullRequestScreen> {
   PrDetail? _pr;
-  String _diff = '';
+  late Future<String?> _diff = _fetchDiff();
+  String? _diffOid;
   String? _error;
   bool _busy = false;
   bool _bodyOpen = false;
@@ -688,16 +724,20 @@ class _PullRequestScreenState extends State<PullRequestScreen> {
     _load();
   }
 
+  Future<String?> _fetchDiff() => widget.client
+      .githubPrDiff(widget.session, widget.number)
+      .then<String?>((d) => d)
+      .catchError((_) => null);
+
   Future<void> _load() async {
+    _diff;
     try {
-      final results = await Future.wait([
-        widget.client.githubPr(widget.session, widget.number),
-        widget.client.githubPrDiff(widget.session, widget.number),
-      ]);
+      final pr = await widget.client.githubPr(widget.session, widget.number);
       if (!mounted) return;
       setState(() {
-        _pr = results[0] as PrDetail;
-        _diff = results[1] as String;
+        if (_diffOid != null && _diffOid != pr.headOid) _diff = _fetchDiff();
+        _diffOid = pr.headOid;
+        _pr = pr;
         _error = null;
       });
     } catch (e) {
@@ -1874,7 +1914,7 @@ class PrFilesScreen extends StatefulWidget {
   final String session;
   final int number;
   final List<PrFile> files;
-  final String diff;
+  final Future<String?> diff;
   final List<PrThread> threads;
   final List<PendingComment> pending;
   final Set<String> viewed;
@@ -1888,22 +1928,36 @@ class PrFilesScreen extends StatefulWidget {
 }
 
 class _PrFilesScreenState extends State<PrFilesScreen> with _AfterTransition {
-  late final Map<String, List<DiffLine>> _parsed = parseUnifiedDiff(widget.diff);
+  Map<String, List<DiffLine>>? _parsed;
+  bool _diffFailed = false;
   late List<PrThread> _threads = widget.threads;
   final Map<String, GlobalKey> _fileKeys = {};
 
+  bool get _ready => settled && _parsed != null;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.diff.then((d) {
+      if (!mounted) return;
+      setState(() {
+        _parsed = parseUnifiedDiff(d ?? '');
+        _diffFailed = d == null;
+      });
+    });
+  }
+
   @override
   void setState(VoidCallback fn) {
-    final wasSettled = settled;
+    final wasReady = _ready;
     super.setState(fn);
-    if (!wasSettled && settled && widget.scrollTo != null) {
+    if (!wasReady && _ready && widget.scrollTo != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _jump(widget.scrollTo!));
     }
   }
 
   void _jump(String path) {
-    final ctx = _fileKeys[path]?.currentContext;
-    if (ctx != null) Scrollable.ensureVisible(ctx, duration: const Duration(milliseconds: 250));
+    prReveal(_fileKeys[path]);
   }
 
   Future<void> _refreshThreads() async {
@@ -2062,15 +2116,24 @@ class _PrFilesScreenState extends State<PrFilesScreen> with _AfterTransition {
     final adds = widget.files.fold<int>(0, (a, f) => a + f.additions);
     final dels = widget.files.fold<int>(0, (a, f) => a + f.deletions);
     final viewed = widget.files.where((f) => widget.viewed.contains(f.path)).length;
-    final diff = SingleChildScrollView(
-      padding: const EdgeInsets.only(bottom: 96),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+    final diff = CustomScrollView(
+      slivers: [
+        if (_diffFailed)
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text("Couldn't load the diff for this pull request.",
+                  style: sans(13, color: AppColors.fg3)),
+            ),
+          ),
         for (final f in widget.files)
           KeyedSubtree(
             key: _fileKeys.putIfAbsent(f.path, () => GlobalKey()),
             child: PrFileDiff(
               file: f,
-              lines: _parsed[f.path] ?? const [],
+              lines: _parsed?[f.path] ?? const [],
+              startCollapsed: prStartCollapsed(widget.files) &&
+                  f.path != widget.scrollTo,
               threads: _threads.where((t) => t.path == f.path).toList(),
               pending: widget.pending,
               viewed: widget.viewed.contains(f.path),
@@ -2083,7 +2146,8 @@ class _PrFilesScreenState extends State<PrFilesScreen> with _AfterTransition {
               onThreadsChanged: _refreshThreads,
             ),
           ),
-      ]),
+        const SliverToBoxAdapter(child: SizedBox(height: 96)),
+      ],
     );
     return Material(
       color: AppColors.bg,
@@ -2103,11 +2167,11 @@ class _PrFilesScreenState extends State<PrFilesScreen> with _AfterTransition {
             child: Stack(children: [
               Positioned.fill(
                 child: kMobile
-                    ? (settled ? diff : _diffPlaceholder())
+                    ? (_ready ? diff : _diffPlaceholder())
                     : Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                         SizedBox(width: 260, child: _fileTree()),
                         Container(width: 1, color: AppColors.border),
-                        Expanded(child: settled ? diff : _diffPlaceholder()),
+                        Expanded(child: _ready ? diff : _diffPlaceholder()),
                       ]),
               ),
               Positioned(
@@ -2127,11 +2191,18 @@ class _PrFilesScreenState extends State<PrFilesScreen> with _AfterTransition {
 /// One file of a diff: a collapsible header with a Viewed box, its hunks with
 /// syntax highlighting, threads under their lines, and line selection for new
 /// comments (tap a line, then shift-click or long-press another to extend).
+// Scrolling past a file lays out all its rows, so a jump through a big PR only
+// stays quick if most of it starts closed.
+bool prStartCollapsed(List<PrFile> files) =>
+    files.length > 40 ||
+    files.fold<int>(0, (n, f) => n + f.additions + f.deletions) > 3000;
+
 class PrFileDiff extends StatefulWidget {
   const PrFileDiff({
     super.key,
     required this.file,
     required this.lines,
+    this.startCollapsed = false,
     required this.threads,
     required this.pending,
     required this.viewed,
@@ -2146,6 +2217,7 @@ class PrFileDiff extends StatefulWidget {
 
   final PrFile file;
   final List<DiffLine> lines;
+  final bool startCollapsed;
   final List<PrThread> threads;
   final List<PendingComment> pending;
   final bool viewed;
@@ -2163,7 +2235,8 @@ class PrFileDiff extends StatefulWidget {
 
 class _PrFileDiffState extends State<PrFileDiff> {
   static const _bigFile = 400;
-  late bool _collapsed = widget.viewed || widget.lines.length > _bigFile;
+  late bool _collapsed =
+      widget.viewed || widget.startCollapsed || widget.lines.length > _bigFile;
   int? _selStart;
   int? _selEnd;
   final _composer = TextEditingController();
@@ -2291,6 +2364,27 @@ class _PrFileDiffState extends State<PrFileDiff> {
     return a != null && a.$1 == side && a.$2 == lineNo;
   }
 
+  // Deep paths would otherwise ellipsize away the only part that differs.
+  Widget _fileName(String path) {
+    final slash = path.lastIndexOf('/');
+    if (!kMobile || slash < 0) {
+      return Text(path,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: mono(12.5, color: AppColors.fg1));
+    }
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(path.substring(slash + 1),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: mono(12.5, color: AppColors.fg1)),
+      Text(path.substring(0, slash),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: mono(11, color: AppColors.fg4)),
+    ]);
+  }
+
   Widget _header() {
     final f = widget.file;
     return Material(
@@ -2303,10 +2397,7 @@ class _PrFileDiffState extends State<PrFileDiff> {
           child: Row(children: [
             AppIcon(_collapsed ? 'chevron-right' : 'chevron-down', size: 14, color: AppColors.fg3),
             const SizedBox(width: 6),
-            Expanded(
-              child: Text(f.path,
-                  maxLines: 1, overflow: TextOverflow.ellipsis, style: mono(12.5, color: AppColors.fg1)),
-            ),
+            Expanded(child: _fileName(f.path)),
             const SizedBox(width: 8),
             prSize(f.additions, f.deletions, size: 11.5),
             if (widget.onViewed != null) ...[
@@ -2460,45 +2551,49 @@ class _PrFileDiffState extends State<PrFileDiff> {
 
   @override
   Widget build(BuildContext context) {
-    final rows = <Widget>[_header()];
+    final rows = <Widget Function()>[_header];
     if (!_collapsed) {
       if (widget.lines.isEmpty) {
-        rows.add(Padding(
-          padding: const EdgeInsets.all(14),
-          child: Text('No textual changes (binary, renamed or too large to show).',
-              style: TS.meta(AppColors.fg4)),
-        ));
+        rows.add(() => Padding(
+              padding: const EdgeInsets.all(14),
+              child: Text('No textual changes (binary, renamed or too large to show).',
+                  style: TS.meta(AppColors.fg4)),
+            ));
       }
       final r = _range;
+      final notes = widget.threads.isNotEmpty || widget.pending.isNotEmpty;
       for (var i = 0; i < widget.lines.length; i++) {
         final line = widget.lines[i];
-        rows.add(_line(i));
-        final anchor = line.anchor;
-        if (anchor != null) {
+        rows.add(() => _line(i));
+        if (notes && line.anchor != null) {
           for (final t in widget.threads.where((t) => _matches(line, t.line, t.side))) {
-            rows.add(PrThreadBox(
-              thread: t,
-              client: widget.client,
-              session: widget.session,
-              number: widget.number,
-              onChanged: widget.onThreadsChanged,
-            ));
+            rows.add(() => PrThreadBox(
+                  key: ValueKey(t.id),
+                  thread: t,
+                  client: widget.client,
+                  session: widget.session,
+                  number: widget.number,
+                  onChanged: widget.onThreadsChanged,
+                ));
           }
           for (final p in widget.pending.where((p) => p.path == widget.file.path && _matches(line, p.line, p.side))) {
-            rows.add(_PendingBox(
-              comment: p,
-              onRemove: () {
-                widget.pending.remove(p);
-                widget.onPendingChanged();
-                setState(() {});
-              },
-            ));
+            rows.add(() => _PendingBox(
+                  comment: p,
+                  onRemove: () {
+                    widget.pending.remove(p);
+                    widget.onPendingChanged();
+                    setState(() {});
+                  },
+                ));
           }
         }
-        if (r != null && i == r.$2) rows.add(_composerBox());
+        if (r != null && i == r.$2) rows.add(_composerBox);
       }
     }
-    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: rows);
+    return SliverList.builder(
+      itemCount: rows.length,
+      itemBuilder: (_, i) => rows[i](),
+    );
   }
 }
 
@@ -2557,7 +2652,12 @@ class PrThreadBox extends StatefulWidget {
   State<PrThreadBox> createState() => _PrThreadBoxState();
 }
 
-class _PrThreadBoxState extends State<PrThreadBox> {
+class _PrThreadBoxState extends State<PrThreadBox>
+    with AutomaticKeepAliveClientMixin {
+  // A half-typed reply has to survive scrolling out of the lazy list.
+  @override
+  bool get wantKeepAlive => true;
+
   late bool _open = !widget.thread.resolved;
   bool _replying = false;
   bool _busy = false;
@@ -2618,6 +2718,7 @@ class _PrThreadBoxState extends State<PrThreadBox> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     final t = widget.thread;
     final first = t.comments.isEmpty ? null : t.comments.first;
     return Container(
@@ -2900,7 +3001,7 @@ class _CommitDiffScreenState extends State<CommitDiffScreen> with _AfterTransiti
                 ? prMessage(_error!)
                 : files == null || !settled
                     ? _diffPlaceholder()
-                    : ListView(padding: const EdgeInsets.only(bottom: 32), children: [
+                    : CustomScrollView(slivers: [
                         for (final e in files.entries)
                           PrFileDiff(
                             file: PrFile(
@@ -2921,6 +3022,7 @@ class _CommitDiffScreenState extends State<CommitDiffScreen> with _AfterTransiti
                             onPendingChanged: () {},
                             onThreadsChanged: () async {},
                           ),
+                        const SliverToBoxAdapter(child: SizedBox(height: 32)),
                       ]),
           ),
         ]),

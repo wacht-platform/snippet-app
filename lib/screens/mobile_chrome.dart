@@ -234,7 +234,7 @@ class MobileBackBar extends StatelessWidget {
     final back = menu || keepBack || defaultTargetPlatform == TargetPlatform.iOS
         ? onBack
         : null;
-    final fill = back != null && trailing.isNotEmpty;
+    final fill = back != null || trailing.isNotEmpty;
     final text = Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.center,
@@ -275,15 +275,16 @@ class MobileBackBar extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Row(children: [
-          if (back == null && trailing.isNotEmpty)
+          if (back == null && trailing.isNotEmpty && !pill)
             const SizedBox(width: 44)
           else if (back != null)
             RoundBtn(
                 icon: menu ? 'menu' : 'chevron-left',
                 tooltip: menu ? 'Menu' : 'Back',
                 onTap: back),
-          if (trailing.length == 2) const SizedBox(width: 44),
-          if (back != null || trailing.isNotEmpty) const SizedBox(width: 10),
+          if (trailing.length == 2 && !pill) const SizedBox(width: 44),
+          if (back != null || (trailing.isNotEmpty && !pill))
+            const SizedBox(width: 10),
           Expanded(
             child: pill
                 ? Center(
@@ -294,7 +295,7 @@ class MobileBackBar extends StatelessWidget {
                         height: 44,
                         constraints: fill
                             ? const BoxConstraints(minWidth: double.infinity)
-                            : const BoxConstraints(minWidth: 120, maxWidth: 260),
+                            : const BoxConstraints(minWidth: 120),
                         padding: const EdgeInsets.symmetric(horizontal: 18),
                         decoration: _floating(22),
                         child: Align(
@@ -305,9 +306,12 @@ class MobileBackBar extends StatelessWidget {
                   )
                 : Center(child: label),
           ),
-          if (back != null || trailing.isNotEmpty) ...[
+          if (trailing.isNotEmpty) ...[
             const SizedBox(width: 10),
-            if (trailing.isEmpty) const SizedBox(width: 44) else ...trailing,
+            ...trailing,
+          ] else if (back != null && !pill) ...[
+            const SizedBox(width: 10),
+            const SizedBox(width: 44),
           ],
         ]),
       ),

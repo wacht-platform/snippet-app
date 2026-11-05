@@ -85,9 +85,7 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(find.text('alpha'), findsOneWidget);
 
-    // `IntrinsicWidth` is what sizes the diff to its widest line; the pane-width
-    // floor is what stops that from being narrower than the pane.
-    expect(tester.getSize(find.byType(IntrinsicWidth)).width, 600);
+    expect(tester.getSize(find.byType(ListView)).width, 600);
   });
 
   testWidgets('a wide diff scrolls instead of being clipped', (tester) async {
@@ -110,6 +108,6 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(tester.takeException(), isNull);
-    expect(tester.getSize(find.byType(IntrinsicWidth)).width, greaterThan(600));
+    expect(tester.getSize(find.byType(ListView)).width, greaterThan(600));
   });
 }

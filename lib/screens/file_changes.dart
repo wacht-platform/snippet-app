@@ -195,13 +195,11 @@ class FileChangeDetail extends StatelessWidget {
     return Container(
       color: bg,
       padding: const EdgeInsets.symmetric(vertical: 2),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        for (final l in lines)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10),
-            child: Text('$sign $l', style: codeMono(12, height: 1.55, color: fg)),
-          ),
-      ]),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        child: Text(lines.map((l) => '$sign $l').join('\n'),
+            style: codeMono(12, height: 1.55, color: fg)),
+      ),
     );
   }
 

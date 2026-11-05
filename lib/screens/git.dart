@@ -1246,18 +1246,15 @@ class _GitFileDiffViewState extends State<GitFileDiffView> {
     _gutterWidth = _measureGutter();
     return LayoutBuilder(builder: (context, c) {
       final paneWidth = c.maxWidth.isFinite ? c.maxWidth : 0.0;
+      final width = _contentWidth();
       return SingleChildScrollView(
         scrollDirection: Axis.horizontal,
-        child: SingleChildScrollView(
-          child: ConstrainedBox(
-            constraints: BoxConstraints(minWidth: paneWidth),
-            child: IntrinsicWidth(
-              child: SelectionArea(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: _parsedLines.map(_renderDiffLine).toList(),
-                ),
-              ),
+        child: SizedBox(
+          width: width > paneWidth ? width : paneWidth,
+          child: SelectionArea(
+            child: ListView.builder(
+              itemCount: _parsedLines.length,
+              itemBuilder: (_, i) => _renderDiffLine(_parsedLines[i]),
             ),
           ),
         ),
@@ -1266,6 +1263,26 @@ class _GitFileDiffViewState extends State<GitFileDiffView> {
   }
 
   double _gutterWidth = 14;
+
+  // Rows are built lazily, so the horizontal extent can't come from measuring
+  // them all; the widest is near enough the longest in a monospaced face.
+  double _contentWidth() {
+    var longest = '';
+    for (final l in _parsedLines) {
+      if (l.text.length > longest.length) longest = l.text;
+    }
+    final painter = TextPainter(
+      text: TextSpan(
+          text: longest,
+          style: DefaultTextStyle.of(context)
+              .style
+              .merge(codeMono(12, height: 1.4))),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    final width = painter.width;
+    painter.dispose();
+    return width + (kMobile ? _gutterWidth + 40 : 108);
+  }
 
   double _measureGutter() {
     var max = 0;

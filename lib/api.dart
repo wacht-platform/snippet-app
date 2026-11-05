@@ -1015,14 +1015,27 @@ class DaemonClient {
   }
 
   /// GET /github/prs — open, mine, review or closed.
-  Future<List<PrSummary>> githubPrs(String session, String filter) async {
-    final r = await http
-        .get(_uri('/github/prs', {'session': session, 'filter': filter}));
+  Future<({List<PrSummary> prs, String? next})> githubPrPage(
+      String session, String filter,
+      {String? cursor, int? limit}) async {
+    final r = await http.get(_uri('/github/prs', {
+      'session': session,
+      'filter': filter,
+      if (cursor != null) 'cursor': cursor,
+      if (limit != null) 'limit': '$limit',
+    }));
     if (r.statusCode != 200) throw _ghError(r);
-    return ((jsonDecode(r.body) as Map<String, dynamic>)['prs'] as List)
-        .map((e) => PrSummary.fromJson(e as Map<String, dynamic>))
-        .toList();
+    final j = jsonDecode(r.body) as Map<String, dynamic>;
+    return (
+      prs: (j['prs'] as List)
+          .map((e) => PrSummary.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      next: j['next_cursor'] as String?,
+    );
   }
+
+  Future<List<PrSummary>> githubPrs(String session, String filter) async =>
+      (await githubPrPage(session, filter, limit: 60)).prs;
 
   Future<PrDetail> githubPr(String session, int number) async {
     final r = await http

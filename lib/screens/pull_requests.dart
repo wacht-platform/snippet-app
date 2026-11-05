@@ -98,6 +98,8 @@ class _PullRequestsScreenState extends State<PullRequestsScreen> {
   ];
   String _filter = 'open';
   List<PrSummary>? _prs;
+  String? _next;
+  bool _loadingMore = false;
   String? _error;
 
   @override
@@ -117,10 +119,34 @@ class _PullRequestsScreenState extends State<PullRequestsScreen> {
     setState(() => _error = null);
     final filter = _filter;
     try {
-      final prs = await widget.client.githubPrs(widget.session, filter);
-      if (mounted && filter == _filter) setState(() => _prs = prs);
+      final page = await widget.client.githubPrPage(widget.session, filter);
+      if (mounted && filter == _filter) {
+        setState(() {
+          _prs = page.prs;
+          _next = page.next;
+        });
+      }
     } catch (e) {
       if (mounted && filter == _filter) setState(() => _error = '$e');
+    }
+  }
+
+  Future<void> _loadMore() async {
+    final cursor = _next;
+    if (cursor == null || _loadingMore) return;
+    final filter = _filter;
+    setState(() => _loadingMore = true);
+    try {
+      final page = await widget.client
+          .githubPrPage(widget.session, filter, cursor: cursor);
+      if (!mounted || filter != _filter) return;
+      setState(() {
+        _prs = appendPrs(_prs, page.prs);
+        _next = page.next;
+      });
+    } catch (_) {
+    } finally {
+      if (mounted) setState(() => _loadingMore = false);
     }
   }
 
@@ -129,6 +155,7 @@ class _PullRequestsScreenState extends State<PullRequestsScreen> {
     setState(() {
       _filter = key;
       _prs = null;
+      _next = null;
     });
     _load();
   }
@@ -280,16 +307,17 @@ class _PullRequestsScreenState extends State<PullRequestsScreen> {
     final review = prs.where((p) => p.author != me && p.reviewers.contains(me)).toList();
     final mine = prs.where((p) => p.author == me).toList();
     final others = prs.where((p) => !review.contains(p) && !mine.contains(p)).toList();
+    final groups = [
+      ('Needs your review', review),
+      ('Yours', mine),
+      ('Others', others),
+    ].where((g) => g.$2.isNotEmpty).toList();
+    if (groups.length == 1) return [for (final p in prs) _row(p)];
     return [
-      for (final (label, list) in [
-        ('Needs your review', review),
-        ('Yours', mine),
-        ('Others', others),
-      ])
-        if (list.isNotEmpty) ...[
-          _sectionHeader(label, list.length),
-          for (final p in list) _row(p),
-        ],
+      for (final (label, list) in groups) ...[
+        _sectionHeader(label, list.length),
+        for (final p in list) _row(p),
+      ],
     ];
   }
 
@@ -359,10 +387,16 @@ class _PullRequestsScreenState extends State<PullRequestsScreen> {
                         ],
                       ),
                     )
-                  : ListView(
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      padding: const EdgeInsets.only(bottom: 24),
-                      children: _body(prs),
+                  : NotificationListener<ScrollNotification>(
+                      onNotification: (n) => prNearEnd(n, _loadMore),
+                      child: ListView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: const EdgeInsets.only(bottom: 24),
+                        children: [
+                          ..._body(prs),
+                          if (_next != null) prLoadMore(_loadingMore, _loadMore),
+                        ],
+                      ),
                     ),
             ),
           ),

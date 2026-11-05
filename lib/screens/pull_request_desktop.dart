@@ -48,6 +48,8 @@ class PrListPanel extends StatefulWidget {
 class _PrListPanelState extends State<PrListPanel> {
   String _filter = 'open';
   List<PrSummary>? _prs;
+  String? _next;
+  bool _loadingMore = false;
   String? _error;
   String _query = '';
   final _search = TextEditingController();
@@ -74,12 +76,35 @@ class _PrListPanelState extends State<PrListPanel> {
     setState(() => _error = null);
     final filter = _filter;
     try {
-      final prs = await widget.client.githubPrs(widget.session, filter);
+      final page = await widget.client.githubPrPage(widget.session, filter);
       if (!mounted || filter != _filter) return;
-      setState(() => _prs = prs);
-      widget.onLoaded?.call(prs);
+      setState(() {
+        _prs = page.prs;
+        _next = page.next;
+      });
+      widget.onLoaded?.call(page.prs);
     } catch (e) {
       if (mounted && filter == _filter) setState(() => _error = '$e');
+    }
+  }
+
+  Future<void> _loadMore() async {
+    final cursor = _next;
+    if (cursor == null || _loadingMore) return;
+    final filter = _filter;
+    setState(() => _loadingMore = true);
+    try {
+      final page = await widget.client
+          .githubPrPage(widget.session, filter, cursor: cursor);
+      if (!mounted || filter != _filter) return;
+      setState(() {
+        _prs = appendPrs(_prs, page.prs);
+        _next = page.next;
+      });
+      widget.onLoaded?.call(_prs!);
+    } catch (_) {
+    } finally {
+      if (mounted) setState(() => _loadingMore = false);
     }
   }
 
@@ -88,6 +113,7 @@ class _PrListPanelState extends State<PrListPanel> {
     setState(() {
       _filter = key;
       _prs = null;
+      _next = null;
     });
     _load();
   }
@@ -285,9 +311,16 @@ class _PrListPanelState extends State<PrListPanel> {
                           })
                     : RefreshIndicator(
                         onRefresh: _load,
-                        child: ListView(
-                          padding: const EdgeInsets.only(bottom: 16),
-                          children: _rows(visible),
+                        child: NotificationListener<ScrollNotification>(
+                          onNotification: (n) => prNearEnd(n, _loadMore),
+                          child: ListView(
+                            padding: const EdgeInsets.only(bottom: 16),
+                            children: [
+                              ..._rows(visible),
+                              if (_next != null)
+                                prLoadMore(_loadingMore, _loadMore),
+                            ],
+                          ),
                         ),
                       ),
       ),
@@ -507,7 +540,9 @@ class _DesktopPrDetail extends StatefulWidget {
 
 class _DesktopPrDetailState extends State<_DesktopPrDetail> {
   PrDetail? _pr;
-  String _diff = '';
+  String? _diff;
+  bool _diffFailed = false;
+  String? _diffOid;
   String? _error;
   bool _busy = false;
   int _tab = 0;
@@ -532,16 +567,29 @@ class _DesktopPrDetailState extends State<_DesktopPrDetail> {
     super.dispose();
   }
 
-  Future<void> _load() async {
+  Future<void> _loadDiff() async {
     try {
-      final results = await Future.wait([
-        widget.client.githubPr(widget.session, widget.number),
-        widget.client.githubPrDiff(widget.session, widget.number),
-      ]);
+      final diff = await widget.client.githubPrDiff(widget.session, widget.number);
+      if (mounted) {
+        setState(() {
+          _diff = diff;
+          _diffFailed = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _diffFailed = true);
+    }
+  }
+
+  Future<void> _load() async {
+    if (_diffOid == null && _diff == null) _loadDiff();
+    try {
+      final pr = await widget.client.githubPr(widget.session, widget.number);
       if (!mounted) return;
+      if (_diffOid != null && _diffOid != pr.headOid) _loadDiff();
       setState(() {
-        _pr = results[0] as PrDetail;
-        _diff = results[1] as String;
+        _diffOid = pr.headOid;
+        _pr = pr;
         _error = null;
       });
     } catch (e) {
@@ -782,13 +830,17 @@ class _DesktopPrDetailState extends State<_DesktopPrDetail> {
       Expanded(
         child: switch (_tab) {
           1 => _DesktopCommits(client: widget.client, session: widget.session, commits: pr.commits),
+          2 when _diffFailed && _diff == null =>
+              prMessage("Couldn't load the diff for this pull request."),
+          2 when _diff == null =>
+              Center(child: Spinner(size: 16, color: AppColors.fg3)),
           2 => _DesktopFiles(
               key: ValueKey('files-$_scrollTo'),
               client: widget.client,
               session: widget.session,
               number: widget.number,
               pr: pr,
-              diff: _diff,
+              diff: _diff!,
               pending: _pending,
               viewed: _viewed,
               canComment: _open,
@@ -1202,27 +1254,31 @@ class _DesktopCommitsState extends State<_DesktopCommits> {
             ? prMessage(_error!)
             : files == null
                 ? Center(child: Spinner(size: 16, color: AppColors.fg3))
-                : ListView(padding: const EdgeInsets.fromLTRB(12, 0, 12, 32), children: [
+                : CustomScrollView(slivers: [
                     for (final e in files.entries)
-                      PrFileDiff(
-                        file: PrFile(
-                          path: e.key,
-                          additions: e.value.where((l) => l.kind == DiffKind.add).length,
-                          deletions: e.value.where((l) => l.kind == DiffKind.del).length,
-                          changeType: '',
+                      SliverPadding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        sliver: PrFileDiff(
+                          file: PrFile(
+                            path: e.key,
+                            additions: e.value.where((l) => l.kind == DiffKind.add).length,
+                            deletions: e.value.where((l) => l.kind == DiffKind.del).length,
+                            changeType: '',
+                          ),
+                          lines: e.value,
+                          threads: const [],
+                          pending: const [],
+                          viewed: false,
+                          onViewed: null,
+                          canComment: false,
+                          client: widget.client,
+                          session: widget.session,
+                          number: 0,
+                          onPendingChanged: () {},
+                          onThreadsChanged: () async {},
                         ),
-                        lines: e.value,
-                        threads: const [],
-                        pending: const [],
-                        viewed: false,
-                        onViewed: null,
-                        canComment: false,
-                        client: widget.client,
-                        session: widget.session,
-                        number: 0,
-                        onPendingChanged: () {},
-                        onThreadsChanged: () async {},
                       ),
+                    const SliverToBoxAdapter(child: SizedBox(height: 32)),
                   ]),
       ),
     ]);
@@ -1290,8 +1346,7 @@ class _DesktopFilesState extends State<_DesktopFiles> {
   }
 
   void _jump(String path) {
-    final ctx = _keys[path]?.currentContext;
-    if (ctx != null) Scrollable.ensureVisible(ctx, duration: const Duration(milliseconds: 220));
+    prReveal(_keys[path]);
   }
 
   Future<void> _jumpMenu(BuildContext anchor) async {
@@ -1361,15 +1416,16 @@ class _DesktopFilesState extends State<_DesktopFiles> {
   Widget build(BuildContext context) {
     final files = widget.pr.files;
     if (files.isEmpty) return prMessage('No files changed.');
-    final diffs = SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 40),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+    final diffs = CustomScrollView(
+      slivers: [
         for (final f in files)
-          KeyedSubtree(
+          SliverPadding(
             key: _keys.putIfAbsent(f.path, () => GlobalKey()),
-            child: PrFileDiff(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            sliver: PrFileDiff(
               file: f,
               lines: _parsed[f.path] ?? const [],
+              startCollapsed: prStartCollapsed(files) && f.path != widget.scrollTo,
               threads: widget.pr.threads.where((t) => t.path == f.path).toList(),
               pending: widget.pending,
               viewed: widget.viewed.contains(f.path),
@@ -1385,7 +1441,8 @@ class _DesktopFilesState extends State<_DesktopFiles> {
               onThreadsChanged: widget.onChanged,
             ),
           ),
-      ]),
+        const SliverToBoxAdapter(child: SizedBox(height: 40)),
+      ],
     );
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       _bar(),
