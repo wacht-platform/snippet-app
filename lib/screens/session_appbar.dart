@@ -393,18 +393,9 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
   Widget _mobileHeader(HarnessState? s) {
     final ws = s?.workspace.trim() ?? '';
     final folder = ws.isEmpty ? '' : lastPathSegment(ws, ifEmpty: ws);
-    var add = 0, del = 0;
-    final evs = s?.events ?? const <Map<String, dynamic>>[];
-    for (var i = evs.length - 1; i >= 0; i--) {
-      if (evs[i]['kind'] != 'turn_changes' || _isMissionControl) continue;
-      add += (evs[i]['add'] as num?)?.toInt() ?? 0;
-      del += (evs[i]['del'] as num?)?.toInt() ?? 0;
-      if (!_isGitSession) break;
-    }
     final sub = [
       if (folder.isNotEmpty) folder,
       if ((_modelLabel ?? '').isNotEmpty) _modelLabel!,
-      if (add > 0 || del > 0) '+$add −$del',
     ].join(' · ');
     return MobileBackBar(
       title: _title.isEmpty ? 'Session' : _title,
