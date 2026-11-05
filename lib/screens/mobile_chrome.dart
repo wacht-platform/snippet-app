@@ -210,11 +210,13 @@ class MobileBackBar extends StatelessWidget {
     this.menu = false,
     this.chevron = false,
     this.hug = false,
+    this.leading,
   });
 
   final String title;
   final String? subtitle;
   final bool hug;
+  final Widget? leading;
   final bool menu;
   final bool chevron;
   final VoidCallback? onBack;
@@ -224,7 +226,7 @@ class MobileBackBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final pill = onTitleTap != null || subtitle != null;
-    final label = Column(
+    final text = Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
@@ -252,6 +254,13 @@ class MobileBackBar extends StatelessWidget {
           ),
       ],
     );
+    final label = leading == null
+        ? text
+        : Row(mainAxisSize: MainAxisSize.min, children: [
+            leading!,
+            const SizedBox(width: 8),
+            Flexible(child: text),
+          ]);
     return SizedBox(
       height: 60,
       child: Padding(
@@ -275,12 +284,16 @@ class MobileBackBar extends StatelessWidget {
                       child: Container(
                         height: 44,
                         constraints: hug
-                            ? const BoxConstraints(minWidth: 120)
+                            ? const BoxConstraints(minWidth: 120, maxWidth: 260)
                             : const BoxConstraints(minWidth: double.infinity),
                         padding: const EdgeInsets.symmetric(horizontal: 18),
                         decoration: _floating(22),
-                        alignment: Alignment.center,
-                        child: hug ? IntrinsicWidth(child: label) : label,
+                        alignment: hug ? null : Alignment.center,
+                        child: hug
+                            ? Align(
+                                widthFactor: 1,
+                                child: IntrinsicWidth(child: label))
+                            : label,
                       ),
                     ),
                   )

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../api.dart';
 import '../crew_widgets.dart';
+import '../mochi.dart';
 import '../models.dart';
 import '../panel.dart';
 import '../platform.dart';
@@ -83,7 +84,8 @@ Future<void> openAgentActions(
               MobileBackBar(
                 title: agentName,
                 subtitle: 'Actions',
-                onBack: () => Navigator.of(page).pop(),
+                hug: true,
+                leading: AgentMochi(agentId, size: 24),
                 onTitleTap: () {},
               ),
               Expanded(

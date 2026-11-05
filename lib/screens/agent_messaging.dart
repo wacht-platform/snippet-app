@@ -1010,15 +1010,9 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
       return MobileBackBar(
         title: widget.agentName,
         subtitle: subtitle.isEmpty ? null : subtitle,
-        onBack: widget.showBack ? _closePage : null,
+        hug: true,
+        leading: AgentMochi(widget.agentId, size: 24),
         onTitleTap: _openActions,
-        trailing: [
-          RoundBtn(
-            tooltip: 'Actions',
-            onTap: _openActions,
-            child: AgentMochi(widget.agentId, size: 28),
-          ),
-        ],
       );
     }
     final canGoBack = widget.showBack &&

@@ -1092,6 +1092,7 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
             MobileBackBar(
               title: title,
               subtitle: 'Actions',
+              hug: true,
               onTitleTap: () {},
             ),
             const SizedBox(height: 8),
