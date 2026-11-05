@@ -225,7 +225,8 @@ class _PullRequestsScreenState extends State<PullRequestsScreen> {
       onTap: () => _open(pr),
       child: Padding(
         padding: EdgeInsets.fromLTRB(16, kMobile ? 12 : 9, 14, kMobile ? 12 : 9),
-        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        child: IntrinsicHeight(
+          child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Padding(
             padding: const EdgeInsets.only(top: 2),
             child: AppIcon(icon, size: 15, color: ink),
@@ -257,8 +258,9 @@ class _PullRequestsScreenState extends State<PullRequestsScreen> {
             ),
           ),
           const SizedBox(width: 12),
-          _avatar(pr.author),
+          Center(child: _avatar(pr.author)),
         ]),
+        ),
       ),
     );
   }
@@ -335,6 +337,7 @@ class _PullRequestsScreenState extends State<PullRequestsScreen> {
               },
               subtitle: widget.status.repo,
               chevron: true,
+              hug: true,
               onTitleTap: () => _pickFilter(anchor),
             ),
           ),

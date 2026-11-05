@@ -1288,13 +1288,12 @@ class _PullRequestScreenState extends State<PullRequestScreen> {
               subtitle: widget.status.repo,
               onBack: () => Navigator.maybePop(context),
               trailing: [
-                if (pr != null)
-                  Builder(
-                    builder: (anchor) => RoundBtn(
-                        icon: 'more-horizontal',
-                        tooltip: 'More',
-                        onTap: _busy ? null : () => _menu(anchor)),
-                  ),
+                Builder(
+                  builder: (anchor) => RoundBtn(
+                      icon: 'more-horizontal',
+                      tooltip: 'More',
+                      onTap: pr == null || _busy ? null : () => _menu(anchor)),
+                ),
               ],
             )
           else

@@ -209,10 +209,12 @@ class MobileBackBar extends StatelessWidget {
     this.trailing = const [],
     this.menu = false,
     this.chevron = false,
+    this.hug = false,
   });
 
   final String title;
   final String? subtitle;
+  final bool hug;
   final bool menu;
   final bool chevron;
   final VoidCallback? onBack;
@@ -266,15 +268,20 @@ class MobileBackBar extends StatelessWidget {
           if (onBack != null || trailing.isNotEmpty) const SizedBox(width: 10),
           Expanded(
             child: pill
-                ? GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: onTitleTap,
-                    child: Container(
-                      height: 44,
-                      padding: const EdgeInsets.symmetric(horizontal: 14),
-                      decoration: _floating(22),
-                      alignment: Alignment.center,
-                      child: label,
+                ? Center(
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: onTitleTap,
+                      child: Container(
+                        height: 44,
+                        constraints: hug
+                            ? const BoxConstraints(minWidth: 120)
+                            : const BoxConstraints(minWidth: double.infinity),
+                        padding: const EdgeInsets.symmetric(horizontal: 18),
+                        decoration: _floating(22),
+                        alignment: Alignment.center,
+                        child: hug ? IntrinsicWidth(child: label) : label,
+                      ),
                     ),
                   )
                 : Center(child: label),
