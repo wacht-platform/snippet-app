@@ -7,8 +7,8 @@ import '../../widgets.dart';
 import '../agent_messaging.dart';
 import '../../platform.dart';
 
-/// One coordination agent: its conversation first, with its inbox and board a
-/// tab away. Identity is a compact header rather than a page of its own.
+/// One coordination agent: its conversation, with its inbox, board and settings
+/// in the actions menu. Identity is a compact header rather than a page of its own.
 class CoordinationAgentDetail extends StatelessWidget {
   const CoordinationAgentDetail({
     super.key,

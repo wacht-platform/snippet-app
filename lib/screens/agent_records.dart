@@ -3,13 +3,17 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../api.dart';
+import '../crew_widgets.dart';
 import '../models.dart';
 import '../panel.dart';
 import '../platform.dart';
 import '../pull_refresh.dart';
 import '../theme.dart';
 import '../widgets.dart';
+import 'action_list.dart';
 import 'list_search_field.dart';
+import 'memory_screen.dart';
+import 'mobile_chrome.dart';
 import 'session.dart';
 import 'session_coordination_cards.dart';
 import 'tasks/task_common.dart';
@@ -59,44 +63,242 @@ String _folder(String path) {
   return parts.length <= 2 ? parts.join('/') : parts.sublist(parts.length - 2).join('/');
 }
 
-/// The Chat, Inbox and Board switch at the top of an agent's page.
-class AgentPageTabs extends StatelessWidget {
-  const AgentPageTabs({super.key, required this.index, required this.onChanged});
-
-  final int index;
-  final ValueChanged<int> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    const labels = ['Chat', 'Inbox', 'Board'];
-    return Container(
-      height: kMobile ? 44 : 34,
-      padding: EdgeInsets.symmetric(horizontal: _gutter - 8),
-      decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: AppColors.border)),
-      ),
-      child: Row(children: [
-        for (var i = 0; i < labels.length; i++)
-          InkWell(
-            onTap: () => onChanged(i),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                border: Border(
-                  bottom: BorderSide(
-                    width: 2,
-                    color: i == index ? AppColors.accent : Colors.transparent,
+/// An agent's Actions: a full page on a phone and a sheet on desktop, the way a
+/// session's are.
+Future<void> openAgentActions(
+  BuildContext context, {
+  required DaemonClient client,
+  required String agentId,
+  required String agentName,
+  VoidCallback? onDeleted,
+}) {
+  if (kMobile) {
+    return Navigator.of(context).push<void>(MaterialPageRoute(
+      builder: (page) => Material(
+        color: AppColors.bg,
+        child: SafeArea(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              MobileBackBar(
+                title: agentName,
+                subtitle: 'Actions',
+                onBack: () => Navigator.of(page).pop(),
+                onTitleTap: () {},
+              ),
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.fromLTRB(M.gutter, 0, M.gutter, 28),
+                  child: _AgentActions(
+                    client: client,
+                    agentId: agentId,
+                    agentName: agentName,
+                    host: page,
+                    onDeleted: () {
+                      Navigator.of(page).pop();
+                      onDeleted?.call();
+                    },
                   ),
                 ),
               ),
-              child: Text(labels[i],
-                  style: sans(_body,
-                      weight: W.label,
-                      color: i == index ? AppColors.fg1 : AppColors.fg3)),
-            ),
+            ],
           ),
-      ]),
+        ),
+      ),
+    ));
+  }
+  return showAppSheet<void>(
+    context,
+    title: 'Actions',
+    maxWidth: 420,
+    maxHeight: 680,
+    child: _AgentActions(
+      client: client,
+      agentId: agentId,
+      agentName: agentName,
+      host: context,
+      dismiss: () => Navigator.of(context).pop(),
+      onDeleted: onDeleted,
+    ),
+  );
+}
+
+class _AgentActions extends StatefulWidget {
+  const _AgentActions({
+    required this.client,
+    required this.agentId,
+    required this.agentName,
+    required this.host,
+    this.dismiss,
+    this.onDeleted,
+  });
+
+  final DaemonClient client;
+  final String agentId;
+  final String agentName;
+
+  /// Where the chosen action opens. On desktop [dismiss] closes the sheet first.
+  final BuildContext host;
+  final VoidCallback? dismiss;
+  final VoidCallback? onDeleted;
+
+  @override
+  State<_AgentActions> createState() => _AgentActionsState();
+}
+
+class _AgentActionsState extends State<_AgentActions> {
+  CoordinationAgent? _agent;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.client.coordinationAgents().then((all) {
+      if (!mounted) return;
+      setState(() =>
+          _agent = all.where((a) => a.id == widget.agentId).firstOrNull);
+    }).catchError((_) {});
+  }
+
+  void _run(void Function(BuildContext) action) {
+    widget.dismiss?.call();
+    action(widget.host);
+  }
+
+  void _openRecords(String title, Widget Function() view) => _run((host) {
+        presentScreen(host,
+            style: PanelStyle.drawer,
+            maxWidth: 720,
+            maxHeight: 820,
+            builder: (_, close) => _RecordsPage(
+                title: title,
+                subtitle: widget.agentName,
+                onClose: close,
+                child: view()));
+      });
+
+  ActionRow _setting(
+      String action, String icon, String label, String detail,
+      {bool danger = false}) {
+    final agent = _agent;
+    return ActionRow(
+      icon: icon,
+      label: label,
+      detail: detail,
+      danger: danger,
+      onTap: agent == null
+          ? null
+          : () => _run((host) => runCrewAgentAction(host, action,
+              client: widget.client,
+              agent: agent,
+              onDeleted: action == 'delete' ? widget.onDeleted : null)),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final client = widget.client;
+    final id = widget.agentId;
+    final name = widget.agentName;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        ActionGroup(label: 'Work', rows: [
+          ActionRow(
+            icon: 'inbox',
+            label: 'Inbox',
+            detail: 'Everything sent to this agent',
+            onTap: () => _openRecords('Inbox',
+                () => AgentInboxView(client: client, agentId: id, agentName: name)),
+          ),
+          ActionRow(
+            icon: 'clipboard',
+            label: 'Board',
+            detail: 'What it dispatched, reported and noted',
+            onTap: () => _openRecords('Board',
+                () => AgentBoardView(client: client, agentId: id, agentName: name)),
+          ),
+          ActionRow(
+            icon: 'terminal',
+            label: 'Desk session',
+            detail: 'The conversation where its mail arrives',
+            onTap: () => _run((host) =>
+                _openSession(host, client, 'inbox-$id', '$name desk')),
+          ),
+        ]),
+        ActionGroup(label: 'Agent', rows: [
+          ActionRow(
+            icon: kMobile ? 'book-marked' : 'brain',
+            label: 'Memory',
+            detail: 'What this agent remembers',
+            onTap: () => _run((host) => presentScreen(host,
+                builder: (_, close) => MemoryScreen(
+                    client: client,
+                    embedded: true,
+                    onBack: close,
+                    initialKey: 'agent:$id'))),
+          ),
+          _setting('wakes', 'calendar-clock', 'Wakes and reporting',
+              'When it wakes and who it tells'),
+          _setting('model', 'cpu', 'Inference profile', 'The model it runs on'),
+          _setting('nickname', 'edit', 'Nickname', 'What it is called here'),
+          _setting('color', 'sparkles', 'Colour', 'Its colour across the app'),
+          _setting('delete', 'trash', 'Delete agent',
+              'Removes its identity and notes',
+              danger: true),
+        ]),
+      ],
+    );
+  }
+}
+
+/// An inbox or board on its own page, under a session-style bar.
+class _RecordsPage extends StatelessWidget {
+  const _RecordsPage(
+      {required this.title,
+      required this.subtitle,
+      required this.onClose,
+      required this.child});
+
+  final String title;
+  final String subtitle;
+  final VoidCallback onClose;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: readingBg,
+      child: SafeArea(
+        bottom: false,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (kMobile)
+              MobileBackBar(title: title, subtitle: subtitle, onBack: onClose)
+            else
+              Container(
+                height: 44,
+                padding: const EdgeInsets.only(left: 12, right: 6),
+                color: AppColors.bg,
+                child: Row(children: [
+                  Text(title,
+                      style: sans(14, weight: W.label, color: AppColors.fg1)),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(subtitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: sans(12, color: AppColors.fg3)),
+                  ),
+                  IconBtn('x',
+                      size: 28, iconSize: 15, tooltip: 'Close', onTap: onClose),
+                ]),
+              ),
+            Expanded(child: child),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -116,7 +318,6 @@ class _RecordList<T> extends StatefulWidget {
     required this.timeOf,
     required this.row,
     required this.empty,
-    this.action,
   });
 
   final String hint;
@@ -126,7 +327,6 @@ class _RecordList<T> extends StatefulWidget {
   final String Function(T) timeOf;
   final Widget Function(T) row;
   final String empty;
-  final Widget? action;
 
   @override
   State<_RecordList<T>> createState() => _RecordListState<T>();
@@ -258,19 +458,11 @@ class _RecordListState<T> extends State<_RecordList<T>> {
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Padding(
         padding: EdgeInsets.fromLTRB(_gutter, kMobile ? 12 : 10, _gutter, 8),
-        child: Row(children: [
-          Expanded(
-            child: ListSearchField(
-              controller: _search,
-              hint: widget.hint,
-              onChanged: _searchChanged,
-            ),
-          ),
-          if (widget.action != null) ...[
-            const SizedBox(width: 4),
-            widget.action!,
-          ],
-        ]),
+        child: ListSearchField(
+          controller: _search,
+          hint: widget.hint,
+          onChanged: _searchChanged,
+        ),
       ),
       SingleChildScrollView(
         scrollDirection: Axis.horizontal,
@@ -656,14 +848,6 @@ class _AgentInboxViewState extends State<AgentInboxView> {
       timeOf: (e) => e.createdAt,
       row: _row,
       empty: 'Nothing has reached ${widget.agentName} yet.',
-      action: IconBtn(
-        'terminal',
-        size: kMobile ? M.minTarget : 28,
-        iconSize: kMobile ? 18 : 15,
-        tooltip: 'Open desk session',
-        onTap: () => _openSession(context, widget.client,
-            'inbox-${widget.agentId}', '${widget.agentName} desk'),
-      ),
     );
   }
 }

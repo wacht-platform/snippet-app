@@ -471,8 +471,6 @@ Future<void> showCrewAgentMenu(
   Offset? point,
   VoidCallback? onDeleted,
 }) async {
-  final name =
-      agent.displayName.trim().isEmpty ? agent.id : agent.displayName.trim();
   final picked = await showAppMenu<String>(
     context,
     point: point,
@@ -480,7 +478,7 @@ Future<void> showCrewAgentMenu(
     items: [
       appMenuItem(
           value: 'nickname',
-          icon: 'pencil',
+          icon: 'edit',
           label: agent.nickname == null ? 'Set nickname' : 'Edit nickname'),
       appMenuItem(value: 'color', icon: 'sparkles', label: 'Change colour'),
       appMenuItem(value: 'model', icon: 'cpu', label: 'Change inference profile'),
@@ -492,7 +490,23 @@ Future<void> showCrewAgentMenu(
           value: 'delete', icon: 'trash', label: 'Delete agent', danger: true),
     ],
   );
-  if (!context.mounted) return;
+  if (!context.mounted || picked == null) return;
+  await runCrewAgentAction(context, picked,
+      client: client, agent: agent, point: point, onDeleted: onDeleted);
+}
+
+/// One agent action by name: nickname, color, wakes, model or delete. The crew
+/// menu and the agent page's Actions both go through here.
+Future<void> runCrewAgentAction(
+  BuildContext context,
+  String picked, {
+  required DaemonClient client,
+  required CoordinationAgent agent,
+  Offset? point,
+  VoidCallback? onDeleted,
+}) async {
+  final name =
+      agent.displayName.trim().isEmpty ? agent.id : agent.displayName.trim();
   if (picked == 'nickname') {
     final next = await promptText(context,
         title:

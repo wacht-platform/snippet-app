@@ -150,7 +150,7 @@ class _AgentCardState extends State<AgentCard> {
           title: name,
           child: SheetActions([
             if (!widget.agent.isMissionControl)
-              SheetAction('pencil', _nicknameLabel, () {
+              SheetAction('edit', _nicknameLabel, () {
                 Navigator.pop(context);
                 _editNickname();
               }),
@@ -182,7 +182,7 @@ class _AgentCardState extends State<AgentCard> {
       anchor: point == null ? context : null,
       items: [
         if (!widget.agent.isMissionControl)
-          appMenuItem(value: 'nickname', icon: 'pencil', label: _nicknameLabel),
+          appMenuItem(value: 'nickname', icon: 'edit', label: _nicknameLabel),
         appMenuItem(value: 'color', icon: 'sparkles', label: 'Change colour'),
         if (!widget.agent.isMissionControl)
           appMenuItem(value: 'model', icon: 'cpu', label: 'Change inference profile'),

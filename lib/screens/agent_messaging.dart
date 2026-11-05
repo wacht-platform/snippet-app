@@ -12,7 +12,6 @@ import 'package:record/record.dart';
 
 import '../api.dart';
 import '../composer_strip.dart';
-import '../crew_widgets.dart';
 import '../media_views.dart';
 import '../motion.dart';
 import '../desktop_pick.dart';
@@ -24,7 +23,7 @@ import '../widgets.dart';
 import '../swr.dart';
 import '../pull_refresh.dart';
 import 'agent_records.dart';
-import 'memory_screen.dart';
+import 'mobile_chrome.dart';
 import '../mochi.dart';
 import 'mochi_color_picker.dart';
 
@@ -340,8 +339,19 @@ class AgentThreadScreen extends StatefulWidget {
 }
 
 class _AgentThreadScreenState extends State<AgentThreadScreen> {
-  int _tab = 0;
-  final Set<int> _visited = {0};
+  void _closePage() {
+    if (widget.onClose != null) {
+      widget.onClose!();
+    } else {
+      Navigator.of(context).maybePop();
+    }
+  }
+
+  void _openActions() => openAgentActions(context,
+      client: widget.client,
+      agentId: widget.agentId,
+      agentName: widget.agentName,
+      onDeleted: _closePage);
   static const _maxAttachments = 10;
   Duration _maxRecordingDuration = const Duration(minutes: 3);
 
@@ -974,40 +984,20 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
           children: [
             if (!hideChrome) ...[
               _header(),
-              Divider(height: 1, color: AppColors.border),
-            ],
-            AgentPageTabs(
-              index: _tab,
-              onChanged: (i) => setState(() {
-                _tab = i;
-                _visited.add(i);
-              }),
-            ),
-            Expanded(
-              child: IndexedStack(
-                index: _tab,
-                children: [
-                  Column(children: [
-                    Expanded(child: _body()),
-                    _composer(),
-                  ]),
-                  if (_visited.contains(1))
-                    AgentInboxView(
-                        client: widget.client,
-                        agentId: widget.agentId,
-                        agentName: widget.agentName)
-                  else
-                    const SizedBox.shrink(),
-                  if (_visited.contains(2))
-                    AgentBoardView(
-                        client: widget.client,
-                        agentId: widget.agentId,
-                        agentName: widget.agentName)
-                  else
-                    const SizedBox.shrink(),
-                ],
+              if (!kMobile) Divider(height: 1, color: AppColors.border),
+            ] else
+              Container(
+                height: 30,
+                alignment: Alignment.centerRight,
+                padding: const EdgeInsets.symmetric(horizontal: 6),
+                child: IconBtn('more-horizontal',
+                    size: 26,
+                    iconSize: 15,
+                    tooltip: 'Actions',
+                    onTap: _openActions),
               ),
-            ),
+            Expanded(child: _body()),
+            _composer(),
           ],
         ),
       ),
@@ -1016,6 +1006,21 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
 
   Widget _header() {
     final subtitle = widget.subtitle?.trim() ?? '';
+    if (kMobile) {
+      return MobileBackBar(
+        title: widget.agentName,
+        subtitle: subtitle.isEmpty ? null : subtitle,
+        onBack: widget.showBack ? _closePage : null,
+        onTitleTap: _openActions,
+        trailing: [
+          RoundBtn(
+            tooltip: 'Actions',
+            onTap: _openActions,
+            child: AgentMochi(widget.agentId, size: 28),
+          ),
+        ],
+      );
+    }
     final canGoBack = widget.showBack &&
         (widget.onClose != null || Navigator.of(context).canPop());
     return Container(
@@ -1076,41 +1081,12 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
               ],
             ),
           ),
-          Builder(
-            builder: (ctx) => IconBtn(
-              'more-horizontal',
-              size: M.minTarget,
-              iconSize: 18,
-              tooltip: 'Agent actions',
-              onTap: () async {
-                try {
-                  final all = await widget.client.coordinationAgents();
-                  final agent =
-                      all.where((x) => x.id == widget.agentId).firstOrNull;
-                  if (agent == null || !ctx.mounted) return;
-                  await showCrewAgentMenu(ctx,
-                      client: widget.client,
-                      agent: agent,
-                      onDeleted: () => widget.onClose != null
-                          ? widget.onClose!()
-                          : Navigator.of(ctx).maybePop());
-                } catch (e) {
-                  if (ctx.mounted) toast(ctx, '$e', danger: true);
-                }
-              },
-            ),
-          ),
           IconBtn(
-            'brain',
+            'more-horizontal',
             size: M.minTarget,
             iconSize: 18,
-            tooltip: 'Memory',
-            onTap: () => presentScreen(context,
-                builder: (_, close) => MemoryScreen(
-                    client: widget.client,
-                    embedded: true,
-                    onBack: close,
-                    initialKey: 'agent:${widget.agentId}')),
+            tooltip: 'Actions',
+            onTap: _openActions,
           ),
           if (!kMobile && widget.onClose != null) ...[
             const SizedBox(width: 4),
