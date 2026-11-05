@@ -499,7 +499,7 @@ class _PaletteState extends State<_Palette> {
               Padding(
                 padding: const EdgeInsets.only(left: 8),
                 child:
-                    Text(item.shortcut, style: mono(11, color: AppColors.fg4)),
+                    Text(item.shortcut, style: sans(11, color: AppColors.fg4)),
               ),
           ]),
         ),
@@ -511,7 +511,7 @@ class _PaletteState extends State<_Palette> {
     Widget hint(String k, String label, {bool last = false}) => Padding(
           padding: EdgeInsets.only(right: last ? 0 : 14),
           child: Text.rich(TextSpan(children: [
-            TextSpan(text: k, style: mono(11, color: AppColors.fg2)),
+            TextSpan(text: k, style: sans(11, color: AppColors.fg2)),
             TextSpan(text: ' $label', style: sans(11, color: AppColors.fg4)),
           ])),
         );

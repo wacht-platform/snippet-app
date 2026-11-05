@@ -477,7 +477,7 @@ class FileChip extends StatelessWidget {
                   Text(ext.length > 6 ? 'FILE' : ext,
                       style: kMobile
                           ? sans(12, color: AppColors.fg3)
-                          : mono(10, color: AppColors.fg3)),
+                          : sans(10, color: AppColors.fg3)),
                 ],
               ),
             ),

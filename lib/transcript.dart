@@ -123,7 +123,7 @@ Widget _sentence(String verb, String object) => Text.rich(
         if (object.isNotEmpty)
           TextSpan(
               text: ' $object',
-              style: mono(_objectSize, height: 1.4, color: AppColors.fg1)),
+              style: sans(_objectSize, height: 1.4, color: AppColors.fg1)),
       ]),
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
@@ -188,12 +188,12 @@ class _DenseToolRowState extends State<DenseToolRow> {
               Flexible(child: _sentence(verb, object)),
               if (added > 0) ...[
                 const SizedBox(width: S.s8),
-                Text('+$added', style: mono(_objectSize, color: AppColors.ok)),
+                Text('+$added', style: sans(_objectSize, color: AppColors.ok)),
               ],
               if (removed > 0) ...[
                 const SizedBox(width: S.s6),
                 Text('−$removed',
-                    style: mono(_objectSize, color: AppColors.danger)),
+                    style: sans(_objectSize, color: AppColors.danger)),
               ],
             ]),
           ),
@@ -252,7 +252,7 @@ class _StepDetailState extends State<_StepDetail> {
     final more = countsLines ? 'Show all $lines lines' : 'Show all';
     final meta = toolMetaParts(step);
     final copy = toolCopyText(step);
-    final metaStyle = mono(kMobile ? 12 : 11.5, color: AppColors.fg3);
+    final metaStyle = sans(kMobile ? 12 : 11.5, color: AppColors.fg3);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -526,7 +526,7 @@ class _LaneNoticeState extends State<LaneNotice> {
       if (status != null && status.isNotEmpty) ...[
         const SizedBox(width: S.s8),
         running
-            ? Text(status, style: mono(small - 1, color: AppColors.fg3))
+            ? Text(status, style: sans(small - 1, color: AppColors.fg3))
             : CardStatus(status, tone: tone),
       ],
     ]);
@@ -899,7 +899,7 @@ class _WatchFiredState extends State<_WatchFired> {
                   child: SingleChildScrollView(
                     reverse: true,
                     child: SelectableText(read.lines.join('\n'),
-                        style: mono(11, height: 1.4, color: AppColors.fg3)),
+                        style: sans(11, height: 1.4, color: AppColors.fg3)),
                   ),
                 ),
               ],

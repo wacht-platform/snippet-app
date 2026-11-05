@@ -185,7 +185,7 @@ class DesktopRecorderStrip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final timeText = Text(time,
-        style: mono(12, color: recording ? AppColors.danger : AppColors.fg3));
+        style: sans(12, color: recording ? AppColors.danger : AppColors.fg3));
     final bar = SizedBox(height: 24, child: wave);
     Widget track = bar;
     if (!recording && onSeek != null) {

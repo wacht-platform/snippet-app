@@ -106,7 +106,7 @@ class _UsagePopoverState extends State<_UsagePopover> {
                   style: sans(12, color: AppColors.fg3)),
             ),
             Text('${r.usedPercent.round()}% used',
-                style: mono(11, color: AppColors.fg3)),
+                style: sans(11, color: AppColors.fg3)),
           ]),
           const SizedBox(height: 5),
           ClipRRect(

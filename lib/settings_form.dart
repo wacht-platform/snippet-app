@@ -248,7 +248,7 @@ class SettingsField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final style = mono
-        ? mono_(kMobile ? 14 : 12.5)
+        ? sans(kMobile ? 15 : 12.5, color: AppColors.fg1)
         : sans(kMobile ? 15 : 12.5, color: AppColors.fg1);
     return SizedBox(
       width: kMobile ? (width > 210 ? 210 : width) : width,

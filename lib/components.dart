@@ -39,7 +39,7 @@ class Tag extends StatelessWidget {
   Widget build(BuildContext context) {
     final (fg, bg) = toneColors(tone);
     final style = mono
-        ? TS.codeSmall(fg).copyWith(fontSize: 11, height: 16 / 11)
+        ? TS.meta(fg).copyWith(fontSize: 11, height: 16 / 11)
         : TS.meta(fg).copyWith(fontWeight: weightFor(W.label));
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: S.s8, vertical: S.s2),

@@ -219,7 +219,7 @@ class _NotificationMessageCardState extends State<NotificationMessageCard> {
       ),
       if (ago.isNotEmpty) ...[
         const SizedBox(width: S.s8),
-        Text(ago, style: mono(11, color: AppColors.fg4)),
+        Text(ago, style: sans(11, color: AppColors.fg4)),
       ],
       SizedBox(width: kMobile ? 18 : 14),
     ]);
@@ -288,7 +288,7 @@ class _NotificationMessageCardState extends State<NotificationMessageCard> {
               attentionTool == 'bash' ? '\$ $body' : body,
               maxLines: 5,
               overflow: TextOverflow.ellipsis,
-              style: mono(12, height: 1.45, color: AppColors.fg2),
+              style: sans(12, height: 1.45, color: AppColors.fg2),
             )
           else if (showBody)
             Text(body,
