@@ -234,6 +234,7 @@ class MobileBackBar extends StatelessWidget {
     final back = menu || keepBack || defaultTargetPlatform == TargetPlatform.iOS
         ? onBack
         : null;
+    final fill = back != null && trailing.isNotEmpty;
     final text = Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.center,
@@ -291,13 +292,14 @@ class MobileBackBar extends StatelessWidget {
                       onTap: onTitleTap,
                       child: Container(
                         height: 44,
-                        constraints:
-                            const BoxConstraints(minWidth: 120, maxWidth: 260),
+                        constraints: fill
+                            ? const BoxConstraints(minWidth: double.infinity)
+                            : const BoxConstraints(minWidth: 120, maxWidth: 260),
                         padding: const EdgeInsets.symmetric(horizontal: 18),
                         decoration: _floating(22),
                         child: Align(
-                            widthFactor: 1,
-                            child: IntrinsicWidth(child: label)),
+                            widthFactor: fill ? null : 1,
+                            child: fill ? label : IntrinsicWidth(child: label)),
                       ),
                     ),
                   )
