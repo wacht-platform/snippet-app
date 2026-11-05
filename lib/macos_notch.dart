@@ -399,9 +399,17 @@ class MacosNotch {
       } catch (_) {}
     }
 
-    // Default to Mission Control whenever no specific session ID is given.
     if (sessionId.isEmpty) {
       sessionId = 'mission-control';
+    }
+    if (sessionId == 'mission-control') {
+      await _channel.invokeMethod<void>('openInApp', <String, dynamic>{
+        ...payload,
+        'url': client.baseUrl,
+        'session': 'mission-control',
+        'title': 'Mission Control',
+      });
+      return;
     }
     if (sessionId == 'mission-control' || _activeTitle.isEmpty) {
       _activeTitle =
