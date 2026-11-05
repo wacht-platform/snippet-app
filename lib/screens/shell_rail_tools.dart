@@ -83,8 +83,6 @@ List<Widget> buildShellRailTools({
         onTap: onTap,
       );
 
-  final events = s?.events ?? const <Map<String, dynamic>>[];
-  final artifacts = events.where((e) => e['kind'] == 'file_presented').length;
   final win = s?.contextWindow ?? 0;
   final used = s?.lastPromptTokens ?? 0;
   final frac = win > 0 ? (used / win).clamp(0.0, 1.0) : 0.0;
@@ -196,8 +194,7 @@ List<Widget> buildShellRailTools({
           item('git-fork', 'Fork from here', () => onSessionAction('fork')),
           const PopupMenuDivider(height: 9),
           item('file-diff', 'File changes', () => onSessionAction('file_changes')),
-          item('clipboard', 'Artifacts', () => onSessionAction('artifacts'),
-              detail: artifacts > 0 ? '$artifacts' : null),
+          item('clipboard', 'Artifacts', () => onSessionAction('artifacts')),
           item('book-marked', 'Memory', () => onSessionAction('memory')),
           item('pull-request', 'Pull requests',
               () => onSessionAction('pull_requests')),
