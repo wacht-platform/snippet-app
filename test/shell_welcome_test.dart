@@ -176,7 +176,7 @@ void main() {
   testWidgets('phone shows the remote steps only', (t) async {
     await _pump(t, TargetPlatform.android);
     expect(find.text('On another computer'), findsNothing);
-    expect(find.text('Scan or paste'), findsOneWidget);
+    expect(find.text('Scan QR code'), findsOneWidget);
     debugDefaultTargetPlatformOverride = null;
   });
 }

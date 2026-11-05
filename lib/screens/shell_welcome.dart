@@ -106,8 +106,8 @@ class _ShellWelcomeViewState extends State<ShellWelcomeView>
     super.initState();
     _clock =
         AnimationController(vsync: this, duration: const Duration(seconds: 9));
+    _clock.repeat();
     if (!kMobile) {
-      _clock.repeat();
       _installed = widget.binaryInstalled();
       _probe();
       _timer = Timer.periodic(widget.recheck, (_) => _probe());
@@ -482,55 +482,6 @@ class _ShellWelcomeViewState extends State<ShellWelcomeView>
     }
   }
 
-  Widget _card({
-    required String icon,
-    required String title,
-    required String subtitle,
-    required List<Widget> children,
-  }) =>
-      Container(
-        padding: EdgeInsets.all(kMobile ? 18 : 20),
-        decoration: BoxDecoration(
-          color: AppColors.surface1,
-          borderRadius: BorderRadius.circular(R.lg),
-          border: Border.all(color: AppColors.border),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Container(
-                width: 38,
-                height: 38,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: AppColors.accentBg,
-                  borderRadius: BorderRadius.circular(R.md),
-                ),
-                child: AppIcon(icon, size: 18, color: AppColors.accent),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(title,
-                        style: sans(kMobile ? 15.5 : 14.5,
-                            weight: W.label, color: AppColors.fg1)),
-                    const SizedBox(height: 3),
-                    Text(subtitle,
-                        style: sans(kMobile ? 13.5 : 12.5,
-                            height: 1.45, color: AppColors.fg3)),
-                  ],
-                ),
-              ),
-            ]),
-            const SizedBox(height: 18),
-            ...children,
-          ],
-        ),
-      );
-
   Widget _wideButton(String label, String icon, VoidCallback? onTap) =>
       Pressable(
         enabled: onTap != null,
@@ -555,71 +506,94 @@ class _ShellWelcomeViewState extends State<ShellWelcomeView>
         ),
       );
 
-  List<Widget> _manualCard() => [
-        _card(
-          icon: 'server',
-          title: 'Run it on a computer',
-          subtitle: kMobile
-              ? 'Install snippet on your computer, then connect this phone to it.'
-              : 'Install snippet on a Linux or macOS computer, then connect here.',
-          children: [
-            const _WelcomeStep(
-              n: '1',
-              title: 'Install',
-              command: installCommand,
-            ),
-            const SizedBox(height: 14),
-            const _WelcomeStep(
-              n: '2',
-              title: 'Start it',
-              command: enableCommand,
-              note: 'Keeps it running in the background, including after '
-                  'you close the terminal or restart.',
-            ),
-            const SizedBox(height: 14),
-            const _WelcomeStep(
-              n: '3',
-              title: 'Show its link',
-              command: 'snippet serve --status',
-              note: 'Prints the link and a QR code.',
-            ),
-            const SizedBox(height: 14),
-            _WelcomeStep(
-              n: '4',
-              title: kMobile
-                  ? 'Scan the QR code, or paste the link'
-                  : 'Paste the link here',
-            ),
-            const SizedBox(height: 18),
-            _wideButton(kMobile ? 'Scan or paste' : 'Connect',
-                kMobile ? 'scan' : 'plus', widget.onAddInstance),
-          ],
-        ),
-      ];
-
-  Widget _phone() => Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 32),
+  Widget _phone() => LayoutBuilder(
+        builder: (context, box) => SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(24, 8, 24, 32),
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 460),
+            constraints: BoxConstraints(
+                maxWidth: 460, minHeight: box.maxHeight - 40),
             child: Column(
-              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Center(
-                    child: MochiIcon(color: const Color(0xFFB9C6FF), size: 56)),
-                const SizedBox(height: 20),
-                Text('Snippet needs a service',
-                    textAlign: TextAlign.center, style: display(26)),
-                const SizedBox(height: 6),
+                SizedBox(
+                  height: 200,
+                  child: PlugArt(time: _clock, hover: 0.5),
+                ),
+                const SizedBox(height: 8),
+                Text('Connect to your computer',
+                    textAlign: TextAlign.center, style: display(24)),
+                const SizedBox(height: 10),
                 Text(
-                  'It does its work in a small service that runs in the '
-                  'background. This app is the window onto it.',
+                  'Snippet does its work in a small service that runs on a '
+                  'computer or server. This app is your window onto it.',
                   textAlign: TextAlign.center,
                   style: sans(14.5, height: 1.5, color: AppColors.fg3),
                 ),
-                const SizedBox(height: 26),
-                ..._manualCard(),
+                const SizedBox(height: 28),
+                _wideButton('Scan QR code', 'scan', widget.onAddInstance),
+                const SizedBox(height: 18),
+                Row(children: [
+                  Expanded(child: Container(height: 1, color: AppColors.border)),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: Text('or paste its link',
+                        style: sans(12.5, color: AppColors.fg4)),
+                  ),
+                  Expanded(child: Container(height: 1, color: AppColors.border)),
+                ]),
+                const SizedBox(height: 18),
+                Row(children: [
+                  Expanded(
+                      child: AppField(
+                          controller: _paste,
+                          mono: true,
+                          hint: 'https://\u2026?token=\u2026',
+                          onSubmitted: _connectRemote)),
+                  const SizedBox(width: 8),
+                  PillBtn('Connect',
+                      onTap: _remoteBusy || _paste.text.trim().isEmpty
+                          ? null
+                          : () => _connectRemote(_paste.text)),
+                ]),
+                if (_remoteError != null) ...[
+                  const SizedBox(height: 10),
+                  Text(_remoteError!,
+                      textAlign: TextAlign.center,
+                      style: sans(12.5, height: 1.4, color: AppColors.danger)),
+                ],
+                const SizedBox(height: 32),
+                Container(
+                  padding: const EdgeInsets.all(18),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface1,
+                    borderRadius: BorderRadius.circular(R.lg),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text('Not running yet? On your computer:',
+                          style: sans(13.5,
+                              weight: W.label, color: AppColors.fg1)),
+                      const SizedBox(height: 14),
+                      const _WelcomeStep(
+                          n: '1', title: 'Install', command: installCommand),
+                      const SizedBox(height: 14),
+                      const _WelcomeStep(
+                          n: '2',
+                          title: 'Start it',
+                          command: enableCommand),
+                      const SizedBox(height: 14),
+                      const _WelcomeStep(
+                        n: '3',
+                        title: 'Show its link and QR code',
+                        command: 'snippet serve --status',
+                        note: 'Prints the link and a QR code to scan.',
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),
