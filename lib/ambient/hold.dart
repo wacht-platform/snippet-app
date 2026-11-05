@@ -85,8 +85,7 @@ class HeldRecorder extends AudioRecorder {
   Future<void> start(RecordConfig config, {required String path}) async {
     _on();
     if (kMacOS) {
-      // AVCaptureAudioFileOutput can yield no file beside ambient's
-      // voice-processing engine, and it drops its errors.
+      // AVCaptureAudioFileOutput reports no error when it can't write its file.
       await _closeMic();
       _pcm = BytesBuilder(copy: false);
       _micPath = path;
@@ -188,7 +187,10 @@ class HeldRecorder extends AudioRecorder {
       throw 'the microphone sent no audio. Check the input device and '
           'microphone access in System Settings.';
     }
-    await File(path).writeAsBytes(pcm16ToWav(pcm), flush: true);
+    // The macOS temp folder from path_provider may not exist yet.
+    final file = File(path);
+    await file.parent.create(recursive: true);
+    await file.writeAsBytes(pcm16ToWav(pcm), flush: true);
     return path;
   }
 

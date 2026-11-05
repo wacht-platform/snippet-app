@@ -61,6 +61,17 @@ void main() {
     expect(voiceNoteExtension, 'wav');
   });
 
+  test('a note saves even when the temp folder does not exist yet', () async {
+    final r = HeldRecorder();
+    final path = '${dir.path}/Caches/com.snippet/note.wav';
+    await r.start(_config, path: path);
+    await settle();
+    sink!.success(Uint8List.fromList([0x00, 0x10]));
+    await settle();
+    expect(await r.stop(), path);
+    expect(File(path).existsSync(), isTrue);
+  });
+
   test('silence fails with a reason and writes no file', () async {
     final r = HeldRecorder();
     final path = '${dir.path}/silent.wav';
