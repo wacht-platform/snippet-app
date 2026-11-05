@@ -1501,6 +1501,7 @@ class _PastedEditorState extends State<_PastedEditor> {
             title: 'Pasted text',
             subtitle: '$lines lines',
             onBack: () => _done('save'),
+            keepBack: true,
             actions: [
               IconBtn('trash', tooltip: 'Remove', onTap: () => _done('remove')),
             ],

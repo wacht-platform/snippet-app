@@ -337,7 +337,6 @@ class _PullRequestsScreenState extends State<PullRequestsScreen> {
               },
               subtitle: widget.status.repo,
               chevron: true,
-              hug: true,
               onTitleTap: () => _pickFilter(anchor),
             ),
           ),

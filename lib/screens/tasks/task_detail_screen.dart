@@ -108,7 +108,16 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     } catch (_) {}
   }
 
+  bool get _closed => const {
+        TaskStatus.done,
+        TaskStatus.failed,
+        TaskStatus.cancelled,
+      }.contains(task?.status);
+
+  bool _holdsTurn(TaskAgent a) => !_closed && a.active && a.hasSessionLease;
+
   String _memberLabel(TaskAgent a) {
+    if (_closed) return '';
     if (!a.active) return 'left';
     if (a.hasSessionLease) return 'has the turn';
     return (a.workSessionId ?? '').isEmpty ? 'waiting' : 'in the session';
@@ -356,7 +365,9 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
   String get _defaultAddressee {
     final holder =
         roster.where((a) => a.active && a.hasSessionLease).firstOrNull;
-    return holder == null ? 'The room' : '${holder.agentId} (has the turn)';
+    return holder == null || _closed
+        ? 'The room'
+        : '${holder.agentId} (has the turn)';
   }
 
   Widget _addresseeBar() {
@@ -861,13 +872,13 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
               Column(children: [
                 for (final a in roster)
                   InkWell(
-                    onTap: (a.active && !a.hasSessionLease)
+                    onTap: (!_closed && a.active && !a.hasSessionLease)
                         ? () => _transferLeaseTo(a)
                         : null,
                     child: SizedBox(
                       height: 48,
                       child: Row(children: [
-                        a.hasSessionLease
+                        _holdsTurn(a)
                             ? WorkingMochi(size: 22, color: mochiColorFor(a.agentId))
                             : AgentMochi(a.agentId, size: 22),
                         const SizedBox(width: 12),
@@ -883,7 +894,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                         Text(
                             _memberLabel(a),
                             style: sans(13,
-                                color: a.hasSessionLease
+                                color: _holdsTurn(a)
                                     ? AppColors.accent
                                     : AppColors.fg4)),
                       ]),
@@ -908,14 +919,14 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                             ? const Radius.circular(10)
                             : Radius.zero,
                       ),
-                      onTap: (roster[i].active && !roster[i].hasSessionLease)
+                      onTap: (!_closed && roster[i].active && !roster[i].hasSessionLease)
                           ? () => _transferLeaseTo(roster[i])
                           : null,
                       child: Padding(
                         padding: const EdgeInsets.symmetric(
                             horizontal: 10, vertical: 8),
                         child: Row(children: [
-                          roster[i].hasSessionLease
+                          _holdsTurn(roster[i])
                               ? WorkingMochi(
                                   size: 18,
                                   color: mochiColorFor(roster[i].agentId))
@@ -933,7 +944,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                           Text(
                             _memberLabel(roster[i]),
                             style: sans(11.5,
-                                color: roster[i].hasSessionLease
+                                color: _holdsTurn(roster[i])
                                     ? AppColors.accent
                                     : AppColors.fg4),
                           ),
@@ -1010,7 +1021,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
             child: EmptyState(
               icon: 'message-text',
               title: 'No messages yet',
-              body: 'Agents on this task talk here. You can post too.',
+              body: 'Agents on this task talk here. You can add a note too.',
             ),
           ),
         ),
@@ -1158,7 +1169,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                     cursorColor: AppColors.accent,
                     decoration: InputDecoration(
                       border: InputBorder.none,
-                      hintText: 'Message this task…',
+                      hintText: 'Add a note…',
                       hintStyle: sans(16, color: AppColors.fg4),
                     ),
                   ),
@@ -1202,7 +1213,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                     decoration: InputDecoration(
                       isCollapsed: true,
                       border: InputBorder.none,
-                      hintText: 'Message this task…',
+                      hintText: 'Add a note…',
                       hintStyle: sans(13, color: AppColors.fg4),
                     ),
                   ),

@@ -186,7 +186,9 @@ class _NewSessionPickerState extends State<NewSessionPicker> {
   String get _here => _listing?.path ?? '';
 
   String get _hereName =>
-      _here.isEmpty ? 'home' : lastPathSegment(_here, ifEmpty: _here);
+      _here.isEmpty || (_atHome && kMobile)
+          ? 'Home'
+          : lastPathSegment(_here, ifEmpty: _here);
 
   bool get _atHome =>
       _homePath == null || _homePath!.isEmpty || _here == _homePath;
@@ -199,8 +201,9 @@ class _NewSessionPickerState extends State<NewSessionPicker> {
     final home = _homePath;
     final here = _here;
     if (here.isEmpty) return const [];
-    if (home == null || home.isEmpty) return [_Crum('~', here)];
-    final crumbs = <_Crum>[_Crum('~', home)];
+    final homeLabel = kMobile ? 'Home' : '~';
+    if (home == null || home.isEmpty) return [_Crum(homeLabel, here)];
+    final crumbs = <_Crum>[_Crum(homeLabel, home)];
     if (here == home) return crumbs;
     // Only a genuine descendant splits into parts — otherwise `~/x` and `~/x-two`
     // would be conflated by a plain prefix test.
@@ -399,7 +402,7 @@ class _NewSessionPickerState extends State<NewSessionPicker> {
       margin: kMobile
           ? const EdgeInsets.fromLTRB(M.gutter, 4, M.gutter, 8)
           : EdgeInsets.zero,
-      padding: EdgeInsets.only(left: kMobile ? 14 : 16, right: kMobile ? 4 : 16),
+      padding: EdgeInsets.only(left: 16, right: kMobile ? 4 : 16),
       decoration: kMobile
           ? BoxDecoration(
               color: AppColors.surface1,
@@ -413,6 +416,10 @@ class _NewSessionPickerState extends State<NewSessionPicker> {
               ),
             ),
       child: Row(children: [
+        if (kMobile) ...[
+          AppIcon(_atHome ? 'home' : 'folder', size: 16, color: AppColors.fg3),
+          const SizedBox(width: 6),
+        ],
         Expanded(
           child: SizedBox(
             height: kMobile ? M.minTarget : 40,
@@ -463,12 +470,14 @@ class _NewSessionPickerState extends State<NewSessionPicker> {
             ),
           ),
         ),
-        const SizedBox(width: 4),
-        IconBtn('arrow-up',
-            size: kMobile ? M.minTarget : 36,
-            iconSize: 17,
-            tooltip: 'Home',
-            onTap: _atHome ? null : () => _go(_homePath)),
+        if (!kMobile || !_atHome) ...[
+          const SizedBox(width: 4),
+          IconBtn(kMobile ? 'home' : 'arrow-up',
+              size: kMobile ? M.minTarget : 36,
+              iconSize: 17,
+              tooltip: 'Home',
+              onTap: _atHome ? null : () => _go(_homePath)),
+        ],
       ]),
     );
   }
@@ -539,12 +548,8 @@ class _NewSessionPickerState extends State<NewSessionPicker> {
           // The desktop half of "this goes somewhere".
           cursor: SystemMouseCursors.click,
           child: Container(
-            height: kMobile ? M.rowHeight : 40,
+            height: kMobile ? 48 : 40,
             padding: EdgeInsets.symmetric(horizontal: kMobile ? 4 : S.s8),
-            decoration: kMobile
-                ? BoxDecoration(
-                    border: Border(bottom: BorderSide(color: AppColors.line)))
-                : null,
             child: Row(children: [
               SizedBox(
                   width: 22,
@@ -559,7 +564,8 @@ class _NewSessionPickerState extends State<NewSessionPicker> {
                     overflow: TextOverflow.ellipsis,
                     style: kMobile ? TS.rowTitle() : TS.ui(AppColors.fg1)),
               ),
-              AppIcon('chevron-right', size: 16, color: AppColors.fg4),
+              AppIcon('chevron-right',
+                  size: kMobile ? 14 : 16, color: AppColors.fg4),
             ]),
           ),
         ),
@@ -592,7 +598,12 @@ class _NewSessionPickerState extends State<NewSessionPicker> {
   Widget _actionBar() => Container(
         padding: EdgeInsets.fromLTRB(
             kMobile ? M.gutter : 16, 8, kMobile ? M.gutter : 16, 10),
-        color: kMobile ? AppColors.bg : AppColors.base,
+        decoration: BoxDecoration(
+          color: kMobile ? AppColors.bg : AppColors.base,
+          border: kMobile
+              ? Border(top: BorderSide(color: AppColors.line))
+              : null,
+        ),
         child: Row(children: [
           // Phones get one labelled "+" menu: tooltips don't exist on touch,
           // so three bare glyphs left you guessing.

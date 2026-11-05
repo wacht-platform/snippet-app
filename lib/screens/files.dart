@@ -461,6 +461,7 @@ class _FileExplorerState extends State<FileExplorer> {
                     // row (with the item count); this bar names the screen.
                     titleSize: kMobile ? M.sectionTitle : 15,
                     compact: true,
+                    keepBack: true,
                     onBack: _selecting
                         ? _exitSelect
                         : (listing?.parent != null && listing?.path != _root

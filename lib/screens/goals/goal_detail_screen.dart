@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../mobile_chrome.dart';
+
 import '../../api.dart';
 import '../../goal_models.dart';
 import '../../models.dart';
@@ -69,6 +71,12 @@ class _GoalDetailScreenState extends State<GoalDetailScreen> {
       body: SafeArea(
         bottom: false,
         child: Column(children: [
+          if (kMobile)
+            MobileBackBar(
+                title: title,
+                onBack: widget.onClose ?? () => Navigator.of(context).pop(),
+                onTitleTap: () {})
+          else
           Padding(
             padding: const EdgeInsets.fromLTRB(6, 8, 10, 4),
             child: Row(children: [

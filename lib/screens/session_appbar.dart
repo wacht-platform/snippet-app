@@ -401,6 +401,7 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
       title: _title.isEmpty ? 'Session' : _title,
       subtitle: sub,
       onBack: widget.onMenu ?? () => Navigator.maybePop(context),
+      keepBack: true,
       onTitleTap: () => _openActionsDrawer(s),
       trailing: [
         if (s != null && s.lanes.any((l) => l.running)) ...[
@@ -530,6 +531,7 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
           title: _terms.length > 1 ? 'Shell ${i + 1}' : 'Shell',
           subtitle: t.alive ? null : 'Starting…',
           onBack: () => _setState(() => _termOpen = false),
+          keepBack: true,
           trailing: [
             RoundBtn(
                 icon: 'plus',
@@ -1092,7 +1094,6 @@ extension _SessionScreenAppBarExt on _SessionScreenState {
             MobileBackBar(
               title: title,
               subtitle: 'Actions',
-              hug: true,
               onTitleTap: () {},
             ),
             const SizedBox(height: 8),

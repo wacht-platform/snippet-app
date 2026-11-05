@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -209,13 +210,16 @@ class MobileBackBar extends StatelessWidget {
     this.trailing = const [],
     this.menu = false,
     this.chevron = false,
-    this.hug = false,
+    this.keepBack = false,
     this.leading,
   });
 
   final String title;
   final String? subtitle;
-  final bool hug;
+  /// For a back that does something the system gesture wouldn't: closing an
+  /// overlay inside the page or saving on the way out. Anywhere else the gesture
+  /// is the way back and the bar stays clear.
+  final bool keepBack;
   final Widget? leading;
   final bool menu;
   final bool chevron;
@@ -226,6 +230,10 @@ class MobileBackBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final pill = onTitleTap != null || subtitle != null;
+    // iOS has no system back for these pages, so only Android loses the button.
+    final back = menu || keepBack || defaultTargetPlatform == TargetPlatform.iOS
+        ? onBack
+        : null;
     final text = Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.center,
@@ -266,15 +274,15 @@ class MobileBackBar extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Row(children: [
-          if (onBack == null && trailing.isNotEmpty)
+          if (back == null && trailing.isNotEmpty)
             const SizedBox(width: 44)
-          else if (onBack != null)
+          else if (back != null)
             RoundBtn(
                 icon: menu ? 'menu' : 'chevron-left',
                 tooltip: menu ? 'Menu' : 'Back',
-                onTap: onBack),
+                onTap: back),
           if (trailing.length == 2) const SizedBox(width: 44),
-          if (onBack != null || trailing.isNotEmpty) const SizedBox(width: 10),
+          if (back != null || trailing.isNotEmpty) const SizedBox(width: 10),
           Expanded(
             child: pill
                 ? Center(
@@ -283,23 +291,19 @@ class MobileBackBar extends StatelessWidget {
                       onTap: onTitleTap,
                       child: Container(
                         height: 44,
-                        constraints: hug
-                            ? const BoxConstraints(minWidth: 120, maxWidth: 260)
-                            : const BoxConstraints(minWidth: double.infinity),
+                        constraints:
+                            const BoxConstraints(minWidth: 120, maxWidth: 260),
                         padding: const EdgeInsets.symmetric(horizontal: 18),
                         decoration: _floating(22),
-                        alignment: hug ? null : Alignment.center,
-                        child: hug
-                            ? Align(
-                                widthFactor: 1,
-                                child: IntrinsicWidth(child: label))
-                            : label,
+                        child: Align(
+                            widthFactor: 1,
+                            child: IntrinsicWidth(child: label)),
                       ),
                     ),
                   )
                 : Center(child: label),
           ),
-          if (onBack != null || trailing.isNotEmpty) ...[
+          if (back != null || trailing.isNotEmpty) ...[
             const SizedBox(width: 10),
             if (trailing.isEmpty) const SizedBox(width: 44) else ...trailing,
           ],

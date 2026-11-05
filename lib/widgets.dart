@@ -1990,6 +1990,7 @@ class SnAppBar extends StatelessWidget {
   final String title;
   final String? subtitle;
   final VoidCallback? onBack;
+  final bool keepBack;
   final Widget? leading;
   final List<Widget> actions;
   final double? titleSize;
@@ -2013,6 +2014,7 @@ class SnAppBar extends StatelessWidget {
       required this.title,
       this.subtitle,
       this.onBack,
+      this.keepBack = false,
       this.leading,
       this.actions = const [],
       this.titleSize,
@@ -2043,6 +2045,7 @@ class SnAppBar extends StatelessWidget {
         title: title,
         subtitle: subtitle,
         onBack: onBack,
+        keepBack: keepBack,
         trailing: [
           for (final a in actions)
             if (a is IconBtn)

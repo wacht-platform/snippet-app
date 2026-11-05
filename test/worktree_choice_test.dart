@@ -75,7 +75,7 @@ void main() {
     final opened = await _pump(tester, _FakeDaemon(repo: true));
     await tester.tap(find.text('This folder'));
     await tester.pumpAndSettle();
-    await start(tester, 'Start chat in app');
+    await start(tester, 'Start chat in Home');
     expect(opened.single, ('/code/app', WorkspaceMode.folder));
   });
 
@@ -92,7 +92,7 @@ void main() {
   testWidgets('outside a repo there is nothing to choose', (tester) async {
     final opened = await _pump(tester, _FakeDaemon(repo: false));
     expect(find.text('Works in'), findsNothing);
-    await start(tester, 'Start chat in app');
+    await start(tester, 'Start chat in Home');
     expect(opened.single, ('/code/app', WorkspaceMode.folder));
   });
 

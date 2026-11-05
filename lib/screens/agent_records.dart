@@ -84,8 +84,8 @@ Future<void> openAgentActions(
               MobileBackBar(
                 title: agentName,
                 subtitle: 'Actions',
-                hug: true,
                 leading: AgentMochi(agentId, size: 24),
+                onBack: () => Navigator.of(page).pop(),
                 onTitleTap: () {},
               ),
               Expanded(

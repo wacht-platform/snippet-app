@@ -85,7 +85,11 @@ void main() {
       lanes = [lane(title: 'Restored worker', status: 'completed')];
       await tester.pump(const Duration(seconds: 1));
       expect(find.text('Restored worker'), findsWidgets);
-      await tester.tap(find.byTooltip('Back'));
+      if (mode == 'mobile') {
+        await tester.binding.handlePopRoute();
+      } else {
+        await tester.tap(find.byTooltip('Back'));
+      }
       await tester.pumpAndSettle();
       expect(find.text('Delegated lanes'), mode == 'hosted desktop' ? findsNothing : findsOneWidget);
       expect(find.byType(LaneDetailScreen), findsNothing);
@@ -99,7 +103,11 @@ void main() {
         debugDefaultTargetPlatformOverride = null;
         return;
       }
-      await tester.tap(find.byTooltip('Back'));
+      if (mode == 'mobile') {
+        await tester.binding.handlePopRoute();
+      } else {
+        await tester.tap(find.byTooltip('Back'));
+      }
       await tester.pumpAndSettle();
       if (mode == 'mobile') {
         expect(find.text('Outer home'), findsOneWidget);
