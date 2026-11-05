@@ -19,7 +19,9 @@ import 'mission_control/mission_control_state.dart'
 class CardMarkdownBody extends StatefulWidget {
   final String body;
   final String? preview;
-  const CardMarkdownBody({super.key, required this.body, this.preview});
+  final bool collapsible;
+  const CardMarkdownBody(
+      {super.key, required this.body, this.preview, this.collapsible = true});
 
   @override
   State<CardMarkdownBody> createState() => _CardMarkdownBodyState();
@@ -31,7 +33,8 @@ class _CardMarkdownBodyState extends State<CardMarkdownBody> {
   @override
   Widget build(BuildContext context) {
     final body = widget.body.trim();
-    final long = body.length > 160 || '\n'.allMatches(body).length > 1;
+    final long = widget.collapsible &&
+        (body.length > 160 || '\n'.allMatches(body).length > 1);
     final text = TranscriptCard.bodyStyle;
     final sheet = markdownStyle(context).copyWith(
       p: text,

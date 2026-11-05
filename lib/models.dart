@@ -1209,6 +1209,51 @@ class BoardEntry {
         createdAt = j['created_at'] as String? ?? '';
 }
 
+/// A page of an agent's board, and the dispatches still waiting for a report.
+class BoardPage {
+  final List<BoardEntry> entries;
+  final List<String> awaiting;
+  const BoardPage(this.entries, this.awaiting);
+}
+
+/// Something that reached an agent: a task offer, a direct message, or a task
+/// room post that names it.
+class InboxEntry {
+  final int id;
+  final String eventId;
+
+  /// `offer`, `message` or `room`.
+  final String source;
+  final String threadId;
+  final String fromKind;
+  final String fromId;
+
+  /// Who it was addressed to, when the agent got a copy of its own session's
+  /// message this is someone else.
+  final String? toId;
+  final String? envelope;
+  final String? postKind;
+  final String? taskId;
+  final String? title;
+  final String text;
+  final String createdAt;
+
+  InboxEntry.fromJson(Map<String, dynamic> j)
+      : id = (j['id'] as num?)?.toInt() ?? 0,
+        eventId = j['event_id'] as String? ?? '',
+        source = j['source'] as String? ?? 'message',
+        threadId = j['thread_id'] as String? ?? '',
+        fromKind = j['from_kind'] as String? ?? '',
+        fromId = j['from_id'] as String? ?? '',
+        toId = j['to_id'] as String?,
+        envelope = j['envelope'] as String?,
+        postKind = j['post_kind'] as String?,
+        taskId = j['task_id'] as String?,
+        title = j['title'] as String?,
+        text = j['text'] as String? ?? '',
+        createdAt = j['created_at'] as String? ?? '';
+}
+
 /// A direct conversation as listed for a participant, with its unread count.
 class DirectThreadSummary {
   final String threadId;

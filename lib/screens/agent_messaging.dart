@@ -23,6 +23,7 @@ import '../theme.dart';
 import '../widgets.dart';
 import '../swr.dart';
 import '../pull_refresh.dart';
+import 'agent_records.dart';
 import 'memory_screen.dart';
 import '../mochi.dart';
 import 'mochi_color_picker.dart';
@@ -339,6 +340,8 @@ class AgentThreadScreen extends StatefulWidget {
 }
 
 class _AgentThreadScreenState extends State<AgentThreadScreen> {
+  int _tab = 0;
+  final Set<int> _visited = {0};
   static const _maxAttachments = 10;
   Duration _maxRecordingDuration = const Duration(minutes: 3);
 
@@ -973,8 +976,38 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
               _header(),
               Divider(height: 1, color: AppColors.border),
             ],
-            Expanded(child: _body()),
-            _composer(),
+            AgentPageTabs(
+              index: _tab,
+              onChanged: (i) => setState(() {
+                _tab = i;
+                _visited.add(i);
+              }),
+            ),
+            Expanded(
+              child: IndexedStack(
+                index: _tab,
+                children: [
+                  Column(children: [
+                    Expanded(child: _body()),
+                    _composer(),
+                  ]),
+                  if (_visited.contains(1))
+                    AgentInboxView(
+                        client: widget.client,
+                        agentId: widget.agentId,
+                        agentName: widget.agentName)
+                  else
+                    const SizedBox.shrink(),
+                  if (_visited.contains(2))
+                    AgentBoardView(
+                        client: widget.client,
+                        agentId: widget.agentId,
+                        agentName: widget.agentName)
+                  else
+                    const SizedBox.shrink(),
+                ],
+              ),
+            ),
           ],
         ),
       ),

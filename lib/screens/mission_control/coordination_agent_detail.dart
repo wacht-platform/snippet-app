@@ -7,15 +7,8 @@ import '../../widgets.dart';
 import '../agent_messaging.dart';
 import '../../platform.dart';
 
-/// One coordination agent — shown as its CONVERSATION.
-///
-/// Tapping an agent opens the message screen, because that is what an agent page
-/// is FOR: talking to it. Identity (handle, role, status) is a compact header on
-/// the thread rather than a page of its own — it is context for the
-/// conversation, not content worth a separate screen.
-///
-/// The board that used to live here is deliberately gone: an empty list of
-/// internal rows is not what anyone opens an agent to see.
+/// One coordination agent: its conversation first, with its inbox and board a
+/// tab away. Identity is a compact header rather than a page of its own.
 class CoordinationAgentDetail extends StatelessWidget {
   const CoordinationAgentDetail({
     super.key,

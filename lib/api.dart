@@ -1654,6 +1654,59 @@ class DaemonClient {
         .toList();
   }
 
+  /// The board with paging, and the dispatches still waiting for a report.
+  /// [outstanding] narrows to those dispatches.
+  Future<BoardPage> agentBoardPage(
+    String agentId, {
+    String? contains,
+    String? kind,
+    int? before,
+    bool outstanding = false,
+    int limit = 50,
+  }) async {
+    final query = <String, String>{
+      'limit': '$limit',
+      if (contains != null && contains.isNotEmpty) 'contains': contains,
+      if (kind != null && kind.isNotEmpty) 'kind': kind,
+      if (before != null) 'before': '$before',
+      if (outstanding) 'outstanding': 'true',
+    };
+    final r = await http
+        .get(_uri('/agents/${Uri.encodeComponent(agentId)}/board', query));
+    if (r.statusCode != 200) throw _err('load agent board', r);
+    final j = jsonDecode(r.body) as Map<String, dynamic>;
+    return BoardPage(
+      ((j['entries'] as List?) ?? const [])
+          .map((e) => BoardEntry.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      ((j['awaiting'] as List?) ?? const []).map((e) => '$e').toList(),
+    );
+  }
+
+  /// GET /agents/{id}/inbox: what has reached this agent, newest first.
+  /// [kind] is `offer`, `message` or `room`.
+  Future<List<InboxEntry>> agentInbox(
+    String agentId, {
+    String? contains,
+    String? kind,
+    int? before,
+    int limit = 50,
+  }) async {
+    final query = <String, String>{
+      'limit': '$limit',
+      if (contains != null && contains.isNotEmpty) 'contains': contains,
+      if (kind != null && kind.isNotEmpty) 'kind': kind,
+      if (before != null) 'before': '$before',
+    };
+    final r = await http
+        .get(_uri('/agents/${Uri.encodeComponent(agentId)}/inbox', query));
+    if (r.statusCode != 200) throw _err('load agent inbox', r);
+    final entries = (jsonDecode(r.body) as Map<String, dynamic>)['entries'];
+    return ((entries as List?) ?? const [])
+        .map((e) => InboxEntry.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
   /// POST /agents/build — ask the runtime to research and build an agent from one prompt.
   Future<void> buildCoordinationAgent(String prompt, {String? nickname}) async {
     final r = await http.post(
