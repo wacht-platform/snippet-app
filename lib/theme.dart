@@ -986,14 +986,14 @@ const List<FontPreset> allFonts = [
 
 const List<FontPreset> allMonoFonts = [
   FontPreset(
-    family: 'GeistMono',
-    label: 'Geist Mono',
-    description: 'Technical Swiss monospace',
-  ),
-  FontPreset(
     family: 'JetBrainsMono',
     label: 'JetBrains Mono',
     description: 'Developer monospace with tall x-height',
+  ),
+  FontPreset(
+    family: 'GeistMono',
+    label: 'Geist Mono',
+    description: 'Technical Swiss monospace',
   ),
   FontPreset(
     family: 'FiraCode',
@@ -1446,7 +1446,22 @@ TextStyle display(double size,
       color: color ?? AppColors.fg1,
     );
 
+/// Numbers, ids and labels: the UI face with tabular figures, not a code face.
 TextStyle mono(double size,
+        {FontWeight weight = W.body,
+        double? height,
+        double? spacing,
+        Color? color,
+        bool tabular = true}) =>
+    sans(size,
+        weight: weight,
+        height: height ?? 1.45,
+        spacing: spacing,
+        color: color ?? AppColors.fg1,
+        tabular: tabular);
+
+/// Real code: the user's chosen monospace face.
+TextStyle codeMono(double size,
         {FontWeight weight = W.body,
         double? height,
         double? spacing,
@@ -1537,9 +1552,9 @@ class TS {
       ? sans(16, height: 26 / 16, color: c ?? AppColors.fg1)
       : sans(14, height: 22 / 14, color: c ?? AppColors.fg1);
   static TextStyle code([Color? c]) =>
-      mono(13, height: 20 / 13, color: c ?? AppColors.fg2);
+      codeMono(13, height: 20 / 13, color: c ?? AppColors.fg2);
   static TextStyle codeSmall([Color? c]) =>
-      mono(12, height: 16 / 12, color: c ?? AppColors.fg3);
+      codeMono(12, height: 16 / 12, color: c ?? AppColors.fg3);
 }
 
 // ---------------------------------------------------------------------------

@@ -742,7 +742,6 @@ class _SessionScreenState extends State<SessionScreen>
     }
   }
 
-  bool _isGitSession = false;
   bool _typedCompact = false;
 
   void _loadSettled() {
@@ -751,7 +750,6 @@ class _SessionScreenState extends State<SessionScreen>
       if (!mounted) return;
       final me = list.where((x) => x.id == widget.sessionId).firstOrNull;
       _keepAwake = me?.keepAwake ?? false;
-      _isGitSession = me?.isGit ?? false;
       final now = me?.settled ?? false;
       if (now != _settled) setState(() => _settled = now);
     }).catchError((_) {});

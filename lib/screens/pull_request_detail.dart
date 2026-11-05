@@ -160,7 +160,7 @@ MarkdownStyleSheet _compactMarkdown(BuildContext context) {
     h1: sans(17, weight: W.strong, color: AppColors.fg1),
     h2: sans(15.5, weight: W.strong, color: AppColors.fg1),
     h3: sans(14.5, weight: W.strong, color: AppColors.fg1),
-    code: mono(12, color: AppColors.fg1).copyWith(backgroundColor: AppColors.surface2),
+    code: codeMono(12, color: AppColors.fg1).copyWith(backgroundColor: AppColors.surface2),
     blockSpacing: 8,
   );
 }
@@ -229,7 +229,7 @@ class PrCommentBody extends StatelessWidget {
             Container(
               color: AppColors.diffAddBg,
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 1),
-              child: Text('+ $line', style: mono(12, height: 1.5, color: AppColors.fg1)),
+              child: Text('+ $line', style: codeMono(12, height: 1.5, color: AppColors.fg1)),
             ),
         ]),
       );
@@ -2346,7 +2346,7 @@ class _PrFileDiffState extends State<PrFileDiff> {
       return Container(
         color: AppColors.accentBg,
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-        child: Text(line.text, style: mono(11.5, color: AppColors.accent)),
+        child: Text(line.text, style: codeMono(11.5, color: AppColors.accent)),
       );
     }
     final bg = selected
@@ -2374,11 +2374,11 @@ class _PrFileDiffState extends State<PrFileDiff> {
             color: selected ? AppColors.accent.withValues(alpha: 0.3) : null,
             child: Text('${number ?? ''}',
                 textAlign: TextAlign.right,
-                style: mono(11, height: 1.75, color: selected ? AppColors.fg1 : AppColors.fg4)),
+                style: codeMono(11, height: 1.75, color: selected ? AppColors.fg1 : AppColors.fg4)),
           ),
           SizedBox(
             width: 16,
-            child: Text(sign, style: mono(12, height: 1.5, color: AppColors.fg3)),
+            child: Text(sign, style: codeMono(12, height: 1.5, color: AppColors.fg3)),
           ),
           Expanded(
             child: Padding(
@@ -2821,7 +2821,7 @@ class _CommitRowState extends State<_CommitRow> {
               ),
               if (_body) ...[
                 const SizedBox(height: 6),
-                Text(c.body.trim(), style: mono(12, height: 1.5, color: AppColors.fg2)),
+                Text(c.body.trim(), style: codeMono(12, height: 1.5, color: AppColors.fg2)),
               ],
               const SizedBox(height: 6),
               Row(children: [

@@ -326,7 +326,7 @@ class _StepDetail extends StatelessWidget {
                   Text('Running…', style: sans(13, color: AppColors.fg3)),
                 ])
               : DefaultTextStyle(
-                  style: mono(12, height: 1.45, color: AppColors.fg2),
+                  style: codeMono(12, height: 1.45, color: AppColors.fg2),
                   child: safeToolDetailView(context,
                       tool: step.tool, args: step.args, result: step.result),
                 ),
@@ -674,7 +674,7 @@ class _TimelineStep extends StatelessWidget {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: _monoSub
-                              ? mono(12, color: AppColors.fg4)
+                              ? codeMono(12, color: AppColors.fg4)
                               : sans(12, color: AppColors.fg4)),
                     ],
                   ],
@@ -732,7 +732,7 @@ class _StepBody extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           DefaultTextStyle(
-            style: mono(12, height: 1.45, color: AppColors.fg2),
+            style: codeMono(12, height: 1.45, color: AppColors.fg2),
             child: safeToolDetailView(context,
                 tool: step.tool, args: step.args, result: step.result),
           ),
@@ -753,7 +753,7 @@ class _StepBody extends StatelessWidget {
           if (tail)
             for (final line in shown)
               Text(line,
-                  style: mono(11.5,
+                  style: codeMono(11.5,
                       height: 18 / 11.5,
                       color:
                           RegExp(r'FAIL|error|panicked', caseSensitive: false)
@@ -764,7 +764,7 @@ class _StepBody extends StatelessWidget {
             Text('Waiting for output…', style: sans(13, color: AppColors.fg4))
           else
             DefaultTextStyle(
-              style: mono(12, height: 1.45, color: AppColors.fg2),
+              style: codeMono(12, height: 1.45, color: AppColors.fg2),
               child: safeToolDetailView(context,
                   tool: step.tool, args: step.args, result: step.result),
             ),

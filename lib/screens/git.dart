@@ -1332,19 +1332,19 @@ class _GitFileDiffViewState extends State<GitFileDiffView> {
             width: _gutterWidth,
             child: Text(n,
                 textAlign: TextAlign.right,
-                style: mono(10.5, height: 1.5, color: gutterFg)),
+                style: codeMono(10.5, height: 1.5, color: gutterFg)),
           ),
           SizedBox(
             width: 16,
             child: Text(sign,
                 textAlign: TextAlign.center,
-                style: mono(12, height: 1.4, weight: W.label, color: fg)),
+                style: codeMono(12, height: 1.4, weight: W.label, color: fg)),
           ),
           Padding(
             padding: const EdgeInsets.only(right: 16),
             child: Text(
               line.text.isEmpty ? ' ' : line.text,
-              style: mono(12, height: 1.4, color: fg),
+              style: codeMono(12, height: 1.4, color: fg),
             ),
           ),
         ]),
@@ -1364,7 +1364,7 @@ class _GitFileDiffViewState extends State<GitFileDiffView> {
             child: Text(
               oldStr,
               textAlign: TextAlign.right,
-              style: mono(11, color: gutterFg),
+              style: codeMono(11, color: gutterFg),
             ),
           ),
           const SizedBox(width: 6),
@@ -1374,7 +1374,7 @@ class _GitFileDiffViewState extends State<GitFileDiffView> {
             child: Text(
               newStr,
               textAlign: TextAlign.right,
-              style: mono(11, color: gutterFg),
+              style: codeMono(11, color: gutterFg),
             ),
           ),
           // Sign (+ / - / space)
@@ -1383,7 +1383,7 @@ class _GitFileDiffViewState extends State<GitFileDiffView> {
             child: Text(
               sign,
               textAlign: TextAlign.center,
-              style: mono(12, weight: W.label, color: fg),
+              style: codeMono(12, weight: W.label, color: fg),
             ),
           ),
           // Code content
@@ -1391,7 +1391,7 @@ class _GitFileDiffViewState extends State<GitFileDiffView> {
             padding: const EdgeInsets.only(right: 16),
             child: Text(
               line.text.isEmpty ? ' ' : line.text,
-              style: mono(12, height: 1.4, color: fg),
+              style: codeMono(12, height: 1.4, color: fg),
             ),
           ),
         ],

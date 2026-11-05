@@ -257,7 +257,7 @@ Widget toolDetailView(BuildContext context,
 double get _bodySize => kMobile ? 13.5 : 13;
 
 TextStyle _code([Color? color]) =>
-    mono(kMobile ? 12.5 : 12, height: 1.45, color: color ?? AppColors.fg2);
+    codeMono(kMobile ? 12.5 : 12, height: 1.45, color: color ?? AppColors.fg2);
 
 Widget _wrap(List<Widget> rows) =>
     Column(crossAxisAlignment: CrossAxisAlignment.start, children: rows);
@@ -405,20 +405,20 @@ Widget _fileLabel(String name, int adds, int dels, {String note = ''}) =>
         child: Text(name,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: mono(kMobile ? 12 : 11.5, color: AppColors.fg3)),
+            style: codeMono(kMobile ? 12 : 11.5, color: AppColors.fg3)),
       ),
       if (adds > 0) ...[
         const SizedBox(width: S.s8),
-        Text('+$adds', style: mono(kMobile ? 12 : 11.5, color: AppColors.ok)),
+        Text('+$adds', style: codeMono(kMobile ? 12 : 11.5, color: AppColors.ok)),
       ],
       if (dels > 0) ...[
         const SizedBox(width: S.s6),
         Text('−$dels',
-            style: mono(kMobile ? 12 : 11.5, color: AppColors.danger)),
+            style: codeMono(kMobile ? 12 : 11.5, color: AppColors.danger)),
       ],
       if (note.isNotEmpty) ...[
         const SizedBox(width: S.s8),
-        Text(note, style: mono(kMobile ? 12 : 11.5, color: AppColors.fg4)),
+        Text(note, style: codeMono(kMobile ? 12 : 11.5, color: AppColors.fg4)),
       ],
     ]);
 
@@ -642,7 +642,7 @@ List<Widget> _searchContentView(Map? a, Map? d) {
             Text(m.line.isEmpty ? m.path : '${m.path}:${m.line}',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: mono(kMobile ? 12 : 11.5, color: AppColors.fg3)),
+                style: codeMono(kMobile ? 12 : 11.5, color: AppColors.fg3)),
           if (m.text.isNotEmpty) _highlightedLine(m.text, query),
         ]),
       ),
@@ -702,7 +702,7 @@ class _WebResult extends StatelessWidget {
           child: Text(meta.join(' · '),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: mono(kMobile ? 12 : 11.5, color: AppColors.fg3)),
+              style: codeMono(kMobile ? 12 : 11.5, color: AppColors.fg3)),
         ),
       if (snippet.isNotEmpty)
         Padding(
@@ -874,11 +874,11 @@ List<Widget> _monitorView(Map? a, Map? d) {
   ];
   if (path.isNotEmpty) {
     out.add(const SizedBox(height: 4));
-    out.add(Text(path, style: mono(12, color: AppColors.fg2)));
+    out.add(Text(path, style: codeMono(12, color: AppColors.fg2)));
   }
   if (filter.isNotEmpty) {
     out.add(const SizedBox(height: 4));
-    out.add(Text(filter, style: mono(11, color: AppColors.fg3)));
+    out.add(Text(filter, style: codeMono(11, color: AppColors.fg3)));
   }
   return out;
 }

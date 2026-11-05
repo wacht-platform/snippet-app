@@ -319,7 +319,7 @@ class _ArtifactInlineState extends State<ArtifactInline>
                   child: SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
                     child: Text(text,
-                        style: mono(12, height: 1.5, color: AppColors.fg2)),
+                        style: codeMono(12, height: 1.5, color: AppColors.fg2)),
                   ),
                 ));
       case 'image':
@@ -1115,7 +1115,7 @@ class _ArtifactViewerState extends State<ArtifactViewer> {
         (text) => SingleChildScrollView(
           padding: const EdgeInsets.all(16),
           child: SelectableText(text,
-              style: mono(12, height: 1.5, color: AppColors.fg2)),
+              style: codeMono(12, height: 1.5, color: AppColors.fg2)),
         ),
       );
 

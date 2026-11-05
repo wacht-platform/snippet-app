@@ -1247,14 +1247,14 @@ class _PastedTextCardState extends State<PastedTextCard> {
                       child: SingleChildScrollView(
                         child: SelectableText(widget.text,
                             style:
-                                mono(12, height: 1.45, color: AppColors.fg1)),
+                                codeMono(12, height: 1.45, color: AppColors.fg1)),
                       ),
                     )
                   : Text(
                       lines.length > 3 ? '$preview\n…' : preview,
                       maxLines: 4,
                       overflow: TextOverflow.fade,
-                      style: mono(12, height: 1.45, color: AppColors.fg2),
+                      style: codeMono(12, height: 1.45, color: AppColors.fg2),
                     ),
             ),
           ),

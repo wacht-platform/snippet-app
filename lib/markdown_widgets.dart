@@ -84,7 +84,7 @@ class CodeBlockBuilder extends MarkdownElementBuilder {
     if (isBlock) {
       // Nested under <pre> — PreBlockBuilder owns the chrome; return plain text.
       final code = raw.endsWith('\n') ? raw.substring(0, raw.length - 1) : raw;
-      return Text(code, style: mono(13, height: 1.5, color: AppColors.fg1));
+      return Text(code, style: codeMono(13, height: 1.5, color: AppColors.fg1));
     }
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
@@ -92,7 +92,7 @@ class CodeBlockBuilder extends MarkdownElementBuilder {
         color: AppColors.accentBg,
         borderRadius: BorderRadius.circular(R.xs),
       ),
-      child: Text(raw, style: mono(13, color: AppColors.accent)),
+      child: Text(raw, style: codeMono(13, color: AppColors.accent)),
     );
   }
 }
@@ -298,19 +298,19 @@ class _MdDiffBlockState extends State<_MdDiffBlock> {
                     label,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: mono(11.5, color: AppColors.fg2),
+                    style: codeMono(11.5, color: AppColors.fg2),
                   ),
                 ),
                 if (parsed.adds > 0) ...[
                   const SizedBox(width: 6),
                   Text('+${parsed.adds}',
-                      style: mono(11,
+                      style: codeMono(11,
                           weight: FontWeight.w600, color: AppColors.diffAddFg)),
                 ],
                 if (parsed.dels > 0) ...[
                   const SizedBox(width: 6),
                   Text('-${parsed.dels}',
-                      style: mono(11,
+                      style: codeMono(11,
                           weight: FontWeight.w600, color: AppColors.diffDelFg)),
                 ],
                 const SizedBox(width: 6),
@@ -393,7 +393,7 @@ class _MdDiffBlockState extends State<_MdDiffBlock> {
           l.text,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: mono(11, height: 1.4, color: AppColors.fg4),
+          style: codeMono(11, height: 1.4, color: AppColors.fg4),
         ),
       );
     }
@@ -416,7 +416,7 @@ class _MdDiffBlockState extends State<_MdDiffBlock> {
     final textWidget = Text(
       l.text.isEmpty ? ' ' : l.text,
       softWrap: wrapped,
-      style: mono(12, height: 1.45, color: fg),
+      style: codeMono(12, height: 1.45, color: fg),
     );
     return Container(
       color: bg,
@@ -429,7 +429,7 @@ class _MdDiffBlockState extends State<_MdDiffBlock> {
             child: Text(
               numStr,
               textAlign: TextAlign.right,
-              style: mono(10.5, height: 1.55, color: numColor),
+              style: codeMono(10.5, height: 1.55, color: numColor),
             ),
           ),
           SizedBox(
@@ -437,7 +437,7 @@ class _MdDiffBlockState extends State<_MdDiffBlock> {
             child: Text(
               sign,
               textAlign: TextAlign.center,
-              style: mono(12,
+              style: codeMono(12,
                   height: 1.45, weight: FontWeight.w600, color: fg),
             ),
           ),
@@ -489,7 +489,7 @@ class _MdCodeBlockState extends State<_MdCodeBlock> {
                   ? const EdgeInsets.fromLTRB(14, 6, 6, 6)
                   : const EdgeInsets.fromLTRB(12, 8, 6, 8),
               child: Row(children: [
-                Text(lang, style: mono(11, color: AppColors.fg3)),
+                Text(lang, style: codeMono(11, color: AppColors.fg3)),
                 const Spacer(),
                 IconBtn(
                   'wrap',
@@ -529,7 +529,7 @@ class _MdCodeBlockState extends State<_MdCodeBlock> {
                             child: Text(
                               '${i + 1}',
                               textAlign: TextAlign.right,
-                              style: mono(11, height: 1.55, color: AppColors.fg4),
+                              style: codeMono(11, height: 1.55, color: AppColors.fg4),
                             ),
                           ),
                           const SizedBox(width: 10),
@@ -556,7 +556,7 @@ class _MdCodeBlockState extends State<_MdCodeBlock> {
                       for (var i = 0; i < lines.length; i++) ...[
                         TextSpan(
                           text: '${i + 1}'.padLeft(3),
-                          style: mono(12, height: 1.55, color: AppColors.fg3),
+                          style: codeMono(12, height: 1.55, color: AppColors.fg3),
                         ),
                         const TextSpan(text: '  '),
                         highlightedCodeSpan(

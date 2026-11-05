@@ -199,7 +199,7 @@ class FileChangeDetail extends StatelessWidget {
         for (final l in lines)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 10),
-            child: Text('$sign $l', style: mono(12, height: 1.55, color: fg)),
+            child: Text('$sign $l', style: codeMono(12, height: 1.55, color: fg)),
           ),
       ]),
     );
