@@ -166,7 +166,8 @@ class _GoalDetailScreenState extends State<GoalDetailScreen> {
   Widget _criterion(int i, GoalCriterion c) {
     final on = _open.contains(i);
     final has = c.hasEvidence;
-    final expandable = c.method.isNotEmpty || has;
+    final gone = c.isDropped;
+    final expandable = c.method.isNotEmpty || has || gone;
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       HoverSurface(
         radius: 8,
@@ -197,7 +198,14 @@ class _GoalDetailScreenState extends State<GoalDetailScreen> {
             Expanded(
               child: Text(c.criterion,
                   style: sans(13.5,
-                      height: 1.4, color: has ? AppColors.fg1 : AppColors.fg2)),
+                          height: 1.4,
+                          color: gone
+                              ? AppColors.fg4
+                              : has
+                                  ? AppColors.fg1
+                                  : AppColors.fg2)
+                      .copyWith(
+                          decoration: gone ? TextDecoration.lineThrough : null)),
             ),
             if (expandable) ...[
               const SizedBox(width: 6),
@@ -218,7 +226,8 @@ class _GoalDetailScreenState extends State<GoalDetailScreen> {
               Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             if (c.method.isNotEmpty) _kv('Check', c.method),
             if (c.evidence != null) _kv('Evidence', c.evidence!),
-            if (!has) _kv('Evidence', 'None recorded yet'),
+            if (gone) _kv('Dropped', c.dropped!),
+            if (!has && !gone) _kv('Evidence', 'None recorded yet'),
           ]),
         ),
       ),

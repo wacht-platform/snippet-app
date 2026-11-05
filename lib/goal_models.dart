@@ -79,17 +79,21 @@ class Goal {
 }
 
 class GoalCriterion {
-  const GoalCriterion({this.criterion = '', this.method = '', this.evidence});
+  const GoalCriterion(
+      {this.criterion = '', this.method = '', this.evidence, this.dropped});
   final String criterion;
   final String method;
   final String? evidence;
+  final String? dropped;
 
   GoalCriterion.fromJson(Map<String, dynamic> j)
       : criterion = _text(j['criterion']),
         method = _text(j['method']),
-        evidence = _opt(j['evidence']);
+        evidence = _opt(j['evidence']),
+        dropped = _opt(j['dropped']);
 
   bool get hasEvidence => evidence != null;
+  bool get isDropped => dropped != null;
 }
 
 class GoalPlanStep {
