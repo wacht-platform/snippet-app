@@ -281,8 +281,141 @@ MissionEnvelope? parseMissionEnvelope(String text) {
     taskId: field('task_id'),
     title: isRecurring ? field('job') : field('title'),
     status: isReport ? field('status') : 'pending',
-    summary: isReport ? field('summary') : scope(),
+    summary: isReport ? _reportSummary(t) : scope(),
   );
+}
+
+String _reportSummary(String t) {
+  final start = RegExp(r'^summary:[ \t]*', multiLine: true).firstMatch(t);
+  if (start == null) return '';
+  final rest = t.substring(start.end);
+  final end = RegExp(
+    r'^(?:artifacts:|\[/(?:mission_task_report|recurring_run_report)\])',
+    multiLine: true,
+  ).firstMatch(rest);
+  return _readableStall(rest.substring(0, end?.start ?? rest.length).trim());
+}
+
+/// Stall reports are written for Mission Control; keep what the user can use.
+String _readableStall(String summary) {
+  final head = RegExp(r'^stalled (\d+) min: no progress since \S+; ')
+      .matchAsPrefix(summary);
+  if (head == null) return summary;
+  final rest = summary
+      .substring(head.end)
+      .replaceFirst(RegExp(r'\n?If that asks for something,[^\n]*$'), '')
+      .replaceFirst(RegExp(r'[;,]?\s*check it with inspect_session[^\n]*$'), '')
+      .replaceAll('waiting_for_input', 'waiting for input');
+  final last = RegExp(r';?\s*its last message was:\s*').firstMatch(rest);
+  final state = (last == null ? rest : rest.substring(0, last.start)).trim();
+  final lead = state.isEmpty
+      ? ''
+      : ' ${state[0].toUpperCase()}${state.substring(1)}.';
+  final said = last == null ? '' : rest.substring(last.end).trim();
+  return 'No progress for ${head.group(1)} min.$lead'
+      '${said.isEmpty ? '' : '\n\nIts last message:\n\n$said'}';
+}
+
+/// Stall reports overtaken by a later report on the same task.
+Set<int> supersededStalls(List<Map<String, dynamic>> events) {
+  final seen = <String>{};
+  final out = <int>{};
+  for (var i = events.length - 1; i >= 0; i--) {
+    final kind = events[i]['kind'];
+    if (kind != 'user_input' && kind != 'steer') continue;
+    final envelope = parseMissionEnvelope(events[i]['text'] as String? ?? '');
+    if (envelope == null || !envelope.isReport || envelope.isPlan) continue;
+    if (envelope.taskId.isEmpty) continue;
+    if (!seen.add(envelope.taskId) && envelope.status == 'stalled') out.add(i);
+  }
+  return out;
+}
+
+class QuietWake {
+  const QuietWake({required this.time, required this.reply});
+  final String time;
+  final String reply;
+}
+
+class QuietWakeRun {
+  const QuietWakeRun({required this.end, required this.wakes});
+
+  /// Index of the run's last event.
+  final int end;
+  final List<QuietWake> wakes;
+}
+
+final _quietOpening = RegExp(
+  r'^(nothing|still quiet|quiet|same quiet|no changes?)\b',
+  caseSensitive: false,
+);
+final _needsAttention = RegExp(
+  r'\b(except|but|however|stuck|failed|failing|blocked|wedged|error|limit|'
+  r'approval|your (call|input|answer|review)|needs? you|'
+  r'waiting (item|on))\b',
+  caseSensitive: false,
+);
+
+bool _isQuietReply(String reply) {
+  final text = reply.trim();
+  return text.isNotEmpty &&
+      text.length <= 320 &&
+      _quietOpening.hasMatch(text) &&
+      !_needsAttention.hasMatch(text.replaceAll(
+          RegExp(r'nothing needs you', caseSensitive: false), ''));
+}
+
+/// Runs of automated wakes that produced nothing for the user, keyed by the
+/// index of their first event. A wake counts only if its reply says so and it
+/// did nothing beyond scheduling the next look, so real news is never folded.
+Map<int, QuietWakeRun> quietWakeRuns(List<Map<String, dynamic>> events) {
+  bool isInput(Map<String, dynamic> e) =>
+      e['kind'] == 'user_input' || e['kind'] == 'steer';
+  final out = <int, QuietWakeRun>{};
+  int? start;
+  var wakes = <QuietWake>[];
+  var i = 0;
+  void close(int end) {
+    if (start != null) out[start!] = QuietWakeRun(end: end, wakes: wakes);
+    start = null;
+    wakes = <QuietWake>[];
+  }
+
+  while (i < events.length) {
+    final e = events[i];
+    final round = isInput(e) ? parseAutonomousRound(e['text'] as String? ?? '') : null;
+    if (round == null || round.due.isNotEmpty) {
+      close(i - 1);
+      i++;
+      continue;
+    }
+    var j = i + 1;
+    var quiet = true;
+    final reply = StringBuffer();
+    while (j < events.length && !isInput(events[j])) {
+      final next = events[j];
+      switch (next['kind']) {
+        case 'assistant_text':
+          reply.writeln(next['text'] as String? ?? '');
+        case 'tool_call' || 'tool_result':
+          if (next['tool_name'] != 'schedule_wake') quiet = false;
+        case 'turn_changes' || 'system_decision':
+          break;
+        default:
+          quiet = false;
+      }
+      j++;
+    }
+    if (quiet && _isQuietReply(reply.toString())) {
+      start ??= i;
+      wakes.add(QuietWake(time: round.time, reply: reply.toString().trim()));
+    } else {
+      close(i - 1);
+    }
+    i = j;
+  }
+  close(events.length - 1);
+  return out;
 }
 
 /// The periodic round the daemon hands Mission Control in autonomous mode.

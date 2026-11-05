@@ -147,6 +147,9 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
         if (e['kind'] == 'user_input' || e['kind'] == 'steer') _s(e['text']),
     ]);
 
+    final quietWakes = quietWakeRuns(events);
+    final staleStalls = supersededStalls(events);
+
     final resultOf = <int, int>{};
     final pairedResults = <int>{};
     {
@@ -174,6 +177,13 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
       final key = eventKey(e);
       final abs = 'event-${_transcriptStart + idx}';
       final k = e['kind'] as String? ?? '';
+      final quietRun = quietWakes[idx];
+      if (quietRun != null) {
+        endTools(key);
+        addEvent(key, QuietWakesRow(run: quietRun));
+        idx = quietRun.end;
+        continue;
+      }
       switch (k) {
         case 'tool_call':
           flushPending(key);
@@ -246,6 +256,13 @@ extension _SessionScreenTranscriptExt on _SessionScreenState {
           if (_looksLikeQuestionAnswer(text)) break;
           final envelope = parseMissionEnvelope(text);
           if (envelope != null) {
+            if (staleStalls.contains(idx)) {
+              addEvent(
+                  key,
+                  NoteLine('Stalled, later updated: ${envelope.title}',
+                      icon: 'alert-triangle'));
+              break;
+            }
             addEvent(key, MissionEnvelopeCard(envelope: envelope));
             break;
           }

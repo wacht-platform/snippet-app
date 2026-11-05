@@ -6,6 +6,7 @@ import '../theme.dart';
 import '../widgets.dart';
 import 'mission_control/mission_control_state.dart'
     show
+        QuietWakeRun,
         AmbientTurn,
         AssignmentEnvelope,
         AutonomousRound,
@@ -472,6 +473,92 @@ class _AutonomousRoundCardState extends State<AutonomousRoundCard> {
             ? content
             : InkWell(
                 onTap: () => setState(() => _open = !_open), child: content),
+      ),
+    );
+  }
+}
+
+/// One quiet row for a run of automated wakes that needed nothing from the user.
+class QuietWakesRow extends StatefulWidget {
+  const QuietWakesRow({super.key, required this.run});
+  final QuietWakeRun run;
+
+  @override
+  State<QuietWakesRow> createState() => _QuietWakesRowState();
+}
+
+class _QuietWakesRowState extends State<QuietWakesRow> {
+  bool _open = false;
+
+  String get _span {
+    final wakes = widget.run.wakes;
+    final first = _roundTime(wakes.first.time);
+    if (wakes.length == 1) return first;
+    final last = _roundTime(wakes.last.time);
+    final firstDay = first.split(' ').first;
+    return last.startsWith('$firstDay ')
+        ? '$first to ${last.substring(firstDay.length + 1)}'
+        : '$first to $last';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final wakes = widget.run.wakes;
+    final meta = TranscriptCard.metaSize;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Material(
+        color: AppColors.surface1,
+        borderRadius: BorderRadius.circular(10),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () => setState(() => _open = !_open),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 40),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(children: [
+                    AppIcon('activity', size: 12, color: AppColors.fg3),
+                    const SizedBox(width: S.s6),
+                    Expanded(
+                      child: Text(
+                          wakes.length == 1
+                              ? 'Quiet wake'
+                              : '${wakes.length} quiet wakes',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: sans(meta, color: AppColors.fg3)),
+                    ),
+                    const SizedBox(width: S.s8),
+                    Text(_span, style: sans(meta, color: AppColors.fg4)),
+                    const SizedBox(width: S.s4),
+                    AppIcon(_open ? 'chevron-down' : 'chevron-right',
+                        size: 12, color: AppColors.fg4),
+                  ]),
+                  if (_open)
+                    for (final wake in wakes)
+                      Padding(
+                        padding: const EdgeInsets.only(left: 18, top: S.s8),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(_roundTime(wake.time),
+                                style: sans(meta, color: AppColors.fg4)),
+                            const SizedBox(height: S.s2),
+                            SelectableText(_plain(wake.reply),
+                                style: TranscriptCard.bodyStyle),
+                          ],
+                        ),
+                      ),
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
