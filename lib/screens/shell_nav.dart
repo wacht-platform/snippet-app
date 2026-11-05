@@ -1,3 +1,4 @@
+import 'mobile_chrome.dart';
 import 'package:flutter/material.dart';
 
 import '../platform.dart';
@@ -322,6 +323,9 @@ class NavBackRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (kMobile && trailing.isNotEmpty) {
+      return MobileBackBar(title: title, onBack: onBack, trailing: trailing);
+    }
     if (kMobile) {
       return Padding(
         padding: const EdgeInsets.fromLTRB(20, 14, 16, 4),
@@ -336,7 +340,6 @@ class NavBackRow extends StatelessWidget {
                     spacing: -0.4,
                     color: AppColors.fg1)),
           ),
-          ...trailing,
         ]),
       );
     }

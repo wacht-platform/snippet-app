@@ -230,10 +230,19 @@ class MobileBackBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final pill = onTitleTap != null || subtitle != null;
-    // iOS has no system back for these pages, so only Android loses the button.
-    final back = menu || keepBack || defaultTargetPlatform == TargetPlatform.iOS
-        ? onBack
-        : null;
+    // iOS has no system back for these pages, so only Android loses the button,
+    // and only when nothing on the right would leave the bar lopsided.
+    final showBack = menu ||
+        keepBack ||
+        trailing.isNotEmpty ||
+        defaultTargetPlatform == TargetPlatform.iOS;
+    final canPop = Navigator.maybeOf(context)?.canPop() ?? false;
+    final back = !showBack
+        ? null
+        : onBack ??
+            (trailing.isNotEmpty && canPop
+                ? () => Navigator.maybePop(context)
+                : null);
     final fill = back != null || trailing.isNotEmpty;
     final text = Column(
       mainAxisSize: MainAxisSize.min,
@@ -295,7 +304,7 @@ class MobileBackBar extends StatelessWidget {
                         height: 44,
                         constraints: fill
                             ? const BoxConstraints(minWidth: double.infinity)
-                            : const BoxConstraints(minWidth: 120),
+                            : const BoxConstraints(minWidth: 280),
                         padding: const EdgeInsets.symmetric(horizontal: 18),
                         decoration: _floating(22),
                         child: Align(
