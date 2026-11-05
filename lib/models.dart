@@ -1180,7 +1180,7 @@ class BoardEntry {
   final int id;
   final String agentId;
 
-  /// `dispatched`, `reported`, or `noted`.
+  /// `dispatched`, `reported`, `noted` or `progress`.
   final String kind;
   final String? sessionId;
 
@@ -1264,6 +1264,9 @@ class CoordinationEvent {
         createdAt = j['created_at'] as String? ?? '';
 
   String get body => payload['body'] is String ? payload['body'] as String : '';
+
+  List<String> get addressedTo =>
+      (payload['to'] as List?)?.whereType<String>().toList() ?? const [];
 }
 
 /// A task tracked by Mission Control.
@@ -1528,6 +1531,29 @@ class TaskAgent {
         status = j['status'] as String? ?? 'pending',
         addedAt = j['added_at'] as String? ?? '',
         removedAt = j['removed_at'] as String?;
+}
+
+/// One agent's stretch holding a task's turn, with what it measurably changed.
+class TaskTurn {
+  final int id;
+  final String agentId;
+  final String sessionId;
+  final String startedAt;
+  final String? endedAt;
+  final List<String> files;
+  final List<String> commits;
+
+  bool get open => endedAt == null;
+
+  TaskTurn.fromJson(Map<String, dynamic> j)
+      : id = (j['id'] as num?)?.toInt() ?? 0,
+        agentId = j['agent_id'] as String? ?? '',
+        sessionId = j['session_id'] as String? ?? '',
+        startedAt = j['started_at'] as String? ?? '',
+        endedAt = j['ended_at'] as String?,
+        files = (j['files'] as List?)?.whereType<String>().toList() ?? const [],
+        commits =
+            (j['commits'] as List?)?.whereType<String>().toList() ?? const [];
 }
 
 /// One step of the working plan the session doing a task keeps.

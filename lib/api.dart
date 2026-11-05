@@ -1631,7 +1631,7 @@ class DaemonClient {
   /// GET /agents/{id}/board — this agent's coordination memory, newest first.
   ///
   /// Optional [workspace] scopes to one folder, [contains] searches the
-  /// summaries, and [kind] narrows to dispatched/reported/noted.
+  /// summaries, and [kind] narrows to dispatched/reported/noted/progress.
   Future<List<BoardEntry>> agentBoard(
     String agentId, {
     String? workspace,
@@ -1823,11 +1823,13 @@ class DaemonClient {
     required String actorId,
     required String body,
     String? idempotencyKey,
+    List<String> to = const [],
   }) async {
     final payload = <String, dynamic>{
       'actor_kind': actorKind,
       'actor_id': actorId,
       'body': body,
+      if (to.isNotEmpty) 'to': to,
     };
     if (idempotencyKey != null && idempotencyKey.isNotEmpty) {
       payload['idempotency_key'] = idempotencyKey;
@@ -1993,6 +1995,17 @@ class DaemonClient {
     final list = jsonDecode(r.body) as List;
     return list
         .map((e) => TaskAgent.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// GET /coordination/tasks/{id}/turns — who held the turn, oldest first.
+  Future<List<TaskTurn>> taskTurns(String id) async {
+    final r = await http
+        .get(_uri('/coordination/tasks/${Uri.encodeComponent(id)}/turns'));
+    if (r.statusCode != 200) throw _err('task turns', r);
+    final list = jsonDecode(r.body) as List;
+    return list
+        .map((e) => TaskTurn.fromJson(e as Map<String, dynamic>))
         .toList();
   }
 

@@ -315,7 +315,8 @@ List<Map> _maps(dynamic v) =>
 /// Tone for the daemon's statuses: tasks, sessions, agents and board kinds.
 Color _statusColor(String status) => switch (status) {
       'done' || 'reported' || 'default' || 'active' => AppColors.ok,
-      'in_progress' || 'running' || 'dispatched' || 'draining' => AppColors.run,
+      'in_progress' || 'running' || 'dispatched' || 'draining' || 'progress' =>
+        AppColors.run,
       'failed' || 'blocked' || 'cancelled' => AppColors.danger,
       'todo' || 'waiting_for_input' => AppColors.accent,
       _ when status.endsWith('unread') => AppColors.accent,

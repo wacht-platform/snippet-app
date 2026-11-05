@@ -81,6 +81,7 @@ class CoordinationThreadState extends ChangeNotifier {
     required String actorId,
     required String body,
     String? idempotencyKey,
+    List<String> to = const [],
   }) async {
     if (sending || body.trim().isEmpty) return null;
     sending = true;
@@ -90,7 +91,8 @@ class CoordinationThreadState extends ChangeNotifier {
           actorKind: actorKind,
           actorId: actorId,
           body: body,
-          idempotencyKey: idempotencyKey);
+          idempotencyKey: idempotencyKey,
+          to: to);
       _merge([event], advanceReplayCursor: false);
       notifyListeners();
       return event;

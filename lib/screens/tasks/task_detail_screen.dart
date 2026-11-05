@@ -10,7 +10,9 @@ import '../../platform.dart';
 import '../../theme.dart';
 import '../../widgets.dart';
 import '../../mochi.dart';
+import '../../panel.dart' show presentScreen;
 import '../mobile_chrome.dart';
+import '../session.dart' show SessionScreen;
 import 'task_common.dart' show statusColor, TaskNoteLines;
 
 /// One task: its state, its roster, its links, and its own message room.
@@ -48,6 +50,12 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
 
   CoordinationThreadState? room;
   final _composer = TextEditingController();
+  List<TaskTurn> turns = const [];
+  String? latestProgress;
+  String? addressee;
+  int _lastSequence = -1;
+  Timer? _crewDebounce;
+  Timer? _crewPoll;
 
   @override
   void initState() {
@@ -60,11 +68,50 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     room?.removeListener(_onRoomChanged);
     room?.dispose();
     _composer.dispose();
+    _crewDebounce?.cancel();
+    _crewPoll?.cancel();
     super.dispose();
   }
 
   void _onRoomChanged() {
-    if (mounted) setState(() {});
+    if (!mounted) return;
+    setState(() {});
+    final newest = room?.events.lastOrNull?.sequence ?? -1;
+    if (newest != _lastSequence) {
+      _lastSequence = newest;
+      _crewDebounce?.cancel();
+      _crewDebounce =
+          Timer(const Duration(milliseconds: 800), _refreshCrew);
+    }
+  }
+
+  Future<void> _refreshCrew() async {
+    try {
+      final roster = await widget.client.taskAgents(widget.taskId);
+      final turns = await widget.client.taskTurns(widget.taskId);
+      String? progress;
+      final current = turns.lastOrNull;
+      if (current != null && current.open) {
+        final rows = await widget.client
+            .agentBoard(current.agentId, kind: 'progress', limit: 20);
+        progress = rows
+            .where((r) => r.correlationId == widget.taskId)
+            .firstOrNull
+            ?.summary;
+      }
+      if (!mounted) return;
+      setState(() {
+        this.roster = roster;
+        this.turns = turns;
+        latestProgress = progress;
+      });
+    } catch (_) {}
+  }
+
+  String _memberLabel(TaskAgent a) {
+    if (!a.active) return 'left';
+    if (a.hasSessionLease) return 'has the turn';
+    return (a.workSessionId ?? '').isEmpty ? 'waiting' : 'in the session';
   }
 
   Future<void> _load() async {
@@ -86,6 +133,13 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
         ..addListener(_onRoomChanged);
       room.attachLive();
       unawaited(room.refresh());
+      unawaited(_refreshCrew());
+      // Progress reports reach an agent's board, not this room, so no event
+      // announces them.
+      _crewPoll?.cancel();
+      _crewPoll = Timer.periodic(const Duration(seconds: 60), (_) {
+        if (turns.lastOrNull?.open ?? false) unawaited(_refreshCrew());
+      });
       setState(() {
         this.task = task;
         this.roster = roster;
@@ -200,7 +254,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     );
     final confirm = await showAppSheet<bool>(
       context,
-      title: 'Transfer session lease',
+      title: 'Pass the turn',
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
         child: Column(
@@ -208,7 +262,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              'Transfer the active work session lease to ${target.agentId}?\nOnly one agent can work in the session at a time.',
+              'Pass the turn to ${target.agentId}?\nThey carry on in the same workspace. ${currentActive.agentId} stays in the room and can still talk.',
               style: sans(13, color: AppColors.fg2, height: 1.4),
             ),
             const SizedBox(height: 16),
@@ -222,7 +276,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                 const SizedBox(width: 8),
                 ElevatedButton(
                   onPressed: () => Navigator.of(context).pop(true),
-                  child: Text('Transfer lease', style: sans(13)),
+                  child: Text('Pass the turn', style: sans(13)),
                 ),
               ],
             ),
@@ -256,13 +310,239 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
         currentActive.agentId,
         target.agentId,
       );
-      final updated = await widget.client.taskAgents(widget.taskId);
-      if (mounted) setState(() => roster = updated);
+      await _refreshCrew();
     } catch (e) {
       if (!mounted) return;
       setState(() => roster = before);
       toast(context, '$e', danger: true);
     }
+  }
+
+  Future<void> _pickAddressee() async {
+    final members = roster.where((a) => a.active).map((a) => a.agentId);
+    final choice = await showAppSheet<String>(
+      context,
+      title: 'Who is this for?',
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        for (final (value, label) in [
+          ('', _defaultAddressee),
+          for (final m in members) (m, m),
+          ('mission-control', 'Mission Control'),
+        ])
+          InkWell(
+            onTap: () => Navigator.of(context).pop(value),
+            child: SizedBox(
+              height: 44,
+              child: Row(children: [
+                if (value.isNotEmpty) ...[
+                  AgentMochi(value, size: 18),
+                  const SizedBox(width: 10),
+                ],
+                Expanded(
+                  child: Text(label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: sans(14, color: AppColors.fg1)),
+                ),
+              ]),
+            ),
+          ),
+      ]),
+    );
+    if (choice == null || !mounted) return;
+    setState(() => addressee = choice.isEmpty ? null : choice);
+  }
+
+  String get _defaultAddressee {
+    final holder =
+        roster.where((a) => a.active && a.hasSessionLease).firstOrNull;
+    return holder == null ? 'The room' : '${holder.agentId} (has the turn)';
+  }
+
+  Widget _addresseeBar() {
+    if (!roster.any((a) => a.active)) return const SizedBox.shrink();
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: InkWell(
+        onTap: _pickAddressee,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: kMobile ? 40 : 28),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              Flexible(
+                child: Text('To ${addressee ?? _defaultAddressee}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: sans(kMobile ? 13 : 12, color: AppColors.fg3)),
+              ),
+              const SizedBox(width: 4),
+              AppIcon('chevron-down', size: 12, color: AppColors.fg4),
+            ]),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _turnsSection() {
+    if (turns.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text('TURNS',
+                style: kMobile
+                    ? sans(12,
+                        weight: W.label, spacing: 0.7, color: AppColors.fg4)
+                    : caps(11, color: AppColors.fg3)),
+          ),
+          for (final turn in turns.reversed) _turnRow(turn),
+        ],
+      ),
+    );
+  }
+
+  String _turnSummary(TaskTurn t) {
+    if (t.open) return 'working now';
+    String count(int n, String one) =>
+        n == 0 ? '' : (n == 1 ? '1 $one' : '$n ${one}s');
+    final parts = [count(t.files.length, 'file'), count(t.commits.length, 'commit')]
+        .where((p) => p.isNotEmpty);
+    return parts.isEmpty ? 'no changes' : parts.join(' · ');
+  }
+
+  Widget _turnRow(TaskTurn t) {
+    final progress = t.open ? latestProgress : null;
+    return InkWell(
+      onTap: () => _showTurn(t),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(minHeight: kMobile ? 44 : 32),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(children: [
+                AgentMochi(t.agentId, size: kMobile ? 20 : 16),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(t.agentId,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: sans(kMobile ? 14.5 : 12.5, color: AppColors.fg1)),
+                ),
+                const SizedBox(width: 8),
+                Text(_turnSummary(t),
+                    style: sans(kMobile ? 13 : 11.5,
+                        color: t.open ? AppColors.accent : AppColors.fg4)),
+              ]),
+              if (progress != null && progress.trim().isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(progress.trim(),
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                      style: sans(kMobile ? 13 : 12,
+                          color: AppColors.fg3, height: 1.4)),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showTurn(TaskTurn t) => showAppSheet<void>(
+        context,
+        title: '${t.agentId}: ${_turnSummary(t)}',
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (t.open)
+              Text('Files and commits are measured when the turn ends.',
+                  style: sans(13, color: AppColors.fg3, height: 1.4)),
+            for (final line in [...t.commits, ...t.files])
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Text(line, style: codeMono(12, color: AppColors.fg2)),
+              ),
+            if (t.sessionId.isNotEmpty)
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    presentScreen(context,
+                        builder: (_, close) => SessionScreen(
+                            client: widget.client,
+                            sessionId: t.sessionId,
+                            title: t.agentId,
+                            onMenu: close));
+                  },
+                  child: Text('Open session',
+                      style: sans(13, color: AppColors.accent)),
+                ),
+              ),
+          ],
+        ),
+      );
+
+  String _speakerId(CoordinationEvent e) => e.eventType == 'task.lease_transferred'
+      ? (e.payload['from_agent_id']?.toString() ?? e.actorId)
+      : e.actorId;
+
+  /// The speaker's name and what the post is doing: who it names, whose turn
+  /// it passes, or that it needs an answer.
+  Widget _speaker(CoordinationEvent e, double size) {
+    final passing = e.eventType == 'task.lease_transferred';
+    final name = _speakerId(e);
+    final kind = e.payload['kind']?.toString();
+    final to = e.addressedTo;
+    return Expanded(
+      child: Text.rich(
+        TextSpan(children: [
+          TextSpan(
+              text: name,
+              style: sans(size, weight: W.label, color: AppColors.fg2)),
+          if (passing)
+            TextSpan(
+                text: ' passed the turn to ${e.payload['to_agent_id'] ?? ''}',
+                style: sans(size, color: AppColors.accent))
+          else if (to.isNotEmpty)
+            TextSpan(
+                text: ' to ${to.join(', ')}',
+                style: sans(size, color: AppColors.fg3)),
+          if (kind == 'question' || kind == 'blocker')
+            TextSpan(
+                text: ' · $kind',
+                style: sans(size,
+                    color: kind == 'blocker'
+                        ? AppColors.danger
+                        : AppColors.fg3)),
+        ]),
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+      ),
+    );
+  }
+
+  Widget _addressed(CoordinationEvent e, Widget message) {
+    if (e.addressedTo.isEmpty) return message;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text('To ${e.addressedTo.join(', ')}',
+            style: sans(12, color: AppColors.fg3)),
+        const SizedBox(height: 4),
+        message,
+      ],
+    );
   }
 
   Future<void> _linkTask() async {
@@ -316,7 +596,9 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     final room = this.room;
     if (text.isEmpty || room == null) return;
     _composer.clear();
+    final to = addressee;
     final sent = await room.send(
+      to: to == null ? const [] : [to],
       actorKind: 'human',
       actorId: 'local',
       body: text,
@@ -324,7 +606,13 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
       idempotencyKey:
           'task-${widget.taskId}-${DateTime.now().microsecondsSinceEpoch}',
     );
-    if (sent == null) _composer.text = text;
+    if (!mounted) return;
+    if (sent == null) {
+      _composer.text = text;
+      if (room.error != null) toast(context, room.error!, danger: true);
+    } else {
+      setState(() => addressee = null);
+    }
   }
 
   @override
@@ -464,6 +752,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                         ..._roomSlivers(),
                       ]),
                     ),
+                    _addresseeBar(),
                     _composerBar(),
                   ]);
   }
@@ -592,9 +881,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                                       : AppColors.fg3)),
                         ),
                         Text(
-                            a.hasSessionLease
-                                ? 'working'
-                                : (a.active ? 'waiting' : 'left'),
+                            _memberLabel(a),
                             style: sans(13,
                                 color: a.hasSessionLease
                                     ? AppColors.accent
@@ -644,9 +931,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                                         : AppColors.fg3)),
                           ),
                           Text(
-                            roster[i].hasSessionLease
-                                ? 'working'
-                                : (roster[i].active ? 'waiting' : 'left'),
+                            _memberLabel(roster[i]),
                             style: sans(11.5,
                                 color: roster[i].hasSessionLease
                                     ? AppColors.accent
@@ -658,6 +943,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                   ],
                 ]),
               ),
+            _turnsSection(),
             const SizedBox(height: 14),
             _section('Related', onAdd: _linkTask),
             if (links.links.isEmpty && links.blockedBy.isEmpty)
@@ -768,7 +1054,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                               )
                             : BorderRadius.circular(20),
                       ),
-                      child: md,
+                      child: _addressed(e, md),
                     ),
                   ),
                 );
@@ -779,10 +1065,9 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(children: [
-                      AgentMochi(e.actorId, size: 18),
+                      AgentMochi(_speakerId(e), size: 18),
                       const SizedBox(width: 8),
-                      Text(e.actorId,
-                          style: sans(13, weight: W.label, color: AppColors.fg2)),
+                      _speaker(e, 13),
                     ]),
                     const SizedBox(height: 6),
                     md,
@@ -804,13 +1089,16 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(color: AppColors.line),
                     ),
-                    child: MarkdownBody(
-                      data: body,
-                      selectable: true,
-                      styleSheet: markdownStyle(context),
-                      builders: {'pre': PreBlockBuilder()},
-                      onTapLink: (txt, href, title) =>
-                          openMarkdownLink(href, context),
+                    child: _addressed(
+                      e,
+                      MarkdownBody(
+                        data: body,
+                        selectable: true,
+                        styleSheet: markdownStyle(context),
+                        builders: {'pre': PreBlockBuilder()},
+                        onTapLink: (txt, href, title) =>
+                            openMarkdownLink(href, context),
+                      ),
                     ),
                   ),
                 ),
@@ -822,11 +1110,9 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(children: [
-                    AgentMochi(e.actorId, size: 16),
+                    AgentMochi(_speakerId(e), size: 16),
                     const SizedBox(width: 6),
-                    Text(e.actorId,
-                        style: sans(12,
-                            weight: W.label, color: AppColors.fg2)),
+                    _speaker(e, 12),
                   ]),
                   const SizedBox(height: 5),
                   MarkdownBody(
