@@ -3,6 +3,8 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'approval_code.dart';
+import 'notification_text.dart';
 import 'platform.dart';
 import 'session_quick_send.dart';
 import 'theme.dart';
@@ -139,9 +141,7 @@ class _NotificationMessageCardState extends State<NotificationMessageCard> {
   }
 
   QuickAnswer _answer(String text) {
-    final a = widget.payload['attention'];
-    final q = a is Map ? '${a['text'] ?? ''}'.trim() : '';
-    return QuickAnswer(q.isEmpty || _moreQuestions > 0 ? text : '$q\n→ $text');
+    return QuickAnswer(answerText(widget.payload['attention'], text));
   }
 
   bool get _expandable => const {
@@ -159,16 +159,8 @@ class _NotificationMessageCardState extends State<NotificationMessageCard> {
     widget.onHold(_open || _focus.hasFocus);
   }
 
-  List<(String, String)> get _choices {
-    final a = widget.payload['attention'];
-    final cs = a is Map ? a['choices'] : null;
-    if (cs is! List) return const [];
-    return [
-      for (final c in cs)
-        if (c is Map && '${c['label'] ?? ''}'.isNotEmpty)
-          ('${c['label']}', '${c['value'] ?? c['label']}')
-    ];
-  }
+  List<(String, String)> get _choices =>
+      answerChoices(widget.payload['attention']);
 
   int get _moreQuestions {
     final a = widget.payload['attention'];
@@ -210,7 +202,7 @@ class _NotificationMessageCardState extends State<NotificationMessageCard> {
             ]),
             if (showBody && !_open)
               Text(body,
-                  maxLines: 1,
+                  maxLines: _expandable ? 1 : 2,
                   overflow: TextOverflow.ellipsis,
                   style: sans(kMobile ? 13 : 12.5,
                       height: 1.35, color: AppColors.fg3)),
@@ -226,7 +218,10 @@ class _NotificationMessageCardState extends State<NotificationMessageCard> {
 
     final attention = p['attention'];
     final attentionTool = attention is Map ? '${attention['tool'] ?? ''}' : '';
+    final attentionLabel =
+        attention is Map ? '${attention['label'] ?? ''}'.trim() : '';
     final isApproval = action == CardAction.approval;
+    final approval = isApproval ? approvalOf(attention) : null;
 
     final link = sans(12.5, weight: W.label, color: AppColors.fg3);
     Widget textLink(String label, VoidCallback onTap) => InkWell(
@@ -264,8 +259,7 @@ class _NotificationMessageCardState extends State<NotificationMessageCard> {
                 small: true,
                 variant: i == 0 ? BtnVariant.primary : BtnVariant.secondary,
                 disabled: busy,
-                onTap: () =>
-                    _send(_answer(label == value ? label : '$label ($value)'))),
+                onTap: () => _send(_answer(choiceAnswer((label, value))))),
         ]),
       CardAction.answer || CardAction.reply => _ReplyField(
           controller: _text,
@@ -283,7 +277,33 @@ class _NotificationMessageCardState extends State<NotificationMessageCard> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (showBody && isApproval)
+          if (approval != null) ...[
+            Text(
+              attentionLabel.isNotEmpty
+                  ? attentionLabel
+                  : approval.headline(attentionTool),
+              style: sans(kMobile ? 14.5 : 13.5,
+                  height: 1.45, color: AppColors.fg1),
+            ),
+            if (approval.shownCommand.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: S.s4),
+                child: ApprovalCode(
+                  code: approval.shownCommand,
+                  shell: attentionTool != 'change_files',
+                  collapsedLines: 5,
+                  selectable: false,
+                ),
+              ),
+            if (approval.secrets.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: S.s6),
+                child: Wrap(spacing: S.s6, runSpacing: S.s4, children: [
+                  for (final name in approval.secrets)
+                    Tag(name, tone: Tone.run, icon: 'key', mono: true),
+                ]),
+              ),
+          ] else if (showBody && isApproval)
             Text(
               attentionTool == 'bash' ? '\$ $body' : body,
               maxLines: 5,

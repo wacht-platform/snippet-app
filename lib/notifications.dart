@@ -11,6 +11,7 @@ import 'android_reconciliation.dart';
 import 'call_tracking.dart';
 import 'notification_sync.dart';
 import 'notification_inbox.dart';
+import 'notification_text.dart';
 import 'file_actions.dart';
 import 'models.dart';
 import 'platform.dart';
@@ -22,6 +23,7 @@ const _summaryId = 2147483600;
 const _actionApprove = 'approve';
 const _actionDeny = 'deny';
 const _actionReply = 'reply';
+const _actionAnswerPrefix = 'answer:';
 const _actionCallTrack = 'call_track';
 const _actionCallIgnore = 'call_ignore';
 const _callChannel = 'snippet_call';
@@ -208,13 +210,15 @@ Future<void> notifyDownload(String name, String filePath, {int? id}) async {
 Future<void> notifySessionEvent({
   required String title,
   required String body,
+  String? html,
   required String payload,
   required String kind,
   required int notificationId,
   FlutterLocalNotificationsPlugin? plugin,
 }) async {
   if ((!kMobile && !kMacOS) || (!kCanNotify && !kMacOS)) return;
-  if (kind != 'waiting' && plainNotificationText(body).isEmpty) return;
+  final plain = html == null ? plainNotificationText(body) : body;
+  if (kind != 'waiting' && plain.isEmpty) return;
   final data = jsonDecode(payload) as Map<String, dynamic>;
   final notifier = plugin ?? _mainNotif;
   final session = _sessionOf(data);
@@ -235,9 +239,11 @@ Future<void> notifySessionEvent({
       payload: data,
       title: title,
       body: body,
+      html: html,
       kind: kind,
       previous: replaces ? null : priorStyle);
-  if (priorStyle != null) {
+  // onlyAlertOnce would silence a second request while the first is still up.
+  if (priorStyle != null || html != null) {
     try {
       await notifier.cancel(id: notificationId);
     } catch (_) {}
@@ -245,7 +251,7 @@ Future<void> notifySessionEvent({
   await notifier.show(
       id: notificationId,
       title: title,
-      body: plainNotificationText(body),
+      body: plain,
       notificationDetails: details,
       payload: payload);
   if (kMobile) {
@@ -296,7 +302,8 @@ String plainNotificationText(String value) {
       RegExp(r'!?\[([^\]]*)\]\([^)]*\)'), (m) => m[1] ?? '');
   text = text
       .replaceAll(RegExp(r'<[^>]+>'), ' ')
-      .replaceAll(RegExp(r'[*_~>#]'), '');
+      .replaceAll(RegExp(r'[*~>#]'), '')
+      .replaceAll(RegExp(r'(?<![A-Za-z0-9])_+|_+(?![A-Za-z0-9])'), '');
   return text.replaceAll(RegExp(r'\s+'), ' ').trim();
 }
 
@@ -304,6 +311,7 @@ NotificationDetails sessionNotificationDetails(
     {required Map<String, dynamic> payload,
     required String title,
     required String body,
+    String? html,
     required String kind,
     MessagingStyleInformation? previous}) {
   final attn = payload['attention'];
@@ -316,10 +324,21 @@ NotificationDetails sessionNotificationDetails(
           cancelNotification: false),
       AndroidNotificationAction(_actionDeny, 'Deny', cancelNotification: false)
     ]);
+  } else if (waiting && attn is Map && attn['more'] is int) {
+    // Several questions need the chat: one answer can't cover them.
   } else if (waiting || kind == 'message') {
-    actions.add(const AndroidNotificationAction(_actionReply, 'Reply',
-        cancelNotification: false,
-        inputs: [AndroidNotificationActionInput(label: 'Reply')]));
+    final choices = answerChoices(attn);
+    if (choices.length <= maxChoiceButtons) {
+      for (final (i, (label, _)) in choices.indexed) {
+        actions.add(AndroidNotificationAction('$_actionAnswerPrefix$i', label,
+            cancelNotification: false));
+      }
+    }
+    if (actions.length < maxChoiceButtons) {
+      actions.add(const AndroidNotificationAction(_actionReply, 'Reply',
+          cancelNotification: false,
+          inputs: [AndroidNotificationActionInput(label: 'Reply')]));
+    }
   }
   final group = '$_androidGroupPrefix${_machineOf(payload)}';
   final session = _sessionOf(payload);
@@ -342,14 +361,20 @@ NotificationDetails sessionNotificationDetails(
         groupKey: group,
         onlyAlertOnce: true,
         actions: actions,
-        styleInformation: MessagingStyleInformation(_snippetPerson,
-            conversationTitle: title,
-            groupConversation: false,
-            messages: [
-              ...?previous?.messages?.where((m) =>
-                  !_isStatusLine(m.text) && m.text != preview),
-              Message(preview, DateTime.now(), _snippetPerson)
-            ].take(10).toList())),
+        largeIcon: html == null
+            ? null
+            : const DrawableResourceAndroidBitmap('notification_avatar'),
+        // MessagingStyle drops markup, so only BigTextStyle can render it.
+        styleInformation: html != null
+            ? BigTextStyleInformation(html, htmlFormatBigText: true)
+            : MessagingStyleInformation(_snippetPerson,
+                conversationTitle: title,
+                groupConversation: false,
+                messages: [
+                  ...?previous?.messages?.where((m) =>
+                      !_isStatusLine(m.text) && m.text != preview),
+                  Message(preview, DateTime.now(), _snippetPerson)
+                ].take(10).toList())),
     macOS: DarwinNotificationDetails(
         threadIdentifier: session.isEmpty ? null : session,
         categoryIdentifier: category,
@@ -388,17 +413,26 @@ Future<bool> routeNotificationAction(
   final attn = data['attention'];
   final question = attn is Map && attn['type'] == 'question';
   final text = input?.trim() ?? '';
+  if (actionId.startsWith(_actionAnswerPrefix)) {
+    final choices = answerChoices(attn);
+    final i = int.tryParse(actionId.substring(_actionAnswerPrefix.length));
+    if (i == null || i >= choices.length) return false;
+    return quickSendForPayload(
+        data, QuickAnswer(answerText(attn, choiceAnswer(choices[i]))));
+  }
   final QuickAction? action = switch (actionId) {
     _actionApprove => const QuickApprove(),
     _actionDeny => const QuickDeny(),
     _actionReply when text.isNotEmpty =>
-      question ? QuickAnswer(text) : QuickReply(text),
+      question ? QuickAnswer(answerText(attn, text)) : QuickReply(text),
     _ => null,
   };
   return action == null ? false : quickSendForPayload(data, action);
 }
 
-bool _isQuickActionId(String? id) => const {
+bool _isQuickActionId(String? id) =>
+    (id?.startsWith(_actionAnswerPrefix) ?? false) ||
+    const {
       _actionApprove,
       _actionDeny,
       _actionReply,
@@ -605,23 +639,26 @@ Future<void> initNotifications() async {
 }
 
 /// Display content for a durable notification.
-({String head, String body, String payload}) notificationContent(
+({String head, String body, String? html, String payload}) notificationContent(
     Instance inst, Map<String, dynamic> e) {
   final session = e['session']?.toString() ?? '';
   final title = e['title']?.toString() ?? 'session';
   final message = e['message']?.toString() ?? '';
-  final (String head, String body) = switch (e['kind']?.toString()) {
-    'waiting' => ('${inst.label} needs your input', title),
-    'done' => ('${inst.label} finished', title),
-    'error' => ('${inst.label} hit an error', title),
-    'idle' => (title.isEmpty ? 'Session' : title, stoppedSummary(e['lanes_running'])),
-    'ping' => (title.isEmpty ? 'Mission Control' : title, message),
-    'direct_message.sent' || 'task.message' => ('Message', _payloadBody(e)),
+  final named = title.isEmpty ? 'Session' : title;
+  final (String head, String body, String? html) = _richContent(e, named) ??
+      switch (e['kind']?.toString()) {
+    'waiting' => ('${inst.label} needs your input', title, null),
+    'done' => ('${inst.label} finished', title, null),
+    'error' => ('${inst.label} hit an error', title, null),
+    'idle' => (named, stoppedSummary(e['lanes_running']), null),
+    'ping' => (title.isEmpty ? 'Mission Control' : title, message, null),
+    'direct_message.sent' || 'task.message' => ('Message', _payloadBody(e), null),
     'term' => (
         message.isEmpty ? '${inst.label} · $title' : message,
         message.isEmpty ? 'Terminal' : title,
+        null,
       ),
-    _ => (inst.label, title),
+    _ => (inst.label, title, null),
   };
   // No token in the payload: the OS persists notification records and exposes
   // them to listeners — the tap handler re-resolves the token from the store.
@@ -636,7 +673,33 @@ Future<void> initNotifications() async {
     'destination': e['destination'],
     'message': message,
   });
-  return (head: head, body: body, payload: payload);
+  return (head: head, body: body, html: html, payload: payload);
+}
+
+(String, String, String?)? _richContent(Map<String, dynamic> e, String title) {
+  final attention = e['attention'];
+  switch (e['kind']?.toString()) {
+    case 'waiting':
+      final approval = approvalPreview(attention);
+      if (approval != null) return (title, approval, approvalHtml(attention));
+      final text = attention is Map ? '${attention['text'] ?? ''}'.trim() : '';
+      if (text.isEmpty) return null;
+      return (title, text, questionHtml(attention));
+    case 'idle' || 'done' || 'error':
+      final last = '${e['body'] ?? ''}'.trim();
+      if (last.isEmpty) return null;
+      final status = switch (e['kind']) {
+        'error' => 'Hit an error',
+        'idle' when '${e['lanes_running'] ?? ''}'.length > 2 =>
+          stoppedSummary(e['lanes_running']),
+        _ => null,
+      };
+      final html = markdownToNotificationHtml(last);
+      final plain = plainNotificationText(last);
+      if (status == null) return (title, plain, html);
+      return (title, '$status: $plain', '<b>$status</b><br>$html');
+  }
+  return null;
 }
 
 String _payloadBody(Map<String, dynamic> e) {

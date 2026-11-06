@@ -96,7 +96,8 @@ class _QuestionRecord extends StatelessWidget {
               children: [
                 for (final (q, a) in rows) ...[
                   Text(q,
-                      style: sans(14.5, height: 20 / 14.5, color: AppColors.fg2)),
+                      style:
+                          sans(14.5, height: 20 / 14.5, color: AppColors.fg2)),
                   const SizedBox(height: 3),
                   Text(a == null || a.isEmpty ? 'Not answered' : a,
                       style: sans(14.5,
@@ -153,7 +154,8 @@ class _QuestionRecord extends StatelessWidget {
               Text(answered ? 'answered' : 'no answer',
                   style: kMobile
                       ? sans(13, color: answered ? AppColors.ok : AppColors.fg4)
-                      : mono(10, color: answered ? AppColors.ok : AppColors.fg3)),
+                      : mono(10,
+                          color: answered ? AppColors.ok : AppColors.fg3)),
             ]),
             if (ctx != null) ...[
               const SizedBox(height: 5),
@@ -217,50 +219,46 @@ class ApprovalBarState extends State<ApprovalBar> {
     return null;
   }
 
-  static final _vaultPrefix = RegExp(
-      r'^\s*⚠?\s*uses vault secret\(s\) \[([^\]]*)\]\s*[—-]\s*',
-      dotAll: true);
-  static final _lanePrefix = RegExp(r'^lane «(.+?)» · ');
-  static final _customTool = RegExp(
-      r'^⚠ (new )?custom tool `([^`]+)`(?:, uses vault secret\(s\) \[([^\]]*)\])? — runs: ',
-      dotAll: true);
-
   @override
   Widget build(BuildContext context) {
     final req = _request;
     final tool = req?['tool_name']?.toString() ?? '';
     var detail = (req?['summary']?.toString() ?? '').trim();
     if (detail.isEmpty) detail = toolArgSummary(tool, req?['arguments']);
-    final lane = _lanePrefix.firstMatch(detail);
-    final laneName = lane?.group(1);
-    if (lane != null) detail = detail.substring(lane.end).trim();
-    List<String> names(String? raw) => (raw ?? '')
-        .split(',')
-        .map((s) => s.trim())
-        .where((s) => s.isNotEmpty)
-        .toList();
-    final custom = _customTool.firstMatch(detail);
-    final vault = custom == null ? _vaultPrefix.firstMatch(detail) : null;
-    final secrets =
-        custom != null ? names(custom.group(3)) : names(vault?.group(1));
-    final newCustom = custom?.group(1) != null;
-    if (custom != null) detail = detail.substring(custom.end).trim();
-    if (vault != null) detail = detail.substring(vault.end).trim();
+    final parsed = ApprovalSummary.parse(detail,
+        fullCommand: req == null
+            ? null
+            : fullApprovalCommand(widget.events, req, detail));
+    final call = req == null ? -1 : widget.events.indexOf(req) - 1;
+    final callArgs = call >= 0 ? widget.events[call]['arguments'] : null;
+    final callLabel = parsed.lane == null &&
+            parsed.customTool == null &&
+            call >= 0 &&
+            widget.events[call]['tool_name'] == tool &&
+            callArgs is Map
+        ? '${callArgs['label'] ?? ''}'.trim()
+        : '';
+    detail = parsed.shownCommand;
+    final laneName = parsed.lane;
+    final secrets = parsed.secrets;
+    final customTool = parsed.customTool;
     final isVault = secrets.isNotEmpty;
     final index = (req?['index'] as num?)?.toInt() ?? 1;
     final total = (req?['total'] as num?)?.toInt() ?? 1;
-    final action = custom != null
-        ? (newCustom
-            ? 'Run new custom tool ${custom.group(2)}?'
-            : 'Run custom tool ${custom.group(2)}?')
+    final action = customTool != null
+        ? (parsed.newCustomTool
+            ? 'Run new custom tool $customTool?'
+            : 'Run custom tool $customTool?')
         : switch (tool) {
             'bash' => 'Run this command?',
             'change_files' => 'Make these file changes?',
             '' => 'Allow this action?',
             _ => 'Allow ${toolTitle(tool).toLowerCase()}?',
           };
-    final question = laneName == null ? action : 'Lane «$laneName» · $action';
-    final isShell = tool == 'bash' || custom != null;
+    final headline = callLabel.isNotEmpty ? callLabel : action;
+    final question =
+        laneName == null ? headline : 'Lane «$laneName» · $headline';
+    final isShell = tool == 'bash' || customTool != null;
 
     final allow = Btn(_sent ? 'Sending' : 'Allow',
         small: true,
@@ -271,8 +269,10 @@ class ApprovalBarState extends State<ApprovalBar> {
         variant: BtnVariant.secondary,
         disabled: _sent,
         onTap: () => _decide({'kind': 'deny'}));
-    final canAlways =
-        widget.showApproveAll && !isVault && laneName == null && !newCustom;
+    final canAlways = widget.showApproveAll &&
+        !isVault &&
+        laneName == null &&
+        !parsed.newCustomTool;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(0, S.s4, 0, S.s6),
@@ -307,24 +307,9 @@ class ApprovalBarState extends State<ApprovalBar> {
             ),
             if (detail.isNotEmpty)
               Flexible(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxHeight: 120),
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(S.s12, 2, S.s12, 4),
-                    child: SingleChildScrollView(
-                      child: SelectableText.rich(TextSpan(children: [
-                        if (isShell)
-                          TextSpan(
-                              text: '\$ ',
-                              style:
-                                  mono(12, height: 1.45, color: AppColors.fg4)),
-                        TextSpan(
-                            text: detail,
-                            style:
-                                mono(12, height: 1.45, color: AppColors.fg2)),
-                      ])),
-                    ),
-                  ),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(S.s12, 2, S.s12, 0),
+                  child: ApprovalCode(code: detail, shell: isShell),
                 ),
               ),
             if (isVault)
@@ -391,7 +376,8 @@ class _PlanCard extends StatelessWidget {
                     Padding(
                       padding: const EdgeInsets.only(top: 3),
                       child: switch (step['status']?.toString()) {
-                        'done' || 'completed' =>
+                        'done' ||
+                        'completed' =>
                           AppIcon('check', size: 14, color: AppColors.ok),
                         'in_progress' => Container(
                             width: 14,
@@ -405,8 +391,8 @@ class _PlanCard extends StatelessWidget {
                             height: 14,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              border: Border.all(
-                                  color: AppColors.fg4, width: 1.5),
+                              border:
+                                  Border.all(color: AppColors.fg4, width: 1.5),
                             ),
                           ),
                       },
@@ -855,7 +841,10 @@ class QuestionBarState extends State<QuestionBar> {
             ),
             if (!kMobile && index < 9) ...[
               const SizedBox(width: 8),
-              Text('${index + 1}', style: (kMobile ? sans(13, color: AppColors.fg4) : mono(10, color: AppColors.fg4))),
+              Text('${index + 1}',
+                  style: (kMobile
+                      ? sans(13, color: AppColors.fg4)
+                      : mono(10, color: AppColors.fg4))),
             ],
           ]),
         ),
@@ -956,8 +945,8 @@ class QuestionBarState extends State<QuestionBar> {
   List<Widget> _reviewRows() => [
         const SizedBox(height: 8),
         Text('Check your answers',
-            style:
-                sans(kMobile ? 15 : 14, weight: W.strong, color: AppColors.fg1)),
+            style: sans(kMobile ? 15 : 14,
+                weight: W.strong, color: AppColors.fg1)),
         const SizedBox(height: 6),
         for (var i = 0; i < _questions.length; i++)
           InkWell(
@@ -979,7 +968,10 @@ class QuestionBarState extends State<QuestionBar> {
                       style: sans(13, height: 1.4, color: AppColors.fg1)),
                 ),
                 const SizedBox(width: 8),
-                Text('Edit', style: (kMobile ? sans(13, color: AppColors.accent) : mono(10, color: AppColors.accent))),
+                Text('Edit',
+                    style: (kMobile
+                        ? sans(13, color: AppColors.accent)
+                        : mono(10, color: AppColors.accent))),
               ]),
             ),
           ),
@@ -1010,7 +1002,8 @@ class QuestionBarState extends State<QuestionBar> {
           decoration: BoxDecoration(
             color: AppColors.surface1,
             border: Border.all(
-                color: AppColors.accent.withValues(alpha: kMobile ? 0.3 : 0.45)),
+                color:
+                    AppColors.accent.withValues(alpha: kMobile ? 0.3 : 0.45)),
             borderRadius: BorderRadius.circular(kMobile ? 22 : R.md),
           ),
           child: Column(
@@ -1040,24 +1033,28 @@ class QuestionBarState extends State<QuestionBar> {
                       ),
                   ])
                 else
-                Row(children: [
-                  AppIcon('message', size: 12, color: AppColors.accent),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                        _sent
-                            ? 'Sending…'
-                            : total > 1
-                                ? 'Questions'
-                                : 'Question',
-                        style: (kMobile ? sans(13, color: AppColors.fg3) : mono(10, color: AppColors.fg3))),
-                  ),
-                  Text(
-                      total > 1
-                          ? (_review ? 'review' : '${_step + 1} of $total')
-                          : 'waiting on you',
-                      style: (kMobile ? sans(13, color: AppColors.accent) : mono(10, color: AppColors.accent))),
-                ]),
+                  Row(children: [
+                    AppIcon('message', size: 12, color: AppColors.accent),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                          _sent
+                              ? 'Sending…'
+                              : total > 1
+                                  ? 'Questions'
+                                  : 'Question',
+                          style: (kMobile
+                              ? sans(13, color: AppColors.fg3)
+                              : mono(10, color: AppColors.fg3))),
+                    ),
+                    Text(
+                        total > 1
+                            ? (_review ? 'review' : '${_step + 1} of $total')
+                            : 'waiting on you',
+                        style: (kMobile
+                            ? sans(13, color: AppColors.accent)
+                            : mono(10, color: AppColors.accent))),
+                  ]),
                 if (total > 1) ...[
                   const SizedBox(height: 8),
                   _tabs(),
@@ -1342,8 +1339,8 @@ class _SessionActionsPanelState extends State<_SessionActionsPanel> {
                 decoration: BoxDecoration(
                   color: AppColors.surface1,
                   shape: BoxShape.circle,
-                  border: Border.all(
-                      color: AppColors.fg1.withValues(alpha: 0.08)),
+                  border:
+                      Border.all(color: AppColors.fg1.withValues(alpha: 0.08)),
                 ),
                 alignment: Alignment.center,
                 child: AppIcon(icon, size: 21, color: AppColors.fg1),

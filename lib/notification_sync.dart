@@ -132,6 +132,7 @@ Future<void> presentNotifications(Instance instance, NotificationInbox inbox,
               await inbox.alertId(event['notification_id'] as String),
           title: content.head,
           body: content.body,
+          html: content.html,
           payload: jsonEncode(payload),
           kind: event['kind']?.toString() ?? '');
     } catch (error, stack) {
@@ -170,6 +171,7 @@ Future<void> _postMacCentre(Instance instance, NotificationInbox inbox,
               await inbox.alertId(event['notification_id'] as String),
           title: content.head,
           body: content.body,
+          html: content.html,
           payload: jsonEncode(payload),
           kind: kind);
     } catch (error, stack) {

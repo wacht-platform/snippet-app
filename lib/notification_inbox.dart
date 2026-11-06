@@ -3,6 +3,8 @@ import 'dart:io';
 
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
+import 'notification_text.dart';
+
 class NotificationCursor implements Comparable<NotificationCursor> {
   const NotificationCursor(this.createdAt, this.eventId);
   final int createdAt;
@@ -282,7 +284,7 @@ Map<String, dynamic> notificationDestination(
   final nestedBody = nestedPayload is Map ? nestedPayload['body'] : null;
   final attention = event['attention'];
   final attentionText = attention is Map ? attention['text'] : null;
-  final rawBody =
+  final rawBody = approvalPreview(attention) ??
       event['body'] ?? event['message'] ?? nestedBody ?? attentionText;
   final body =
       (rawBody == null || '$rawBody'.trim().isEmpty) && kind == 'idle'
