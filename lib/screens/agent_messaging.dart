@@ -1,4 +1,5 @@
 import 'package:snippet/ambient/hold.dart';
+import 'package:snippet/ambient/live_caption.dart';
 import 'dart:async';
 import 'dart:io';
 
@@ -1436,7 +1437,7 @@ class _AgentThreadScreenState extends State<AgentThreadScreen> {
       duration: Motion.fast,
       curve: Motion.enter,
       padding: EdgeInsets.only(bottom: keyboard),
-      child: Container(
+      child: LiveCaptionAnchor(
         padding: EdgeInsets.fromLTRB(
           kMobile ? M.gutter : (widget.embedded ? kComposerGutter : 20),
           8,

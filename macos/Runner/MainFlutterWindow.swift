@@ -507,6 +507,9 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
       case "callTracking":
         self.notchHUD?.presentCallTracking(callId: (call.arguments as? [String: Any])?["callId"] as? String ?? "")
         result(nil)
+      case "liveCaption":
+        self.notchHUD?.updateLiveCaption((call.arguments as? [String: Any])?["text"] as? String ?? "")
+        result(nil)
       case "callClear":
         self.notchHUD?.clearCall()
         result(nil)
@@ -1605,10 +1608,11 @@ final class NotchHUDController {
 
   private var conversationExpanded = false
   private var activePayload: String = ""
+  private var liveCaption: String?
 
   var isShowing: Bool { panel.isVisible }
   var isIdleStrip: Bool {
-    panel.isVisible && !conversationExpanded && notifTitle == nil && callMode == nil
+    panel.isVisible && !conversationExpanded && notifTitle == nil && callMode == nil && liveCaption == nil
   }
   var onStripHover: ((Bool) -> Void)?
 
@@ -1712,6 +1716,13 @@ final class NotchHUDController {
         return
       }
     }
+    refreshHUD(animated: true)
+  }
+
+  func updateLiveCaption(_ text: String) {
+    let next: String? = text.isEmpty ? nil : text
+    guard next != liveCaption else { return }
+    liveCaption = next
     refreshHUD(animated: true)
   }
 
@@ -1910,7 +1921,7 @@ final class NotchHUDController {
   private func refreshHUD(animated: Bool) {
     let hasNotif = notifTitle != nil
     let showAmbient = windowHidden && (ambientActive || assistantSpeaking || userSpeaking)
-    let shouldShow = windowHidden && (conversationExpanded || hasNotif || hasUnreadNotification || showAmbient || callMode != nil)
+    let shouldShow = windowHidden && (conversationExpanded || hasNotif || hasUnreadNotification || showAmbient || liveCaption != nil || callMode != nil)
 
     if !shouldShow {
       waveTimer?.invalidate()
@@ -1941,6 +1952,11 @@ final class NotchHUDController {
       targetWidth = hw.width + 120 + topCornerRadius * 2
       let hasBannerActions = callMode != "prompt" && !NotchHUDController.bannerActions(from: notifPayload).isEmpty
       targetHeight = hw.height + (callMode == "prompt" ? 80 : (hasBannerActions ? 82 : 48))
+    } else if liveCaption != nil {
+      topCornerRadius = 6
+      bottomCornerRadius = 16
+      targetWidth = hw.width + 300 + topCornerRadius * 2
+      targetHeight = hw.height + 34
     } else if callMode == "tracking" {
       topCornerRadius = 6
       bottomCornerRadius = 16
@@ -1978,7 +1994,8 @@ final class NotchHUDController {
       notifStartedAt: notifStartedAt,
       notifDuration: callMode == "prompt" ? callDuration : notifDuration * (NotchHUDController.bannerActions(from: notifPayload).isEmpty ? 1 : 3),
       callMode: callMode,
-      bannerActions: callMode == "prompt" ? [] : NotchHUDController.bannerActions(from: notifPayload)
+      bannerActions: callMode == "prompt" ? [] : NotchHUDController.bannerActions(from: notifPayload),
+      liveCaption: conversationExpanded ? nil : liveCaption
     )
 
     if !panel.isVisible {
@@ -2612,8 +2629,10 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
     notifStartedAt: TimeInterval,
     notifDuration: TimeInterval,
     callMode: String?,
-    bannerActions: [(String, String, Bool)]
+    bannerActions: [(String, String, Bool)],
+    liveCaption: String?
   ) {
+    self.liveCaption = liveCaption
     self.bannerActions = bannerActions
     self.callMode = callMode
     self.notifTitle = notifTitle
@@ -2633,6 +2652,8 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
     needsLayout = true
     needsDisplay = true
   }
+
+  private var liveCaption: String?
 
   func stepAnimation() {
     phase += 0.08
@@ -2715,7 +2736,21 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
       SnippetTheme.accent.setFill()
       NSBezierPath(ovalIn: dot).fill()
     }
-    if callMode == "tracking" && notifTitle == nil {
+    if let caption = liveCaption, notifTitle == nil {
+      let left = b.minX + topCornerRadius + 16
+      let rowMidY = b.minY + 17
+      var textLeft = left
+      if callMode == "tracking" {
+        NSColor(srgbRed: 0.90, green: 0.45, blue: 0.40, alpha: 1).setFill()
+        NSBezierPath(ovalIn: NSRect(x: left, y: rowMidY - 3, width: 6, height: 6)).fill()
+        textLeft = left + 14
+      }
+      let style = NSMutableParagraphStyle()
+      style.lineBreakMode = .byTruncatingHead
+      (caption as NSString).draw(
+        in: NSRect(x: textLeft, y: rowMidY - 9, width: max(0, b.maxX - topCornerRadius - 16 - textLeft), height: 18),
+        withAttributes: [.font: SnippetTheme.sans(12, weight: .medium), .foregroundColor: SnippetTheme.fg1, .paragraphStyle: style])
+    } else if callMode == "tracking" && notifTitle == nil {
       let left = b.minX + topCornerRadius + 16
       let rowMidY = b.minY + 17
       NSColor(srgbRed: 0.90, green: 0.45, blue: 0.40, alpha: 1).setFill()

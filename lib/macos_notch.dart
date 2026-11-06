@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 import 'ambient/controller.dart';
+import 'ambient/live_caption.dart';
 import 'api.dart';
 import 'call_tracking.dart';
 import 'models.dart';
@@ -71,6 +72,9 @@ class MacosNotch {
   static void ensureInitialized() {
     if (_initialized || !kMacOS) return;
     _initialized = true;
+    LiveCaptionFeed.instance.text.addListener(() {
+      _channel.invokeMethod<void>('liveCaption', {'text': LiveCaptionFeed.instance.text.value ?? ''}).catchError((Object _) {});
+    });
     _channel.setMethodCallHandler((call) async {
       switch (call.method) {
         case 'onNotificationTap':

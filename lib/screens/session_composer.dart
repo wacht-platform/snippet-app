@@ -1049,7 +1049,7 @@ extension _SessionScreenComposerExt on _SessionScreenState {
         child: ConstrainedBox(
           constraints: BoxConstraints(
               maxWidth: kMobile ? double.infinity : kDesktopComposerWidth),
-          child: Container(
+          child: LiveCaptionAnchor(
             // Inset from the pane on EVERY layout. Embedded used to be 0, which is
             // why the composer stuck to the sides of the shell.
             padding: EdgeInsets.fromLTRB(

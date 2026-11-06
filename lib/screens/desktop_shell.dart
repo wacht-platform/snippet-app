@@ -1,10 +1,12 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
+import '../ambient/live_caption.dart';
 import '../api.dart';
 import '../github_models.dart';
 import '../swr.dart';
@@ -713,6 +715,11 @@ class _DesktopShellState extends State<DesktopShell>
           final event = DeviceEvent.decode(msg);
           if (event == null) return;
           final kind = event.kind;
+          if (kind == 'ambient_live') {
+            final frame = jsonDecode(msg as String);
+            if (frame is Map) LiveCaptionFeed.instance.apply(frame);
+            return;
+          }
           if (kind == 'notification' && _active != null) {
             unawaited(receiveLiveNotification(_active!, msg)
                 .catchError((Object _) {}));

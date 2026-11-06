@@ -5,6 +5,8 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'package:snippet/ambient/live_caption.dart';
+
 import '../../../composer_strip.dart';
 import '../../../drafts.dart';
 import '../../../platform.dart';
@@ -101,13 +103,13 @@ class _MissionComposerState extends State<MissionComposer> {
   Widget build(BuildContext context) {
     final sending = widget.state.sending;
     if (!kMobile) {
-      return Padding(
+      return LiveCaptionAnchor(
         padding: EdgeInsets.fromLTRB(
             20, 8, 20, 10 + MediaQuery.of(context).padding.bottom),
         child: _desktopStrip(),
       );
     }
-    return Container(
+    return LiveCaptionAnchor(
       padding: EdgeInsets.fromLTRB(
         kMobile ? M.gutter : 20,
         8,
