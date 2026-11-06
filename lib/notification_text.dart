@@ -237,3 +237,55 @@ String markdownToNotificationHtml(String markdown) {
   }
   return out.join('<br>');
 }
+
+/// One event reaches the notch from several paths, and a stopped session's text
+/// repeats what the live chat already showed. The first wins unless a later copy
+/// carries the buttons.
+class NotificationDedupe {
+  NotificationDedupe({this.window = const Duration(seconds: 60)});
+
+  final Duration window;
+  final _seen = <String, ({DateTime at, bool actionable})>{};
+
+  static String _normal(String text) {
+    final words =
+        text.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), ' ').trim();
+    return words.length > 120 ? words.substring(0, 120) : words;
+  }
+
+  bool admit({
+    required String id,
+    required String session,
+    required String text,
+    bool actionable = false,
+    DateTime? now,
+  }) {
+    final at = now ?? DateTime.now();
+    _seen.removeWhere((_, v) => at.difference(v.at) > window);
+    final normal = _normal(text);
+    final keys = [
+      if (id.isNotEmpty) 'id:$id',
+      if (normal.isNotEmpty) 'text:$session:$normal',
+    ];
+    final known =
+        keys.map((k) => _seen[k]).whereType<({DateTime at, bool actionable})>();
+    final admitted =
+        known.isEmpty || (actionable && known.every((v) => !v.actionable));
+    if (admitted) {
+      for (final k in keys) {
+        _seen[k] = (at: at, actionable: actionable);
+      }
+    }
+    return admitted;
+  }
+}
+
+const _toastStates = {'waiting', 'idle', 'done', 'error'};
+
+/// A session's newer state replaces its older one instead of stacking beside it.
+bool toastSuperseded(Map<String, dynamic> older, Map<String, dynamic> newer) =>
+    _toastStates.contains(older['kind']) &&
+    _toastStates.contains(newer['kind']) &&
+    '${older['session'] ?? ''}'.isNotEmpty &&
+    older['session'] == newer['session'] &&
+    older['url'] == newer['url'];

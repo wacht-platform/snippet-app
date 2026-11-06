@@ -9,6 +9,7 @@ import 'api.dart';
 import 'call_tracking.dart';
 import 'models.dart';
 import 'notch_home.dart';
+import 'notification_text.dart';
 import 'notifications.dart';
 import 'platform.dart';
 import 'screens/mission_control/mission_control_state.dart'
@@ -52,7 +53,8 @@ class MacosNotch {
   static HarnessState? _mcState;
   static int _mcRevision = 0;
   static String _mcLiveStreamText = '';
-  static String _lastNotifiedKey = '';
+  static String _mcTurnText = '';
+  static final _notchDedupe = NotificationDedupe();
 
   static WebSocketChannel? _activeSocket;
   static StreamSubscription<dynamic>? _activeSub;
@@ -113,7 +115,8 @@ class MacosNotch {
         case 'bannerAction':
           final args = call.arguments;
           if (args is Map) {
-            await _bannerAction('${args['action'] ?? ''}', '${args['payload'] ?? ''}');
+            await _bannerAction(
+                '${args['action'] ?? ''}', '${args['payload'] ?? ''}');
           }
         case 'callAction':
           final args = call.arguments;
@@ -266,39 +269,12 @@ class MacosNotch {
               if (next.status != 'running') {
                 _mcLiveStreamText = '';
               }
-              if (wire == 'delta' &&
-                  prev != null &&
-                  next.events.length > prev.events.length) {
-                final added = next.events.sublist(prev.events.length);
-                for (final e in added.reversed) {
-                  final kind = e['kind'] as String? ?? '';
-                  var msgText = '';
-                  if (kind == 'assistant_text' || kind == 'assistant') {
-                    msgText = ((e['text'] as String?) ?? '').trim();
-                  } else if (kind == 'user_question') {
-                    msgText = userQuestionLead(e);
-                  }
-                  if (msgText.isNotEmpty) {
-                    final cleaned =
-                        msgText.replaceAll(RegExp(r'\s+'), ' ').trim();
-                    showNotification(
-                      title: 'Mission Control',
-                      subtitle: cleaned,
-                      kind: kind == 'user_question' ? 'waiting' : 'message',
-                      payload: {
-                        'url': client.baseUrl,
-                        'session': 'mission-control',
-                        'title': 'Mission Control',
-                        'body': cleaned,
-                        'destination': const {
-                          'type': 'session',
-                          'id': 'mission-control',
-                        },
-                      },
-                    );
-                    break;
-                  }
-                }
+              if (wire == 'delta' && prev != null) {
+                final grew = next.events.length > prev.events.length;
+                _noteMissionControl(
+                    client,
+                    grew ? next.events.sublist(prev.events.length) : const [],
+                    next.status);
               }
               if (_activeSessionId == 'mission-control') {
                 _activeState = next;
@@ -817,6 +793,42 @@ class MacosNotch {
     }).catchError((Object _) {});
   }
 
+  static void _showMissionControl(
+      DaemonClient client, String text, String kind) {
+    showNotification(
+      title: 'Mission Control',
+      subtitle: text,
+      kind: kind,
+      payload: {
+        'url': client.baseUrl,
+        'session': 'mission-control',
+        'title': 'Mission Control',
+        'body': text,
+        'destination': const {'type': 'session', 'id': 'mission-control'},
+      },
+    );
+  }
+
+  /// A running turn's progress text stays quiet: only its last message surfaces,
+  /// when the turn ends. A question can't wait for that.
+  static void _noteMissionControl(
+      DaemonClient client, List<Map<String, dynamic>> added, String status) {
+    for (final e in added) {
+      final kind = e['kind'] as String? ?? '';
+      if (kind == 'assistant_text' || kind == 'assistant') {
+        final text = ((e['text'] as String?) ?? '').trim();
+        if (text.isNotEmpty) _mcTurnText = text;
+      } else if (kind == 'user_question') {
+        final text = userQuestionLead(e).replaceAll(RegExp(r'\s+'), ' ').trim();
+        if (text.isNotEmpty) _showMissionControl(client, text, 'waiting');
+      }
+    }
+    if (status != 'running' && _mcTurnText.isNotEmpty) {
+      _showMissionControl(client, _mcTurnText, 'message');
+      _mcTurnText = '';
+    }
+  }
+
   static void showNotification({
     required String title,
     required String subtitle,
@@ -831,12 +843,16 @@ class MacosNotch {
       subtitle = subtitle.trim().isEmpty ? head : '$head · $subtitle';
     }
     title = channel;
-    final dedupeKey = '$title|$subtitle|$kind';
-    if (dedupeKey == _lastNotifiedKey) return;
-    _lastNotifiedKey = dedupeKey;
-    Future<void>.delayed(const Duration(seconds: 2), () {
-      if (_lastNotifiedKey == dedupeKey) _lastNotifiedKey = '';
-    });
+    final attention = payload['attention'];
+    if (kind != 'ambient' &&
+        !_notchDedupe.admit(
+          id: '${payload['notification_id'] ?? ''}',
+          session: '${payload['session'] ?? title}',
+          text: subtitle,
+          actionable: attention is Map,
+        )) {
+      return;
+    }
     NotchHome.remember(
         title: title, subtitle: subtitle, kind: kind, payload: payload);
     _channel.invokeMethod<void>('showNotification', <String, Object?>{

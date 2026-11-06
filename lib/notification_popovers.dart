@@ -10,6 +10,7 @@ import 'notifications.dart';
 import 'theme.dart';
 import 'platform.dart';
 import 'notification_card.dart';
+import 'notification_text.dart';
 import 'notification_stack.dart';
 import 'session_quick_send.dart' show resolveInstanceForPayload;
 
@@ -120,13 +121,18 @@ class _NotificationPopoversState extends State<NotificationPopovers> {
     );
   }
 
+  void _addPending(Map<String, dynamic> payload) {
+    _pending.removeWhere((old) => toastSuperseded(old, payload));
+    _pending.add(payload);
+  }
+
   @override
   void initState() {
     super.initState();
     MacosNotch.ensureInitialized();
     _contentEntry = OverlayEntry(builder: _buildContent);
     final initial = foregroundNotifications.drain();
-    _pending.addAll(initial);
+    initial.forEach(_addPending);
     _arm();
     for (final p in initial) {
       _forwardToMacNotch(p);
@@ -136,7 +142,7 @@ class _NotificationPopoversState extends State<NotificationPopovers> {
     _subscription = foregroundNotifications.stream.listen((payload) {
       _forwardToMacNotch(payload);
       if (!mounted) return;
-      setState(() => _pending.add(payload));
+      setState(() => _addPending(payload));
       _arm();
     });
   }

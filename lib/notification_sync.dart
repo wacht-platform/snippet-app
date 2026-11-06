@@ -93,7 +93,7 @@ Future<void> presentNotifications(Instance instance, NotificationInbox inbox,
   if (!background && (notificationAppForeground || kMacOS)) {
     for (final event in received) {
       final payload = notificationDestination(instance.url, event);
-      if (kMacOS) {
+      if (kMacOS && !suppressVisibleNotification(payload)) {
         final content = notificationContent(instance, event);
         MacosNotch.showNotification(
           title: payload['title']?.toString() ?? content.head,

@@ -440,6 +440,7 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
 
     let home = NotchHomeController(
       hudBusy: { [weak hud] in hud?.isShowing ?? false },
+      hudIdle: { [weak hud] in hud?.isIdleStrip ?? false },
       appOpen: { [weak self] in
         guard let w = self else { return false }
         return w.isVisible && !w.isMiniaturized
@@ -449,6 +450,7 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
       self?.notchChannel?.invokeMethod("homeAction", arguments: ["id": id, "action": action])
     }
     home.onOpenApp = { [weak self] in self?.restoreFromMenuBar() }
+    hud.onStripHover = { [weak home] inside in home?.hoverFromStrip(inside) }
     self.notchHome = home
 
     notchChan.setMethodCallHandler { [weak self] call, result in
@@ -1586,6 +1588,10 @@ final class NotchHUDController {
   private var activePayload: String = ""
 
   var isShowing: Bool { panel.isVisible }
+  var isIdleStrip: Bool {
+    panel.isVisible && !conversationExpanded && notifTitle == nil && callMode == nil
+  }
+  var onStripHover: ((Bool) -> Void)?
 
   init(
     onActivateWindow: @escaping () -> Void,
@@ -1625,6 +1631,10 @@ final class NotchHUDController {
 
     v.onBannerTap = { [weak self] in
       self?.handleBannerTap()
+    }
+    v.onHoverChanged = { [weak self] inside in
+      guard let self = self else { return }
+      if !inside || self.isIdleStrip { self.onStripHover?(inside) }
     }
     v.onCloseBar = { [weak self] in
       self?.collapseConversation()
@@ -1994,6 +2004,21 @@ final class NotchHUDController {
 
 final class NotchHUDView: NSView, NSTextFieldDelegate {
   var onBannerTap: (() -> Void)?
+  var onHoverChanged: ((Bool) -> Void)?
+  private var hoverArea: NSTrackingArea?
+
+  override func updateTrackingAreas() {
+    super.updateTrackingAreas()
+    if let hoverArea = hoverArea { removeTrackingArea(hoverArea) }
+    let area = NSTrackingArea(
+      rect: bounds, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect],
+      owner: self, userInfo: nil)
+    addTrackingArea(area)
+    hoverArea = area
+  }
+
+  override func mouseEntered(with event: NSEvent) { onHoverChanged?(true) }
+  override func mouseExited(with event: NSEvent) { onHoverChanged?(false) }
   var onCloseBar: (() -> Void)?
   var onOpenFullApp: (() -> Void)?
   var onSubmitReply: ((String) -> Void)?
@@ -3503,12 +3528,17 @@ final class NotchHomeController {
   private var collapseTimer: Timer?
   private var visibilityTimer: Timer?
   private var hudBusy: () -> Bool
+  private var hudIdle: () -> Bool
   private var appOpen: () -> Bool
   var onAction: ((String, String) -> Void)?
   var onOpenApp: (() -> Void)?
 
-  init(hudBusy: @escaping () -> Bool, appOpen: @escaping () -> Bool = { false }) {
+  init(
+    hudBusy: @escaping () -> Bool, hudIdle: @escaping () -> Bool = { false },
+    appOpen: @escaping () -> Bool = { false }
+  ) {
     self.hudBusy = hudBusy
+    self.hudIdle = hudIdle
     self.appOpen = appOpen
     let rect = NSRect(x: 0, y: 0, width: 260, height: 32)
     let p = NotchPanel(
@@ -3564,8 +3594,20 @@ final class NotchHomeController {
     refresh(animated: true)
   }
 
+  /// The ambient strip sits above this panel and keeps the voice state visible, so
+  /// the panel only appears there while open.
+  private var shouldHide: Bool {
+    if appOpen() { return true }
+    if hudIdle() { return !expanded }
+    return hudBusy()
+  }
+
+  func hoverFromStrip(_ inside: Bool) {
+    if !appOpen() { hover(inside) }
+  }
+
   private func syncVisibility() {
-    let hide = hudBusy() || appOpen()
+    let hide = shouldHide
     if hide && panel.isVisible {
       expanded = false
       detailId = nil
@@ -3619,7 +3661,10 @@ final class NotchHomeController {
   }
 
   private func refresh(animated: Bool) {
-    if hudBusy() || appOpen() { return }
+    if shouldHide {
+      if panel.isVisible { panel.orderOut(nil) }
+      return
+    }
     guard let screen = NSScreen.main ?? NSScreen.screens.first else { return }
     let hw = measure(screen)
     let detail = detailId.flatMap { id in model.items.first { $0.id == id } }
