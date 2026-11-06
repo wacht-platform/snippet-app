@@ -77,7 +77,7 @@ class _NewSessionPickerState extends State<NewSessionPicker> {
   /// Keeps the CURRENT folder (the last crumb) in view on wide paths.
   ///
   /// Deliberately NOT `ListView(reverse: true)`: reverse flips the DRAWING order,
-  /// which rendered `intellinesia › code › ~` — the path backwards. Order stays
+  /// which rendered `alice › code › ~` — the path backwards. Order stays
   /// left-to-right; only the scroll position moves to the end.
   final ScrollController _crumbScroll = ScrollController();
 
@@ -428,7 +428,7 @@ class _NewSessionPickerState extends State<NewSessionPicker> {
               scrollDirection: Axis.horizontal,
               // Order is deliberately LEFT-TO-RIGHT (root first). `reverse: true`
               // would have kept the tail in view but draws the list backwards,
-              // which rendered the path as `intellinesia › code › ~`. The
+              // which rendered the path as `alice › code › ~`. The
               // controller jumps to the deep end instead (see `_go`).
               padding: const EdgeInsets.symmetric(vertical: 4),
               itemCount: crumbs.length,

@@ -81,7 +81,7 @@ class _FakeScreen extends StatelessWidget {
 
 const _items = <Map<String, dynamic>>[
   {
-    'title': 'Technoxi LinkedIn',
+    'title': 'Acme LinkedIn',
     'kind': 'idle',
     'session': 's-5',
     'body': 'Finished the engagement pass',

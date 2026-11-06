@@ -33,7 +33,7 @@ const _items = <Map<String, dynamic>>[
     'body': '## Summary\n- Merged the **review** queue fix',
   },
   {
-    'title': 'Technoxi LinkedIn',
+    'title': 'Acme LinkedIn',
     'kind': 'idle',
     'session': 's-5',
     'body': 'Finished the engagement pass',

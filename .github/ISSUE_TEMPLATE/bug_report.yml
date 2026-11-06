@@ -1,0 +1,36 @@
+name: Bug report
+description: Something in the snippet app does not work as it should
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Security problems should not be filed here. See SECURITY.md for how to report them privately.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you saw, and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: App version, daemon version, and device or operating system.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or screenshots
+      description: Logs or screenshots. Remove API keys, tokens and personal data.

@@ -1,11 +1,12 @@
-# Contributing to snippet-mobile
+# Contributing to the snippet app
 
 Thanks for your interest! Issues and pull requests are welcome.
 
 ## Getting started
 - Build/run: see [README.md](README.md).
 - `flutter pub get`, then `flutter run -d macos` or `flutter run` (Android).
-- Run `flutter analyze lib` — it must pass before a PR.
+- `flutter analyze lib` and `flutter test` must pass before a PR.
+- Report security problems privately, as described in [SECURITY.md](SECURITY.md).
 
 ## Style
 - Keep code comments lean and sparse; match the surrounding style.

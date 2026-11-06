@@ -1,12 +1,12 @@
 <div align="center">
 
-<img src="https://raw.githubusercontent.com/wacht-platform/snippet-service/main/snippet-mascot/png/snip-mascot-256.png" alt="Mochi, the snippet mascot" width="96" height="96" />
+<img src="https://raw.githubusercontent.com/intellinesia/snippet/main/snippet-mascot/png/snip-mascot-256.png" alt="Mochi, the snippet mascot" width="96" height="96" />
 
 # snippet app
 
-The Android, macOS, Linux and Windows client for [snippet](https://github.com/wacht-platform/snippet-service).
+The Android, macOS, Linux and Windows client for [snippet](https://github.com/intellinesia/snippet).
 
-[![latest release](https://img.shields.io/github/v/release/wacht-platform/snippet-app?include_prereleases&label=latest%20release)](https://github.com/wacht-platform/snippet-app/releases/tag/latest)
+[![latest release](https://img.shields.io/github/v/release/intellinesia/snippet-app?include_prereleases&label=latest%20release)](https://github.com/intellinesia/snippet-app/releases/tag/latest)
 [![license: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
 
 </div>
@@ -29,7 +29,7 @@ The app connects to a `snippet serve` daemon running on your own machine. The co
 
 ## Install
 
-Every push to `main` updates the rolling [latest release](https://github.com/wacht-platform/snippet-app/releases/tag/latest):
+Every push to `main` updates the rolling [latest release](https://github.com/intellinesia/snippet-app/releases/tag/latest):
 
 | Platform | Asset |
 | --- | --- |
@@ -47,7 +47,7 @@ The Android build is self-signed, so remove an older install before updating if 
 1. On the machine with your code, run `snippet serve`.
 2. In the app choose **Add machine**, then scan the QR code or paste the URL and token it prints.
 
-For a remote machine, run `snippet serve` with a tunnel (Tailscale or Cloudflare); see the [service README](https://github.com/wacht-platform/snippet-service#remote-control-with-serve).
+For a remote machine, run `snippet serve` with a tunnel (Tailscale or Cloudflare); see the [service README](https://github.com/intellinesia/snippet#remote-control-with-serve).
 
 ## Build
 
@@ -64,3 +64,7 @@ CI builds all four platforms on every push to `main`: [`.github/workflows/releas
 ## License
 
 Copyright (C) 2026 snipextt. Licensed under the [GNU Affero General Public License v3.0 or later](LICENSE).
+
+Bundled fonts are licensed under the SIL Open Font License, see [assets/fonts/OFL.txt](assets/fonts/OFL.txt). Provider logos in `assets/providers` belong to their respective owners and are used only to identify those services.
+
+To report a vulnerability, see [SECURITY.md](SECURITY.md).
