@@ -13,6 +13,9 @@ Thanks for your interest! Issues and pull requests are welcome.
 - Never log or expose the user's API key or the serve token.
 - No AI/tool branding in commit messages.
 
+## Conduct
+This project follows the [Code of Conduct](CODE_OF_CONDUCT.md).
+
 ## Licensing
 By contributing, you agree that your contributions are licensed under the
 project's license, **AGPL-3.0-or-later** (see [LICENSE](LICENSE)).
