@@ -302,6 +302,7 @@ class AmbientCapture {
       }
       if (peak > _peak) _peak = peak;
       _silentFrames = peak == 0 ? _silentFrames + 1 : 0;
+      if (_silentFrames == 0) _micRetried = false;
       if (_silentFrames == 94) {
         _error =
             'The microphone is only sending silence. Check the input device and that microphone access is allowed for this app.';

@@ -179,7 +179,10 @@ class AmbientController extends ChangeNotifier {
         notificationText: 'Ambient listening is on',
         callback: ambientServiceEntry,
       );
-      if (result is ServiceRequestFailure) return '${result.error}';
+      // Already running after a relaunch is what was asked for, not a failure that should turn ambient off.
+      if (result is ServiceRequestFailure && !await FlutterForegroundTask.isRunningService) {
+        return '${result.error}';
+      }
       if (AmbientHold.local) AmbientHold.publishCurrent();
       status = const AmbientStatus(running: true);
       notifyListeners();

@@ -141,9 +141,7 @@ class AmbientVoice {
     if (data.isEmpty) return;
     st.bytes += data.length;
     st.lastFrame = DateTime.now();
-    unawaited(_sink.enqueueFrame(turn, data).then((_) {
-      if (_streamDead.contains(turn)) unawaited(_sink.stopStream(turn));
-    }).catchError((Object _) {}));
+    unawaited(_sink.enqueueFrame(turn, data).catchError((Object _) {}));
   }
 
   void _streamChanged() {
@@ -244,6 +242,11 @@ class AmbientVoice {
   }
 
   Future<void> stopStream([int turn = 0]) async {
+    // The daemon sends up to three stops per interrupt; a late one must not cut the reply that replaced this turn.
+    if (turn != 0 && !_streams.containsKey(turn)) {
+      _streamDead.add(turn);
+      return;
+    }
     final stopped = turn == 0 ? _streams.keys.toList() : [turn];
     for (final t in stopped) {
       final st = _streams[t];

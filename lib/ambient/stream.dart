@@ -67,7 +67,12 @@ class AmbientStream {
         queryParameters: {'token': token, 'device': device},
       );
       final ws = await WebSocket.connect(uri.toString()).timeout(const Duration(seconds: 8));
-      ws.pingInterval = const Duration(seconds: 20);
+      if (_closed) {
+        unawaited(ws.close());
+        return null;
+      }
+      // A half-open socket swallows live speech until the ping notices it.
+      ws.pingInterval = const Duration(seconds: 5);
       ws.listen(
         (data) => _onMessage(data),
         onDone: () => _lost(ws),

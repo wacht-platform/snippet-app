@@ -364,6 +364,16 @@ class AmbientAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
         return !s.stopping
     }
 
+    // A failed write leaves frames queued with no reader; the next frame needs a fresh track.
+    private fun dropDeadSink(s: Sink) {
+        synchronized(lock) {
+            if (sink === s && !s.stopping) {
+                lastPos = positionOf(s) + ("active" to 0)
+                releaseSink(s)
+            }
+        }
+    }
+
     private fun writerLoop(s: Sink) {
         while (!s.stopping) {
             val item = try { s.queue.poll(30000, TimeUnit.MILLISECONDS) } catch (_: InterruptedException) { return }
@@ -393,10 +403,16 @@ class AmbientAudioPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
                 false
             }
             if (skip) continue
-            if (!writeAll(s, pcm)) return
+            if (!writeAll(s, pcm)) {
+                dropDeadSink(s)
+                return
+            }
             s.framesWritten += frames
             if (item.silenceFrames > 0) {
-                if (!writeAll(s, ByteArray(item.silenceFrames * 2))) return
+                if (!writeAll(s, ByteArray(item.silenceFrames * 2))) {
+                    dropDeadSink(s)
+                    return
+                }
                 s.framesWritten += item.silenceFrames
             }
         }

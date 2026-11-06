@@ -984,10 +984,29 @@ final class MacosVoiceProcessingEngine: NSObject, FlutterStreamHandler {
         // External audio interfaces that do not support VoiceProcessingIO fall back cleanly.
       }
       configured = true
+      NotificationCenter.default.addObserver(
+        forName: .AVAudioEngineConfigurationChange,
+        object: engine,
+        queue: .main
+      ) { [weak self] _ in self?.restartAfterRouteChange() }
     }
     if !engine.isRunning {
       engine.prepare()
       try engine.start()
+    }
+  }
+
+  // AirPods, a new default device or a wake from sleep stop the engine and the mic tap without an error.
+  private func restartAfterRouteChange() {
+    guard eventSink != nil else { return }
+    removeMicTap()
+    do {
+      try ensureEngineRunning()
+      installMicTapIfNeeded()
+    } catch {
+      DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in
+        self?.restartAfterRouteChange()
+      }
     }
   }
 
