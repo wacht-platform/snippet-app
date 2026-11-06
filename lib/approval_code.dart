@@ -31,7 +31,7 @@ TextSpan approvalCodeSpan(String code, {required bool shell}) {
   if (open == null || terminator < 1) return part(code, 'bash');
   final program = RegExp(r'[\w.-]+').firstMatch(lines.first)?[0] ?? '';
   final language = _heredocLanguages[program] ?? '';
-  return TextSpan(children: [
+  return TextSpan(style: codeMono(size, height: height), children: [
     part(lines.first, 'bash'),
     const TextSpan(text: '\n'),
     if (terminator > 1) ...[
