@@ -1722,8 +1722,9 @@ final class NotchHUDController {
   func updateLiveCaption(_ text: String) {
     let next: String? = text.isEmpty ? nil : text
     guard next != liveCaption else { return }
+    let appeared = (next == nil) != (liveCaption == nil)
     liveCaption = next
-    refreshHUD(animated: true)
+    refreshHUD(animated: appeared)
   }
 
   func updateAmbient(
@@ -1955,7 +1956,7 @@ final class NotchHUDController {
     } else if liveCaption != nil {
       topCornerRadius = 6
       bottomCornerRadius = 16
-      targetWidth = hw.width + 300 + topCornerRadius * 2
+      targetWidth = hw.width + 120 + topCornerRadius * 2
       targetHeight = hw.height + 34
     } else if callMode == "tracking" {
       topCornerRadius = 6
@@ -2737,19 +2738,21 @@ final class NotchHUDView: NSView, NSTextFieldDelegate {
       NSBezierPath(ovalIn: dot).fill()
     }
     if let caption = liveCaption, notifTitle == nil {
-      let left = b.minX + topCornerRadius + 16
       let rowMidY = b.minY + 17
-      var textLeft = left
-      if callMode == "tracking" {
-        NSColor(srgbRed: 0.90, green: 0.45, blue: 0.40, alpha: 1).setFill()
-        NSBezierPath(ovalIn: NSRect(x: left, y: rowMidY - 3, width: 6, height: 6)).fill()
-        textLeft = left + 14
-      }
+      let dotSpace: CGFloat = callMode == "tracking" ? 14 : 0
       let style = NSMutableParagraphStyle()
       style.lineBreakMode = .byTruncatingHead
+      let attributes: [NSAttributedString.Key: Any] = [.font: SnippetTheme.sans(12, weight: .medium), .foregroundColor: SnippetTheme.fg1, .paragraphStyle: style]
+      let available = max(0, b.width - (topCornerRadius + 16) * 2 - dotSpace)
+      let textWidth = min(ceil((caption as NSString).size(withAttributes: attributes).width), available)
+      let left = b.midX - (textWidth + dotSpace) / 2
+      if dotSpace > 0 {
+        NSColor(srgbRed: 0.90, green: 0.45, blue: 0.40, alpha: 1).setFill()
+        NSBezierPath(ovalIn: NSRect(x: left, y: rowMidY - 3, width: 6, height: 6)).fill()
+      }
       (caption as NSString).draw(
-        in: NSRect(x: textLeft, y: rowMidY - 9, width: max(0, b.maxX - topCornerRadius - 16 - textLeft), height: 18),
-        withAttributes: [.font: SnippetTheme.sans(12, weight: .medium), .foregroundColor: SnippetTheme.fg1, .paragraphStyle: style])
+        in: NSRect(x: left + dotSpace, y: rowMidY - 9, width: textWidth, height: 18),
+        withAttributes: attributes)
     } else if callMode == "tracking" && notifTitle == nil {
       let left = b.minX + topCornerRadius + 16
       let rowMidY = b.minY + 17
