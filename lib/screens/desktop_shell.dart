@@ -1198,17 +1198,21 @@ class _DesktopShellState extends State<DesktopShell>
       toast(context, 'That machine is no longer saved.', danger: true);
       return;
     }
-    setState(() {
-      _active = resolved;
-      _client = DaemonClient(resolved.url, resolved.token);
-      _sessions = null;
-      _liveStatus.clear();
-    });
-    // AFTER setState: setClient notifies, which re-enters via
-    // `_syncGlobalShellTabs` -> setState, and calling setState during setState
-    // throws. Global shells are per-machine, so they reconnect here.
-    _shells.setClient(_client);
-    _connectEventsWatch();
+    if (_client == null ||
+        norm(_client!.baseUrl) != norm(resolved.url) ||
+        _client!.token != resolved.token) {
+      setState(() {
+        _active = resolved;
+        _client = DaemonClient(resolved.url, resolved.token);
+        _sessions = null;
+        _liveStatus.clear();
+      });
+      // AFTER setState: setClient notifies, which re-enters via
+      // `_syncGlobalShellTabs` -> setState, and calling setState during setState
+      // throws. Global shells are per-machine, so they reconnect here.
+      _shells.setClient(_client);
+      _connectEventsWatch();
+    }
     final notificationId = m['notification_id'] as String?;
     if (notificationId != null) {
       await (await NotificationInbox.open()).markRead(notificationId);
