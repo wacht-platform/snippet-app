@@ -320,8 +320,12 @@ class _RecordList<T> extends StatefulWidget {
     required this.timeOf,
     required this.row,
     required this.empty,
+    this.groupedFilters = const {},
   });
 
+  /// Filters whose rows stand for groups: a group's newest row changes, so a
+  /// poll replaces the list rather than prepending to it.
+  final Set<String> groupedFilters;
   final String hint;
   final List<(String, String?)> filters;
   final _Load<T> load;
@@ -399,7 +403,15 @@ class _RecordListState<T> extends State<_RecordList<T>> {
       if (!mounted || generation != _generation) return;
       final newest = widget.idOf(_items.first);
       final fresh = page.where((e) => widget.idOf(e) > newest).toList();
-      if (fresh.isNotEmpty) setState(() => _items = [...fresh, ..._items]);
+      if (fresh.isEmpty) return;
+      setState(() {
+        if (widget.groupedFilters.contains(_filter)) {
+          _items = page;
+          _more = page.length >= _pageSize;
+        } else {
+          _items = [...fresh, ..._items];
+        }
+      });
     } catch (_) {
       // The next poll or a pull retries; a blip shouldn't replace the list.
     }
@@ -873,16 +885,24 @@ class _AgentBoardViewState extends State<AgentBoardView> {
 
   Set<String> _awaiting = const {};
   final Map<String, BoardEntry> _reports = {};
+  bool _groupedByFolder = false;
 
   Future<List<BoardEntry>> _load(
       {int? before, String? query, String? filter}) async {
+    _groupedByFolder = filter == 'by-folder';
+    final group = switch (filter) {
+      'by-task' => 'task',
+      'by-folder' => 'folder',
+      _ => null,
+    };
     final page = await widget.client.agentBoardPage(
       widget.agentId,
       before: before,
       contains: query,
-      kind: filter == 'waiting' ? null : filter,
+      kind: filter == 'waiting' || group != null ? null : filter,
       outstanding: filter == 'waiting',
       limit: _pageSize,
+      group: group,
     );
     if (mounted) {
       setState(() {
@@ -960,7 +980,87 @@ class _AgentBoardViewState extends State<AgentBoardView> {
     );
   }
 
+  void _openGroup(BoardEntry e, {required bool byFolder}) {
+    final folder = e.folder ?? e.workspace;
+    final task = e.correlationId;
+    final Future<List<BoardEntry>>? rows = byFolder
+        ? (folder == null
+            ? null
+            : widget.client
+                .agentBoardPage(widget.agentId, workspace: folder, limit: 100)
+                .then((p) => p.entries))
+        : (task == null
+            ? null
+            : widget.client
+                .agentBoardPage(widget.agentId, correlationId: task, limit: 100)
+                .then((p) => p.entries));
+    if (rows == null) {
+      _open(e);
+      return;
+    }
+    _showRecord(
+      context,
+      title: byFolder ? _folder(folder!) : (e.taskTitle ?? 'Task'),
+      meta: '${e.groupCount} entries'
+          '${e.taskStatus == null ? '' : ' · ${e.taskStatus!.replaceAll('_', ' ')}'}',
+      text: '',
+      extra: [
+        FutureBuilder<List<BoardEntry>>(
+          future: rows,
+          builder: (context, snap) {
+            final data = snap.data;
+            if (data == null) {
+              return Text(snap.hasError ? 'Could not load this log.' : 'Loading',
+                  style: sans(_body, color: AppColors.fg3));
+            }
+            return BoardLog(entries: data);
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _groupRow(BoardEntry e, {required bool byFolder}) {
+    final folder = e.folder ?? e.workspace;
+    final String title = byFolder
+        ? (folder == null ? 'No folder' : _folder(folder))
+        : (e.taskTitle ??
+            (e.correlationId == null ? 'Not on a task' : 'Earlier work'));
+    final status = e.taskStatus?.replaceAll('_', ' ');
+    final count = e.groupCount ?? 1;
+    return _RecordRow(
+      time: e.createdAt,
+      onTap: () => _openGroup(e, byFolder: byFolder),
+      leading: Row(children: [
+        AppIcon(byFolder ? 'folder' : 'file-text',
+            size: kMobile ? 15 : 13, color: AppColors.fg2),
+        const SizedBox(width: 6),
+        Flexible(
+          child: Text(title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: sans(_body, weight: W.label, color: AppColors.fg1)),
+        ),
+        const SizedBox(width: 8),
+        Text(
+            [
+              '$count',
+              if (!byFolder && status != null) status,
+            ].join(' · '),
+            maxLines: 1,
+            style: sans(_meta, color: AppColors.fg3)),
+      ]),
+      child: Text(_plain(_summary(e)),
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: sans(_body, color: AppColors.fg2, height: 1.4)),
+    );
+  }
+
   Widget _row(BoardEntry e) {
+    if (e.groupCount != null) {
+      return _groupRow(e, byFolder: _groupedByFolder);
+    }
     final look = _look(e);
     final folder = e.workspace;
     return _RecordRow(
@@ -1000,8 +1100,11 @@ class _AgentBoardViewState extends State<AgentBoardView> {
   Widget build(BuildContext context) {
     return _RecordList<BoardEntry>(
       hint: "Search ${widget.agentName}'s work",
+      groupedFilters: const {'by-task', 'by-folder'},
       filters: const [
         ('All', null),
+        ('By task', 'by-task'),
+        ('By folder', 'by-folder'),
         ('Waiting', 'waiting'),
         ('Dispatched', 'dispatched'),
         ('Reported', 'reported'),
@@ -1013,6 +1116,60 @@ class _AgentBoardViewState extends State<AgentBoardView> {
       timeOf: (e) => e.createdAt,
       row: _row,
       empty: 'No work recorded for ${widget.agentName} yet.',
+    );
+  }
+}
+
+/// A running log, newest first. Automatic entries only show when nothing was
+/// written, since they say little beside what the agent recorded itself.
+class BoardLog extends StatelessWidget {
+  const BoardLog({super.key, required this.entries, this.showAgent = false});
+
+  static const _automatic = 'Automatic, the session wrote no report: ';
+
+  final List<BoardEntry> entries;
+  final bool showAgent;
+
+  String _text(BoardEntry e) {
+    var text = e.summary.startsWith(_automatic)
+        ? e.summary.substring(_automatic.length)
+        : e.summary;
+    final id = e.correlationId;
+    if (id != null && text.startsWith(id)) {
+      text = text.substring(id.length).replaceFirst(RegExp(r'^\s*[—:-]\s*'), '');
+      if (text.isNotEmpty) text = text[0].toUpperCase() + text.substring(1);
+    }
+    return text.replaceAllMapped(
+        RegExp(r'\n(Why|Learned): '), (m) => '\n\n**${m[1]}:** ');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final written =
+        entries.where((e) => !e.summary.startsWith(_automatic)).toList();
+    final rows = written.isEmpty ? entries : written;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final e in rows)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                    [
+                      _fullTime(e.createdAt),
+                      if (showAgent) e.agentId,
+                      if (e.kind != 'progress') e.kind,
+                    ].join(' · '),
+                    style: sans(_meta, color: AppColors.fg3)),
+                const SizedBox(height: 2),
+                CardMarkdownBody(body: _text(e), collapsible: false),
+              ],
+            ),
+          ),
+      ],
     );
   }
 }

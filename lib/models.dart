@@ -1192,6 +1192,14 @@ class BoardEntry {
   final String? correlationId;
   final String createdAt;
 
+  /// The project the row belongs to, the same across its worktrees.
+  final String? folder;
+
+  /// Set on a grouped read: how many rows this group holds, and its task.
+  final int? groupCount;
+  final String? taskTitle;
+  final String? taskStatus;
+
   BoardEntry.fromJson(Map<String, dynamic> j)
       : id = (j['id'] as num?)?.toInt() ?? 0,
         agentId = j['agent_id'] as String? ?? '',
@@ -1206,7 +1214,13 @@ class BoardEntry {
         correlationId = (j['correlation_id'] as String?)?.trim().isEmpty ?? true
             ? null
             : (j['correlation_id'] as String).trim(),
-        createdAt = j['created_at'] as String? ?? '';
+        createdAt = j['created_at'] as String? ?? '',
+        folder = (j['folder'] as String?)?.trim().isEmpty ?? true
+            ? null
+            : (j['folder'] as String).trim(),
+        groupCount = (j['group_count'] as num?)?.toInt(),
+        taskTitle = j['task_title'] as String?,
+        taskStatus = j['task_status'] as String?;
 }
 
 /// A page of an agent's board, and the dispatches still waiting for a report.

@@ -12,6 +12,7 @@ import '../../widgets.dart';
 import '../../mochi.dart';
 import '../../panel.dart' show presentScreen;
 import '../mobile_chrome.dart';
+import '../agent_records.dart' show BoardLog;
 import '../session.dart' show SessionScreen;
 import 'task_common.dart' show statusColor, TaskNoteLines;
 
@@ -51,7 +52,8 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
   CoordinationThreadState? room;
   final _composer = TextEditingController();
   List<TaskTurn> turns = const [];
-  String? latestProgress;
+  List<BoardEntry> log = const [];
+  bool logExpanded = false;
   String? addressee;
   int _lastSequence = -1;
   Timer? _crewDebounce;
@@ -89,21 +91,12 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     try {
       final roster = await widget.client.taskAgents(widget.taskId);
       final turns = await widget.client.taskTurns(widget.taskId);
-      String? progress;
-      final current = turns.lastOrNull;
-      if (current != null && current.open) {
-        final rows = await widget.client
-            .agentBoard(current.agentId, kind: 'progress', limit: 20);
-        progress = rows
-            .where((r) => r.correlationId == widget.taskId)
-            .firstOrNull
-            ?.summary;
-      }
+      final log = await widget.client.taskLog(widget.taskId);
       if (!mounted) return;
       setState(() {
         this.roster = roster;
         this.turns = turns;
-        latestProgress = progress;
+        this.log = log;
       });
     } catch (_) {}
   }
@@ -417,6 +410,33 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     );
   }
 
+  Widget _logSection() {
+    if (log.isEmpty) return const SizedBox.shrink();
+    const collapsed = 4;
+    final shown =
+        logExpanded || log.length <= collapsed ? log : log.sublist(0, collapsed);
+    return Padding(
+      padding: const EdgeInsets.only(top: 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('LOG',
+              style: kMobile
+                  ? sans(12, weight: W.label, spacing: 0.7, color: AppColors.fg4)
+                  : caps(11, color: AppColors.fg3)),
+          const SizedBox(height: 4),
+          BoardLog(entries: shown, showAgent: true),
+          if (log.length > collapsed)
+            TextButton(
+              onPressed: () => setState(() => logExpanded = !logExpanded),
+              child: Text(logExpanded ? 'Show less' : 'Show all ${log.length}',
+                  style: sans(kMobile ? 13 : 12, color: AppColors.accent)),
+            ),
+        ],
+      ),
+    );
+  }
+
   String _turnSummary(TaskTurn t) {
     if (t.open) return 'working now';
     String count(int n, String one) =>
@@ -427,7 +447,6 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
   }
 
   Widget _turnRow(TaskTurn t) {
-    final progress = t.open ? latestProgress : null;
     return InkWell(
       onTap: () => _showTurn(t),
       child: ConstrainedBox(
@@ -451,15 +470,6 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                     style: sans(kMobile ? 13 : 11.5,
                         color: t.open ? AppColors.accent : AppColors.fg4)),
               ]),
-              if (progress != null && progress.trim().isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: Text(progress.trim(),
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
-                      style: sans(kMobile ? 13 : 12,
-                          color: AppColors.fg3, height: 1.4)),
-                ),
             ],
           ),
         ),
@@ -955,6 +965,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                 ]),
               ),
             _turnsSection(),
+            _logSection(),
             const SizedBox(height: 14),
             _section('Related', onAdd: _linkTask),
             if (links.links.isEmpty && links.blockedBy.isEmpty)

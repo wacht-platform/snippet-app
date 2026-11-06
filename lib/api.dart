@@ -1641,34 +1641,9 @@ class DaemonClient {
     }
   }
 
-  /// GET /agents/{id}/board — this agent's coordination memory, newest first.
-  ///
-  /// Optional [workspace] scopes to one folder, [contains] searches the
-  /// summaries, and [kind] narrows to dispatched/reported/noted/progress.
-  Future<List<BoardEntry>> agentBoard(
-    String agentId, {
-    String? workspace,
-    String? contains,
-    String? kind,
-    int limit = 50,
-  }) async {
-    final query = <String, String>{'limit': '$limit'};
-    if (workspace != null && workspace.isNotEmpty) {
-      query['workspace'] = workspace;
-    }
-    if (contains != null && contains.isNotEmpty) query['contains'] = contains;
-    if (kind != null && kind.isNotEmpty) query['kind'] = kind;
-    final r = await http
-        .get(_uri('/agents/${Uri.encodeComponent(agentId)}/board', query));
-    if (r.statusCode != 200) throw _err('load agent board', r);
-    final entries = (jsonDecode(r.body) as Map<String, dynamic>)['entries'];
-    return ((entries as List?) ?? const [])
-        .map((e) => BoardEntry.fromJson(e as Map<String, dynamic>))
-        .toList();
-  }
-
   /// The board with paging, and the dispatches still waiting for a report.
   /// [outstanding] narrows to those dispatches.
+  /// [group] is `task` or `folder`: one row per group, newest activity first.
   Future<BoardPage> agentBoardPage(
     String agentId, {
     String? contains,
@@ -1676,9 +1651,15 @@ class DaemonClient {
     int? before,
     bool outstanding = false,
     int limit = 50,
+    String? group,
+    String? correlationId,
+    String? workspace,
   }) async {
     final query = <String, String>{
       'limit': '$limit',
+      if (group != null) 'group': group,
+      if (correlationId != null) 'correlation_id': correlationId,
+      if (workspace != null) 'workspace': workspace,
       if (contains != null && contains.isNotEmpty) 'contains': contains,
       if (kind != null && kind.isNotEmpty) 'kind': kind,
       if (before != null) 'before': '$before',
@@ -1694,6 +1675,17 @@ class DaemonClient {
           .toList(),
       ((j['awaiting'] as List?) ?? const []).map((e) => '$e').toList(),
     );
+  }
+
+  /// One task's running log across everyone who worked on it, newest first.
+  Future<List<BoardEntry>> taskLog(String taskId, {int limit = 50}) async {
+    final r = await http.get(_uri(
+        '/coordination/tasks/${Uri.encodeComponent(taskId)}/log',
+        {'limit': '$limit'}));
+    if (r.statusCode != 200) throw _err('load task log', r);
+    return (jsonDecode(r.body) as List)
+        .map((e) => BoardEntry.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 
   /// GET /agents/{id}/inbox: what has reached this agent, newest first.
