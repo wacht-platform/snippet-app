@@ -84,7 +84,8 @@ class _ApprovalCodeState extends State<ApprovalCode> {
         textDirection: TextDirection.ltr,
         textScaler: MediaQuery.textScalerOf(context),
       )..layout(maxWidth: box.maxWidth);
-      final lineHeight = MediaQuery.textScalerOf(context).scale(12) * 1.5;
+      final metrics = painter.computeLineMetrics();
+      final lineHeight = metrics.isEmpty ? 18.0 : metrics.first.height;
       final limit = lineHeight * widget.collapsedLines;
       final overflows = painter.height > limit + 1;
       painter.dispose();
